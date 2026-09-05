@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
-import { ActionIcon, Alert, Box, Button, Group, Stack, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Alert, Anchor, Box, Button, Group, Stack, Text, Tooltip } from "@mantine/core";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { IconChevronDown, IconChevronRight, IconChevronsDown, IconChevronsUp, IconFileImport, IconFolders, IconPlus, IconServer2, IconSitemap } from "@tabler/icons-react";
 import { getContractFacets, getContractTree, type TreeContract, type TreeDomain, type TreeSystem } from "../api/contracts";
@@ -15,7 +15,7 @@ import LoadingBlock from "../components/LoadingBlock";
 import PageHeader from "../components/PageHeader";
 import TypeBadge from "../components/TypeBadge";
 import { useContractFilterState } from "../hooks/useContractFilterState";
-import { importContractPath, newContractPath } from "../utils/contractLinks";
+import { importContractPath, newContractPath, versionPath } from "../utils/contractLinks";
 import { loadErrorMessage } from "../utils/saveError";
 import classes from "../theme.module.css";
 
@@ -30,9 +30,15 @@ function ContractRow({ contract }: { contract: TreeContract }) {
       <ContractNameLink id={contract.id} name={contract.name} />
       {contract.latestVersion ? (
         <Group gap={6} wrap="nowrap">
-          <Text size="xs" ff="monospace">
+          <Anchor
+            component={RouterLink}
+            to={versionPath(contract.id, contract.latestVersion.id, "reader")}
+            size="xs"
+            ff="monospace"
+            aria-label={t("versions.readAria", { version: contract.latestVersion.version, name: contract.name })}
+          >
             {contract.latestVersion.version}
-          </Text>
+          </Anchor>
           <LifecyclePill lifecycle={contract.latestVersion.lifecycle} size="xs" />
           <CheckSummaryBadges errors={contract.latestVersion.checkErrors} warnings={contract.latestVersion.checkWarnings} complete={contract.latestVersion.checkComplete} />
         </Group>

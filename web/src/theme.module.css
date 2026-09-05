@@ -188,6 +188,21 @@
   top: calc(var(--app-shell-header-height, 0px) + var(--mantine-spacing-md));
 }
 
+/* The reader's table of contents: sticky beside the content, scrolling on its own when long. */
+.readerToc {
+  position: sticky;
+  top: calc(var(--app-shell-header-height, 0px) + var(--mantine-spacing-md));
+  max-height: calc(100vh - var(--app-shell-header-height, 0px) - 2 * var(--mantine-spacing-md));
+  overflow-y: auto;
+}
+
+/* A finding's deep link into the reader: the element it lands on wears the accent ring briefly. */
+[data-highlight="true"] {
+  outline: 2px solid var(--covenant-accent-ink);
+  outline-offset: 2px;
+  border-radius: var(--mantine-radius-sm);
+}
+
 /* An ordered-list editor's rows (the namespaces/lifecycles dictionaries): one bordered
    list, hairlines between rows — not a mini-card per row. */
 .listRows {

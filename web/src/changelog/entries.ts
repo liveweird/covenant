@@ -17,6 +17,20 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.5.0",
+    date: "2026-09-05",
+    en: `**The contract reader.**
+
+- Every version now has a Reader view beside the Source: the document rendered for reading — for OpenAPI, the operations grouped by tag with their parameters, request bodies, responses and security; for AsyncAPI, the servers, channels, operations and messages; for ODCS, the datasets with their columns, quality rules, servers, team and service levels.
+- Schemas are navigable trees: types, formats, constraints, enumerations, defaults and examples, references resolved in place (and linked to the Schemas section), recursion and unresolvable references marked. A table of contents follows you down the page.
+- A finding in the Reader jumps to the element it concerns. A published version opens on the Reader, an editable one on the Source; your own choice is remembered, and the Hierarchy links straight into the Reader.`,
+    pl: `**Czytnik kontraktów.**
+
+- Każda wersja ma teraz widok Czytnika obok Źródła: dokument przygotowany do czytania — dla OpenAPI operacje pogrupowane według tagów z parametrami, treścią żądań, odpowiedziami i zabezpieczeniami; dla AsyncAPI serwery, kanały, operacje i komunikaty; dla ODCS zbiory danych z kolumnami, regułami jakości, serwerami, zespołem i poziomami usług.
+- Schematy to nawigowalne drzewa: typy, formaty, ograniczenia, wyliczenia, wartości domyślne i przykłady, referencje rozwiązane w miejscu (i podlinkowane do sekcji Schematy), rekurencja i nierozwiązywalne referencje oznaczone. Spis treści towarzyszy Ci w dół strony.
+- Uwaga w Czytniku przenosi do elementu, którego dotyczy. Opublikowana wersja otwiera się w Czytniku, edytowalna w Źródle; Twój własny wybór jest zapamiętywany, a Hierarchia prowadzi prosto do Czytnika.`,
+  },
+  {
     version: "0.4.0",
     date: "2026-09-05",
     en: `**Follow contracts, count before you filter, and try a contract against a real system.**

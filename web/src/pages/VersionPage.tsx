@@ -10,17 +10,20 @@ import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import EditPageLoadState from "../components/EditPageLoadState";
 import FindingsPanel from "../components/FindingsPanel";
 import LazyCodeEditor, { type JumpRequest } from "../components/LazyCodeEditor";
+import LazyContractReader from "../components/LazyContractReader";
 import LifecyclePill from "../components/LifecyclePill";
 import PageHeader from "../components/PageHeader";
 import SaveAnywayModal from "../components/SaveAnywayModal";
 import TypeBadge from "../components/TypeBadge";
 import VersionHeaderActions from "../components/VersionHeaderActions";
 import VersionMetaStrip from "../components/VersionMetaStrip";
+import VersionViewToggle from "../components/VersionViewToggle";
 import { useDeleteConfirm } from "../hooks/useDeleteConfirm";
 import { useDocumentCheck } from "../hooks/useDocumentCheck";
 import { useVersionActions } from "../hooks/useVersionActions";
 import { useVersionDownload } from "../hooks/useVersionDownload";
 import { useVersionSave } from "../hooks/useVersionSave";
+import { useVersionView } from "../hooks/useVersionView";
 import { contractPath, contractsPath } from "../utils/contractLinks";
 import { detectFormat, MAX_DOCUMENT_BYTES, utf8Length } from "../utils/document";
 import { toDiagnostics } from "../utils/findingDiagnostics";
@@ -29,11 +32,24 @@ import { loadErrorMessage, saveErrorMessage } from "../utils/saveError";
 import { showSuccessToast } from "../utils/toast";
 import classes from "../theme.module.css";
 
+/** The two-column split per view: the reader gets more room, its findings aside less. */
+const MAIN_SPAN = { reader: 9, source: 8 } as const;
+const ASIDE_SPAN = { reader: 3, source: 4 } as const;
+const JUMP_BY = { reader: "path", source: "line" } as const;
+
+function editingHintKey(hasHard: boolean, tooLarge: boolean, dirty: boolean) {
+  if (hasHard) return "versions.blockedBySyntax" as const;
+  if (tooLarge) return "versions.validation.contentTooLarge" as const;
+  return dirty ? ("versions.unsaved" as const) : ("versions.noChanges" as const);
+}
+
 /**
  * One version (`/contracts/:id/versions/:vid`): the document read-only in the editor with the
  * stored findings beside it; for a writer of a DRAFT/PROPOSED version, Edit switches the same
  * editor to editing with the live check, and Save runs the strict-save → Save-anyway flow.
- * Transitions, recheck and delete act on the STORED text (disabled while editing).
+ * Transitions, recheck and delete act on the STORED text (disabled while editing). Two renderings
+ * of the stored document — the Reader (the render model, milestone 4) and the Source (the editor) —
+ * behind the header toggle; editing forces Source.
  */
 export default function VersionPage() {
   const { t } = useTranslation();
@@ -47,6 +63,8 @@ export default function VersionPage() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string | null>(null);
   const [jump, setJump] = useState<JumpRequest | null>(null);
+  const [highlight, setHighlight] = useState<{ path: string; nonce: number } | null>(null);
+  const { view, setView } = useVersionView(version.data?.lifecycle, editing);
   const downloads = useVersionDownload();
   const actions = useVersionActions(id, vid);
 
@@ -101,13 +119,7 @@ export default function VersionPage() {
   }
   const data = contract.data;
   const canEdit = data.canWrite && isContentEditable(stored.lifecycle);
-  const editingHint = hasHard
-    ? t("versions.blockedBySyntax")
-    : tooLarge
-      ? t("versions.validation.contentTooLarge")
-      : dirty
-        ? t("versions.unsaved")
-        : t("versions.noChanges");
+  const editingHint = t(editingHintKey(hasHard, tooLarge, dirty));
   const latestId = data.latestVersion?.id ?? null;
 
   return (
@@ -122,6 +134,7 @@ export default function VersionPage() {
           </Group>
         }
         backTo={{ to: contractPath(id), label: t("contracts.backToContract") }}
+        toolbar={<VersionViewToggle view={view} onChange={setView} disabled={editing} />}
         actions={
           <VersionHeaderActions
             contract={data}
@@ -151,21 +164,25 @@ export default function VersionPage() {
         </Alert>
       )}
       <Grid gap="md">
-        <Grid.Col span={{ base: 12, lg: 8 }}>
+        <Grid.Col span={{ base: 12, lg: MAIN_SPAN[view] }}>
           <Stack gap="xs">
-            <LazyCodeEditor
-              value={text}
-              onChange={editing ? setDraft : undefined}
-              readOnly={!editing}
-              format={detectFormat(text)}
-              diagnostics={diagnostics}
-              jumpTo={jump}
-              ariaLabel={t("versions.editorAria")}
-            />
+            {view === "reader" ? (
+              <LazyContractReader contract={data} version={stored} highlight={highlight} />
+            ) : (
+              <LazyCodeEditor
+                value={text}
+                onChange={editing ? setDraft : undefined}
+                readOnly={!editing}
+                format={detectFormat(text)}
+                diagnostics={diagnostics}
+                jumpTo={jump}
+                ariaLabel={t("versions.editorAria")}
+              />
+            )}
             <VersionMetaStrip version={stored} />
           </Stack>
         </Grid.Col>
-        <Grid.Col span={{ base: 12, lg: 4 }}>
+        <Grid.Col span={{ base: 12, lg: ASIDE_SPAN[view] }}>
           <Box className={classes.stickyAside}>
             <Paper withBorder p="md" radius="md">
               <FindingsPanel
@@ -174,7 +191,14 @@ export default function VersionPage() {
                 checked={!editing || check.checked}
                 checkComplete={editing ? (check.report?.checkerAvailable ?? true) : stored.checkComplete}
                 baselineVersion={check.report?.baselineVersion}
-                onJump={(f) => f.line != null && setJump({ line: f.line, column: f.column, nonce: Date.now() })}
+                jumpBy={JUMP_BY[view]}
+                onJump={(f) => {
+                  if (view === "reader") {
+                    if (f.path) setHighlight({ path: f.path, nonce: Date.now() });
+                  } else if (f.line != null) {
+                    setJump({ line: f.line, column: f.column, nonce: Date.now() });
+                  }
+                }}
               />
             </Paper>
           </Box>

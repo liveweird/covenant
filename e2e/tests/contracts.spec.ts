@@ -5,6 +5,7 @@
 // downloads it, reads the history, and tears everything down through the lifecycle's exit (deprecate → retire) and
 // the delete rules. A second test pins the read-only view of a
 // regular user. Owns: its throwaway domain/system/team/contract/user (unique `e2e-*` names).
+import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { createUserViaUi, deleteUserRow, expect, login, openFilters, rowOperation, signOut, test, uniqueText } from "./helpers";
 
@@ -176,6 +177,21 @@ test("admin imports a contract, iterates a version through Save-anyway, compares
   await page.getByRole("button", { name: "Activate" }).click();
   await expect(page.getByRole("button", { name: "Deprecate" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Edit document" })).toHaveCount(0);
+
+  // The Reader: a published version opens on it (the page stays on Source while it is edited in
+  // place — the default is frozen at load), so switch over: the operation card, an axe scan of the
+  // settled reader, then Source again — the choice survives a reload.
+  const viewToggle = page.getByRole("radiogroup", { name: "Document view" });
+  await viewToggle.getByText("Reader", { exact: true }).click();
+  const reader = page.getByRole("region", { name: "Contract reader" });
+  await expect(reader.getByRole("heading", { name: "/pets" })).toBeVisible();
+  await expect(reader.getByRole("button", { name: "Pet" })).toBeVisible();
+  const axe = await new AxeBuilder({ page }).include('[aria-label="Contract reader"]').withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  expect(axe.violations.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target.join(" ")) }))).toEqual([]);
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Contract reader" })).toBeVisible();
+  await viewToggle.getByText("Source", { exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Contract document" })).toBeVisible();
   await page.getByRole("button", { name: "More actions" }).click();
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("menuitem", { name: "Download" }).click()]);
   expect(download.suggestedFilename()).toMatch(new RegExp(`__${contractName}__1\\.0\\.0\\.yaml$`));

@@ -5,7 +5,9 @@ export const newContractPath = `${contractsPath}/new`;
 export const importContractPath = `${contractsPath}/import`;
 export const contractPath = (id: number) => `${contractsPath}/${id}`;
 export const editContractPath = (id: number) => `${contractPath(id)}/edit`;
-export const versionPath = (contractId: number, versionId: number) => `${contractPath(contractId)}/versions/${versionId}`;
+/** `view` = a deep link into the Reader or the Source rendering (the page remembers the user's own choice otherwise). */
+export const versionPath = (contractId: number, versionId: number, view?: "reader" | "source") =>
+  `${contractPath(contractId)}/versions/${versionId}${view ? `?view=${view}` : ""}`;
 /** `from` = the version to start the new document from (copy its text); omitted = a blank template. */
 export const newVersionPath = (contractId: number, from?: number) =>
   `${contractPath(contractId)}/versions/new${from == null ? "" : `?from=${from}`}`;

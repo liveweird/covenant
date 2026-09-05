@@ -23,6 +23,17 @@ describe("FindingsPanel", () => {
     expect(onJump).toHaveBeenCalledWith(HARD);
   });
 
+  test("in path mode the jump button targets the finding's element, only for findings with a path", async () => {
+    const onJump = vi.fn();
+    renderWithProviders(<FindingsPanel findings={[HARD, FINDING, INFO]} mode="stored" onJump={onJump} jumpBy="path" />);
+    const list = screen.getByRole("list", { name: "Findings" });
+    expect(within(list).queryAllByRole("button", { name: /Go to line/ })).toHaveLength(0);
+    const buttons = within(list).getAllByRole("button", { name: "Go to the element" });
+    expect(buttons).toHaveLength(1);
+    await userEvent.setup().click(buttons[0]);
+    expect(onJump).toHaveBeenCalledWith(FINDING);
+  });
+
   test("severity and source chips narrow the list; no match says so", async () => {
     const user = userEvent.setup();
     renderWithProviders(<FindingsPanel findings={[HARD, FINDING]} mode="stored" />);

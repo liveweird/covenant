@@ -29,5 +29,6 @@
   "incompleteTitle": "Checks incomplete",
   "incompleteBody": "The lint and semantic checker was unavailable — only the built-in syntax and schema checks ran. Re-run the checks later.",
   "hard": "Syntax",
-  "baseline": "Compared against active version {{version}} for breaking changes"
+  "baseline": "Compared against active version {{version}} for breaking changes",
+  "jumpToElement": "Go to the element"
 }

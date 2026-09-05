@@ -27,19 +27,23 @@
 7. They open 1.0.0, click Propose then Activate.
    - *Expected*: Deprecate becomes the only move and the Edit document button is gone (the text is
      locked).
-8. They download the document from the More menu.
+8. They switch the version page to the Reader.
+   - *Expected*: the operation card `/pets` and the `Pet` schema render; an axe A/AA scan of the
+     reader region finds nothing; after a reload the page still opens on the Reader (the choice is
+     remembered); switching back to Source shows the document text.
+9. They download the document from the More menu.
    - *Expected*: the file is named `<system>__<contract>__1.0.0.yaml`.
-9. They start another new version, paste the document with the required `Pet.name` property
+10. They start another new version, paste the document with the required `Pet.name` property
    removed, and bump Minor (1.2.0).
    - *Expected*: the findings panel says it compared against active version 1.0.0 and lists the
      `CHANGED_RESPONSE` breaking change plus the blocking `BREAKING_WITHOUT_MAJOR_BUMP` finding.
-10. They bump Major (2.0.0).
+11. They bump Major (2.0.0).
     - *Expected*: the blocking finding disappears while the breaking change stays listed as a
       note; they go back without saving.
-11. Back on the contract page they read the History section.
+12. Back on the contract page they read the History section.
     - *Expected*: it lists "Version 1.0.0: Proposed → Active", "Version 1.1.0 created" and
       "Version 1.0.0 imported" as localized lines.
-12. Teardown through the rules: the 1.1.0 draft deletes from its row; deleting the contract is
+13. Teardown through the rules: the 1.1.0 draft deletes from its row; deleting the contract is
    refused while 1.0.0 is active ("still has active or deprecated versions"); they deprecate and
    retire 1.0.0 (each behind a confirm), delete the contract, then the system, domain and team.
    - *Expected*: each step lands where described; the contract delete returns to the list.

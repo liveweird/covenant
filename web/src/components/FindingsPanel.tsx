@@ -29,6 +29,7 @@ export default function FindingsPanel({
   checkComplete = true,
   baselineVersion = null,
   onJump,
+  jumpBy = "line",
 }: {
   findings: readonly Finding[];
   mode: "live" | "stored";
@@ -39,6 +40,8 @@ export default function FindingsPanel({
   baselineVersion?: string | null;
   /** Called with a positioned finding — the editor scrolls to it. Omitted for a text-less view. */
   onJump?: (finding: Finding) => void;
+  /** What the jump button targets: the editor's line (Source view) or the reader element at the finding's path. */
+  jumpBy?: "line" | "path";
 }) {
   const { t } = useTranslation();
   const [severities, setSeverities] = useState<string[]>([]);
@@ -132,9 +135,16 @@ export default function FindingsPanel({
                   </Text>
                 )}
               </Stack>
-              {f.line != null && onJump && (
+              {jumpBy === "line" && f.line != null && onJump && (
                 <Tooltip label={t("findings.jumpTo", { line: f.line, column: f.column ?? 1 })}>
                   <ActionIcon size="sm" aria-label={t("findings.jumpTo", { line: f.line, column: f.column ?? 1 })} onClick={() => onJump(f)}>
+                    <IconCrosshair size={14} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
+              {jumpBy === "path" && f.path && onJump && (
+                <Tooltip label={t("findings.jumpToElement")}>
+                  <ActionIcon size="sm" aria-label={t("findings.jumpToElement")} onClick={() => onJump(f)}>
                     <IconCrosshair size={14} />
                   </ActionIcon>
                 </Tooltip>

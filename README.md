@@ -54,9 +54,8 @@ export for the commit back.
   synced, a breaking change waived, the owner changed — lands in your bell (never for your own acts),
 - a per-contract history timeline, and a repo reference per version with sync-from-source
   (which side moved, a line diff, overwrite or a new version from the repo copy),
+- the **contract reader** — a structured, reader-optimised rendering of any version (the Swagger-UI equivalent, for OpenAPI, AsyncAPI and ODCS alike): operations by tag with parameters, bodies and responses; channels, operations and messages; datasets with their columns, quality rules, servers and service levels — schemas as navigable trees with references resolved, recursion and unresolvable references marked, a table of contents, and findings that jump to the element they concern; a Source toggle keeps the raw document one click away,
 - every quality gate wired, locally and in CI.
-
-Coming next (milestone 4): the contract reader — a structured, reader-optimised rendering of a version (the Swagger-UI equivalent) for OpenAPI, AsyncAPI and ODCS, beside the source view.
 
 ## The stack
 

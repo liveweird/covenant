@@ -16,6 +16,7 @@ import enEnvironments from "./locales/en/environments.json";
 import enContracts from "./locales/en/contracts.json";
 import enFindings from "./locales/en/findings.json";
 import enNotifications from "./locales/en/notifications.json";
+import enReader from "./locales/en/reader.json";
 import enHierarchy from "./locales/en/hierarchy.json";
 import enSystems from "./locales/en/systems.json";
 import enTeams from "./locales/en/teams.json";
@@ -67,6 +68,7 @@ export const en = {
   contracts: enContracts,
   findings: enFindings,
   notifications: enNotifications,
+  reader: enReader,
   hierarchy: enHierarchy,
   systems: enSystems,
   teams: enTeams,

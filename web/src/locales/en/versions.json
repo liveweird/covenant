@@ -157,5 +157,6 @@
     "hint": "A public https:// link to the document in its repository (a GitHub/GitLab blob or raw URL). Leave empty to unlink.",
     "invalid": "Only https:// URLs without credentials can be linked",
     "save": "Save link"
-  }
+  },
+  "readAria": "Read version {{version}} of {{name}}"
 }

@@ -159,5 +159,6 @@
     "hint": "Publiczny link https:// do dokumentu w jego repozytorium (adres blob lub raw z GitHuba/GitLaba). Zostaw puste, aby usunąć powiązanie.",
     "invalid": "Można powiązać tylko adresy https:// bez danych logowania",
     "save": "Zapisz powiązanie"
-  }
+  },
+  "readAria": "Czytaj wersję {{version}} kontraktu {{name}}"
 }

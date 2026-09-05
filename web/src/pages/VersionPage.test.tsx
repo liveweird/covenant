@@ -4,6 +4,7 @@ import { renderWithProviders, screen, waitFor, within } from "../test/render";
 import { Route, Routes } from "react-router-dom";
 import VersionPage from "./VersionPage";
 import { bodyOf, CLEAN_REPORT, CONTENT, CONTRACT, findCall, OLD_VERSION, serve, signIn, VERSION, type FetchMock } from "../test/contractsFixtures";
+import { MODEL_OPENAPI } from "../test/readerFixtures";
 
 vi.mock("../components/LazyCodeEditor", async () => (await import("../test/codeEditorStub")).codeEditorMock());
 
@@ -34,6 +35,8 @@ describe("VersionPage", () => {
     "GET /api/v1/contracts/5/versions/11": { status: 200, body: VERSION },
     "GET /api/v1/contracts/5/versions/10": { status: 200, body: OLD_VERSION },
     "POST /api/v1/contracts/versions/check": { status: 200, body: CLEAN_REPORT },
+    "GET /api/v1/contracts/5/versions/10/model": { status: 200, body: MODEL_OPENAPI },
+    "GET /api/v1/contracts/5/versions/11/model": { status: 200, body: MODEL_OPENAPI },
   };
 
   test("shows the document read-only with its stored findings, meta and the writer's lifecycle moves", async () => {
@@ -165,6 +168,42 @@ describe("VersionPage", () => {
     await user.click(screen.getByRole("button", { name: "More actions" }));
     expect(await screen.findByRole("menuitem", { name: "Link source…" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Sync from source" })).not.toBeInTheDocument();
+  });
+
+  test("a published version opens on the Reader; Source is a toggle away and remembered; a pathed finding lands on its card", async () => {
+    const pathed = { severity: "WARN", source: "LINT", code: "operation-description", message: "Describe it", path: "/paths/~1pets~1{id}/get/responses/200" };
+    serve(mockFetch, { ...base, "GET /api/v1/contracts/5/versions/10": { status: 200, body: { ...OLD_VERSION, findings: [pathed] } } });
+    const user = userEvent.setup();
+    renderPage("/contracts/5/versions/10");
+    await screen.findByRole("heading", { level: 2, name: "orders-api 1.0.0" });
+    expect(screen.getByRole("radio", { name: "Reader" })).toBeChecked();
+    expect(await screen.findByRole("region", { name: "Contract reader" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Contract document" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("article", { name: "/pets/{id}" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Go to the element" }));
+    await waitFor(() => expect(screen.getByRole("article", { name: "/pets/{id}" })).toHaveAttribute("data-highlight", "true"));
+    await user.click(screen.getByRole("radio", { name: "Source" }));
+    expect(await screen.findByRole("textbox", { name: "Contract document" })).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem("covenant.viewSettings.version.view") ?? "null")).toBe("source");
+    expect(screen.getByRole("button", { name: "Try it" })).toBeEnabled();
+  });
+
+  test("a draft opens on Source; ?view=reader deep-links into the Reader without persisting; Edit forces Source", async () => {
+    serve(mockFetch, base);
+    const user = userEvent.setup();
+    const first = renderPage();
+    await screen.findByRole("heading", { level: 2, name: "orders-api 1.1.0" });
+    expect(screen.getByRole("radio", { name: "Source" })).toBeChecked();
+    expect(screen.getByRole("textbox", { name: "Contract document" })).toBeInTheDocument();
+    first.unmount();
+    renderPage("/contracts/5/versions/11?view=reader");
+    await screen.findByRole("heading", { level: 2, name: "orders-api 1.1.0" });
+    expect(screen.getByRole("radio", { name: "Reader" })).toBeChecked();
+    expect(await screen.findByRole("region", { name: "Contract reader" })).toBeInTheDocument();
+    expect(localStorage.getItem("covenant.viewSettings.version.view")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Edit document" }));
+    expect(await screen.findByRole("textbox", { name: "Contract document" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Reader" })).toBeDisabled();
   });
 
   test("a missing version says so", async () => {

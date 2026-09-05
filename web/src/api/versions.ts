@@ -14,6 +14,29 @@ export type CheckReport = components["schemas"]["CheckReport"];
 export type DocumentCheckBody = components["schemas"]["DocumentCheckRequest"];
 export type DocumentFormat = components["schemas"]["DocumentFormat"];
 export type SyncState = components["schemas"]["SyncStateResponse"];
+// The reader's render model (milestone 4) — computed server-side, typed here from the spec.
+export type RenderModel = components["schemas"]["RenderModelResponse"];
+export type SchemaNode = components["schemas"]["SchemaNode"];
+export type OpenApiModel = components["schemas"]["OpenApiModel"];
+export type OperationView = components["schemas"]["OperationView"];
+export type ResponseView = components["schemas"]["ResponseView"];
+export type MediaTypeView = components["schemas"]["MediaTypeView"];
+export type SecurityRequirementView = components["schemas"]["SecurityRequirementView"];
+export type SecuritySchemeView = components["schemas"]["SecuritySchemeView"];
+export type NamedSchemaView = components["schemas"]["NamedSchemaView"];
+export type InfoView = components["schemas"]["InfoView"];
+export type TagView = components["schemas"]["TagView"];
+export type ExternalDocsView = components["schemas"]["ExternalDocsView"];
+export type ExampleView = components["schemas"]["ExampleView"];
+export type KeyValue = components["schemas"]["KeyValue"];
+export type AsyncApiModel = components["schemas"]["AsyncApiModel"];
+export type ChannelView = components["schemas"]["ChannelView"];
+export type AsyncOperationView = components["schemas"]["AsyncOperationView"];
+export type MessageView = components["schemas"]["MessageView"];
+export type OdcsModel = components["schemas"]["OdcsModel"];
+export type DatasetView = components["schemas"]["DatasetView"];
+export type OdcsPropertyView = components["schemas"]["OdcsPropertyView"];
+export type QualityView = components["schemas"]["QualityView"];
 type Lifecycle = components["schemas"]["Lifecycle"];
 
 export type SaveOptions = { allowInvalid?: boolean };
@@ -34,6 +57,11 @@ export async function getVersion(contractId: number, versionId: number): Promise
 }
 
 /** The raw stored bytes — the download path (the viewer reads `content` off the detail instead). */
+/** The reader's render model — keyed by the version's content hash upstream, so a stored edit refetches it. */
+export async function getVersionModel(contractId: number, versionId: number): Promise<RenderModel> {
+  return jsonRequest<RenderModel>(`/api/v1/contracts/${contractId}/versions/${versionId}/model`);
+}
+
 export async function getVersionContent(contractId: number, versionId: number): Promise<string> {
   const res = await authedFetch(`/api/v1/contracts/${contractId}/versions/${versionId}/content`);
   if (!res.ok) throw new ApiError(res.status, await safeJson(res));
