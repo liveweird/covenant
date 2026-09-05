@@ -17,6 +17,24 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.2.0",
+    date: "2026-09-05",
+    en: `**The contract catalog: domains, systems, teams, contracts and their versions.**
+
+- Browse the catalog as a Domain → System → Contract tree on the home page, or as a filterable list.
+- Contracts belong to a system, follow one standard (OpenAPI, AsyncAPI or ODCS) and are owned by a team or a person; owners and administrators edit them, everyone reads.
+- Every version is the standard document itself, kept byte-exact, numbered with strict SemVer and moved through a lifecycle: draft → proposed → active → deprecated → retired. Published text is locked.
+- The editor checks the document as you type — syntax, schema, semantic and lint findings, with jump-to-line — and lets you save with soft findings after an explicit confirmation.
+- Import a document by pasting, uploading or fetching a public URL; compare two versions line by line; download any version; export a contract with all its versions.`,
+    pl: `**Katalog kontraktów: domeny, systemy, zespoły, kontrakty i ich wersje.**
+
+- Przeglądaj katalog jako drzewo Domena → System → Kontrakt na stronie startowej albo jako filtrowaną listę.
+- Kontrakt należy do systemu, trzyma się jednego standardu (OpenAPI, AsyncAPI lub ODCS) i ma właściciela — zespół albo osobę; edytują go właściciele i administratorzy/rki, czytają wszyscy.
+- Każda wersja to sam dokument standardu, przechowywany bajt w bajt, numerowany ścisłym SemVer i prowadzony przez cykl życia: szkic → zaproponowana → aktywna → przestarzała → wycofana. Opublikowany tekst jest zablokowany.
+- Edytor sprawdza dokument w trakcie pisania — uwagi składniowe, schematowe, semantyczne i lint, z przejściem do linii — i pozwala zapisać z miękkimi uwagami po wyraźnym potwierdzeniu.
+- Importuj dokument wklejając go, wgrywając plik lub pobierając z publicznego adresu URL; porównuj dwie wersje linia po linii; pobieraj dowolną wersję; eksportuj kontrakt ze wszystkimi wersjami.`,
+  },
+  {
     version: "0.1.0",
     date: "2026-09-05",
     en: `**Covenant is born: the foundation for a shared contract repository.**

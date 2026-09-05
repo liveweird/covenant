@@ -23,6 +23,7 @@ const chrome = EditorView.theme({
     lineHeight: "1.55",
   },
   ".cm-content": { padding: "8px 0" },
+  ".cm-placeholder": { color: "var(--mantine-color-dimmed)" },
   ".cm-gutters": {
     backgroundColor: "light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6))",
     color: "var(--mantine-color-dimmed)",

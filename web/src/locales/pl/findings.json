@@ -26,5 +26,6 @@
   "noneMatch": "Żadna uwaga nie pasuje do wybranych filtrów",
   "jumpTo": "Przejdź do linii {{line}}, kolumny {{column}}",
   "incompleteTitle": "Sprawdzenia niepełne",
-  "incompleteBody": "Moduł lint i sprawdzeń semantycznych był niedostępny — wykonano tylko wbudowane sprawdzenia składni i schematu. Uruchom sprawdzenia ponownie później."
+  "incompleteBody": "Moduł lint i sprawdzeń semantycznych był niedostępny — wykonano tylko wbudowane sprawdzenia składni i schematu. Uruchom sprawdzenia ponownie później.",
+  "hard": "Składnia"
 }

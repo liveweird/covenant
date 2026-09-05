@@ -23,18 +23,34 @@ export for the commit back.
 
 ## What's here today
 
-The foundation, ready for the contract features to land on:
-
+- **The catalog** — Domain → System → Contract as a tree on the home page and as a filterable list
+  (text, domain, system, type, lifecycle, owning team, only-with-errors); contracts of type
+  **OpenAPI**, **AsyncAPI** or **ODCS** owned by a team or a person, with the write rule enforced
+  server-side (owning team's members, the owning user, administrators) and ownership transfer
+  reserved to administrators.
+- **Versions** — the standard document itself, stored byte-exact; strict **SemVer** (a new number
+  must be above the highest), the lifecycle DRAFT → PROPOSED → ACTIVE → DEPRECATED → RETIRED
+  (PROPOSED may step back; the text locks from ACTIVE on; only a DRAFT deletes).
+- **Checks** — on every save and live while typing: parse + type gate (hard, never waivable),
+  swagger-parser for OpenAPI, offline JSON Schema validation for AsyncAPI 2.6/3.x and ODCS
+  3.0–3.1 with the payload walk (JSON Schema 2020-12 meta-validation, Avro), then the **checker**
+  sidecar's lint (Spectral) and AsyncAPI semantics — findings with severity, source, code and
+  position, jump-to-line in the editor; soft errors save through an explicit "Save anyway".
+- **Import, diff, export** — paste, upload or server-fetch a public URL (GitHub/GitLab blob links
+  rewritten to raw); a dry run predicts the outcome; two versions compared line by line; any
+  version downloadable as its file; a contract exportable with all its versions as JSON.
+- **Registries** — domains, systems and flat teams with rosters, administrator-curated.
 - accounts — JWT sign-in with a sliding refresh pair and a revocation blocklist, opt-in **email
   MFA**, self-service password reset, per-account lockout and per-IP rate limits,
 - administration — user management with a one-time generated-password reveal, per-user feature
   flags,
-- a bilingual (English/Polish) UI with light/dark themes and a ⌘K / Ctrl K command palette,
-- the **checker** sidecar's HTTP contract (Spectral + AsyncAPI parser, behind the server only),
+- a bilingual (English/Polish) UI with light/dark themes and a ⌘K / Ctrl K command palette (pages,
+  actions, and a server-side contract search),
 - every quality gate wired, locally and in CI.
 
-Coming next, feature by feature: teams → domains and systems → contracts and versions →
-validators → checker engines → import, diff, and export.
+Coming next: breaking-change detection between versions (openapi-diff, `@asyncapi/diff`) as a
+waivable finding on non-major bumps, sync from the Git repository, and the per-contract history
+timeline.
 
 ## The stack
 

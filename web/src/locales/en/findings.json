@@ -26,5 +26,6 @@
   "noneMatch": "No findings match the chips",
   "jumpTo": "Go to line {{line}}, column {{column}}",
   "incompleteTitle": "Checks incomplete",
-  "incompleteBody": "The lint and semantic checker was unavailable — only the built-in syntax and schema checks ran. Re-run the checks later."
+  "incompleteBody": "The lint and semantic checker was unavailable — only the built-in syntax and schema checks ran. Re-run the checks later.",
+  "hard": "Syntax"
 }

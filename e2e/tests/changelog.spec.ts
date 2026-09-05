@@ -28,6 +28,6 @@ test("the what's-new dot leads to the changelog and clears once it is read", asy
 
   // The dot stays cleared on later navigation.
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Hierarchy" })).toBeVisible();
   await expect(page.getByTitle("What's new")).toHaveCount(0);
 });

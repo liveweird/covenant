@@ -77,13 +77,18 @@ outcomes). **A new or behaviorally changed test lands with its scenario file and
 the same commit** — this list is the coverage map, the scenario file is the design.
 
 - [`accessibility.spec.ts`](scenarios/accessibility.md) — axe WCAG A/AA smoke: login + the
-  authenticated pages (`/`, `/domains`, `/systems`, `/teams`, `/users`, `/users/new`, `/feature-flags`,
-  `/change-password`, `/changelog`), `color-contrast` included (the theme's tokens are AA-tested in
+  authenticated pages (`/`, `/contracts`, `/contracts/new`, `/contracts/import`, `/domains`, `/systems`,
+  `/teams`, `/users`, `/users/new`, `/feature-flags`, `/change-password`, `/changelog`), `color-contrast` included (the theme's tokens are AA-tested in
   `web/src/theme.test.ts`).
 - [`auth.spec.ts`](scenarios/auth.md) — login / logout / invalid credentials / guarded deep link.
 - [`changelog.spec.ts`](scenarios/changelog.md) — the what's-new dot on a fresh device
   leads to the changelog via the version stamp and clears once read (no language switching
   — it runs as the seed admin; see `i18n.spec.ts`).
+- [`contracts.spec.ts`](scenarios/contracts.md) — the core loop: import an OpenAPI document as a
+  contract's first version (name/version prefilled from the document) → a minor version with a
+  broken `$ref` stored through Save-anyway → the two compared → 1.0.0 proposed and activated (text
+  locked) → downloaded → teardown through the delete rules (draft deletes, an active version blocks
+  the contract, deprecate → retire, then delete); a regular user's read-only tree, page and list.
 - [`i18n.spec.ts`](scenarios/i18n.md) — the synced per-user language: a throwaway user
   switches to Polish, the choice survives a reload AND a wiped-device re-login (served from
   the stored value), and the admin's English flips it back; seeded accounts stay English.

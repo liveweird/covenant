@@ -18,7 +18,7 @@ export default function CheckSummaryBadges({ errors, warnings, complete }: { err
         </Badge>
       )}
       {errors === 0 && warnings === 0 && (
-        <Badge color="teal" size="xs" variant="outline">
+        <Badge color="teal" size="xs" variant="light">
           {t("findings.cleanShort")}
         </Badge>
       )}

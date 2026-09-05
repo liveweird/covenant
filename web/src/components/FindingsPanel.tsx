@@ -55,7 +55,7 @@ export default function FindingsPanel({
         </Text>
         <Group gap={6} wrap="nowrap">
           {SEVERITIES.map((s) => (
-            <Badge key={s} color={SEVERITY_COLOR[s]} variant={counts[s] > 0 ? "light" : "outline"} size="sm">
+            <Badge key={s} color={counts[s] > 0 ? SEVERITY_COLOR[s] : "gray"} variant="light" size="sm">
               {t(`findings.count.${s}`, { count: counts[s] })}
             </Badge>
           ))}
@@ -105,8 +105,8 @@ export default function FindingsPanel({
         <Stack gap={6} role="list" aria-label={t("findings.listAria")}>
           {visible.map((f, index) => (
             <Group key={`${f.code}-${f.line ?? ""}-${f.path ?? ""}-${index}`} role="listitem" gap="xs" wrap="nowrap" align="flex-start">
-              <Badge color={SEVERITY_COLOR[f.severity]} variant={isHardFinding(f) ? "filled" : "light"} size="xs" style={{ flexShrink: 0, marginTop: 2 }}>
-                {t(`findings.severity.${f.severity}`)}
+              <Badge color={SEVERITY_COLOR[f.severity]} variant="light" size="xs" style={{ flexShrink: 0, marginTop: 2 }}>
+                {isHardFinding(f) ? t("findings.hard") : t(`findings.severity.${f.severity}`)}
               </Badge>
               <Stack gap={0} style={{ flex: 1, minWidth: 0 }}>
                 <Group gap={6} wrap="nowrap">
