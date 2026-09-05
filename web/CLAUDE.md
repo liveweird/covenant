@@ -93,7 +93,7 @@ The SPA is **N-language by architecture** via react-i18next (`src/i18n.ts`); the
 - `theme.module.css` is scheme-aware **via `light-dark()`** throughout (tables card-framed on a quiet tinted canvas, white header/navbar surfaces, hairline borders) — new surface styling follows that pattern, not `[data-mantine-color-scheme]` selectors. Every `Table` inherits the card frame + hoverable rows + neutral compact header from the theme's `Table.extend` — don't add per-table frames.
 - Soft diffuse `shadows` scale; tightened heading sizes (pages title themselves with `order={2}`).
 - Inter is bundled (`@fontsource-variable/inter`, imported in `main.tsx`) so it loads same-origin and satisfies the CSP `font-src 'self'`; the system stack is the fallback.
-- The logo SVGs (`public/logo-*.svg` — a hexagonal wax seal impressed with an endless knot, rendered by `components/BrandLogo.tsx`) are the brand mark. Restyle rule: keep aria-labels, roles, and real semantic elements stable — e2e and unit tests locate by role/name.
+- The logo SVGs (`public/logo-*.svg` — a violet seal bearing a triskele — three curling paths meeting at a gold centre, rendered by `components/BrandLogo.tsx`) are the brand mark. Restyle rule: keep aria-labels, roles, and real semantic elements stable — e2e and unit tests locate by role/name.
 
 ## Changelog & app versioning
 
