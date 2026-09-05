@@ -112,6 +112,7 @@ export default function TryItDrawer({
       position="right"
       size="xl"
       closeOnClickOutside={false}
+      closeButtonProps={{ "aria-label": t("common.action.close") }}
       title={t("tryIt.title", { name: contract.name, version: version.version })}
     >
       <Stack gap="md">

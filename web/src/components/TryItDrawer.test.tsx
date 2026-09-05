@@ -233,5 +233,6 @@ describe("TryItDrawer", () => {
     await user.click(await screen.findByRole("option", { name: "prod" }));
     expect(await screen.findByLabelText("Environment", { selector: "input" })).toHaveValue("prod");
     expect(JSON.parse(localStorage.getItem("covenant.viewSettings.tryIt.environment.7") ?? "null")).toBe("12");
+    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 });

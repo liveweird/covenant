@@ -56,7 +56,7 @@ export for the commit back.
   (which side moved, a line diff, overwrite or a new version from the repo copy),
 - every quality gate wired, locally and in CI.
 
-Coming next (milestone 3): search facets, live-endpoint conformance and client generation.
+Coming next (milestone 4): the contract reader — a structured, reader-optimised rendering of a version (the Swagger-UI equivalent) for OpenAPI, AsyncAPI and ODCS, beside the source view.
 
 ## The stack
 

@@ -17,6 +17,22 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.4.0",
+    date: "2026-09-05",
+    en: `**Follow contracts, count before you filter, and try a contract against a real system.**
+
+- Follow a contract and every event on it — versions created, edited, published, synced, a breaking change waived, the owner changed — lands in your bell; your own actions stay silent. Open a notification to jump to the version, mark one or all as seen.
+- Every filter option on the catalog says how many contracts picking it would yield.
+- Administrators register Environments per system: an HTTP base URL, a Kafka cluster, a read-only PostgreSQL database. Passwords are stored encrypted and never shown again.
+- Try it, on any version: send a request to an OpenAPI operation, publish a record onto an AsyncAPI channel (contract writers only) or read its newest records, read a sample of an ODCS dataset — through an environment, with the response, the records or the columns measured against the contract as conformance findings. Nothing is stored; credentials you type are sent once and forgotten.`,
+    pl: `**Obserwuj kontrakty, licz przed filtrowaniem i wypróbuj kontrakt na prawdziwym systemie.**
+
+- Obserwuj kontrakt, a każde zdarzenie — utworzone, edytowane, opublikowane i zsynchronizowane wersje, zaakceptowana zmiana łamiąca, zmiana właściciela/właścicielki — trafi do Twojego dzwonka; własne działania pozostają ciche. Otwórz powiadomienie, by przejść do wersji, oznacz jedno albo wszystkie jako przeczytane.
+- Każda opcja filtra w katalogu mówi, ile kontraktów da jej wybranie.
+- Administratorzy/administratorki rejestrują Środowiska per system: bazowy adres HTTP, klaster Kafka, bazę PostgreSQL tylko do odczytu. Hasła są przechowywane zaszyfrowane i nigdy więcej nie pokazywane.
+- Wypróbuj, na dowolnej wersji: wyślij żądanie do operacji OpenAPI, opublikuj rekord na kanale AsyncAPI (tylko osoby piszące kontrakt) albo odczytaj jego najnowsze rekordy, pobierz próbkę zbioru danych ODCS — przez środowisko, z odpowiedzią, rekordami lub kolumnami zmierzonymi względem kontraktu jako uwagi o zgodności. Nic nie jest zapisywane; wpisane dane uwierzytelniające są wysyłane raz i zapominane.`,
+  },
+  {
     version: "0.3.0",
     date: "2026-09-05",
     en: `**Breaking changes, history and sync from the repository.**
