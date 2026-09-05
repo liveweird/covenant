@@ -17,6 +17,22 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.5.1",
+    date: "2026-09-06",
+    en: `**The checkup release: guardrails, hardening and a few gaps closed.**
+
+- Deleting a system that still holds contracts, or a team that still owns them, is refused — move or transfer the contracts first. Systems now show how many contracts they hold.
+- The deployment gained health and readiness probes, a non-root container and a hardened Kubernetes pod; the CI pipeline gained a check that the client types match the API contract, a check that every documented response is exercised by a test, and nightly browser runs.
+- Accessibility: every dialog's close button is named, long code values wrap instead of scrolling, and the read-only editor can be reached from the keyboard — all found by the widened automated sweep over detail pages, drawers and dialogs.
+- The reader's POST badge is gray, like the other methods: the brand purple stays for the actions you can click.`,
+    pl: `**Wydanie po przeglądzie: bariery jakości, wzmocnienia i kilka domkniętych luk.**
+
+- Usunięcie systemu, który nadal zawiera kontrakty, albo zespołu, który nadal jest ich właścicielem, jest odmawiane — najpierw przenieś kontrakty. Systemy pokazują teraz, ile kontraktów zawierają.
+- Wdrożenie zyskało sondy działania i gotowości, kontener bez uprawnień roota i wzmocniony pod Kubernetes; potok CI zyskał sprawdzenie, że typy klienta zgadzają się z kontraktem API, sprawdzenie, że każda udokumentowana odpowiedź ma swój test, oraz nocne przebiegi w przeglądarce.
+- Dostępność: przycisk zamknięcia każdego okna dialogowego ma nazwę, długie wartości kodu zawijają się zamiast przewijać, a edytor tylko do odczytu jest osiągalny z klawiatury — wszystko wykryte przez rozszerzony automatyczny przegląd stron szczegółów, szuflad i okien dialogowych.
+- Odznaka metody POST w Czytniku jest szara jak pozostałe: fiolet marki zostaje dla akcji, które da się kliknąć.`,
+  },
+  {
     version: "0.5.0",
     date: "2026-09-05",
     en: `**The contract reader.**
