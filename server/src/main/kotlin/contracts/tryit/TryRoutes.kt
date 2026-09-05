@@ -29,15 +29,15 @@ import io.ktor.server.request.receive
 import io.ktor.server.resources.get
 import io.ktor.server.resources.post
 import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
 import io.ktor.server.routing.routing
+import ch.nokillswit.plugins.RateLimits
 import java.net.URI
 
 /** The host of a `jdbc:postgresql://host:port/db` URL — the one thing about the target the audit records. */
 private fun jdbcHost(jdbcUrl: String): String? = runCatching { URI.create(jdbcUrl.removePrefix("jdbc:")).host }.getOrNull()
 
 /** The per-IP bucket the try POSTs share — registered with the others in `configureAuthRoutes`. */
-const val TRY_RATE_LIMIT = "tryIt"
-const val DEFAULT_TRY_LIMIT_PER_MINUTE = 60
 
 /** Everything a try leg needs, resolved in one preamble — the version, its contract, the decrypted targets, the parsed tree. */
 class TryContext(
@@ -82,162 +82,174 @@ fun Application.configureTryRoutes() {
 
     routing {
         authenticate {
-            get<ContractsRoute.Id.Versions.Vid.Try> { route ->
-                call.caller()
-                val contractId = route.parent.parent.parent.id
-                val version = versionService.read(contractId, route.parent.vid).orNotFound("Version")
-                val type = contractService.typeOf(contractId).orNotFound("Contract")
-                // A stored document parsed at store time; a legacy row that no longer does offers nothing to try.
-                val root = (DocumentParser.parse(version.content) as? ParseOutcome.Parsed)?.root
-                call.respond(HttpStatusCode.OK, if (root == null) TryCatalogResponse(type) else TryCatalog.build(type, root))
+            tryCatalog(contractService, versionService)
+            // The bucket sits INSIDE authenticate: an anonymous probe answers 401 without spending a
+            // try token (behind a shared egress IP it could otherwise starve real users' quota).
+            rateLimit(RateLimitName(RateLimits.TRY)) {
+                tryHttp(preamble)
+                tryKafkaPublish(preamble, contractService)
+                tryKafkaRead(preamble)
+                trySql(preamble)
             }
         }
-        // authenticate OUTSIDE the bucket: an anonymous probe answers 401 without spending a try token
-        // (behind a shared egress IP it could otherwise starve real users' quota).
-        authenticate {
-            rateLimit(RateLimitName(TRY_RATE_LIMIT)) {
-                post<ContractsRoute.Id.Versions.Vid.Try.Http> { route ->
-                    val caller = call.caller()
-                    val contractId = route.parent.parent.parent.parent.id
-                    val request = call.receive<TryHttpRequest>()
-                    val ctx = preamble.resolve(caller, contractId, route.parent.parent.vid, request.environmentId, ContractType.OPENAPI)
-                    val baseUrl = ctx.targets.httpBaseUrl ?: throw BadRequestException("The environment has no HTTP base URL")
-                    val prepared = HttpTry.prepare(request, ctx.root, baseUrl)
-                    val trail = arrayOf(
-                        "byUserId" to caller.userId, "contractId" to contractId, "versionId" to ctx.version.id,
-                        "environmentId" to ctx.targets.id, "host" to prepared.uri.host, "method" to prepared.method,
-                        "pathTemplate" to request.path,
-                    )
-                    val observation = try {
-                        HttpTry.send(prepared)
-                    } catch (e: BadGatewayException) {
-                        audit("contract.tried_http", *trail, "outcome" to "unreachable")
-                        throw e
-                    }
-                    audit(
-                        "contract.tried_http", *trail,
-                        "status" to observation.status, "durationMs" to observation.durationMs, "outcome" to "answered",
-                    )
-                    val schemas = DocumentSchemas.of(ContractType.OPENAPI, ctx.root)
-                    call.respond(
-                        HttpStatusCode.OK,
-                        TryHttpResponse(
-                            url = prepared.uri.toString().substringBefore('?'),
-                            status = observation.status,
-                            headers = observation.headers,
-                            body = observation.body,
-                            bodyTruncated = observation.truncated,
-                            durationMs = observation.durationMs,
-                            conformance = HttpTry.assess(request, prepared, observation, ctx.root, schemas),
-                        ),
-                    )
-                }
-                post<ContractsRoute.Id.Versions.Vid.Try.Kafka.Publish> { route ->
-                    val caller = call.caller()
-                    val contractId = route.parent.parent.parent.parent.parent.id
-                    // Writers only, BEFORE the body decodes: the one try that mutates a real system.
-                    contractService.authorizeWrite(caller, contractId)
-                    val request = call.receive<TryKafkaPublishRequest>()
-                    val vid = route.parent.parent.parent.vid
-                    val ctx = preamble.resolve(caller, contractId, vid, request.environmentId, ContractType.ASYNCAPI)
-                    val target = ctx.targets.kafka ?: throw BadRequestException("The environment has no Kafka cluster")
-                    val prepared = KafkaTry.prepare(ctx.root, request.channel, request.message)
-                    KafkaTry.validateHeaders(request.headers)
-                    val schemas = DocumentSchemas.of(ContractType.ASYNCAPI, ctx.root)
-                    val conformance = KafkaTry.assessPublish(ctx.root, schemas, prepared, request.payload)
-                    val trail = arrayOf(
-                        "byUserId" to caller.userId, "contractId" to contractId, "versionId" to ctx.version.id,
-                        "environmentId" to ctx.targets.id, "bootstrap" to target.bootstrapServers, "topic" to prepared.topic,
-                    )
-                    val published = try {
-                        KafkaTry.publish(target, prepared, request)
-                    } catch (e: BadGatewayException) {
-                        audit("contract.tried_kafka_publish", *trail, "outcome" to "failed")
-                        throw e
-                    }
-                    audit(
-                        "contract.tried_kafka_publish", *trail,
-                        "partition" to published.metadata.partition(), "offset" to published.metadata.offset(), "outcome" to "published",
-                    )
-                    call.respond(
-                        HttpStatusCode.OK,
-                        TryKafkaPublishResponse(
-                            topic = prepared.topic,
-                            partition = published.metadata.partition(),
-                            offset = published.metadata.offset(),
-                            timestamp = published.metadata.timestamp(),
-                            durationMs = published.durationMs,
-                            conformance = conformance,
-                        ),
-                    )
-                }
-                post<ContractsRoute.Id.Versions.Vid.Try.Kafka.Read> { route ->
-                    val caller = call.caller()
-                    val contractId = route.parent.parent.parent.parent.parent.id
-                    val request = call.receive<TryKafkaReadRequest>()
-                    val vid = route.parent.parent.parent.vid
-                    val ctx = preamble.resolve(caller, contractId, vid, request.environmentId, ContractType.ASYNCAPI)
-                    val target = ctx.targets.kafka ?: throw BadRequestException("The environment has no Kafka cluster")
-                    val prepared = KafkaTry.prepare(ctx.root, request.channel, request.message)
-                    val trail = arrayOf(
-                        "byUserId" to caller.userId, "contractId" to contractId, "versionId" to ctx.version.id,
-                        "environmentId" to ctx.targets.id, "bootstrap" to target.bootstrapServers, "topic" to prepared.topic,
-                    )
-                    val read = try {
-                        KafkaTry.read(target, prepared, request.limit)
-                    } catch (e: BadGatewayException) {
-                        audit("contract.tried_kafka_read", *trail, "outcome" to "failed")
-                        throw e
-                    }
-                    audit("contract.tried_kafka_read", *trail, "count" to read.records.size, "outcome" to "read")
-                    val views = read.records.map { KafkaTry.view(it) }
-                    val schemas = DocumentSchemas.of(ContractType.ASYNCAPI, ctx.root)
-                    call.respond(
-                        HttpStatusCode.OK,
-                        TryKafkaReadResponse(
-                            topic = prepared.topic,
-                            messages = views,
-                            reachedEnd = read.reachedEnd,
-                            durationMs = read.durationMs,
-                            conformance = KafkaTry.assessRead(ctx.root, schemas, prepared, views),
-                        ),
-                    )
-                }
-                post<ContractsRoute.Id.Versions.Vid.Try.Sql> { route ->
-                    val caller = call.caller()
-                    val contractId = route.parent.parent.parent.parent.id
-                    val request = call.receive<TrySqlRequest>()
-                    val ctx = preamble.resolve(caller, contractId, route.parent.parent.vid, request.environmentId, ContractType.ODCS)
-                    val target = ctx.targets.postgres ?: throw BadRequestException("The environment has no PostgreSQL target")
-                    val prepared = SqlTry.prepare(request, ctx.root)
-                    val trail = arrayOf(
-                        "byUserId" to caller.userId, "contractId" to contractId, "versionId" to ctx.version.id,
-                        "environmentId" to ctx.targets.id, "host" to jdbcHost(target.jdbcUrl), "dataset" to prepared.quoted(),
-                    )
-                    val sample = try {
-                        SqlTry.execute(prepared, target)
-                    } catch (e: BadGatewayException) {
-                        audit("contract.tried_sql", *trail, "outcome" to "failed")
-                        throw e
-                    }
-                    val outcome = if (sample.datasetMissing) "dataset_missing" else "sampled"
-                    audit(
-                        "contract.tried_sql", *trail,
-                        "rowCount" to sample.rows.size, "durationMs" to sample.durationMs, "outcome" to outcome,
-                    )
-                    call.respond(
-                        HttpStatusCode.OK,
-                        TrySqlResponse(
-                            statement = prepared.statement,
-                            columns = SqlTry.columns(prepared, sample),
-                            rows = sample.rows,
-                            truncated = sample.truncated,
-                            durationMs = sample.durationMs,
-                            conformance = SqlTry.assess(prepared, sample),
-                        ),
-                    )
-                }
-            }
-        }
+    }
+}
+
+private fun Route.tryCatalog(contractService: ContractService, versionService: ContractVersionService) {
+    get<ContractsRoute.Id.Versions.Vid.Try> { route ->
+        call.caller()
+        val contractId = route.parent.parent.parent.id
+        val version = versionService.read(contractId, route.parent.vid).orNotFound("Version")
+        val type = contractService.typeOf(contractId).orNotFound("Contract")
+        // A stored document parsed at store time; a legacy row that no longer does offers nothing to try.
+        val root = (DocumentParser.parse(version.content) as? ParseOutcome.Parsed)?.root
+        call.respond(HttpStatusCode.OK, if (root == null) TryCatalogResponse(type) else TryCatalog.build(type, root))
+    }
+}
+
+/**
+ * Every try leaves ONE audit line: [event] with the leg's [trail] plus `outcome` — [failure] when the
+ * target could not be reached (the 502 keeps propagating), [success]'s fields when it answered.
+ */
+private inline fun <T> audited(
+    event: String,
+    trail: Array<out Pair<String, Any?>>,
+    failure: String,
+    success: (T) -> Array<out Pair<String, Any?>>,
+    block: () -> T,
+): T {
+    val result = try {
+        block()
+    } catch (e: BadGatewayException) {
+        audit(event, *trail, "outcome" to failure)
+        throw e
+    }
+    audit(event, *trail, *success(result))
+    return result
+}
+
+private fun TryContext.trail(caller: CallerPrincipal, contractId: UInt, vararg leg: Pair<String, Any?>): Array<Pair<String, Any?>> =
+    arrayOf<Pair<String, Any?>>(
+        "byUserId" to caller.userId, "contractId" to contractId, "versionId" to version.id, "environmentId" to targets.id,
+    ) + leg
+
+private fun Route.tryHttp(preamble: TryPreamble) {
+    post<ContractsRoute.Id.Versions.Vid.Try.Http> { route ->
+        val caller = call.caller()
+        val contractId = route.parent.parent.parent.parent.id
+        val request = call.receive<TryHttpRequest>()
+        val ctx = preamble.resolve(caller, contractId, route.parent.parent.vid, request.environmentId, ContractType.OPENAPI)
+        val baseUrl = ctx.targets.httpBaseUrl ?: throw BadRequestException("The environment has no HTTP base URL")
+        val prepared = HttpTry.prepare(request, ctx.root, baseUrl)
+        val trail = ctx.trail(caller, contractId, "host" to prepared.uri.host, "method" to prepared.method, "pathTemplate" to request.path)
+        val observation = audited(
+            "contract.tried_http", trail, failure = "unreachable",
+            success = { o -> arrayOf("status" to o.status, "durationMs" to o.durationMs, "outcome" to "answered") },
+        ) { HttpTry.send(prepared) }
+        val schemas = DocumentSchemas.of(ContractType.OPENAPI, ctx.root)
+        call.respond(
+            HttpStatusCode.OK,
+            TryHttpResponse(
+                url = prepared.uri.toString().substringBefore('?'),
+                status = observation.status,
+                headers = observation.headers,
+                body = observation.body,
+                bodyTruncated = observation.truncated,
+                durationMs = observation.durationMs,
+                conformance = HttpTry.assess(request, prepared, observation, ctx.root, schemas),
+            ),
+        )
+    }
+}
+
+private fun Route.tryKafkaPublish(preamble: TryPreamble, contractService: ContractService) {
+    post<ContractsRoute.Id.Versions.Vid.Try.Kafka.Publish> { route ->
+        val caller = call.caller()
+        val contractId = route.parent.parent.parent.parent.parent.id
+        // Writers only, BEFORE the body decodes: the one try that mutates a real system.
+        contractService.authorizeWrite(caller, contractId)
+        val request = call.receive<TryKafkaPublishRequest>()
+        val ctx = preamble.resolve(caller, contractId, route.parent.parent.parent.vid, request.environmentId, ContractType.ASYNCAPI)
+        val target = ctx.targets.kafka ?: throw BadRequestException("The environment has no Kafka cluster")
+        val prepared = KafkaTry.prepare(ctx.root, request.channel, request.message)
+        KafkaTry.validateHeaders(request.headers)
+        val schemas = DocumentSchemas.of(ContractType.ASYNCAPI, ctx.root)
+        val conformance = KafkaTry.assessPublish(ctx.root, schemas, prepared, request.payload)
+        val trail = ctx.trail(caller, contractId, "bootstrap" to target.bootstrapServers, "topic" to prepared.topic)
+        val published = audited(
+            "contract.tried_kafka_publish", trail, failure = "failed",
+            success = { p ->
+                arrayOf("partition" to p.metadata.partition(), "offset" to p.metadata.offset(), "outcome" to "published")
+            },
+        ) { KafkaTry.publish(target, prepared, request) }
+        call.respond(
+            HttpStatusCode.OK,
+            TryKafkaPublishResponse(
+                topic = prepared.topic,
+                partition = published.metadata.partition(),
+                offset = published.metadata.offset(),
+                timestamp = published.metadata.timestamp(),
+                durationMs = published.durationMs,
+                conformance = conformance,
+            ),
+        )
+    }
+}
+
+private fun Route.tryKafkaRead(preamble: TryPreamble) {
+    post<ContractsRoute.Id.Versions.Vid.Try.Kafka.Read> { route ->
+        val caller = call.caller()
+        val contractId = route.parent.parent.parent.parent.parent.id
+        val request = call.receive<TryKafkaReadRequest>()
+        val ctx = preamble.resolve(caller, contractId, route.parent.parent.parent.vid, request.environmentId, ContractType.ASYNCAPI)
+        val target = ctx.targets.kafka ?: throw BadRequestException("The environment has no Kafka cluster")
+        val prepared = KafkaTry.prepare(ctx.root, request.channel, request.message)
+        val trail = ctx.trail(caller, contractId, "bootstrap" to target.bootstrapServers, "topic" to prepared.topic)
+        val read = audited(
+            "contract.tried_kafka_read", trail, failure = "failed",
+            success = { r -> arrayOf("count" to r.records.size, "outcome" to "read") },
+        ) { KafkaTry.read(target, prepared, request.limit) }
+        val views = read.records.map { KafkaTry.view(it) }
+        val schemas = DocumentSchemas.of(ContractType.ASYNCAPI, ctx.root)
+        call.respond(
+            HttpStatusCode.OK,
+            TryKafkaReadResponse(
+                topic = prepared.topic,
+                messages = views,
+                reachedEnd = read.reachedEnd,
+                durationMs = read.durationMs,
+                conformance = KafkaTry.assessRead(ctx.root, schemas, prepared, views),
+            ),
+        )
+    }
+}
+
+private fun Route.trySql(preamble: TryPreamble) {
+    post<ContractsRoute.Id.Versions.Vid.Try.Sql> { route ->
+        val caller = call.caller()
+        val contractId = route.parent.parent.parent.parent.id
+        val request = call.receive<TrySqlRequest>()
+        val ctx = preamble.resolve(caller, contractId, route.parent.parent.vid, request.environmentId, ContractType.ODCS)
+        val target = ctx.targets.postgres ?: throw BadRequestException("The environment has no PostgreSQL target")
+        val prepared = SqlTry.prepare(request, ctx.root)
+        val trail = ctx.trail(caller, contractId, "host" to jdbcHost(target.jdbcUrl), "dataset" to prepared.quoted())
+        val sample = audited(
+            "contract.tried_sql", trail, failure = "failed",
+            success = { s ->
+                val outcome = if (s.datasetMissing) "dataset_missing" else "sampled"
+                arrayOf("rowCount" to s.rows.size, "durationMs" to s.durationMs, "outcome" to outcome)
+            },
+        ) { SqlTry.execute(prepared, target) }
+        call.respond(
+            HttpStatusCode.OK,
+            TrySqlResponse(
+                statement = prepared.statement,
+                columns = SqlTry.columns(prepared, sample),
+                rows = sample.rows,
+                truncated = sample.truncated,
+                durationMs = sample.durationMs,
+                conformance = SqlTry.assess(prepared, sample),
+            ),
+        )
     }
 }

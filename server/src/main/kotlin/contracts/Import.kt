@@ -17,6 +17,9 @@ import kotlinx.serialization.Serializable
  */
 const val MAX_IMPORT_ITEMS = 20
 
+/** The importer, built by the composition root (infra/db/Database.kt) like every other service. */
+val ContractImporterKey = io.ktor.util.AttributeKey<ContractImporter>("ContractImporter")
+
 @Serializable
 data class ImportItem(
     val systemId: UInt,
@@ -64,6 +67,8 @@ data class ImportItemResult(
     val message: String? = null,
     val errors: Int = 0,
     val warnings: Int = 0,
+    /** True when the stored (or predicted) report carries `BREAKING_WITHOUT_MAJOR_BUMP` — the followers' extra notification. */
+    val breaking: Boolean = false,
 )
 
 @Serializable
@@ -117,6 +122,7 @@ class ContractImporter(
                 contractId = existingId,
                 errors = report.errors,
                 warnings = report.warnings,
+                breaking = report.findings.any { it.code == ch.nokillswit.contracts.checks.BreakingChanges.CODE_WITHOUT_MAJOR_BUMP },
                 message = report.softErrors.takeIf { it.isNotEmpty() }?.joinToString("; ") { "${it.code}: ${it.message}" },
             )
             seen.add(key)

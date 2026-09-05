@@ -2709,6 +2709,8 @@ export interface components {
             message?: string | null;
             errors: number;
             warnings: number;
+            /** @description True when the report carries `BREAKING_WITHOUT_MAJOR_BUMP` (stored, or predicted by the dry run). */
+            breaking: boolean;
         };
         ImportResponse: {
             results: components["schemas"]["ImportItemResult"][];

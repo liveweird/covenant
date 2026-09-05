@@ -53,7 +53,7 @@ export default defineConfig([
       // Core size/complexity backstops — generous by design (React components are single
       // functions; these only catch future monsters, today's max: 627 lines / cc 44).
       complexity: ['error', 50],
-      'max-lines-per-function': ['error', { max: 700, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['error', { max: 360, skipBlankLines: true, skipComments: true }],
       'max-depth': ['error', 5],
       // The drill-down link builders (userXxxLink + DrillDownOpts tail params) carry 6.
       'max-params': ['error', 8],

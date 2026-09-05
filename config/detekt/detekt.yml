@@ -8,12 +8,13 @@ build:
   maxIssues: 0
 
 complexity:
-  # Route registration is declarative by architecture — each feature's configureXxxRoutes lists
-  # every endpoint in one function (see "Package layout" in CLAUDE.md), so *Routes.kt files are
-  # exempt from method-size/complexity rules; services and helpers are not. Tests are exempt
-  # from LongMethod: scenario tests are named sentences and read top-to-bottom.
+  # Route registration is declarative by architecture — a configureXxxRoutes lists its endpoints, or
+  # (past ~100 lines) delegates to private `Route.xxx(deps)` functions grouped by concern (the checkup
+  # split auth, users, contracts, versions and try-it that way), so *Routes.kt files are measured like
+  # everything else; only the complexity rule keeps its exemption (a handler is a straight-line ladder
+  # of guards). Tests are exempt from LongMethod: scenario tests are named sentences and read top-to-bottom.
   LongMethod:
-    excludes: ['**/src/test/**', '**/*Routes.kt']
+    excludes: ['**/src/test/**']
     threshold: 100
   CyclomaticComplexMethod:
     excludes: ['**/*Routes.kt']

@@ -28,6 +28,7 @@ import io.ktor.server.resources.post
 import io.ktor.server.resources.put
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
 import io.ktor.server.routing.routing
 import kotlinx.serialization.Serializable
 
@@ -163,118 +164,133 @@ internal fun ApplicationCall.contractFilter(): ContractListFilter {
 }
 
 fun Application.configureContractRoutes() {
+    // Read from the APPLICATION's attributes here — inside `routing {}` the name resolves to the Route's own set.
     val contractService = attributes[ContractServiceKey]
     val activity = attributes[ContractActivityKey]
     val eventService = attributes[ContractEventServiceKey]
     val subscriptions = attributes[ContractSubscriptionServiceKey]
-
     routing {
         authenticate {
-            // Reads: any authenticated user. Writes: the writer rule (contracts/ContractAccess.kt),
-            // checked through contractService.authorizeWrite BEFORE the body decodes (403 wins
-            // over 400); ownership transfer is ADMIN only.
-            get<ContractsRoute> {
-                val viewer = contractService.viewer(call.caller())
-                val paging = call.parsePaging(sortable = CONTRACT_SORT_FIELDS)
-                val result = contractService.list(call.contractFilter(), paging, viewer)
-                call.respond(HttpStatusCode.OK, paging.toPage(result.items, result.total))
-            }
-            get<ContractsRoute.Tree> {
-                val viewer = contractService.viewer(call.caller())
-                call.respond(HttpStatusCode.OK, contractService.tree(call.contractFilter(), viewer))
-            }
-            get<ContractsRoute.Facets> {
-                call.caller()
-                call.respond(HttpStatusCode.OK, contractService.facets(call.contractFilter()))
-            }
-            post<ContractsRoute> {
-                val caller = call.caller()
-                val request = sanitizedContractCreate(call.receive())
-                validateContractCreate(request)
-                val id = contractService.create(request, caller)
-                audit(
-                    "contract.created",
-                    "byUserId" to caller.userId.toLong(),
-                    "contractId" to id.toLong(),
-                    "systemId" to request.systemId.toLong(),
-                    "type" to request.type.name,
-                    "owner" to ownershipOf(request.ownerTeamId, request.ownerUserId).asParam(),
-                )
-                activity.record(
-                    id,
-                    caller.userId,
-                    ContractEventType.CREATED,
-                    mapOf("name" to request.name, "type" to request.type.name),
-                )
-                call.response.header(HttpHeaders.Location, call.application.href(ContractsRoute.Id(id = id)))
-                call.respond(HttpStatusCode.Created, contractService.read(id, contractService.viewer(caller)).orVanished("Contract", id))
-            }
-            get<ContractsRoute.Id> { route ->
-                val viewer = contractService.viewer(call.caller())
-                call.respond(HttpStatusCode.OK, contractService.read(route.id, viewer).orNotFound("Contract"))
-            }
-            // Following: whoever may read a contract may follow it — idempotent, 404 for a missing one.
-            put<ContractsRoute.Id.Subscription> { route ->
-                val caller = call.caller()
-                if (!subscriptions.subscribe(route.parent.id, caller.userId)) throw NotFoundException("Contract not found")
-                audit("contract.subscribed", "byUserId" to caller.userId.toLong(), "contractId" to route.parent.id.toLong())
-                call.respond(HttpStatusCode.NoContent)
-            }
-            delete<ContractsRoute.Id.Subscription> { route ->
-                val caller = call.caller()
-                subscriptions.unsubscribe(route.parent.id, caller.userId).orNotFound("Subscription")
-                audit("contract.unsubscribed", "byUserId" to caller.userId.toLong(), "contractId" to route.parent.id.toLong())
-                call.respond(HttpStatusCode.NoContent)
-            }
-            put<ContractsRoute.Id> { route ->
-                val caller = call.caller()
-                contractService.authorizeWrite(caller, route.id)
-                val request = sanitizedContractUpdate(call.receive())
-                validateContractUpdate(request)
-                contractService.update(route.id, request).orNotFound("Contract")
-                audit("contract.updated", "byUserId" to caller.userId.toLong(), "contractId" to route.id.toLong())
-                activity.record(route.id, caller.userId, ContractEventType.UPDATED, mapOf("name" to request.name))
-                call.respond(HttpStatusCode.NoContent)
-            }
-            put<ContractsRoute.Id.Owner> { route ->
-                val caller = call.caller()
-                requireAdmin(caller)
-                val request = call.receive<OwnerUpdateRequest>()
-                val ownership = ownershipOf(request.ownerTeamId, request.ownerUserId)
-                val previous = contractService.transferOwner(route.parent.id, ownership).orNotFound("Contract")
-                audit(
-                    "contract.owner_changed",
-                    "byUserId" to caller.userId.toLong(),
-                    "contractId" to route.parent.id.toLong(),
-                    "from" to previous.asParam(),
-                    "to" to ownership.asParam(),
-                )
-                activity.record(
-                    route.parent.id, caller.userId, ContractEventType.OWNER_CHANGED,
-                    mapOf("owner.from" to previous.asParam(), "owner.to" to ownership.asParam()),
-                )
-                call.respond(HttpStatusCode.NoContent)
-            }
-            delete<ContractsRoute.Id> { route ->
-                val caller = call.caller()
-                contractService.authorizeWrite(caller, route.id)
-                contractService.delete(route.id).orNotFound("Contract")
-                audit("contract.deleted", "byUserId" to caller.userId.toLong(), "contractId" to route.id.toLong())
-                // The deletion event lands in a history the API can no longer reach — kept for the record.
-                activity.record(route.id, caller.userId, ContractEventType.DELETED)
-                call.respond(HttpStatusCode.NoContent)
-            }
-            get<ContractsRoute.Id.Export> { route ->
-                val viewer = contractService.viewer(call.caller())
-                call.respond(HttpStatusCode.OK, contractService.export(route.parent.id, viewer).orNotFound("Contract"))
-            }
-            get<ContractsRoute.Id.Events> { route ->
-                val viewer = contractService.viewer(call.caller())
-                contractService.read(route.parent.id, viewer).orNotFound("Contract")
-                val paging = call.parsePaging(sortable = EVENT_LOG_SORT_FIELDS, defaultSort = EVENT_LOG_DEFAULT_SORT)
-                val result = eventService.listFor(route.parent.id, paging)
-                call.respond(HttpStatusCode.OK, paging.toPage(result.items, result.total))
-            }
+            contractCollection(contractService, activity)
+            contractItem(contractService, activity, eventService, subscriptions)
         }
+    }
+}
+
+/** The collection: list, tree, facets, create. */
+private fun Route.contractCollection(contractService: ContractService, activity: ContractActivity) {
+    // Reads: any authenticated user. Writes: the writer rule (contracts/ContractAccess.kt),
+    // checked through contractService.authorizeWrite BEFORE the body decodes (403 wins
+    // over 400); ownership transfer is ADMIN only.
+    get<ContractsRoute> {
+        val viewer = contractService.viewer(call.caller())
+        val paging = call.parsePaging(sortable = CONTRACT_SORT_FIELDS)
+        val result = contractService.list(call.contractFilter(), paging, viewer)
+        call.respond(HttpStatusCode.OK, paging.toPage(result.items, result.total))
+    }
+    get<ContractsRoute.Tree> {
+        val viewer = contractService.viewer(call.caller())
+        call.respond(HttpStatusCode.OK, contractService.tree(call.contractFilter(), viewer))
+    }
+    get<ContractsRoute.Facets> {
+        call.caller()
+        call.respond(HttpStatusCode.OK, contractService.facets(call.contractFilter()))
+    }
+    post<ContractsRoute> {
+        val caller = call.caller()
+        val request = sanitizedContractCreate(call.receive())
+        validateContractCreate(request)
+        val id = contractService.create(request, caller)
+        audit(
+            "contract.created",
+            "byUserId" to caller.userId.toLong(),
+            "contractId" to id.toLong(),
+            "systemId" to request.systemId.toLong(),
+            "type" to request.type.name,
+            "owner" to ownershipOf(request.ownerTeamId, request.ownerUserId).asParam(),
+        )
+        activity.record(
+            id,
+            caller.userId,
+            ContractEventType.CREATED,
+            mapOf("name" to request.name, "type" to request.type.name),
+        )
+        call.response.header(HttpHeaders.Location, call.application.href(ContractsRoute.Id(id = id)))
+        call.respond(HttpStatusCode.Created, contractService.read(id, contractService.viewer(caller)).orVanished("Contract", id))
+    }
+}
+
+/** One contract: read, follow, update, owner transfer, delete, export, history. */
+private fun Route.contractItem(
+    contractService: ContractService,
+    activity: ContractActivity,
+    eventService: ContractEventService,
+    subscriptions: ContractSubscriptionService,
+) {
+    get<ContractsRoute.Id> { route ->
+        val viewer = contractService.viewer(call.caller())
+        call.respond(HttpStatusCode.OK, contractService.read(route.id, viewer).orNotFound("Contract"))
+    }
+    // Following: whoever may read a contract may follow it — idempotent, 404 for a missing one.
+    put<ContractsRoute.Id.Subscription> { route ->
+        val caller = call.caller()
+        if (!subscriptions.subscribe(route.parent.id, caller.userId)) throw NotFoundException("Contract not found")
+        audit("contract.subscribed", "byUserId" to caller.userId.toLong(), "contractId" to route.parent.id.toLong())
+        call.respond(HttpStatusCode.NoContent)
+    }
+    delete<ContractsRoute.Id.Subscription> { route ->
+        val caller = call.caller()
+        subscriptions.unsubscribe(route.parent.id, caller.userId).orNotFound("Subscription")
+        audit("contract.unsubscribed", "byUserId" to caller.userId.toLong(), "contractId" to route.parent.id.toLong())
+        call.respond(HttpStatusCode.NoContent)
+    }
+    put<ContractsRoute.Id> { route ->
+        val caller = call.caller()
+        contractService.authorizeWrite(caller, route.id)
+        val request = sanitizedContractUpdate(call.receive())
+        validateContractUpdate(request)
+        contractService.update(route.id, request).orNotFound("Contract")
+        audit("contract.updated", "byUserId" to caller.userId.toLong(), "contractId" to route.id.toLong())
+        activity.record(route.id, caller.userId, ContractEventType.UPDATED, mapOf("name" to request.name))
+        call.respond(HttpStatusCode.NoContent)
+    }
+    put<ContractsRoute.Id.Owner> { route ->
+        val caller = call.caller()
+        requireAdmin(caller)
+        val request = call.receive<OwnerUpdateRequest>()
+        val ownership = ownershipOf(request.ownerTeamId, request.ownerUserId)
+        val previous = contractService.transferOwner(route.parent.id, ownership).orNotFound("Contract")
+        audit(
+            "contract.owner_changed",
+            "byUserId" to caller.userId.toLong(),
+            "contractId" to route.parent.id.toLong(),
+            "from" to previous.asParam(),
+            "to" to ownership.asParam(),
+        )
+        activity.record(
+            route.parent.id, caller.userId, ContractEventType.OWNER_CHANGED,
+            mapOf("owner.from" to previous.asParam(), "owner.to" to ownership.asParam()),
+        )
+        call.respond(HttpStatusCode.NoContent)
+    }
+    delete<ContractsRoute.Id> { route ->
+        val caller = call.caller()
+        contractService.authorizeWrite(caller, route.id)
+        contractService.delete(route.id).orNotFound("Contract")
+        audit("contract.deleted", "byUserId" to caller.userId.toLong(), "contractId" to route.id.toLong())
+        // The deletion event lands in a history the API can no longer reach — kept for the record.
+        activity.record(route.id, caller.userId, ContractEventType.DELETED)
+        call.respond(HttpStatusCode.NoContent)
+    }
+    get<ContractsRoute.Id.Export> { route ->
+        val viewer = contractService.viewer(call.caller())
+        call.respond(HttpStatusCode.OK, contractService.export(route.parent.id, viewer).orNotFound("Contract"))
+    }
+    get<ContractsRoute.Id.Events> { route ->
+        val viewer = contractService.viewer(call.caller())
+        contractService.read(route.parent.id, viewer).orNotFound("Contract")
+        val paging = call.parsePaging(sortable = EVENT_LOG_SORT_FIELDS, defaultSort = EVENT_LOG_DEFAULT_SORT)
+        val result = eventService.listFor(route.parent.id, paging)
+        call.respond(HttpStatusCode.OK, paging.toPage(result.items, result.total))
     }
 }

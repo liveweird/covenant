@@ -3697,7 +3697,7 @@ components:
       enum: [CREATED, CREATED_WITH_FINDINGS, VERSION_ADDED, VERSION_ADDED_WITH_FINDINGS, INVALID, CONFLICT, FORBIDDEN, ERROR]
     ImportItemResult:
       type: object
-      required: [index, name, version, status, errors, warnings]
+      required: [index, name, version, status, errors, warnings, breaking]
       properties:
         index: { type: integer, minimum: 0 }
         name: { type: string }
@@ -3708,6 +3708,9 @@ components:
         message: { type: string, nullable: true }
         errors: { type: integer, minimum: 0 }
         warnings: { type: integer, minimum: 0 }
+        breaking:
+          type: boolean
+          description: True when the report carries `BREAKING_WITHOUT_MAJOR_BUMP` (stored, or predicted by the dry run).
     ImportResponse:
       type: object
       required: [results]

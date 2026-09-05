@@ -13,6 +13,8 @@ ktor:
       - ch.nokillswit.plugins.MonitoringKt.configureMonitoring
       - ch.nokillswit.plugins.SerializationKt.configureSerialization
       - ch.nokillswit.plugins.SecurityKt.configureSecurity
+      # Every per-IP bucket (login, refresh, password reset, MFA, try-it) — before any route module.
+      - ch.nokillswit.plugins.RateLimitsKt.configureRateLimits
       - ch.nokillswit.plugins.ErrorHandlingKt.configureErrorHandling
       - ch.nokillswit.plugins.OpenTelemetryKt.configureOpenTelemetry
       - ch.nokillswit.plugins.AutoHeadResponseKt.configureAutoHeadResponse
@@ -39,7 +41,6 @@ ktor:
       - ch.nokillswit.contracts.ContractVersionRoutesKt.configureContractVersionRoutes
       - ch.nokillswit.notifications.NotificationRoutesKt.configureNotificationRoutes
       - ch.nokillswit.auth.AuthRoutesKt.configureAuthRoutes
-      # after the auth module: the try POSTs ride a RateLimit bucket configureAuthRoutes installs
       - ch.nokillswit.contracts.tryit.TryRoutesKt.configureTryRoutes
       # — catch-all router
       - ch.nokillswit.plugins.RoutingKt.configureRouting

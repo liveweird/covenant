@@ -4,6 +4,10 @@ import ch.nokillswit.auth.TokenBlocklistService
 import ch.nokillswit.contracts.ContractEventService
 import ch.nokillswit.contracts.ContractEventServiceKey
 import ch.nokillswit.contracts.ContractService
+import ch.nokillswit.contracts.ContractUrlFetcherKey
+import ch.nokillswit.contracts.ContractUrlFetcher
+import ch.nokillswit.contracts.ContractImporterKey
+import ch.nokillswit.contracts.ContractImporter
 import ch.nokillswit.contracts.ContractServiceKey
 import ch.nokillswit.contracts.ContractVersionService
 import ch.nokillswit.contracts.ContractVersionServiceKey
@@ -59,7 +63,13 @@ suspend fun Application.configureDatabase() {
     // application.yaml therefore lists BEFORE this module).
     val contractService = ContractService(database, teamService)
     attributes.put(ContractServiceKey, contractService)
-    attributes.put(ContractVersionServiceKey, ContractVersionService(database, attributes[ChecksServiceKey]))
+    val versionService = ContractVersionService(database, attributes[ChecksServiceKey])
+    attributes.put(ContractVersionServiceKey, versionService)
+    // The import pipeline and the SSRF-guarded fetcher: stateless collaborators, built here rather than
+    // in a route file so every service has ONE home (a test pre-puts ContractUrlFetcherKey to aim the
+    // fetch at a fixture — the routes read the key per request).
+    attributes.put(ContractImporterKey, ContractImporter(contractService, versionService, attributes[ChecksServiceKey]))
+    attributes.put(ContractUrlFetcherKey, ContractUrlFetcher())
     val eventService = ContractEventService(database)
     attributes.put(ContractEventServiceKey, eventService)
     // Followers + their notifications: the routes record every contract mutation through
