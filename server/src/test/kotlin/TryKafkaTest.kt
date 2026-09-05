@@ -23,11 +23,25 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.testApplication
 import java.util.UUID
 import kotlin.test.Test
+import org.junit.BeforeClass
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** The Kafka try legs against a single-node KRaft container registered as an environment's cluster. */
 class TryKafkaTest {
+    companion object {
+        /**
+         * Starts (and on a cold runner PULLS) the Kafka container BEFORE any test body: `testApplication`
+         * runs the body under a one-minute coroutine budget, and the first Kafka test used to pay the
+         * image pull inside it — an `UncompletedCoroutinesError` on CI that never reproduced locally.
+         */
+        @JvmStatic
+        @BeforeClass
+        fun startKafka() {
+            KafkaTestSupport.bootstrapServers
+        }
+    }
+
 
     private fun name(prefix: String) = "$prefix-${UUID.randomUUID().toString().substring(0, 8)}"
 
