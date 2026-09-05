@@ -499,6 +499,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/environments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List environments
+         * @description Any authenticated user — the try-it feature's target picker reads them; every mutation
+         *     below is ADMIN only. Responses never carry a password (`hasPassword` says whether one is
+         *     stored). Sortable: `id`, `name`, `systemId`, `createdAt`, `updatedAt`. Filters: `name`
+         *     (case- and accent-insensitive substring), `systemId`.
+         */
+        get: operations["listEnvironments"];
+        put?: never;
+        /**
+         * Create an environment
+         * @description ADMIN only (guarded before the body decodes). At least one target (`httpBaseUrl`, `kafka`,
+         *     `postgres`) is required. Static shape rules only — an absolute http(s) base URL without
+         *     credentials, query or fragment (link-local hosts refused); 1–20 `host:port` bootstrap
+         *     servers; a SASL protocol needs a mechanism, a username and a password; a JDBC URL
+         *     starting with `jdbc:postgresql://` whose parameters are limited to `ssl`, `sslmode`,
+         *     `currentSchema`, `ApplicationName`. `systemId` must be an active system (`400`); a
+         *     case-insensitive name clash with an active environment IN THE SAME SYSTEM is `409`.
+         *     Passwords are encrypted at rest and never returned.
+         */
+        post: operations["createEnvironment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/environments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Fetch an environment
+         * @description Any authenticated user. Never carries a password.
+         */
+        get: operations["getEnvironment"];
+        /**
+         * Replace an environment
+         * @description ADMIN only (guard before the id lookup). A full replace of every non-secret field; a
+         *     target whose `password` is absent keeps the stored one, a target omitted altogether is
+         *     removed with its credentials. The same shape rules and the `409` as on create.
+         */
+        put: operations["updateEnvironment"];
+        post?: never;
+        /**
+         * Delete an environment
+         * @description ADMIN only. Soft delete; deleting a SYSTEM deletes its environments too.
+         */
+        delete: operations["deleteEnvironment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contracts": {
         parameters: {
             query?: never;
@@ -1322,6 +1388,77 @@ export interface components {
             domainId: number;
             name: string;
             description?: string | null;
+        };
+        /** @enum {string} */
+        KafkaSecurityProtocol: "PLAINTEXT" | "SSL" | "SASL_PLAINTEXT" | "SASL_SSL";
+        /** @enum {string} */
+        KafkaSaslMechanism: "PLAIN" | "SCRAM-SHA-256" | "SCRAM-SHA-512";
+        KafkaTargetRequest: {
+            /** @description 1–20 comma-separated host:port entries. */
+            bootstrapServers: string;
+            securityProtocol: components["schemas"]["KafkaSecurityProtocol"];
+            saslMechanism?: components["schemas"]["KafkaSaslMechanism"] | null;
+            username?: string | null;
+            /** @description Write-only. Absent on a PUT keeps the stored password. */
+            password?: string | null;
+        };
+        PostgresTargetRequest: {
+            /** @description `jdbc:postgresql://host:port/db`, parameters limited to ssl, sslmode, currentSchema, ApplicationName. Give the try-it feature a READ-ONLY role. */
+            jdbcUrl: string;
+            username: string;
+            /** @description Write-only. Absent on a PUT keeps the stored password. */
+            password?: string | null;
+        };
+        EnvironmentRequest: {
+            /** Format: int32 */
+            systemId: number;
+            name: string;
+            description?: string | null;
+            /** @description Absolute http(s) URL without credentials, query or fragment; replaces the document's servers. */
+            httpBaseUrl?: string | null;
+            kafka?: components["schemas"]["KafkaTargetRequest"] | null;
+            postgres?: components["schemas"]["PostgresTargetRequest"] | null;
+        };
+        KafkaTargetResponse: {
+            bootstrapServers: string;
+            securityProtocol: components["schemas"]["KafkaSecurityProtocol"];
+            saslMechanism?: components["schemas"]["KafkaSaslMechanism"] | null;
+            username?: string | null;
+            hasPassword: boolean;
+        };
+        PostgresTargetResponse: {
+            jdbcUrl: string;
+            username: string;
+            hasPassword: boolean;
+        };
+        EnvironmentResponse: {
+            /** Format: int32 */
+            id: number;
+            /** Format: int32 */
+            systemId: number;
+            systemName: string;
+            name: string;
+            description?: string | null;
+            httpBaseUrl?: string | null;
+            kafka?: components["schemas"]["KafkaTargetResponse"] | null;
+            postgres?: components["schemas"]["PostgresTargetResponse"] | null;
+            /**
+             * Format: int64
+             * @description Epoch millis
+             */
+            createdAt: number;
+            /**
+             * Format: int64
+             * @description Epoch millis
+             */
+            updatedAt: number;
+        };
+        EnvironmentPage: {
+            items: components["schemas"]["EnvironmentResponse"][];
+            page: number;
+            pageSize: number;
+            /** Format: int64 */
+            total: number;
         };
         SystemResponse: {
             /** Format: int32 */
@@ -2813,6 +2950,155 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listEnvironments: {
+        parameters: {
+            query?: {
+                /** @description 1-based page index. Defaults to 1. */
+                page?: components["parameters"]["Page"];
+                /** @description Rows per page. Defaults to 20, maximum 100. */
+                pageSize?: components["parameters"]["PageSize"];
+                /**
+                 * @description Sort spec. Format: `field` (ascending) or `-field` (descending). Multiple fields are
+                 *     comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
+                 *     sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
+                 *     always appended as a deterministic tiebreaker.
+                 */
+                sort?: components["parameters"]["Sort"];
+                name?: string;
+                systemId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of environments */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvironmentPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    createEnvironment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnvironmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Created; `Location` points at the new environment */
+            201: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvironmentResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["PayloadTooLarge"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getEnvironment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvironmentResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    updateEnvironment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnvironmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    deleteEnvironment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];
         };
     };

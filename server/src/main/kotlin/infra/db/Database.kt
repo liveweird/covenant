@@ -25,6 +25,9 @@ import ch.nokillswit.contracts.ContractSubscriptionServiceKey
 import ch.nokillswit.contracts.ContractSubscriptionService
 import ch.nokillswit.contracts.ContractActivityKey
 import ch.nokillswit.contracts.ContractActivity
+import ch.nokillswit.infra.crypto.FieldCipherKey
+import ch.nokillswit.environments.EnvironmentServiceKey
+import ch.nokillswit.environments.EnvironmentService
 
 /**
  * The DI composition root: connects the one R2DBC database and publishes every service into
@@ -44,6 +47,8 @@ suspend fun Application.configureDatabase() {
     val domainService = DomainService(database)
     attributes.put(DomainServiceKey, domainService)
     attributes.put(SystemServiceKey, SystemService(database, domainService))
+    // The try-it environments: credentials encrypted at rest with the FieldCipher configureCrypto published.
+    attributes.put(EnvironmentServiceKey, EnvironmentService(database, attributes[FieldCipherKey]))
     // The contract services: the writer guard reads team membership (TeamService), the store
     // paths run the check pipeline (ChecksService — published by configureChecks, which
     // application.yaml therefore lists BEFORE this module).

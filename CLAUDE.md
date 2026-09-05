@@ -137,6 +137,12 @@ ch.nokillswit
 ├── domains/            the hierarchy's top level (V7): Domain.kt, DomainService.kt (paged list +
 │                       listAll for the tree/pickers, active-system counts, the holds-systems 409 on
 │                       delete), DomainRoutes.kt — /api/v1/domains, reads any authenticated, writes ADMIN
+├── environments/       the try-it connection targets (V15): Environment.kt (DTOs — write-only passwords in,
+│                       `hasPassword` out — and the decrypted EnvironmentTargets for the try services only),
+│                       TargetValidation.kt (the static shape rules: http(s) base URL, bootstrap entries, SASL
+│                       triplet, the JDBC parameter allow-list), EnvironmentService.kt (EncryptedAtRest —
+│                       kafka_password/pg_password), EnvironmentRoutes.kt — /api/v1/environments, reads any
+│                       authenticated, writes ADMIN. The registry IS the try-it SSRF control (security.md)
 ├── systems/            the hierarchy's middle level (V8): System.kt, SystemService.kt (joins the domain
 │                       name; domainId filter; a PUT moves the system; the domain id checked inside the
 │                       write's transaction), SystemRoutes.kt — /api/v1/systems, same authz split

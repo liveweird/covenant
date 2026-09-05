@@ -12,6 +12,7 @@ import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.dao.id.UIntIdTable
 import org.jetbrains.exposed.v1.r2dbc.*
 import org.jetbrains.exposed.v1.r2dbc.transactions.suspendTransaction
+import ch.nokillswit.environments.EnvironmentService
 
 val SystemServiceKey = AttributeKey<SystemService>("SystemService")
 
@@ -88,12 +89,24 @@ class SystemService(private val database: R2dbcDatabase, private val domains: Do
         }
     }
 
-    /** Soft delete; the contracts feature adds the 409 while an active contract still points here. */
+    /**
+     * Soft delete; the contracts feature adds the 409 while an active contract still points here.
+     * The system's environments (V15) are configuration OF the system and go with it, in the same
+     * transaction (a sanctioned cross-feature write — see persistence.md).
+     */
     suspend fun delete(id: UInt): Int = suspendTransaction(database) {
-        Systems.update({ (Systems.id eq id) and active() }) {
+        val rows = Systems.update({ (Systems.id eq id) and active() }) {
             it[markedAsDeleted] = true
             it[updatedAt] = now()
         }
+        if (rows > 0) {
+            val e = EnvironmentService.Environments
+            e.update({ (e.systemId eq id) and (e.markedAsDeleted eq false) }) {
+                it[e.markedAsDeleted] = true
+                it[e.updatedAt] = now()
+            }
+        }
+        rows
     }
 
     private suspend fun requireDomain(domainId: UInt) {

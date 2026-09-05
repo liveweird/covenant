@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.r2dbc.R2dbcDatabase
+import org.jetbrains.exposed.v1.r2dbc.insert
 import org.jetbrains.exposed.v1.r2dbc.selectAll
 import org.jetbrains.exposed.v1.r2dbc.transactions.suspendTransaction
 import org.jetbrains.exposed.v1.r2dbc.update
@@ -190,6 +191,9 @@ suspend fun assertStartupFails(messagePart: String, start: suspend () -> Unit) {
 internal fun newTokenBlocklistService(clock: () -> Long): ch.nokillswit.auth.TokenBlocklistService =
     ch.nokillswit.auth.TokenBlocklistService(sharedTestDatabase, clock)
 
+/** The shared test database — for fixtures that construct a service by hand (the encryption tests). */
+fun sharedDatabaseForTests(): R2dbcDatabase = sharedTestDatabase
+
 private val sharedTestDatabase: R2dbcDatabase by lazy {
     R2dbcDatabase.connect(
         url = PostgresTestSupport.r2dbcUrl,
@@ -274,6 +278,44 @@ object TestSeedState {
 }
 
 /** Direct team fixtures — roster reads past the routes (the soft-delete assertions) and quick seeding. */
+object TestEnvironments {
+    val service: ch.nokillswit.environments.EnvironmentService by lazy {
+        ch.nokillswit.environments.EnvironmentService(
+            sharedTestDatabase,
+            ch.nokillswit.infra.crypto.FieldCipher(TEST_DATA_ENCRYPTION_KEY),
+        )
+    }
+
+    /** The application.yaml dev default — the key every test app boots with, so this service reads what the app wrote. */
+    const val TEST_DATA_ENCRYPTION_KEY = "ef9b766b3b3dc805220826e796b1b907d7b7fb55048940e1b730af61b7f17aa4"
+
+    data class RawRow(val kafkaPassword: String?, val pgPassword: String?, val markedAsDeleted: Boolean)
+
+    suspend fun rawRow(id: UInt): RawRow = suspendTransaction(sharedTestDatabase) {
+        val e = ch.nokillswit.environments.EnvironmentService.Environments
+        e.selectAll().where { e.id eq id }
+            .map { RawRow(it[e.kafkaPassword], it[e.pgPassword], it[e.markedAsDeleted]) }
+            .toList().single()
+    }
+
+    /** A legacy row with PLAINTEXT passwords — what a pre-encryption deployment would hold; the bootstrap must wrap it. */
+    suspend fun seedLegacyPlaintext(systemId: UInt, name: String, pgPassword: String): UInt = suspendTransaction(
+        sharedTestDatabase,
+    ) {
+        val e = ch.nokillswit.environments.EnvironmentService.Environments
+        val now = System.currentTimeMillis()
+        e.insert {
+            it[e.systemId] = systemId
+            it[e.name] = name
+            it[e.pgJdbcUrl] = "jdbc:postgresql://db.internal:5432/app"
+            it[e.pgUsername] = "reader"
+            it[e.pgPassword] = pgPassword
+            it[e.createdAt] = now
+            it[e.updatedAt] = now
+        }[e.id].value
+    }
+}
+
 object TestNotifications {
     val service: ch.nokillswit.notifications.NotificationService by lazy {
         ch.nokillswit.notifications.NotificationService(sharedTestDatabase)

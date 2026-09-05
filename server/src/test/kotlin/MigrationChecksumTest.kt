@@ -34,6 +34,7 @@ class MigrationChecksumTest {
         "V12__contract_version_source.sql" to -1247035387,
         "V13__create_contract_subscriptions.sql" to -1656044623,
         "V14__create_notifications.sql" to -2059319655,
+        "V15__create_environments.sql" to -121549605,
     )
 
     @Test

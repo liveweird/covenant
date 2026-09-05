@@ -4,6 +4,7 @@ import ch.nokillswit.auth.hashPassword
 import ch.nokillswit.users.UserServiceKey
 import io.ktor.server.application.*
 import ch.nokillswit.infra.crypto.EncryptedAtRest
+import ch.nokillswit.environments.EnvironmentServiceKey
 
 /** The V3 seed account's well-known bcrypt hash (plaintext "changeme"). */
 internal const val SEED_PASSWORD_HASH = "\$2y\$12\$VD60LjzPo00G5MtaWE3h9OrqYUid.MVxc5D7oHsM8oErnD9wuIvya"
@@ -60,5 +61,5 @@ suspend fun Application.configureBootstrap() {
     }
 }
 
-/** Every service owning encrypted-at-rest columns (see EncryptedAtRest) — the environments registry lands next. */
-private fun Application.encryptedAtRestServices(): List<EncryptedAtRest> = emptyList()
+/** Every service owning encrypted-at-rest columns (see EncryptedAtRest). */
+private fun Application.encryptedAtRestServices(): List<EncryptedAtRest> = listOf(attributes[EnvironmentServiceKey])

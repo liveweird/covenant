@@ -31,6 +31,7 @@ ktor:
       - ch.nokillswit.teams.TeamRoutesKt.configureTeamRoutes
       - ch.nokillswit.domains.DomainRoutesKt.configureDomainRoutes
       - ch.nokillswit.systems.SystemRoutesKt.configureSystemRoutes
+      - ch.nokillswit.environments.EnvironmentRoutesKt.configureEnvironmentRoutes
       - ch.nokillswit.contracts.ContractRoutesKt.configureContractRoutes
       - ch.nokillswit.contracts.ContractVersionRoutesKt.configureContractVersionRoutes
       - ch.nokillswit.notifications.NotificationRoutesKt.configureNotificationRoutes
