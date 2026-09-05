@@ -19,7 +19,7 @@
     "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.0",
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.4.1",
     "eslint": "^10.8.0",
     "eslint-plugin-sonarjs": "^4.2.0",
     "globals": "^17.8.0",
