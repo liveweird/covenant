@@ -17,7 +17,8 @@
     "SEMANTIC": "Semantyka",
     "LINT": "Lint",
     "BREAKING": "Zmiana łamiąca",
-    "SYSTEM": "System"
+    "SYSTEM": "System",
+    "CONFORMANCE": "Zgodność"
   },
   "waiting": "Sprawdzanie dokumentu…",
   "checking": "Sprawdzanie…",

@@ -7,14 +7,15 @@ import kotlinx.serialization.Serializable
  * and stored as the version's JSON snapshot. HARD = `source == SYNTAX` (a `400` on every store
  * path, never waivable); a SOFT `ERROR` blocks a strict save unless `allowInvalid=true`;
  * `WARN`/`INFO` never block. `SYSTEM` carries operational notes (`CHECKER_UNAVAILABLE`,
- * `FINDINGS_TRUNCATED`). Codes are stable machine ids: the JVM's own SCREAMING_SNAKE codes,
+ * `FINDINGS_TRUNCATED`); `CONFORMANCE` is a LIVE observation — a try-it response, message or table
+ * measured against the document (never stored on a version). Codes are stable machine ids: the JVM's own SCREAMING_SNAKE codes,
  * Spectral's kebab rule ids, the AsyncAPI parser's codes.
  */
 @Serializable
 enum class Severity { ERROR, WARN, INFO }
 
 @Serializable
-enum class FindingSource { SYNTAX, SCHEMA, SEMANTIC, LINT, BREAKING, SYSTEM }
+enum class FindingSource { SYNTAX, SCHEMA, SEMANTIC, LINT, BREAKING, CONFORMANCE, SYSTEM }
 
 @Serializable
 data class Finding(

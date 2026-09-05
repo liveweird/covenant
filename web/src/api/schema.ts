@@ -1175,6 +1175,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contracts/{id}/versions/{vid}/try": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What the version's document offers to try
+         * @description Any authenticated user. Derived from the stored document — the SPA parses no YAML: the
+         *     OpenAPI operations (path templates, parameters with path-level ones merged in, request-body
+         *     media types, declared response keys, the header names the security schemes expect), the
+         *     AsyncAPI channels (address, verbs, messages with their payload-schema pointers) or the ODCS
+         *     datasets (properties with logical/physical types). The family object matching the contract's
+         *     type is filled; the others stay empty. A stored document that no longer parses offers nothing.
+         */
+        get: operations["getTryCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1688,10 +1716,78 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        HttpParameterSummary: {
+            name: string;
+            /** @description path | query | header | cookie */
+            location: string;
+            required: boolean;
+            /** @description The declared schema type, when a scalar. */
+            type?: string | null;
+        };
+        HttpRequestBodySummary: {
+            required: boolean;
+            mediaTypes: string[];
+        };
+        HttpOperationSummary: {
+            operationId?: string | null;
+            /** @description Upper-case HTTP method. */
+            method: string;
+            /** @description The path template as declared (`/pets/{id}`). */
+            path: string;
+            summary?: string | null;
+            parameters: components["schemas"]["HttpParameterSummary"][];
+            requestBody?: components["schemas"]["HttpRequestBodySummary"] | null;
+            /** @description The declared response keys — `200`, `2XX`, `default`. */
+            responses: string[];
+            securityHeaders: string[];
+        };
+        KafkaMessageSummary: {
+            name: string;
+            contentType?: string | null;
+            schemaFormat?: string | null;
+            /** @description The payload schema's JSON pointer in the document. */
+            payloadPointer?: string | null;
+        };
+        KafkaChannelSummary: {
+            /** @description The channel's key (3.x) or address (2.x). */
+            channel: string;
+            /** @description The topic. */
+            address: string;
+            /** @description 3.x send/receive, 2.x publish/subscribe. */
+            actions: string[];
+            messages: components["schemas"]["KafkaMessageSummary"][];
+        };
+        SqlPropertySummary: {
+            name: string;
+            physicalName?: string | null;
+            logicalType?: string | null;
+            physicalType?: string | null;
+            required: boolean;
+        };
+        SqlDatasetSummary: {
+            name: string;
+            physicalName?: string | null;
+            physicalType?: string | null;
+            properties: components["schemas"]["SqlPropertySummary"][];
+        };
+        TryCatalogResponse: {
+            type: components["schemas"]["ContractType"];
+            http: components["schemas"]["HttpOperationSummary"][];
+            kafka: components["schemas"]["KafkaChannelSummary"][];
+            sql: components["schemas"]["SqlDatasetSummary"][];
+        };
+        ConformanceReport: {
+            findings: components["schemas"]["Finding"][];
+            errors: number;
+            warnings: number;
+            infos: number;
+            /** @description The JSON pointer of the schema the observation was validated against. */
+            validatedAgainst?: string | null;
+        };
         /** @enum {string} */
         Severity: "ERROR" | "WARN" | "INFO";
         /** @enum {string} */
-        FindingSource: "SYNTAX" | "SCHEMA" | "SEMANTIC" | "LINT" | "BREAKING" | "SYSTEM";
+        FindingSource: "SYNTAX" | "SCHEMA" | "SEMANTIC" | "LINT" | "BREAKING" | "CONFORMANCE" | "SYSTEM";
         Finding: {
             severity: components["schemas"]["Severity"];
             source: components["schemas"]["FindingSource"];
@@ -4116,6 +4212,33 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getTryCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The catalog */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TryCatalogResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];
         };
     };

@@ -26,6 +26,7 @@ import ch.nokillswit.contracts.checks.OpenApiBreaking
 import ch.nokillswit.contracts.checks.DocumentFormat
 import ch.nokillswit.contracts.checks.FindingSource
 import ch.nokillswit.contracts.checks.Severity
+import ch.nokillswit.contracts.tryit.TryCatalogResponse
 import ch.nokillswit.plugins.ProblemDetail
 import ch.nokillswit.users.UserRole
 import io.ktor.client.HttpClient
@@ -236,6 +237,29 @@ class ContractVersionTest {
         val other = admin.contract("vlife2")
         assertEquals(HttpStatusCode.NotFound, admin.get("${path(other)}/${v.id}").status)
     }
+
+    @Test
+    fun `try catalog - the version's document read as operations, channels or datasets - 404 for a foreign version`() =
+        testApplication {
+            usePostgresTestcontainer()
+            val admin = seededClient("vtry", UserRole.ADMIN)
+            val api = admin.contract("vtry")
+            val v = admin.postJson(path(api), VersionCreateRequest("1.0.0", ContractFixtures.openApi)).body<VersionResponse>()
+            val http = admin.get("${path(api)}/${v.id}/try").body<TryCatalogResponse>()
+            assertEquals(ContractType.OPENAPI, http.type)
+            assertTrue(http.http.any { it.method == "GET" && it.path == "/pets" }, http.http.toString())
+            assertTrue(http.kafka.isEmpty() && http.sql.isEmpty())
+            val events = admin.contract("vtry", ContractType.ASYNCAPI)
+            val ev = admin.postJson(path(events), VersionCreateRequest("1.0.0", ContractFixtures.asyncApi3)).body<VersionResponse>()
+            val kafka = admin.get("${path(events)}/${ev.id}/try").body<TryCatalogResponse>()
+            assertEquals(listOf("lightMeasured"), kafka.kafka.map { it.channel })
+            val data = admin.contract("vtry", ContractType.ODCS)
+            val dv = admin.postJson(path(data), VersionCreateRequest("1.0.0", ContractFixtures.odcs)).body<VersionResponse>()
+            val sql = admin.get("${path(data)}/${dv.id}/try").body<TryCatalogResponse>()
+            assertEquals(listOf("customer_view"), sql.sql.map { it.name })
+            assertEquals(HttpStatusCode.NotFound, admin.get("${path(api)}/${dv.id}/try").status, "a version of another contract")
+            assertEquals(HttpStatusCode.NotFound, admin.get("${path(api)}/999999/try").status)
+        }
 
     @Test
     fun `raw content - the stored bytes with the format's media type, and a download disposition`() = testApplication {

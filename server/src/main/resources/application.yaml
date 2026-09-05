@@ -35,6 +35,7 @@ ktor:
       - ch.nokillswit.contracts.ContractRoutesKt.configureContractRoutes
       - ch.nokillswit.contracts.ContractVersionRoutesKt.configureContractVersionRoutes
       - ch.nokillswit.notifications.NotificationRoutesKt.configureNotificationRoutes
+      - ch.nokillswit.contracts.tryit.TryRoutesKt.configureTryRoutes
       - ch.nokillswit.auth.AuthRoutesKt.configureAuthRoutes
       # — catch-all router
       - ch.nokillswit.plugins.RoutingKt.configureRouting

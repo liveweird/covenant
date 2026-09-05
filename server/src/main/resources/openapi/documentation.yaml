@@ -32,6 +32,7 @@ tags:
   - name: environments
   - name: contracts
   - name: contract-versions
+  - name: try-it
   - name: notifications
 
 paths:
@@ -1739,6 +1740,32 @@ paths:
         '204': { description: All of the caller's notifications marked as seen }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/{id}/versions/{vid}/try:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+      - $ref: '#/components/parameters/VersionId'
+    get:
+      tags: [try-it]
+      operationId: getTryCatalog
+      summary: What the version's document offers to try
+      description: |
+        Any authenticated user. Derived from the stored document — the SPA parses no YAML: the
+        OpenAPI operations (path templates, parameters with path-level ones merged in, request-body
+        media types, declared response keys, the header names the security schemes expect), the
+        AsyncAPI channels (address, verbs, messages with their payload-schema pointers) or the ODCS
+        datasets (properties with logical/physical types). The family object matching the contract's
+        type is filled; the others stay empty. A stored document that no longer parses offers nothing.
+      responses:
+        '200':
+          description: The catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TryCatalogResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 components:
   securitySchemes:
     bearerAuth:
@@ -2541,12 +2568,90 @@ components:
         page: { type: integer, minimum: 1 }
         pageSize: { type: integer, minimum: 1, maximum: 100 }
         total: { type: integer, format: int64, minimum: 0 }
+    HttpParameterSummary:
+      type: object
+      required: [name, location, required]
+      properties:
+        name: { type: string }
+        location: { type: string, description: "path | query | header | cookie" }
+        required: { type: boolean }
+        type: { type: string, nullable: true, description: "The declared schema type, when a scalar." }
+    HttpRequestBodySummary:
+      type: object
+      required: [required, mediaTypes]
+      properties:
+        required: { type: boolean }
+        mediaTypes: { type: array, items: { type: string } }
+    HttpOperationSummary:
+      type: object
+      required: [method, path, parameters, responses, securityHeaders]
+      properties:
+        operationId: { type: string, nullable: true }
+        method: { type: string, description: Upper-case HTTP method. }
+        path: { type: string, description: "The path template as declared (`/pets/{id}`)." }
+        summary: { type: string, nullable: true }
+        parameters: { type: array, items: { $ref: '#/components/schemas/HttpParameterSummary' } }
+        requestBody:
+          allOf: [{ $ref: '#/components/schemas/HttpRequestBodySummary' }]
+          nullable: true
+        responses: { type: array, items: { type: string }, description: "The declared response keys — `200`, `2XX`, `default`." }
+        securityHeaders: { type: array, items: { type: string } }
+    KafkaMessageSummary:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        contentType: { type: string, nullable: true }
+        schemaFormat: { type: string, nullable: true }
+        payloadPointer: { type: string, nullable: true, description: The payload schema's JSON pointer in the document. }
+    KafkaChannelSummary:
+      type: object
+      required: [channel, address, actions, messages]
+      properties:
+        channel: { type: string, description: The channel's key (3.x) or address (2.x). }
+        address: { type: string, description: The topic. }
+        actions: { type: array, items: { type: string }, description: "3.x send/receive, 2.x publish/subscribe." }
+        messages: { type: array, items: { $ref: '#/components/schemas/KafkaMessageSummary' } }
+    SqlPropertySummary:
+      type: object
+      required: [name, required]
+      properties:
+        name: { type: string }
+        physicalName: { type: string, nullable: true }
+        logicalType: { type: string, nullable: true }
+        physicalType: { type: string, nullable: true }
+        required: { type: boolean }
+    SqlDatasetSummary:
+      type: object
+      required: [name, properties]
+      properties:
+        name: { type: string }
+        physicalName: { type: string, nullable: true }
+        physicalType: { type: string, nullable: true }
+        properties: { type: array, items: { $ref: '#/components/schemas/SqlPropertySummary' } }
+    TryCatalogResponse:
+      type: object
+      required: [type, http, kafka, sql]
+      properties:
+        type: { $ref: '#/components/schemas/ContractType' }
+        http: { type: array, items: { $ref: '#/components/schemas/HttpOperationSummary' } }
+        kafka: { type: array, items: { $ref: '#/components/schemas/KafkaChannelSummary' } }
+        sql: { type: array, items: { $ref: '#/components/schemas/SqlDatasetSummary' } }
+    ConformanceReport:
+      type: object
+      required: [findings, errors, warnings, infos]
+      properties:
+        findings: { type: array, items: { $ref: '#/components/schemas/Finding' } }
+        errors: { type: integer, minimum: 0 }
+        warnings: { type: integer, minimum: 0 }
+        infos: { type: integer, minimum: 0 }
+        validatedAgainst: { type: string, nullable: true, description: The JSON pointer of the schema the observation was validated against. }
     Severity:
       type: string
       enum: [ERROR, WARN, INFO]
     FindingSource:
       type: string
-      enum: [SYNTAX, SCHEMA, SEMANTIC, LINT, BREAKING, SYSTEM]
+      enum: [SYNTAX, SCHEMA, SEMANTIC, LINT, BREAKING, CONFORMANCE, SYSTEM]
     Finding:
       type: object
       required: [severity, source, code, message]

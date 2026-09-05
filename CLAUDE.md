@@ -123,7 +123,12 @@ ch.nokillswit
 │                       @asyncapi/diff pass), VendoredSchemas.kt (offline
 │                       networknt registries over resources/schemas), CheckerClient.kt (the sidecar
 │                       client + its AttributeKey test seam), ChecksService.kt (the pipeline), Checks.kt
-│                       (the module reading checker.url/token/timeoutMs)
+│                       (the module reading checker.url/token/timeoutMs); and tryit/ (milestone 3c) —
+│                       TryModel.kt (the catalog + report DTOs), TryCatalog.kt (what a document offers to
+│                       try, pure over the tree), Conformance.kt (DocumentSchemas — the in-document offline
+│                       networknt registry with the OpenAPI dialects — HttpConformance, PayloadConformance),
+│                       OdcsTypes.kt (logicalType ↔ PostgreSQL type families), TryRoutes.kt
+│                       (GET …/{vid}/try; the try POSTs land leg by leg)
 ├── notifications/      in-app notifications (V14, Lettuce's, ported minus flags/email): Notification.kt (the
 │                       NotificationType whitelist + DTOs), NotificationService.kt (createAll/read/seen/unseen/
 │                       seenAll/soft delete/paged list on ONE predicate), NotificationRoutes.kt — /api/v1/notifications,

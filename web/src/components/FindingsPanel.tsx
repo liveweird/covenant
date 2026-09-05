@@ -6,7 +6,7 @@ import type { Finding, FindingSource, Severity } from "../api/versions";
 import { isHardFinding } from "../api/versions";
 
 const SEVERITIES = ["ERROR", "WARN", "INFO"] as const satisfies readonly Severity[];
-const SOURCES = ["SYNTAX", "SCHEMA", "SEMANTIC", "LINT", "BREAKING", "SYSTEM"] as const satisfies readonly FindingSource[];
+const SOURCES = ["SYNTAX", "SCHEMA", "SEMANTIC", "LINT", "BREAKING", "CONFORMANCE", "SYSTEM"] as const satisfies readonly FindingSource[];
 
 /**
  * The colour vocabulary: red = blocks the save (a HARD syntax finding, or a soft ERROR that

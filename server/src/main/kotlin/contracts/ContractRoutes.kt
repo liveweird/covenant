@@ -107,6 +107,31 @@ class ContractsRoute {
                 @Serializable
                 @Resource("sync")
                 class Sync(val parent: Vid)
+
+                /** The try-it family (contracts/tryit/): the catalog GET, then the HTTP / Kafka / SQL legs. */
+                @Serializable
+                @Resource("try")
+                class Try(val parent: Vid) {
+                    @Serializable
+                    @Resource("http")
+                    class Http(val parent: Try)
+
+                    @Serializable
+                    @Resource("kafka")
+                    class Kafka(val parent: Try) {
+                        @Serializable
+                        @Resource("publish")
+                        class Publish(val parent: Kafka)
+
+                        @Serializable
+                        @Resource("read")
+                        class Read(val parent: Kafka)
+                    }
+
+                    @Serializable
+                    @Resource("sql")
+                    class Sql(val parent: Try)
+                }
             }
         }
     }
