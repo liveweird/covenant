@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, Menu } from "@mantine/core";
-import { IconArrowsDiff, IconCloudDownload, IconDots, IconDownload, IconLink, IconPencil, IconRefresh, IconTrash } from "@tabler/icons-react";
+import { IconArrowsDiff, IconCloudDownload, IconDots, IconDownload, IconLink, IconPencil, IconPlayerPlay, IconRefresh, IconTrash } from "@tabler/icons-react";
 import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
 import type { ContractResponse, Lifecycle } from "../api/contracts";
@@ -10,13 +10,15 @@ import { isDeletable } from "../utils/lifecycle";
 import LifecycleActions from "./LifecycleActions";
 import SourceUrlModal from "./SourceUrlModal";
 import SyncVersionModal from "./SyncVersionModal";
+import TryItDrawer from "./TryItDrawer";
 
 /**
  * The version page's header row: the lifecycle moves (writers), Edit (writers, while the text
  * is editable), and the More menu — Download and Compare for everyone, Link source, Sync from
- * source (once linked), Re-run checks and Delete (a DRAFT) for writers. Everything but Edit is
- * disabled while the document is being edited: the operations act on the STORED text. The two
- * source modals live here with their open state, beside the items that open them.
+ * source (once linked), Re-run checks and Delete (a DRAFT) for writers — plus Try it (everyone),
+ * which opens the try-it drawer over the STORED version. Everything but Edit is disabled while
+ * the document is being edited: the operations act on the stored text. The two source modals and
+ * the drawer live here with their open state, beside the controls that open them.
  */
 export default function VersionHeaderActions({
   contract,
@@ -51,8 +53,10 @@ export default function VersionHeaderActions({
   const { t } = useTranslation();
   const [linking, setLinking] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [trying, setTrying] = useState(false);
   return (
     <>
+      <TryItDrawer contract={contract} version={version} opened={trying} onClose={() => setTrying(false)} />
       <SourceUrlModal contractId={contract.id} version={linking ? version : null} onClose={() => setLinking(false)} />
       <SyncVersionModal contract={contract} version={syncing ? version : null} onClose={() => setSyncing(false)} onSynced={onSynced} />
       {contract.canWrite && !editing && (
@@ -63,6 +67,9 @@ export default function VersionHeaderActions({
           {t("versions.editDocument")}
         </Button>
       )}
+      <Button variant="default" leftSection={<IconPlayerPlay size={16} />} onClick={() => setTrying(true)} disabled={editing}>
+        {t("tryIt.action")}
+      </Button>
       <Menu>
         <Menu.Target>
           <Button variant="default" leftSection={<IconDots size={16} />} aria-label={t("contracts.moreActions")} disabled={editing}>

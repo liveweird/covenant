@@ -1,0 +1,82 @@
+{
+  "action": "Try it",
+  "title": "Try {{name}} {{version}}",
+  "intro": "The server sends the call to an environment and measures what comes back against this version of the contract. Nothing is stored.",
+  "environment": "Environment",
+  "environmentHint": "Where the call goes — an administrator-curated target of this system.",
+  "noEnvironments": "No environment of this system has a {{target}} target.",
+  "noEnvironmentsAdmin": "Add one in the Environments registry",
+  "target": {
+    "http": "HTTP",
+    "kafka": "Kafka",
+    "postgres": "PostgreSQL"
+  },
+  "nothingToTry": "This document offers nothing to try.",
+  "duration": "{{ms}} ms",
+  "http": {
+    "operation": "Operation",
+    "pathParam": "Path parameter {{name}}",
+    "query": "Query parameters",
+    "headers": "Headers",
+    "headersHint": "The document expects {{names}}. Values are sent once and never stored.",
+    "headersPlain": "Sent as typed, once — never stored.",
+    "contentType": "Content type",
+    "body": "Request body",
+    "send": "Send",
+    "response": "Response",
+    "status": "Status {{status}}",
+    "responseHeaders": "Response headers",
+    "responseBody": "Response body",
+    "noBody": "No body",
+    "truncated": "The body was cut at 1 MiB"
+  },
+  "kafka": {
+    "channel": "Channel",
+    "message": "Message",
+    "actions": "Declared actions: {{actions}}",
+    "key": "Key",
+    "headers": "Headers",
+    "payload": "Payload",
+    "publish": "Publish",
+    "publishWriters": "Only the contract's writers may publish; reading is open to everyone.",
+    "read": "Read recent",
+    "limit": "Records",
+    "published": "Published to {{topic}} — partition {{partition}}, offset {{offset}}",
+    "publishedAria": "Publish result",
+    "records": "Records on {{topic}}",
+    "noRecords": "No records on {{topic}}",
+    "record": "Partition {{partition}}, offset {{offset}}",
+    "reachedEnd": "Read to the end of every partition",
+    "notEnd": "More records remain",
+    "noPayload": "No payload (a tombstone)",
+    "base64": "binary — shown as base64",
+    "truncated": "cut at 64 KiB"
+  },
+  "sql": {
+    "dataset": "Dataset",
+    "limit": "Rows",
+    "run": "Run",
+    "result": "Sample",
+    "statement": "Statement",
+    "rows_one": "{{count}} row",
+    "rows_other": "{{count}} rows",
+    "truncated": "The sample was cut at 1 MiB",
+    "null": "NULL",
+    "noRows": "The dataset is empty",
+    "tableAria": "Sample rows"
+  },
+  "keyValue": {
+    "key": "Name",
+    "value": "Value",
+    "add": "Add",
+    "remove": "Remove {{name}}",
+    "empty": "None"
+  },
+  "error": {
+    "forbidden": "Only the contract's writers may do this.",
+    "invalid": "The request was refused.",
+    "tooMany": "Too many tries — wait a minute.",
+    "failedStatus": "The try failed ({{status}})",
+    "failed": "The try failed. Check your connection and try again."
+  }
+}
