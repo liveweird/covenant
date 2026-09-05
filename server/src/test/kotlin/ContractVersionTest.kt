@@ -26,6 +26,7 @@ import ch.nokillswit.contracts.checks.OpenApiBreaking
 import ch.nokillswit.contracts.checks.DocumentFormat
 import ch.nokillswit.contracts.checks.FindingSource
 import ch.nokillswit.contracts.checks.Severity
+import ch.nokillswit.contracts.render.RenderModelResponse
 import ch.nokillswit.contracts.tryit.TryCatalogResponse
 import ch.nokillswit.plugins.ProblemDetail
 import ch.nokillswit.users.UserRole
@@ -236,6 +237,29 @@ class ContractVersionTest {
         // A version id under the wrong contract is a 404, not a leak.
         val other = admin.contract("vlife2")
         assertEquals(HttpStatusCode.NotFound, admin.get("${path(other)}/${v.id}").status)
+    }
+
+    @Test
+    fun `render model - the family matching the contract's type, the spec version, 404 for a foreign version`() = testApplication {
+        usePostgresTestcontainer()
+        val admin = seededClient("vmodel", UserRole.ADMIN)
+        val api = admin.contract("vmodel")
+        val v = admin.postJson(path(api), VersionCreateRequest("1.0.0", ContractFixtures.openApi)).body<VersionResponse>()
+        val model = admin.get("${path(api)}/${v.id}/model").body<RenderModelResponse>()
+        assertEquals(ContractType.OPENAPI, model.type)
+        assertEquals("3.1.0", model.specVersion)
+        assertEquals(listOf("GET /pets"), model.openApi?.operations?.map { "${it.method} ${it.path}" })
+        assertEquals(listOf("Pet"), model.openApi?.schemas?.map { it.name })
+        assertNull(model.asyncApi)
+        assertNull(model.odcs)
+        val events = admin.contract("vmodel", ContractType.ASYNCAPI)
+        val ev = admin.postJson(path(events), VersionCreateRequest("1.0.0", ContractFixtures.asyncApi3)).body<VersionResponse>()
+        val asyncModel = admin.get("${path(events)}/${ev.id}/model").body<RenderModelResponse>()
+        assertEquals("lightMeasured", asyncModel.asyncApi?.channels?.single()?.name)
+        val data = admin.contract("vmodel", ContractType.ODCS)
+        val dv = admin.postJson(path(data), VersionCreateRequest("1.0.0", ContractFixtures.odcs)).body<VersionResponse>()
+        assertEquals("customer_view", admin.get("${path(data)}/${dv.id}/model").body<RenderModelResponse>().odcs?.datasets?.single()?.name)
+        assertEquals(HttpStatusCode.NotFound, admin.get("${path(api)}/${dv.id}/model").status)
     }
 
     @Test

@@ -4,6 +4,7 @@ import ch.nokillswit.audit.audit
 import ch.nokillswit.authz.caller
 import ch.nokillswit.authz.orNotFound
 import ch.nokillswit.contracts.checks.BreakingChanges
+import ch.nokillswit.contracts.render.ContractRenderer
 import ch.nokillswit.contracts.checks.ChecksServiceKey
 import ch.nokillswit.contracts.checks.DocumentFormat
 import ch.nokillswit.contracts.checks.auditCheckerUnavailable
@@ -28,6 +29,7 @@ import io.ktor.server.resources.post
 import io.ktor.server.resources.put
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
 import io.ktor.server.routing.routing
 import java.net.URI
 
@@ -103,6 +105,14 @@ fun Application.configureContractVersionRoutes() {
             get<ContractsRoute.Id.Versions.Vid> { route ->
                 call.caller()
                 call.respond(HttpStatusCode.OK, versionService.read(route.parent.parent.id, route.vid).orNotFound("Version"))
+            }
+            get<ContractsRoute.Id.Versions.Vid.Model> { route ->
+                call.caller()
+                val contractId = route.parent.parent.parent.id
+                val version = versionService.read(contractId, route.parent.vid).orNotFound("Version")
+                val type = contractService.typeOf(contractId).orNotFound("Contract")
+                val model = ContractRenderer.render(type, version.content)
+                call.respondText(ContractRenderer.json.encodeToString(model), ContentType.Application.Json, HttpStatusCode.OK)
             }
             get<ContractsRoute.Id.Versions.Vid.Content> { route ->
                 val viewer = contractService.viewer(call.caller())

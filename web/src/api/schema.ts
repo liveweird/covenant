@@ -1175,6 +1175,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contracts/{id}/versions/{vid}/model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The reader's render model of the version's document
+         * @description Any authenticated user. A normalized, `$ref`-resolved, type-specific view of the stored
+         *     document — computed server-side per request (the SPA parses no YAML; hostile documents are
+         *     bounded once: `truncated` says the walk was cut, a `TRUNCATED` marker sits at the cut). Exactly
+         *     one of `openApi` / `asyncApi` / `odcs` is present, matching the contract's type. A stored
+         *     document that no longer parses or fails the type gate answers `200` with `error` set and no
+         *     model. Every nested list is always present; optional scalars are omitted when absent.
+         */
+        get: operations["getVersionModel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contracts/{id}/versions/{vid}/try": {
         parameters: {
             query?: never;
@@ -2024,6 +2052,429 @@ export interface components {
             /** Format: int64 */
             durationMs: number;
             conformance: components["schemas"]["ConformanceReport"];
+        };
+        /** @description Exactly one family model is present, matching `type`; none when `error` is set. */
+        RenderModelResponse: {
+            type: components["schemas"]["ContractType"];
+            specVersion?: string | null;
+            truncated: boolean;
+            error?: components["schemas"]["Finding"];
+            openApi?: components["schemas"]["OpenApiModel"];
+            asyncApi?: components["schemas"]["AsyncApiModel"];
+            odcs?: components["schemas"]["OdcsModel"];
+        };
+        /** @enum {string} */
+        SchemaMarker: "CIRCULAR" | "UNRESOLVED" | "TRUNCATED";
+        KeyValue: {
+            key: string;
+            value: string;
+        };
+        Constraint: {
+            keyword: string;
+            value: string;
+        };
+        PropertyView: {
+            name: string;
+            required: boolean;
+            schema: components["schemas"]["SchemaNode"];
+        };
+        DiscriminatorView: {
+            propertyName: string;
+            mapping: components["schemas"]["KeyValue"][];
+        };
+        /** @description The shared recursive schema primitive (JSON Schema 2020-12, OpenAPI 3.0's dialect and Avro all normalize onto it). */
+        SchemaNode: {
+            pointer: string;
+            ref?: string | null;
+            marker?: components["schemas"]["SchemaMarker"];
+            raw?: string | null;
+            types: string[];
+            nullable: boolean;
+            format?: string | null;
+            title?: string | null;
+            description?: string | null;
+            deprecated: boolean;
+            readOnly: boolean;
+            writeOnly: boolean;
+            properties: components["schemas"]["PropertyView"][];
+            additionalProperties?: components["schemas"]["SchemaNode"];
+            additionalPropertiesAllowed?: boolean | null;
+            items?: components["schemas"]["SchemaNode"];
+            tupleItems: components["schemas"]["SchemaNode"][];
+            allOf: components["schemas"]["SchemaNode"][];
+            anyOf: components["schemas"]["SchemaNode"][];
+            oneOf: components["schemas"]["SchemaNode"][];
+            not?: components["schemas"]["SchemaNode"];
+            discriminator?: components["schemas"]["DiscriminatorView"];
+            enumValues: string[];
+            constValue?: string | null;
+            defaultValue?: string | null;
+            examples: string[];
+            constraints: components["schemas"]["Constraint"][];
+        };
+        ContactView: {
+            name?: string | null;
+            url?: string | null;
+            email?: string | null;
+        };
+        LicenseView: {
+            name: string;
+            url?: string | null;
+            identifier?: string | null;
+        };
+        ExternalDocsView: {
+            url: string;
+            description?: string | null;
+        };
+        InfoView: {
+            title: string;
+            version: string;
+            summary?: string | null;
+            description?: string | null;
+            termsOfService?: string | null;
+            contact?: components["schemas"]["ContactView"];
+            license?: components["schemas"]["LicenseView"];
+        };
+        TagView: {
+            name: string;
+            description?: string | null;
+            externalDocs?: components["schemas"]["ExternalDocsView"];
+        };
+        ExampleView: {
+            name: string;
+            summary?: string | null;
+            description?: string | null;
+            value: string;
+        };
+        NamedSchemaView: {
+            name: string;
+            pointer: string;
+            schema: components["schemas"]["SchemaNode"];
+        };
+        OAuthFlowView: {
+            type: string;
+            authorizationUrl?: string | null;
+            tokenUrl?: string | null;
+            refreshUrl?: string | null;
+            scopes: components["schemas"]["KeyValue"][];
+        };
+        SecuritySchemeView: {
+            name: string;
+            pointer: string;
+            type: string;
+            description?: string | null;
+            scheme?: string | null;
+            bearerFormat?: string | null;
+            location?: string | null;
+            paramName?: string | null;
+            openIdConnectUrl?: string | null;
+            flows: components["schemas"]["OAuthFlowView"][];
+        };
+        SecuritySchemeUse: {
+            name: string;
+            scopes: string[];
+        };
+        /** @description One alternative — every scheme in it must hold. */
+        SecurityRequirementView: {
+            schemes: components["schemas"]["SecuritySchemeUse"][];
+        };
+        ServerVariableView: {
+            name: string;
+            default: string;
+            enumValues: string[];
+            description?: string | null;
+        };
+        ServerView: {
+            url: string;
+            description?: string | null;
+            variables: components["schemas"]["ServerVariableView"][];
+        };
+        MediaTypeView: {
+            mediaType: string;
+            schema?: components["schemas"]["SchemaNode"];
+            examples: components["schemas"]["ExampleView"][];
+        };
+        ParameterView: {
+            pointer: string;
+            name: string;
+            location: string;
+            required: boolean;
+            deprecated: boolean;
+            description?: string | null;
+            style?: string | null;
+            explode?: boolean | null;
+            schema?: components["schemas"]["SchemaNode"];
+            examples: components["schemas"]["ExampleView"][];
+            content: components["schemas"]["MediaTypeView"][];
+        };
+        RequestBodyView: {
+            pointer: string;
+            description?: string | null;
+            required: boolean;
+            content: components["schemas"]["MediaTypeView"][];
+        };
+        HeaderView: {
+            name: string;
+            description?: string | null;
+            required: boolean;
+            deprecated: boolean;
+            schema?: components["schemas"]["SchemaNode"];
+        };
+        ResponseView: {
+            pointer: string;
+            status: string;
+            description?: string | null;
+            headers: components["schemas"]["HeaderView"][];
+            content: components["schemas"]["MediaTypeView"][];
+        };
+        OperationView: {
+            pointer: string;
+            method: string;
+            path: string;
+            operationId?: string | null;
+            summary?: string | null;
+            description?: string | null;
+            tags: string[];
+            deprecated: boolean;
+            parameters: components["schemas"]["ParameterView"][];
+            requestBody?: components["schemas"]["RequestBodyView"];
+            responses: components["schemas"]["ResponseView"][];
+            /** @description Absent = inherits the document's security; empty = explicitly none. */
+            security?: components["schemas"]["SecurityRequirementView"][] | null;
+            externalDocs?: components["schemas"]["ExternalDocsView"];
+            servers: components["schemas"]["ServerView"][];
+        };
+        OpenApiModel: {
+            info: components["schemas"]["InfoView"];
+            servers: components["schemas"]["ServerView"][];
+            tags: components["schemas"]["TagView"][];
+            operations: components["schemas"]["OperationView"][];
+            webhooks: components["schemas"]["OperationView"][];
+            security: components["schemas"]["SecurityRequirementView"][];
+            securitySchemes: components["schemas"]["SecuritySchemeView"][];
+            schemas: components["schemas"]["NamedSchemaView"][];
+            externalDocs?: components["schemas"]["ExternalDocsView"];
+        };
+        AsyncServerView: {
+            name: string;
+            host?: string | null;
+            pathname?: string | null;
+            protocol?: string | null;
+            protocolVersion?: string | null;
+            description?: string | null;
+            security: string[];
+            tags: string[];
+            bindings: string[];
+        };
+        ChannelParameterView: {
+            name: string;
+            description?: string | null;
+            location?: string | null;
+            enumValues: string[];
+            default?: string | null;
+            schema?: components["schemas"]["SchemaNode"];
+        };
+        /** @description `target` is a key into `AsyncApiModel.messages`; absent when the reference could not be resolved. */
+        MessageRefView: {
+            name: string;
+            target?: string | null;
+        };
+        ChannelView: {
+            pointer: string;
+            name: string;
+            address?: string | null;
+            title?: string | null;
+            summary?: string | null;
+            description?: string | null;
+            servers: string[];
+            parameters: components["schemas"]["ChannelParameterView"][];
+            messages: components["schemas"]["MessageRefView"][];
+            bindings: string[];
+        };
+        AsyncOperationView: {
+            pointer: string;
+            name: string;
+            /** @description send or receive (2.x publish → receive, subscribe → send). */
+            action: string;
+            legacyAction?: string | null;
+            channel?: string | null;
+            messages: components["schemas"]["MessageRefView"][];
+            reply?: string | null;
+            summary?: string | null;
+            description?: string | null;
+            security: string[];
+            tags: string[];
+            bindings: string[];
+        };
+        MessageView: {
+            key: string;
+            pointer: string;
+            name?: string | null;
+            title?: string | null;
+            summary?: string | null;
+            description?: string | null;
+            contentType?: string | null;
+            schemaFormat?: string | null;
+            headers?: components["schemas"]["SchemaNode"];
+            payload?: components["schemas"]["SchemaNode"];
+            correlationId?: string | null;
+            examples: components["schemas"]["ExampleView"][];
+            tags: string[];
+            bindings: string[];
+            deprecated: boolean;
+            inline: boolean;
+        };
+        AsyncApiModel: {
+            info: components["schemas"]["InfoView"];
+            tags: components["schemas"]["TagView"][];
+            defaultContentType?: string | null;
+            servers: components["schemas"]["AsyncServerView"][];
+            channels: components["schemas"]["ChannelView"][];
+            operations: components["schemas"]["AsyncOperationView"][];
+            messages: components["schemas"]["MessageView"][];
+            schemas: components["schemas"]["NamedSchemaView"][];
+            securitySchemes: components["schemas"]["SecuritySchemeView"][];
+            externalDocs?: components["schemas"]["ExternalDocsView"];
+        };
+        AuthoritativeDefinitionView: {
+            type?: string | null;
+            url: string;
+        };
+        OdcsDescriptionView: {
+            purpose?: string | null;
+            limitations?: string | null;
+            usage?: string | null;
+            authoritativeDefinitions: components["schemas"]["AuthoritativeDefinitionView"][];
+            customProperties: components["schemas"]["KeyValue"][];
+        };
+        QualityView: {
+            pointer: string;
+            type?: string | null;
+            rule?: string | null;
+            name?: string | null;
+            description?: string | null;
+            query?: string | null;
+            engine?: string | null;
+            implementation?: string | null;
+            dimension?: string | null;
+            severity?: string | null;
+            businessImpact?: string | null;
+            schedule?: string | null;
+            scheduler?: string | null;
+            thresholds: components["schemas"]["KeyValue"][];
+        };
+        OdcsPropertyView: {
+            pointer: string;
+            name: string;
+            businessName?: string | null;
+            logicalType?: string | null;
+            physicalType?: string | null;
+            physicalName?: string | null;
+            description?: string | null;
+            required: boolean;
+            unique: boolean;
+            primaryKey: boolean;
+            primaryKeyPosition?: number | null;
+            partitioned: boolean;
+            partitionKeyPosition?: number | null;
+            classification?: string | null;
+            encryptedName?: string | null;
+            criticalDataElement: boolean;
+            transformSourceObjects: string[];
+            transformLogic?: string | null;
+            transformDescription?: string | null;
+            examples: string[];
+            tags: string[];
+            options: components["schemas"]["KeyValue"][];
+            quality: components["schemas"]["QualityView"][];
+            items?: components["schemas"]["OdcsPropertyView"];
+            properties: components["schemas"]["OdcsPropertyView"][];
+            customProperties: components["schemas"]["KeyValue"][];
+            marker?: components["schemas"]["SchemaMarker"];
+        };
+        DatasetView: {
+            pointer: string;
+            name: string;
+            physicalName?: string | null;
+            physicalType?: string | null;
+            logicalType?: string | null;
+            businessName?: string | null;
+            description?: string | null;
+            dataGranularityDescription?: string | null;
+            tags: string[];
+            properties: components["schemas"]["OdcsPropertyView"][];
+            quality: components["schemas"]["QualityView"][];
+            authoritativeDefinitions: components["schemas"]["AuthoritativeDefinitionView"][];
+            customProperties: components["schemas"]["KeyValue"][];
+        };
+        OdcsRoleView: {
+            role: string;
+            access?: string | null;
+            description?: string | null;
+            firstLevelApprovers?: string | null;
+            secondLevelApprovers?: string | null;
+            customProperties: components["schemas"]["KeyValue"][];
+        };
+        OdcsServerView: {
+            pointer: string;
+            server: string;
+            type?: string | null;
+            description?: string | null;
+            environment?: string | null;
+            details: components["schemas"]["KeyValue"][];
+            roles: components["schemas"]["OdcsRoleView"][];
+        };
+        TeamMemberView: {
+            username: string;
+            role?: string | null;
+            name?: string | null;
+            description?: string | null;
+            dateIn?: string | null;
+            dateOut?: string | null;
+            replacedByUsername?: string | null;
+        };
+        SlaPropertyView: {
+            property: string;
+            value: string;
+            valueExt?: string | null;
+            unit?: string | null;
+            element?: string | null;
+            driver?: string | null;
+        };
+        SupportView: {
+            channel: string;
+            url?: string | null;
+            tool?: string | null;
+            scope?: string | null;
+            description?: string | null;
+            invitationUrl?: string | null;
+        };
+        PriceView: {
+            priceAmount?: string | null;
+            priceCurrency?: string | null;
+            priceUnit?: string | null;
+        };
+        OdcsModel: {
+            id?: string | null;
+            name?: string | null;
+            version?: string | null;
+            status?: string | null;
+            domain?: string | null;
+            dataProduct?: string | null;
+            tenant?: string | null;
+            tags: string[];
+            contractCreatedTs?: string | null;
+            description?: components["schemas"]["OdcsDescriptionView"];
+            datasets: components["schemas"]["DatasetView"][];
+            servers: components["schemas"]["OdcsServerView"][];
+            team: components["schemas"]["TeamMemberView"][];
+            roles: components["schemas"]["OdcsRoleView"][];
+            slaDefaultElement?: string | null;
+            slaProperties: components["schemas"]["SlaPropertyView"][];
+            support: components["schemas"]["SupportView"][];
+            price?: components["schemas"]["PriceView"];
+            authoritativeDefinitions: components["schemas"]["AuthoritativeDefinitionView"][];
+            customProperties: components["schemas"]["KeyValue"][];
         };
         ConformanceReport: {
             findings: components["schemas"]["Finding"][];
@@ -4461,6 +4912,33 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getVersionModel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The render model */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderModelResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];
         };
     };

@@ -130,7 +130,13 @@ ch.nokillswit
 │                       OdcsTypes.kt (logicalType ↔ PostgreSQL type families), HttpTry.kt / SqlTry.kt /
 │                       KafkaTry.kt + KafkaClients.kt (the three legs — the server calls the environment,
 │                       never the SPA), TryRoutes.kt (GET …/{vid}/try + the four try POSTs behind the
-│                       shared TryPreamble and the tryIt RateLimit bucket)
+│                       shared TryPreamble and the tryIt RateLimit bucket); and render/ (milestone 4, the
+│                       reader's model behind GET …/{vid}/model) — RenderModel.kt (the @Serializable view
+│                       DTOs: SchemaNode + the OpenApi/AsyncApi/Odcs family models), JsonPointers.kt,
+│                       RenderBudget.kt (maxDepth 32 / maxNodes 20k → TRUNCATED markers), Nodes.kt (total
+│                       accessors), SchemaWalker.kt (JSON Schema → SchemaNode, 3.0 and 2020-12 dialects, the
+│                       cycle rule), AvroSchemaMapper.kt, Shared.kt, OpenApiRenderer/AsyncApiRenderer/
+│                       OdcsRenderer.kt, ContractRenderer.kt (parse → type gate → dispatch; nulls omitted)
 ├── notifications/      in-app notifications (V14, Lettuce's, ported minus flags/email): Notification.kt (the
 │                       NotificationType whitelist + DTOs), NotificationService.kt (createAll/read/seen/unseen/
 │                       seenAll/soft delete/paged list on ONE predicate), NotificationRoutes.kt — /api/v1/notifications,

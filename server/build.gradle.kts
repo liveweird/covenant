@@ -36,16 +36,26 @@ kotlin {
 
 kover {
     reports {
+        filters {
+            excludes {
+                // @Serializable data classes are wire shapes: kotlinx-serialization synthesizes one branch
+                // per optional property (the default-value mask in the generated constructor and
+                // serializer) that no test can meaningfully exercise — the reader's ~40 view DTOs alone
+                // added a thousand such branches. Behavior never lives in them (services, validators and
+                // renderers are plain classes and stay measured; a DTO's companion object stays measured
+                // too, since the annotation sits on the class).
+                annotatedBy("kotlinx.serialization.Serializable")
+            }
+        }
         verify {
             rule {
-                // Line-coverage floor (actual 89.4% after the scaffold prune, 2026-09-05 — the ported
-                // UrlFetch.kt route tests return with the import feature; re-measure with
+                // Line-coverage floor (actual 96.5% on 2026-09-05, measured with the @Serializable
+                // exclusion above — the floors were 88/66 before it; re-measure with
                 // `:server:koverXmlReport` and RAISE, never lower).
-                minBound(88)
-                // Branch-coverage floor (actual 68.3%, 2026-09-05; the gap to 100% is dominated by
-                // kotlinx-serialization synthetic branches in @Serializable data classes). NOTE:
-                // `check` runs only koverVerify — run `:server:koverXmlReport` for fresh actuals.
-                minBound(66, coverageUnits = kotlinx.kover.gradle.plugin.dsl.CoverageUnit.BRANCH)
+                minBound(95)
+                // Branch-coverage floor (actual 77.4%, 2026-09-05). NOTE: `check` runs only
+                // koverVerify — run `:server:koverXmlReport` for fresh actuals.
+                minBound(76, coverageUnits = kotlinx.kover.gradle.plugin.dsl.CoverageUnit.BRANCH)
             }
         }
     }

@@ -108,6 +108,11 @@ class ContractsRoute {
                 @Resource("sync")
                 class Sync(val parent: Vid)
 
+                /** The reader's render model (contracts/render/). */
+                @Serializable
+                @Resource("model")
+                class Model(val parent: Vid)
+
                 /** The try-it family (contracts/tryit/): the catalog GET, then the HTTP / Kafka / SQL legs. */
                 @Serializable
                 @Resource("try")

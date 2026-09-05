@@ -1740,6 +1740,32 @@ paths:
         '204': { description: All of the caller's notifications marked as seen }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/{id}/versions/{vid}/model:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+      - $ref: '#/components/parameters/VersionId'
+    get:
+      tags: [contract-versions]
+      operationId: getVersionModel
+      summary: The reader's render model of the version's document
+      description: |
+        Any authenticated user. A normalized, `$ref`-resolved, type-specific view of the stored
+        document — computed server-side per request (the SPA parses no YAML; hostile documents are
+        bounded once: `truncated` says the walk was cut, a `TRUNCATED` marker sits at the cut). Exactly
+        one of `openApi` / `asyncApi` / `odcs` is present, matching the contract's type. A stored
+        document that no longer parses or fails the type gate answers `200` with `error` set and no
+        model. Every nested list is always present; optional scalars are omitted when absent.
+      responses:
+        '200':
+          description: The render model
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RenderModelResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
   /api/v1/contracts/{id}/versions/{vid}/try:
     parameters:
       - $ref: '#/components/parameters/ResourceId'
@@ -2905,6 +2931,516 @@ components:
         reachedEnd: { type: boolean }
         durationMs: { type: integer, format: int64 }
         conformance: { $ref: '#/components/schemas/ConformanceReport' }
+    RenderModelResponse:
+      type: object
+      description: Exactly one family model is present, matching `type`; none when `error` is set.
+      required: [type, truncated]
+      properties:
+        type: { $ref: '#/components/schemas/ContractType' }
+        specVersion: { type: string, nullable: true }
+        truncated: { type: boolean }
+        error: { $ref: '#/components/schemas/Finding' }
+        openApi: { $ref: '#/components/schemas/OpenApiModel' }
+        asyncApi: { $ref: '#/components/schemas/AsyncApiModel' }
+        odcs: { $ref: '#/components/schemas/OdcsModel' }
+    SchemaMarker:
+      type: string
+      enum: [CIRCULAR, UNRESOLVED, TRUNCATED]
+    KeyValue:
+      type: object
+      required: [key, value]
+      properties:
+        key: { type: string }
+        value: { type: string }
+    Constraint:
+      type: object
+      required: [keyword, value]
+      properties:
+        keyword: { type: string }
+        value: { type: string }
+    PropertyView:
+      type: object
+      required: [name, required, schema]
+      properties:
+        name: { type: string }
+        required: { type: boolean }
+        schema: { $ref: '#/components/schemas/SchemaNode' }
+    DiscriminatorView:
+      type: object
+      required: [propertyName, mapping]
+      properties:
+        propertyName: { type: string }
+        mapping: { type: array, items: { $ref: '#/components/schemas/KeyValue' } }
+    SchemaNode:
+      type: object
+      description: The shared recursive schema primitive (JSON Schema 2020-12, OpenAPI 3.0's dialect and Avro all normalize onto it).
+      required: [pointer, types, nullable, deprecated, readOnly, writeOnly, properties, tupleItems, allOf, anyOf, oneOf, enumValues, examples, constraints]
+      properties:
+        pointer: { type: string }
+        ref: { type: string, nullable: true }
+        marker: { $ref: '#/components/schemas/SchemaMarker' }
+        raw: { type: string, nullable: true }
+        types: { type: array, items: { type: string } }
+        nullable: { type: boolean }
+        format: { type: string, nullable: true }
+        title: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        deprecated: { type: boolean }
+        readOnly: { type: boolean }
+        writeOnly: { type: boolean }
+        properties: { type: array, items: { $ref: '#/components/schemas/PropertyView' } }
+        additionalProperties: { $ref: '#/components/schemas/SchemaNode' }
+        additionalPropertiesAllowed: { type: boolean, nullable: true }
+        items: { $ref: '#/components/schemas/SchemaNode' }
+        tupleItems: { type: array, items: { $ref: '#/components/schemas/SchemaNode' } }
+        allOf: { type: array, items: { $ref: '#/components/schemas/SchemaNode' } }
+        anyOf: { type: array, items: { $ref: '#/components/schemas/SchemaNode' } }
+        oneOf: { type: array, items: { $ref: '#/components/schemas/SchemaNode' } }
+        not: { $ref: '#/components/schemas/SchemaNode' }
+        discriminator: { $ref: '#/components/schemas/DiscriminatorView' }
+        enumValues: { type: array, items: { type: string } }
+        constValue: { type: string, nullable: true }
+        defaultValue: { type: string, nullable: true }
+        examples: { type: array, items: { type: string } }
+        constraints: { type: array, items: { $ref: '#/components/schemas/Constraint' } }
+    ContactView:
+      type: object
+      properties:
+        name: { type: string, nullable: true }
+        url: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+    LicenseView:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        url: { type: string, nullable: true }
+        identifier: { type: string, nullable: true }
+    ExternalDocsView:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string }
+        description: { type: string, nullable: true }
+    InfoView:
+      type: object
+      required: [title, version]
+      properties:
+        title: { type: string }
+        version: { type: string }
+        summary: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        termsOfService: { type: string, nullable: true }
+        contact: { $ref: '#/components/schemas/ContactView' }
+        license: { $ref: '#/components/schemas/LicenseView' }
+    TagView:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        description: { type: string, nullable: true }
+        externalDocs: { $ref: '#/components/schemas/ExternalDocsView' }
+    ExampleView:
+      type: object
+      required: [name, value]
+      properties:
+        name: { type: string }
+        summary: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        value: { type: string }
+    NamedSchemaView:
+      type: object
+      required: [name, pointer, schema]
+      properties:
+        name: { type: string }
+        pointer: { type: string }
+        schema: { $ref: '#/components/schemas/SchemaNode' }
+    OAuthFlowView:
+      type: object
+      required: [type, scopes]
+      properties:
+        type: { type: string }
+        authorizationUrl: { type: string, nullable: true }
+        tokenUrl: { type: string, nullable: true }
+        refreshUrl: { type: string, nullable: true }
+        scopes: { type: array, items: { $ref: '#/components/schemas/KeyValue' } }
+    SecuritySchemeView:
+      type: object
+      required: [name, pointer, type, flows]
+      properties:
+        name: { type: string }
+        pointer: { type: string }
+        type: { type: string }
+        description: { type: string, nullable: true }
+        scheme: { type: string, nullable: true }
+        bearerFormat: { type: string, nullable: true }
+        location: { type: string, nullable: true }
+        paramName: { type: string, nullable: true }
+        openIdConnectUrl: { type: string, nullable: true }
+        flows: { type: array, items: { $ref: '#/components/schemas/OAuthFlowView' } }
+    SecuritySchemeUse:
+      type: object
+      required: [name, scopes]
+      properties:
+        name: { type: string }
+        scopes: { type: array, items: { type: string } }
+    SecurityRequirementView:
+      type: object
+      description: One alternative — every scheme in it must hold.
+      required: [schemes]
+      properties:
+        schemes: { type: array, items: { $ref: '#/components/schemas/SecuritySchemeUse' } }
+    ServerVariableView:
+      type: object
+      required: [name, default, enumValues]
+      properties:
+        name: { type: string }
+        default: { type: string }
+        enumValues: { type: array, items: { type: string } }
+        description: { type: string, nullable: true }
+    ServerView:
+      type: object
+      required: [url, variables]
+      properties:
+        url: { type: string }
+        description: { type: string, nullable: true }
+        variables: { type: array, items: { $ref: '#/components/schemas/ServerVariableView' } }
+    MediaTypeView:
+      type: object
+      required: [mediaType, examples]
+      properties:
+        mediaType: { type: string }
+        schema: { $ref: '#/components/schemas/SchemaNode' }
+        examples: { type: array, items: { $ref: '#/components/schemas/ExampleView' } }
+    ParameterView:
+      type: object
+      required: [pointer, name, location, required, deprecated, examples, content]
+      properties:
+        pointer: { type: string }
+        name: { type: string }
+        location: { type: string }
+        required: { type: boolean }
+        deprecated: { type: boolean }
+        description: { type: string, nullable: true }
+        style: { type: string, nullable: true }
+        explode: { type: boolean, nullable: true }
+        schema: { $ref: '#/components/schemas/SchemaNode' }
+        examples: { type: array, items: { $ref: '#/components/schemas/ExampleView' } }
+        content: { type: array, items: { $ref: '#/components/schemas/MediaTypeView' } }
+    RequestBodyView:
+      type: object
+      required: [pointer, required, content]
+      properties:
+        pointer: { type: string }
+        description: { type: string, nullable: true }
+        required: { type: boolean }
+        content: { type: array, items: { $ref: '#/components/schemas/MediaTypeView' } }
+    HeaderView:
+      type: object
+      required: [name, required, deprecated]
+      properties:
+        name: { type: string }
+        description: { type: string, nullable: true }
+        required: { type: boolean }
+        deprecated: { type: boolean }
+        schema: { $ref: '#/components/schemas/SchemaNode' }
+    ResponseView:
+      type: object
+      required: [pointer, status, headers, content]
+      properties:
+        pointer: { type: string }
+        status: { type: string }
+        description: { type: string, nullable: true }
+        headers: { type: array, items: { $ref: '#/components/schemas/HeaderView' } }
+        content: { type: array, items: { $ref: '#/components/schemas/MediaTypeView' } }
+    OperationView:
+      type: object
+      required: [pointer, method, path, tags, deprecated, parameters, responses, servers]
+      properties:
+        pointer: { type: string }
+        method: { type: string }
+        path: { type: string }
+        operationId: { type: string, nullable: true }
+        summary: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        tags: { type: array, items: { type: string } }
+        deprecated: { type: boolean }
+        parameters: { type: array, items: { $ref: '#/components/schemas/ParameterView' } }
+        requestBody: { $ref: '#/components/schemas/RequestBodyView' }
+        responses: { type: array, items: { $ref: '#/components/schemas/ResponseView' } }
+        security: { type: array, nullable: true, description: "Absent = inherits the document's security; empty = explicitly none.", items: { $ref: '#/components/schemas/SecurityRequirementView' } }
+        externalDocs: { $ref: '#/components/schemas/ExternalDocsView' }
+        servers: { type: array, items: { $ref: '#/components/schemas/ServerView' } }
+    OpenApiModel:
+      type: object
+      required: [info, servers, tags, operations, webhooks, security, securitySchemes, schemas]
+      properties:
+        info: { $ref: '#/components/schemas/InfoView' }
+        servers: { type: array, items: { $ref: '#/components/schemas/ServerView' } }
+        tags: { type: array, items: { $ref: '#/components/schemas/TagView' } }
+        operations: { type: array, items: { $ref: '#/components/schemas/OperationView' } }
+        webhooks: { type: array, items: { $ref: '#/components/schemas/OperationView' } }
+        security: { type: array, items: { $ref: '#/components/schemas/SecurityRequirementView' } }
+        securitySchemes: { type: array, items: { $ref: '#/components/schemas/SecuritySchemeView' } }
+        schemas: { type: array, items: { $ref: '#/components/schemas/NamedSchemaView' } }
+        externalDocs: { $ref: '#/components/schemas/ExternalDocsView' }
+    AsyncServerView:
+      type: object
+      required: [name, security, tags, bindings]
+      properties:
+        name: { type: string }
+        host: { type: string, nullable: true }
+        pathname: { type: string, nullable: true }
+        protocol: { type: string, nullable: true }
+        protocolVersion: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        security: { type: array, items: { type: string } }
+        tags: { type: array, items: { type: string } }
+        bindings: { type: array, items: { type: string } }
+    ChannelParameterView:
+      type: object
+      required: [name, enumValues]
+      properties:
+        name: { type: string }
+        description: { type: string, nullable: true }
+        location: { type: string, nullable: true }
+        enumValues: { type: array, items: { type: string } }
+        default: { type: string, nullable: true }
+        schema: { $ref: '#/components/schemas/SchemaNode' }
+    MessageRefView:
+      type: object
+      description: "`target` is a key into `AsyncApiModel.messages`; absent when the reference could not be resolved."
+      required: [name]
+      properties:
+        name: { type: string }
+        target: { type: string, nullable: true }
+    ChannelView:
+      type: object
+      required: [pointer, name, servers, parameters, messages, bindings]
+      properties:
+        pointer: { type: string }
+        name: { type: string }
+        address: { type: string, nullable: true }
+        title: { type: string, nullable: true }
+        summary: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        servers: { type: array, items: { type: string } }
+        parameters: { type: array, items: { $ref: '#/components/schemas/ChannelParameterView' } }
+        messages: { type: array, items: { $ref: '#/components/schemas/MessageRefView' } }
+        bindings: { type: array, items: { type: string } }
+    AsyncOperationView:
+      type: object
+      required: [pointer, name, action, messages, security, tags, bindings]
+      properties:
+        pointer: { type: string }
+        name: { type: string }
+        action: { type: string, description: "send or receive (2.x publish → receive, subscribe → send)." }
+        legacyAction: { type: string, nullable: true }
+        channel: { type: string, nullable: true }
+        messages: { type: array, items: { $ref: '#/components/schemas/MessageRefView' } }
+        reply: { type: string, nullable: true }
+        summary: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        security: { type: array, items: { type: string } }
+        tags: { type: array, items: { type: string } }
+        bindings: { type: array, items: { type: string } }
+    MessageView:
+      type: object
+      required: [key, pointer, examples, tags, bindings, deprecated, inline]
+      properties:
+        key: { type: string }
+        pointer: { type: string }
+        name: { type: string, nullable: true }
+        title: { type: string, nullable: true }
+        summary: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        contentType: { type: string, nullable: true }
+        schemaFormat: { type: string, nullable: true }
+        headers: { $ref: '#/components/schemas/SchemaNode' }
+        payload: { $ref: '#/components/schemas/SchemaNode' }
+        correlationId: { type: string, nullable: true }
+        examples: { type: array, items: { $ref: '#/components/schemas/ExampleView' } }
+        tags: { type: array, items: { type: string } }
+        bindings: { type: array, items: { type: string } }
+        deprecated: { type: boolean }
+        inline: { type: boolean }
+    AsyncApiModel:
+      type: object
+      required: [info, tags, servers, channels, operations, messages, schemas, securitySchemes]
+      properties:
+        info: { $ref: '#/components/schemas/InfoView' }
+        tags: { type: array, items: { $ref: '#/components/schemas/TagView' } }
+        defaultContentType: { type: string, nullable: true }
+        servers: { type: array, items: { $ref: '#/components/schemas/AsyncServerView' } }
+        channels: { type: array, items: { $ref: '#/components/schemas/ChannelView' } }
+        operations: { type: array, items: { $ref: '#/components/schemas/AsyncOperationView' } }
+        messages: { type: array, items: { $ref: '#/components/schemas/MessageView' } }
+        schemas: { type: array, items: { $ref: '#/components/schemas/NamedSchemaView' } }
+        securitySchemes: { type: array, items: { $ref: '#/components/schemas/SecuritySchemeView' } }
+        externalDocs: { $ref: '#/components/schemas/ExternalDocsView' }
+    AuthoritativeDefinitionView:
+      type: object
+      required: [url]
+      properties:
+        type: { type: string, nullable: true }
+        url: { type: string }
+    OdcsDescriptionView:
+      type: object
+      required: [authoritativeDefinitions, customProperties]
+      properties:
+        purpose: { type: string, nullable: true }
+        limitations: { type: string, nullable: true }
+        usage: { type: string, nullable: true }
+        authoritativeDefinitions: { type: array, items: { $ref: '#/components/schemas/AuthoritativeDefinitionView' } }
+        customProperties: { type: array, items: { $ref: '#/components/schemas/KeyValue' } }
+    QualityView:
+      type: object
+      required: [pointer, thresholds]
+      properties:
+        pointer: { type: string }
+        type: { type: string, nullable: true }
+        rule: { type: string, nullable: true }
+        name: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        query: { type: string, nullable: true }
+        engine: { type: string, nullable: true }
+        implementation: { type: string, nullable: true }
+        dimension: { type: string, nullable: true }
+        severity: { type: string, nullable: true }
+        businessImpact: { type: string, nullable: true }
+        schedule: { type: string, nullable: true }
+        scheduler: { type: string, nullable: true }
+        thresholds: { type: array, items: { $ref: '#/components/schemas/KeyValue' } }
+    OdcsPropertyView:
+      type: object
+      required: [pointer, name, required, unique, primaryKey, partitioned, criticalDataElement, transformSourceObjects, examples, tags, options, quality, properties, customProperties]
+      properties:
+        pointer: { type: string }
+        name: { type: string }
+        businessName: { type: string, nullable: true }
+        logicalType: { type: string, nullable: true }
+        physicalType: { type: string, nullable: true }
+        physicalName: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        required: { type: boolean }
+        unique: { type: boolean }
+        primaryKey: { type: boolean }
+        primaryKeyPosition: { type: integer, nullable: true }
+        partitioned: { type: boolean }
+        partitionKeyPosition: { type: integer, nullable: true }
+        classification: { type: string, nullable: true }
+        encryptedName: { type: string, nullable: true }
+        criticalDataElement: { type: boolean }
+        transformSourceObjects: { type: array, items: { type: string } }
+        transformLogic: { type: string, nullable: true }
+        transformDescription: { type: string, nullable: true }
+        examples: { type: array, items: { type: string } }
+        tags: { type: array, items: { type: string } }
+        options: { type: array, items: { $ref: '#/components/schemas/KeyValue' } }
+        quality: { type: array, items: { $ref: '#/components/schemas/QualityView' } }
+        items: { $ref: '#/components/schemas/OdcsPropertyView' }
+        properties: { type: array, items: { $ref: '#/components/schemas/OdcsPropertyView' } }
+        customProperties: { type: array, items: { $ref: '#/components/schemas/KeyValue' } }
+        marker: { $ref: '#/components/schemas/SchemaMarker' }
+    DatasetView:
+      type: object
+      required: [pointer, name, tags, properties, quality, authoritativeDefinitions, customProperties]
+      properties:
+        pointer: { type: string }
+        name: { type: string }
+        physicalName: { type: string, nullable: true }
+        physicalType: { type: string, nullable: true }
+        logicalType: { type: string, nullable: true }
+        businessName: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        dataGranularityDescription: { type: string, nullable: true }
+        tags: { type: array, items: { type: string } }
+        properties: { type: array, items: { $ref: '#/components/schemas/OdcsPropertyView' } }
+        quality: { type: array, items: { $ref: '#/components/schemas/QualityView' } }
+        authoritativeDefinitions: { type: array, items: { $ref: '#/components/schemas/AuthoritativeDefinitionView' } }
+        customProperties: { type: array, items: { $ref: '#/components/schemas/KeyValue' } }
+    OdcsRoleView:
+      type: object
+      required: [role, customProperties]
+      properties:
+        role: { type: string }
+        access: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        firstLevelApprovers: { type: string, nullable: true }
+        secondLevelApprovers: { type: string, nullable: true }
+        customProperties: { type: array, items: { $ref: '#/components/schemas/KeyValue' } }
+    OdcsServerView:
+      type: object
+      required: [pointer, server, details, roles]
+      properties:
+        pointer: { type: string }
+        server: { type: string }
+        type: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        environment: { type: string, nullable: true }
+        details: { type: array, items: { $ref: '#/components/schemas/KeyValue' } }
+        roles: { type: array, items: { $ref: '#/components/schemas/OdcsRoleView' } }
+    TeamMemberView:
+      type: object
+      required: [username]
+      properties:
+        username: { type: string }
+        role: { type: string, nullable: true }
+        name: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        dateIn: { type: string, nullable: true }
+        dateOut: { type: string, nullable: true }
+        replacedByUsername: { type: string, nullable: true }
+    SlaPropertyView:
+      type: object
+      required: [property, value]
+      properties:
+        property: { type: string }
+        value: { type: string }
+        valueExt: { type: string, nullable: true }
+        unit: { type: string, nullable: true }
+        element: { type: string, nullable: true }
+        driver: { type: string, nullable: true }
+    SupportView:
+      type: object
+      required: [channel]
+      properties:
+        channel: { type: string }
+        url: { type: string, nullable: true }
+        tool: { type: string, nullable: true }
+        scope: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        invitationUrl: { type: string, nullable: true }
+    PriceView:
+      type: object
+      properties:
+        priceAmount: { type: string, nullable: true }
+        priceCurrency: { type: string, nullable: true }
+        priceUnit: { type: string, nullable: true }
+    OdcsModel:
+      type: object
+      required: [tags, datasets, servers, team, roles, slaProperties, support, authoritativeDefinitions, customProperties]
+      properties:
+        id: { type: string, nullable: true }
+        name: { type: string, nullable: true }
+        version: { type: string, nullable: true }
+        status: { type: string, nullable: true }
+        domain: { type: string, nullable: true }
+        dataProduct: { type: string, nullable: true }
+        tenant: { type: string, nullable: true }
+        tags: { type: array, items: { type: string } }
+        contractCreatedTs: { type: string, nullable: true }
+        description: { $ref: '#/components/schemas/OdcsDescriptionView' }
+        datasets: { type: array, items: { $ref: '#/components/schemas/DatasetView' } }
+        servers: { type: array, items: { $ref: '#/components/schemas/OdcsServerView' } }
+        team: { type: array, items: { $ref: '#/components/schemas/TeamMemberView' } }
+        roles: { type: array, items: { $ref: '#/components/schemas/OdcsRoleView' } }
+        slaDefaultElement: { type: string, nullable: true }
+        slaProperties: { type: array, items: { $ref: '#/components/schemas/SlaPropertyView' } }
+        support: { type: array, items: { $ref: '#/components/schemas/SupportView' } }
+        price: { $ref: '#/components/schemas/PriceView' }
+        authoritativeDefinitions: { type: array, items: { $ref: '#/components/schemas/AuthoritativeDefinitionView' } }
+        customProperties: { type: array, items: { $ref: '#/components/schemas/KeyValue' } }
     ConformanceReport:
       type: object
       required: [findings, errors, warnings, infos]
