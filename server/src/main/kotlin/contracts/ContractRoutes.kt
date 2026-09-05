@@ -90,6 +90,14 @@ class ContractsRoute {
                 @Serializable
                 @Resource("recheck")
                 class Recheck(val parent: Vid)
+
+                @Serializable
+                @Resource("source")
+                class Source(val parent: Vid)
+
+                @Serializable
+                @Resource("sync")
+                class Sync(val parent: Vid)
             }
         }
     }

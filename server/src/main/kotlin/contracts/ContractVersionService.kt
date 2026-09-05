@@ -64,6 +64,10 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
         val createdAt = long("created_at")
         val updatedAt = long("updated_at")
         val markedAsDeleted = bool("marked_as_deleted").default(false)
+        // V12 — the repo reference and the sync baseline (row state beside the byte-exact text).
+        val sourceUrl = varchar("source_url", length = MAX_FETCH_URL_LENGTH).nullable()
+        val lastSyncedAt = long("last_synced_at").default(0)
+        val syncedContent = text("synced_content").nullable()
     }
 
     private val json = Json
@@ -99,6 +103,7 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
         allowInvalid: Boolean,
     ): VersionSaveResult {
         val semver = SemVer.parse(request.version)
+        val source = sanitizedSourceUrl(request.sourceUrl) // re-checked service-side too
         val baseline = baselineFor(contractId, semver)
         val report = checks.check(
             type, request.content, declaredVersion = request.version, lifecycle = Lifecycle.DRAFT, baseline = baseline,
@@ -138,6 +143,10 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
                 it[ContractVersions.createdBy] = createdBy
                 it[createdAt] = stamp
                 it[updatedAt] = stamp
+                // A text pulled from its repo copy is, right now, in sync with it.
+                it[sourceUrl] = source
+                it[lastSyncedAt] = if (source != null) stamp else 0
+                it[syncedContent] = if (source != null) request.content else null
             }[ContractVersions.id].value
             recomputeLatest(contractId)
             VersionSaveResult(rowOf(contractId, id)!!.toResponse(), waived)
@@ -151,6 +160,50 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
         type: ContractType,
         content: String,
         allowInvalid: Boolean,
+    ): VersionSaveResult = storeContent(contractId, versionId, type, content, allowInvalid, sync = false)
+
+    /**
+     * The repo → Covenant sync: the repo copy (fetched client-side through the guarded
+     * `POST /contracts/fetch`) replaces the text and stamps the sync state. Soft findings are
+     * ALWAYS waived (the import posture — the repo is the source of truth), HARD ones stay a 400,
+     * the lifecycle lock stays a 409, and a version without a reference is a 400.
+     */
+    suspend fun sync(contractId: UInt, versionId: UInt, type: ContractType, content: String): VersionSaveResult =
+        storeContent(contractId, versionId, type, content, allowInvalid = true, sync = true)
+
+    /**
+     * Sets or clears the version's repo reference (any lifecycle — a reference is metadata, not
+     * text). A CHANGED reference resets the sync state (a different source was never synced
+     * from) and never bumps `updatedAt` (that signal means "text edited since the sync").
+     * Returns the change, or null for a missing version.
+     */
+    suspend fun updateSource(contractId: UInt, versionId: UInt, sourceUrl: String?): SourceChange? = suspendTransaction(database) {
+        val next = sanitizedSourceUrl(sourceUrl) // re-checked service-side too
+        val row = rowOf(contractId, versionId) ?: return@suspendTransaction null
+        val previous = row[ContractVersions.sourceUrl]
+        if (previous != next) {
+            ContractVersions.update({ (ContractVersions.id eq versionId) and active() }) {
+                it[ContractVersions.sourceUrl] = next
+                it[lastSyncedAt] = 0
+                it[syncedContent] = null
+            }
+        }
+        SourceChange(row[ContractVersions.version], previous, next)
+    }
+
+    suspend fun syncState(contractId: UInt, versionId: UInt): SyncStateResponse? = suspendTransaction(database) {
+        rowOf(contractId, versionId)?.let {
+            SyncStateResponse(it[ContractVersions.sourceUrl], it[ContractVersions.lastSyncedAt], it[ContractVersions.syncedContent])
+        }
+    }
+
+    private suspend fun storeContent(
+        contractId: UInt,
+        versionId: UInt,
+        type: ContractType,
+        content: String,
+        allowInvalid: Boolean,
+        sync: Boolean,
     ): VersionSaveResult {
         val current = suspendTransaction(
             database,
@@ -158,6 +211,7 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
         if (!current.lifecycle.contentEditable) throw ConflictException(
             "A ${current.lifecycle} version's document is read-only — create a new version instead",
         )
+        if (sync && current.sourceUrl == null) throw BadRequestException("The version has no source reference to sync from")
         val baseline = baselineFor(contractId, SemVer.parse(current.version))
         val report = checks.check(type, content, declaredVersion = current.version, lifecycle = current.lifecycle, baseline = baseline)
         val waived = requireOrWaive(report, allowInvalid)
@@ -182,6 +236,11 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
                 it[checkComplete] = report.checkerAvailable
                 it[checkedAt] = stamp
                 it[updatedAt] = stamp
+                if (sync) {
+                    // The same stamp on both: updatedAt > lastSyncedAt is exactly "edited since".
+                    it[lastSyncedAt] = stamp
+                    it[syncedContent] = content
+                }
             }
             if (rows == 0) throw ConflictException("The version changed underneath you — reload and retry")
             VersionSaveResult(rowOf(contractId, versionId)!!.toResponse(), waived)
@@ -355,6 +414,8 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
         createdBy = this[ContractVersions.createdBy].value,
         createdAt = this[ContractVersions.createdAt],
         updatedAt = this[ContractVersions.updatedAt],
+        sourceUrl = this[ContractVersions.sourceUrl],
+        lastSyncedAt = this[ContractVersions.lastSyncedAt],
     )
 
     private fun ResultRow.toListItem() = VersionListItem(
@@ -372,11 +433,18 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
         createdBy = this[ContractVersions.createdBy].value,
         createdAt = this[ContractVersions.createdAt],
         updatedAt = this[ContractVersions.updatedAt],
+        sourceUrl = this[ContractVersions.sourceUrl],
+        lastSyncedAt = this[ContractVersions.lastSyncedAt],
     )
 
     private companion object {
         const val MAX_LISTED = 5
     }
+}
+
+/** What `updateSource` did: the version's number and the reference before/after (equal = no-op). */
+data class SourceChange(val version: String, val previous: String?, val next: String?) {
+    val changed: Boolean get() = previous != next
 }
 
 internal fun sha256(text: String): String =

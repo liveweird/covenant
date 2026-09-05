@@ -41,7 +41,7 @@ describe("ImportContract page", () => {
     await user.click(screen.getByRole("button", { name: "Check" }));
     await waitFor(() => expect(findCall(mockFetch, "POST", "/api/v1/contracts/import/check")).toBeDefined());
     const body = bodyOf(findCall(mockFetch, "POST", "/api/v1/contracts/import/check")) as { items: unknown[] };
-    expect(body.items).toEqual([{ systemId: 7, type: "OPENAPI", name: "Orders", description: null, ownerTeamId: null, ownerUserId: null, version: "1.1.0", content: CONTENT }]);
+    expect(body.items).toEqual([{ systemId: 7, type: "OPENAPI", name: "Orders", description: null, ownerTeamId: null, ownerUserId: null, version: "1.1.0", sourceUrl: null, content: CONTENT }]);
     expect(await screen.findByText("Would add this version")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open the contract" })).toHaveAttribute("href", "/contracts/5");
   });

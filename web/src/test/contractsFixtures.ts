@@ -34,7 +34,7 @@ export const CONTENT = "openapi: 3.1.0\ninfo:\n  title: Orders\n  version: 1.1.0
 const OLD_CONTENT = "openapi: 3.1.0\ninfo:\n  title: Orders\n  version: 1.0.0\npaths: {}\n";
 const VERSION_ITEM = {
   id: 11, contractId: 5, version: "1.1.0", lifecycle: "DRAFT" as const, format: "yaml" as const, docTitle: "Orders", specVersion: "3.1.0",
-  checkErrors: 0, checkWarnings: 1, checkInfos: 0, checkComplete: true, createdBy: 1, createdAt: 1, updatedAt: 2,
+  checkErrors: 0, checkWarnings: 1, checkInfos: 0, checkComplete: true, createdBy: 1, createdAt: 1, updatedAt: 2, sourceUrl: null as string | null, lastSyncedAt: 0,
 };
 const OLD_VERSION_ITEM = { ...VERSION_ITEM, id: 10, version: "1.0.0", lifecycle: "ACTIVE" as const, checkWarnings: 0 };
 export const VERSION_PAGE = { items: [VERSION_ITEM, OLD_VERSION_ITEM], page: 1, pageSize: 20, total: 2 };

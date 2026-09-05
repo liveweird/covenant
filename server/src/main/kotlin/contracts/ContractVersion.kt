@@ -16,10 +16,34 @@ data class VersionCreateRequest(
     val version: String,
     /** The raw YAML or JSON text, at most `contracts.maxDocumentBytes` bytes. */
     val content: String,
+    /**
+     * The https URL of the repo copy this text was pulled from, when it was (the import page's
+     * URL fetch): stored as the version's source reference AND stamped as synced — the text IS
+     * the repo copy at this moment.
+     */
+    val sourceUrl: String? = null,
 )
 
 @Serializable
 data class VersionContentRequest(val content: String)
+
+/** `PUT …/{vid}/source` — set or clear (null/blank) the version's repo reference; no fetch happens. */
+@Serializable
+data class VersionSourceRequest(val sourceUrl: String? = null)
+
+/** `GET …/{vid}/sync` — the reference plus the baseline the SPA attributes a difference with. */
+@Serializable
+data class SyncStateResponse(
+    val sourceUrl: String?,
+    /** Epoch millis; 0 = never synced. */
+    val lastSyncedAt: Long,
+    /** The text as pulled at the last sync — the Covenant-vs-repo comparison baseline; null = never. */
+    val syncedContent: String?,
+)
+
+/** `POST …/{vid}/sync` — the repo copy, fetched client-side through `POST /contracts/fetch`. */
+@Serializable
+data class SyncRequest(val content: String)
 
 @Serializable
 data class TransitionRequest(val to: Lifecycle)
@@ -56,6 +80,10 @@ data class VersionResponse(
     val createdBy: UInt,
     val createdAt: Long,
     val updatedAt: Long,
+    /** The repo copy's https URL; null = no reference. */
+    val sourceUrl: String? = null,
+    /** Epoch millis of the last repo → Covenant sync; 0 = never. `updatedAt > lastSyncedAt` = edited here since. */
+    val lastSyncedAt: Long = 0,
 )
 
 /** The list row — no content, no findings (the counts stand in). */
@@ -75,6 +103,8 @@ data class VersionListItem(
     val createdBy: UInt,
     val createdAt: Long,
     val updatedAt: Long,
+    val sourceUrl: String? = null,
+    val lastSyncedAt: Long = 0,
 )
 
 typealias VersionPageResponse = PageResponse<VersionListItem>

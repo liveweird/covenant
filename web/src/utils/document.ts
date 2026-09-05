@@ -19,6 +19,16 @@ export function utf8Length(text: string): number {
  * become raw.githubusercontent.com, GitLab `/-/blob/` becomes `/-/raw/`. Anything else — raw
  * links included — passes through untouched.
  */
+/** The server's static source-reference rule, mirrored: an absolute https URL without credentials. */
+export function isSourceUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" && parsed.username === "" && parsed.password === "" && url.length <= 2048;
+  } catch {
+    return false;
+  }
+}
+
 export function normalizeSourceUrl(url: string): string {
   const trimmed = url.trim();
   const github = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/(.+)$/.exec(trimmed);

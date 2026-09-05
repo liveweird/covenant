@@ -136,6 +136,7 @@ export default function VersionPage() {
             onDownload={() => void downloads.download({ contractId: id, versionId: vid, system: data.system.name, contract: data.name, version: stored.version, format: stored.format, content: stored.content })}
             onRecheck={() => actions.recheck.mutate()}
             onDelete={() => remove.requestDelete({ id: vid, version: stored.version })}
+          onSynced={refresh}
           />
         }
       />

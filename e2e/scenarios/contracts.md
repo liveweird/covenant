@@ -60,5 +60,6 @@
 
 - **Ownership matrix, SemVer rules, HARD/SOFT gate, transitions, import statuses** — pinned by
   `ContractTest`/`ContractVersionTest`/`ContractImportTest` (server) and the page tests (SPA).
-- **URL fetch** — needs a public host; the SSRF guard is `UrlFetchTest`, the picker is
-  `DocumentSourcePicker.test.tsx`.
+- **URL fetch and sync-from-source** — both need a public host; the SSRF guard is `UrlFetchTest`,
+  the picker is `DocumentSourcePicker.test.tsx`, the sync modal `SyncVersionModal.test.tsx` and the
+  server rules `ContractVersionTest` (source reference, sync).

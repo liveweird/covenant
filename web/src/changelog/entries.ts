@@ -17,6 +17,20 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.3.0",
+    date: "2026-09-05",
+    en: `**Breaking changes, history and sync from the repository.**
+
+- Every save and the live check compare the document against the contract's active version: a breaking change without a major bump is a blocking finding you can still waive; with the bump it is a note. OpenAPI, AsyncAPI and ODCS each have their own comparison.
+- The contract page shows its history — versions created, edited, published, synced, owners changed — one line per event.
+- A version can be linked to its file in the repository. Sync fetches the repository copy, shows which side changed and the line diff, and overwrites a draft or starts a new version from the repository copy when the version is published. A document imported from a URL is linked automatically.`,
+    pl: `**Zmiany łamiące, historia i synchronizacja z repozytorium.**
+
+- Każdy zapis i sprawdzanie na żywo porównują dokument z aktywną wersją kontraktu: zmiana łamiąca bez podniesienia wersji głównej to blokująca uwaga, którą nadal można zaakceptować; z podniesieniem — tylko informacja. OpenAPI, AsyncAPI i ODCS mają własne porównania.
+- Strona kontraktu pokazuje jego historię — utworzone, edytowane, opublikowane i zsynchronizowane wersje, zmiany właściciela — po jednej linii na zdarzenie.
+- Wersję można powiązać z jej plikiem w repozytorium. Synchronizacja pobiera kopię z repozytorium, pokazuje, która strona się zmieniła, oraz różnice linia po linii, a następnie nadpisuje szkic albo — gdy wersja jest opublikowana — zaczyna nową wersję od kopii z repozytorium. Dokument zaimportowany z adresu URL zostaje powiązany automatycznie.`,
+  },
+  {
     version: "0.2.0",
     date: "2026-09-05",
     en: `**The contract catalog: domains, systems, teams, contracts and their versions.**

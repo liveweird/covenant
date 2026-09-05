@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Alert, Box, Button, Grid, Group, Paper, Select, Stack, Text, TextInput } from "@mantine/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getContract } from "../api/contracts";
 import { ApiError } from "../api/http";
 import { createVersion, getVersion, listVersions } from "../api/versions";
 import DocumentSourcePicker from "../components/DocumentSourcePicker";
+import type { SeededDocument } from "../components/SyncVersionModal";
 import EditPageLoadState from "../components/EditPageLoadState";
 import FindingsPanel from "../components/FindingsPanel";
 import LazyCodeEditor, { type JumpRequest } from "../components/LazyCodeEditor";
@@ -38,8 +39,10 @@ export default function NewVersion() {
   const queryClient = useQueryClient();
   const { id: idParam } = useParams();
   const [params] = useSearchParams();
+  // The sync modal seeds a locked version's successor with the repo copy (see SyncVersionModal).
+  const seeded = useLocation().state as SeededDocument | null;
   const id = Number(idParam);
-  const fromParam = params.get("from");
+  const fromParam = seeded ? null : params.get("from");
   const contract = useQuery({ queryKey: ["contracts", "detail", id], queryFn: () => getContract(id), enabled: Number.isFinite(id) });
   const versions = useQuery({
     queryKey: ["contracts", "versions", id, "all"],
@@ -49,7 +52,12 @@ export default function NewVersion() {
   const highest = versions.data?.items[0]?.version ?? null;
 
   const [version, setVersion] = useState<string | null>(null);
-  const [content, setContent] = useState<string | null>(null);
+  const [content, setContent] = useState<string | null>(seeded?.content ?? null);
+  // The text as fetched from its URL: the create carries the reference only while the text is
+  // still that copy byte for byte — an edited fetch is no longer "the repo copy right now".
+  const [fetched, setFetched] = useState<{ text: string; sourceUrl: string } | null>(
+    seeded?.sourceUrl ? { text: seeded.content, sourceUrl: seeded.sourceUrl } : null,
+  );
   const [copyFrom, setCopyFrom] = useState<string | null>(fromParam);
   const [jump, setJump] = useState<JumpRequest | null>(null);
   const source = useQuery({
@@ -89,7 +97,12 @@ export default function NewVersion() {
 
   const save = useVersionSave({
     document: () => ({ type: type ?? "OPENAPI", content: effectiveContent, version: effectiveVersion }),
-    saveRequest: (options) => createVersion(id, { version: effectiveVersion.trim(), content: effectiveContent }, options),
+    saveRequest: (options) =>
+      createVersion(
+        id,
+        { version: effectiveVersion.trim(), content: effectiveContent, sourceUrl: fetched && fetched.text === effectiveContent ? fetched.sourceUrl : null },
+        options,
+      ),
     onSaved: async (saved, waived) => {
       await queryClient.invalidateQueries({ queryKey: ["contracts"] });
       showSuccessToast(t(waived ? "versions.toast.createdWithFindings" : "versions.toast.created"));
@@ -164,9 +177,10 @@ export default function NewVersion() {
             />
           </Group>
           <DocumentSourcePicker
-            onLoad={(text) => {
+            onLoad={(text, origin) => {
               setContent(text);
               setCopyFrom(null);
+              setFetched(origin ? { text, sourceUrl: origin } : null);
             }}
           />
         </Stack>

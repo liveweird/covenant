@@ -31,6 +31,7 @@ class MigrationChecksumTest {
         "V9__create_contracts.sql" to 1757262119,
         "V10__create_contract_versions.sql" to -928227664,
         "V11__create_contract_events.sql" to 1147817582,
+        "V12__contract_version_source.sql" to -1247035387,
     )
 
     @Test

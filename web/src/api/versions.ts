@@ -13,6 +13,7 @@ export type FindingSource = components["schemas"]["FindingSource"];
 export type CheckReport = components["schemas"]["CheckReport"];
 export type DocumentCheckBody = components["schemas"]["DocumentCheckRequest"];
 export type DocumentFormat = components["schemas"]["DocumentFormat"];
+export type SyncState = components["schemas"]["SyncStateResponse"];
 type Lifecycle = components["schemas"]["Lifecycle"];
 
 export type SaveOptions = { allowInvalid?: boolean };
@@ -39,7 +40,11 @@ export async function getVersionContent(contractId: number, versionId: number): 
   return res.text();
 }
 
-export async function createVersion(contractId: number, body: { version: string; content: string }, options?: SaveOptions): Promise<VersionResponse> {
+export async function createVersion(
+  contractId: number,
+  body: { version: string; content: string; sourceUrl?: string | null },
+  options?: SaveOptions,
+): Promise<VersionResponse> {
   return jsonRequest<VersionResponse>(withWaiver(`/api/v1/contracts/${contractId}/versions`, options), {
     method: "POST",
     body: JSON.stringify(body),
@@ -66,6 +71,24 @@ export async function recheckVersion(contractId: number, versionId: number): Pro
 
 export async function deleteVersion(contractId: number, versionId: number): Promise<void> {
   await voidRequest(`/api/v1/contracts/${contractId}/versions/${versionId}`, { method: "DELETE" });
+}
+
+/** The version's repo reference plus the baseline text the sync modal attributes a difference with. */
+export async function getSyncState(contractId: number, versionId: number): Promise<SyncState> {
+  return jsonRequest<SyncState>(`/api/v1/contracts/${contractId}/versions/${versionId}/sync`);
+}
+
+/** Set or clear (null) the version's repo reference — no fetch happens; a changed reference resets the sync state. */
+export async function setVersionSource(contractId: number, versionId: number, sourceUrl: string | null): Promise<void> {
+  await voidRequest(`/api/v1/contracts/${contractId}/versions/${versionId}/source`, { method: "PUT", body: JSON.stringify({ sourceUrl }) });
+}
+
+/**
+ * The repo → Covenant overwrite with the copy the client fetched: the server waives soft findings
+ * itself (the import posture — no Save-anyway here), a HARD finding or a locked lifecycle rejects.
+ */
+export async function syncVersion(contractId: number, versionId: number, content: string): Promise<VersionResponse> {
+  return jsonRequest<VersionResponse>(`/api/v1/contracts/${contractId}/versions/${versionId}/sync`, { method: "POST", body: JSON.stringify({ content }) });
 }
 
 /** The live check — findings-so-far for an in-progress document; never a 400 for document problems. */

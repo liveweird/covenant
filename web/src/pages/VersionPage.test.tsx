@@ -134,6 +134,39 @@ describe("VersionPage", () => {
     expect(await screen.findByRole("heading", { level: 2, name: "Contract page" })).toBeInTheDocument();
   });
 
+  test("a writer's More menu links a source and, once linked, syncs; the meta strip shows the source and its sync state", async () => {
+    const linked = { ...VERSION, sourceUrl: "https://github.com/acme/contracts/blob/main/orders.yaml", lastSyncedAt: 2 };
+    serve(mockFetch, { ...base, "GET /api/v1/contracts/5/versions/11": { status: 200, body: linked } });
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("heading", { level: 2, name: "orders-api 1.1.0" });
+    expect(screen.getByRole("link", { name: "https://github.com/acme/contracts/blob/main/orders.yaml" })).toHaveAttribute("target", "_blank");
+    expect(screen.getByText(/^Synced /)).toBeInTheDocument();
+    expect(screen.queryByText("Edited since the last sync")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    expect(await screen.findByRole("menuitem", { name: "Link source…" })).toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "Sync from source" }));
+    expect(await screen.findByRole("dialog", { name: "Sync 1.1.0 from its source" })).toBeInTheDocument();
+  });
+
+  test("local edits since a sync are flagged on the meta strip", async () => {
+    const drifted = { ...VERSION, sourceUrl: "https://github.com/acme/contracts/blob/main/orders.yaml", lastSyncedAt: 1, updatedAt: 2 };
+    serve(mockFetch, { ...base, "GET /api/v1/contracts/5/versions/11": { status: 200, body: drifted } });
+    renderPage();
+    await screen.findByRole("heading", { level: 2, name: "orders-api 1.1.0" });
+    expect(screen.getByText("Edited since the last sync")).toBeInTheDocument();
+  });
+
+  test("an unlinked version offers Link source but no Sync", async () => {
+    serve(mockFetch, base);
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("heading", { level: 2, name: "orders-api 1.1.0" });
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    expect(await screen.findByRole("menuitem", { name: "Link source…" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Sync from source" })).not.toBeInTheDocument();
+  });
+
   test("a missing version says so", async () => {
     serve(mockFetch, { ...base, "GET /api/v1/contracts/5/versions/11": { status: 404, body: { title: "Not Found", status: 404 } } });
     renderPage();

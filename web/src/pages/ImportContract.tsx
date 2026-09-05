@@ -76,9 +76,12 @@ export default function ImportContract() {
   const tooLarge = utf8Length(content) > MAX_DOCUMENT_BYTES;
 
   // Prefill from what the document declares — only fields the user has not typed into.
-  function onDocument(text: string) {
+  // The URL the text was fetched from rides the item only while the text is still that copy.
+  const [fetched, setFetched] = useState<{ text: string; sourceUrl: string } | null>(null);
+  function onDocument(text: string, origin?: string | null) {
     setContent(text);
     setResult(null);
+    if (origin !== undefined) setFetched(origin ? { text, sourceUrl: origin } : null);
   }
   const report = check.report;
   const title = report?.title ?? null;
@@ -101,6 +104,7 @@ export default function ImportContract() {
       ...splitOwnerValue(values.owner ?? ""),
       version: values.version.trim(),
       content,
+      sourceUrl: fetched && fetched.text === content ? fetched.sourceUrl : null,
     };
     setBusy(mode);
     setError(null);

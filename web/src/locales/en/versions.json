@@ -96,7 +96,10 @@
     "specVersion": "Spec: {{specVersion}}",
     "sha": "SHA-256",
     "checked": "Checked {{when}}",
-    "updated": "Updated {{when}}"
+    "updated": "Updated {{when}}",
+    "source": "Source",
+    "synced": "Synced {{when}}",
+    "localChanges": "Edited since the last sync"
   },
   "diff": {
     "title": "Compare versions of {{name}}",
@@ -117,10 +120,42 @@
     "savedWithFindings": "Document saved with findings",
     "deleted": "Version deleted",
     "transitioned": "Lifecycle updated",
-    "rechecked": "Checks re-run"
+    "rechecked": "Checks re-run",
+    "synced": "Document synced from its source",
+    "sourceSaved": "Source link saved"
   },
   "deleteTitle": "Delete version?",
   "deleteBody": "Version {{version}} of \"{{name}}\" will be deleted. Only drafts can be deleted.",
   "deleteFailed": "Could not delete the version",
-  "deleteNotDraft": "Only a DRAFT version can be deleted — this one is part of the contract's history."
+  "deleteNotDraft": "Only a DRAFT version can be deleted — this one is part of the contract's history.",
+  "sync": {
+    "action": "Sync from source",
+    "title": "Sync {{version}} from its source",
+    "sourceLabel": "Source:",
+    "lastSynced": "Last synced {{ago}}",
+    "neverSynced": "Never synced",
+    "changedInRepo": "Changed in the repository",
+    "changedLocally": "Edited in Covenant",
+    "inSync": "Covenant and the repository are in sync",
+    "diffLabel": "Changes between the stored document and the repository copy",
+    "loadingAria": "Loading the repository copy",
+    "loadFailed": "Could not prepare the comparison",
+    "repoBroken": "The repository copy does not parse — fix it there first.",
+    "findingsWarning_one": "The repository copy carries {{count}} finding — syncing stores it anyway.",
+    "findingsWarning_other": "The repository copy carries {{count}} findings — syncing stores them anyway.",
+    "overwriteWarning": "Syncing overwrites the stored document with the repository copy shown above. Edits made only in Covenant will be lost.",
+    "lockedHint": "This version is published, so its document cannot change — start a new version from the repository copy instead.",
+    "confirm": "Overwrite stored document",
+    "newVersion": "New version from the repository copy",
+    "failed": "Sync failed",
+    "invalid": "The repository copy was rejected — see the details"
+  },
+  "sourceLink": {
+    "action": "Link source…",
+    "title": "Source of {{version}}",
+    "field": "Repository URL",
+    "hint": "A public https:// link to the document in its repository (a GitHub/GitLab blob or raw URL). Leave empty to unlink.",
+    "invalid": "Only https:// URLs without credentials can be linked",
+    "save": "Save link"
+  }
 }

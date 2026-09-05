@@ -125,11 +125,15 @@
       "versionTransitioned": "Wersja {{version}}: {{from}} → {{to}}",
       "versionRechecked": "Wersja {{version}} sprawdzona ponownie",
       "versionDeleted": "Wersja {{version}} usunięta",
-      "imported": "Wersja {{version}} zaimportowana"
+      "imported": "Wersja {{version}} zaimportowana",
+      "versionSourceSet": "Wersja {{version}}: powiązano ze źródłem",
+      "versionSourceCleared": "Wersja {{version}}: usunięto powiązanie ze źródłem",
+      "versionSynced": "Wersja {{version}} zsynchronizowana ze źródłem"
     },
     "detail": {
       "name": "Nazwa: {{name}}",
-      "owner": "Z {{from}} na {{to}}"
+      "owner": "Z {{from}} na {{to}}",
+      "source": "Źródło: {{url}}"
     }
   }
 }

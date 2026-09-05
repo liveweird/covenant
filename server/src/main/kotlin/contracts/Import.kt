@@ -28,6 +28,8 @@ data class ImportItem(
     val ownerUserId: UInt? = null,
     val version: String,
     val content: String,
+    /** The https URL the document was fetched from, when it was — stored and stamped as synced (see VersionCreateRequest). */
+    val sourceUrl: String? = null,
 )
 
 @Serializable
@@ -176,7 +178,7 @@ class ContractImporter(
         val saved = versions.create(
             contractId,
             item.type,
-            VersionCreateRequest(item.version, item.content),
+            VersionCreateRequest(item.version, item.content, item.sourceUrl),
             caller.userId,
             allowInvalid = true,
         )

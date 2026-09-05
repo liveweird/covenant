@@ -30,8 +30,11 @@ describe("ContractHistory", () => {
       at(8, "VERSION_DELETED", { version: "1.1.0" }),
       at(9, "IMPORTED", { version: "1.2.0" }),
       at(10, "SOMETHING_NEW", { version: "9" }),
+      at(11, "VERSION_SOURCE_CHANGED", { version: "1.2.0", sourceUrl: "https://github.com/acme/c/blob/main/o.yaml" }),
+      at(12, "VERSION_SOURCE_CHANGED", { version: "1.2.0", sourceUrl: "" }),
+      at(13, "VERSION_SYNCED", { version: "1.2.0" }),
     ];
-    serve(mockFetch, { "GET /api/v1/contracts/5/events?": { status: 200, body: { items, page: 1, pageSize: 10, total: 10 } } });
+    serve(mockFetch, { "GET /api/v1/contracts/5/events?": { status: 200, body: { items, page: 1, pageSize: 20, total: 13 } } });
     renderWithProviders(<ContractHistory contractId={5} />);
     const region = await screen.findByRole("region", { name: "History" });
     // The region renders while loading; wait for the first entry before the synchronous sweep.
@@ -48,10 +51,14 @@ describe("ContractHistory", () => {
       "Version 1.1.0 deleted",
       "Version 1.2.0 imported",
       "SOMETHING_NEW",
+      "Version 1.2.0: source linked",
+      "Source: https://github.com/acme/c/blob/main/o.yaml",
+      "Version 1.2.0: source unlinked",
+      "Version 1.2.0 synced from its source",
     ]) {
       expect(within(region).getByText(text)).toBeInTheDocument();
     }
-    expect(within(region).getAllByText(/Ada Admin ·/)).toHaveLength(10);
+    expect(within(region).getAllByText(/Ada Admin ·/)).toHaveLength(13);
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
   });
 

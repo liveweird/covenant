@@ -881,6 +881,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contracts/{id}/versions/{vid}/source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set or clear the version's repo reference
+         * @description Writers only, any lifecycle (a reference is metadata, not text). Nothing is fetched. A
+         *     CHANGED reference resets the sync state (`lastSyncedAt = 0`, no baseline) and never bumps
+         *     `updatedAt`; an unchanged value is a silent 204. Static guards only: absolute https, no
+         *     credentials, at most 2048 characters (`400`) — the public-host check runs at fetch time.
+         */
+        put: operations["updateContractVersionSource"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/{id}/versions/{vid}/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The version's sync state
+         * @description Any authenticated user. The reference, the last sync stamp and the baseline text the SPA attributes a difference with (Covenant vs the repo).
+         */
+        get: operations["getContractVersionSyncState"];
+        put?: never;
+        /**
+         * Replace the document with the repo copy and stamp the sync
+         * @description Writers only. The client fetched the reference through `POST /contracts/fetch` and
+         *     confirmed the diff; the server runs the whole check pipeline on the repo copy, ALWAYS
+         *     waives soft findings (the import posture — the repo is the source of truth; HARD findings
+         *     stay a `400`), stores the text and stamps `lastSyncedAt = updatedAt` with the text as the
+         *     new baseline. `409` when the lifecycle locks the text, `400` when the version has no
+         *     reference. Recorded in the history even when the copy matched: pulling it is the act.
+         */
+        post: operations["syncContractVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1236,7 +1294,7 @@ export interface components {
             versions: components["schemas"]["ExportedVersion"][];
         };
         /** @enum {string} */
-        ContractEventType: "CREATED" | "UPDATED" | "OWNER_CHANGED" | "DELETED" | "VERSION_CREATED" | "VERSION_CONTENT_UPDATED" | "VERSION_TRANSITIONED" | "VERSION_DELETED" | "VERSION_RECHECKED" | "IMPORTED";
+        ContractEventType: "CREATED" | "UPDATED" | "OWNER_CHANGED" | "DELETED" | "VERSION_CREATED" | "VERSION_CONTENT_UPDATED" | "VERSION_TRANSITIONED" | "VERSION_DELETED" | "VERSION_RECHECKED" | "VERSION_SOURCE_CHANGED" | "VERSION_SYNCED" | "IMPORTED";
         ContractEventResponse: {
             /** Format: int32 */
             id: number;
@@ -1302,6 +1360,30 @@ export interface components {
             version: string;
             /** @description Raw YAML or JSON text, at most 2 MiB. */
             content: string;
+            /**
+             * @description The https URL the text was fetched from, when it was: stored as the version's source
+             *     reference AND stamped as synced (the text IS the repo copy right now). Static guards only
+             *     (absolute https, no credentials) — a rejected value is a 400.
+             */
+            sourceUrl?: string | null;
+        };
+        VersionSourceRequest: {
+            /** @description The new reference; null or blank clears it. A CHANGED reference resets the sync state. */
+            sourceUrl?: string | null;
+        };
+        SyncStateResponse: {
+            sourceUrl?: string | null;
+            /**
+             * Format: int64
+             * @description Epoch millis; 0 = never synced.
+             */
+            lastSyncedAt: number;
+            /** @description The text as pulled at the last sync — the Covenant-vs-repo comparison baseline; null = never. */
+            syncedContent?: string | null;
+        };
+        SyncRequest: {
+            /** @description The repo copy's raw text, at most 2 MiB (fetched client-side through POST /contracts/fetch). */
+            content: string;
         };
         VersionContentRequest: {
             content: string;
@@ -1310,6 +1392,13 @@ export interface components {
             to: components["schemas"]["Lifecycle"];
         };
         VersionResponse: {
+            /** @description The https URL of the version's repo copy; null = no reference. */
+            sourceUrl?: string | null;
+            /**
+             * Format: int64
+             * @description Epoch millis of the last repo → Covenant sync; 0 = never. `updatedAt > lastSyncedAt` means edited in Covenant since.
+             */
+            lastSyncedAt: number;
             /** Format: int32 */
             id: number;
             /** Format: int32 */
@@ -1337,6 +1426,12 @@ export interface components {
             updatedAt: number;
         };
         VersionListItem: {
+            sourceUrl?: string | null;
+            /**
+             * Format: int64
+             * @description Epoch millis; 0 = never synced.
+             */
+            lastSyncedAt: number;
             /** Format: int32 */
             id: number;
             /** Format: int32 */
@@ -1376,6 +1471,8 @@ export interface components {
             ownerUserId?: number | null;
             version: string;
             content: string;
+            /** @description The https URL the document was fetched from, when it was — stored on the new version and stamped as synced. */
+            sourceUrl?: string | null;
         };
         ImportRequest: {
             items: components["schemas"]["ImportItem"][];
@@ -3137,6 +3234,97 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    updateContractVersionSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionSourceRequest"];
+            };
+        };
+        responses: {
+            /** @description Reference stored */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getContractVersionSyncState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sync state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncStateResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    syncContractVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyncRequest"];
+            };
+        };
+        responses: {
+            /** @description The synced version with its fresh report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["PayloadTooLarge"];
             500: components["responses"]["InternalServerError"];
         };
     };

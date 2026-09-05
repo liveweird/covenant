@@ -28,6 +28,7 @@ import io.ktor.server.resources.put
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.routing.routing
+import java.net.URI
 
 /** The document store paths, the live check, the import pair and the URL fetch. */
 private val WITH_FINDINGS = setOf(ImportStatus.CREATED_WITH_FINDINGS, ImportStatus.VERSION_ADDED_WITH_FINDINGS)
@@ -163,6 +164,58 @@ fun Application.configureContractVersionRoutes() {
                     mapOf("version" to response.version, "from" to from.name, "to" to request.to.name),
                 )
                 call.respond(HttpStatusCode.OK, response)
+            }
+            put<ContractsRoute.Id.Versions.Vid.Source> { route ->
+                val caller = call.caller()
+                val contractId = route.parent.parent.parent.id
+                contractService.authorizeWrite(caller, contractId)
+                val request = call.receive<VersionSourceRequest>()
+                val sourceUrl = sanitizedSourceUrl(request.sourceUrl)
+                val change = versionService.updateSource(contractId, route.parent.vid, sourceUrl).orNotFound("Version")
+                if (change.changed) {
+                    // Scheme/host only — a source URL may embed query-string tokens (the fetch audit's rule).
+                    audit(
+                        "contract_version.source_changed",
+                        "byUserId" to caller.userId.toLong(),
+                        "contractId" to contractId.toLong(),
+                        "versionId" to route.parent.vid.toLong(),
+                        "version" to change.version,
+                        "host" to (sourceUrl?.let { URI(it).host } ?: ""),
+                    )
+                    eventService.record(
+                        contractId, caller.userId, ContractEventType.VERSION_SOURCE_CHANGED,
+                        mapOf("version" to change.version, "sourceUrl" to (sourceUrl ?: "")),
+                    )
+                }
+                call.respond(HttpStatusCode.NoContent)
+            }
+            get<ContractsRoute.Id.Versions.Vid.Sync> { route ->
+                call.caller()
+                val state = versionService.syncState(route.parent.parent.parent.id, route.parent.vid).orNotFound("Version")
+                call.respond(HttpStatusCode.OK, state)
+            }
+            post<ContractsRoute.Id.Versions.Vid.Sync> { route ->
+                val caller = call.caller()
+                val contractId = route.parent.parent.parent.id
+                contractService.authorizeWrite(caller, contractId)
+                // The repo → Covenant overwrite: the client fetched the reference (POST /contracts/fetch)
+                // and shows the diff; the service always waives soft findings (the import posture).
+                val request = call.receive<SyncRequest>()
+                requireDocumentSize(request.content)
+                val type = contractService.typeOf(contractId).orNotFound("Contract")
+                val saved = versionService.sync(contractId, route.parent.vid, type, request.content)
+                audit(
+                    "contract_version.synced",
+                    "byUserId" to caller.userId.toLong(),
+                    "contractId" to contractId.toLong(),
+                    "versionId" to saved.response.id.toLong(),
+                    "version" to saved.response.version,
+                    "waivedFindings" to saved.waived.size,
+                )
+                call.auditCheckerUnavailableFor(saved.response)
+                // Recorded even when the repo copy matched: pulling it IS the act (it stamps the sync state).
+                eventService.record(contractId, caller.userId, ContractEventType.VERSION_SYNCED, mapOf("version" to saved.response.version))
+                call.respond(HttpStatusCode.OK, saved.response)
             }
             post<ContractsRoute.Id.Versions.Vid.Recheck> { route ->
                 val caller = call.caller()

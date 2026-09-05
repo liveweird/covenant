@@ -96,7 +96,10 @@
     "specVersion": "Spec: {{specVersion}}",
     "sha": "SHA-256",
     "checked": "Sprawdzono {{when}}",
-    "updated": "Zmieniono {{when}}"
+    "updated": "Zmieniono {{when}}",
+    "source": "Źródło",
+    "synced": "Zsynchronizowano {{when}}",
+    "localChanges": "Edytowano od ostatniej synchronizacji"
   },
   "diff": {
     "title": "Porównaj wersje {{name}}",
@@ -121,6 +124,40 @@
     "savedWithFindings": "Zapisano dokument z uwagami",
     "deleted": "Usunięto wersję",
     "transitioned": "Zmieniono cykl życia",
-    "rechecked": "Ponownie uruchomiono sprawdzenia"
+    "rechecked": "Ponownie uruchomiono sprawdzenia",
+    "synced": "Dokument zsynchronizowano ze źródłem",
+    "sourceSaved": "Zapisano powiązanie ze źródłem"
+  },
+  "sync": {
+    "action": "Synchronizuj ze źródłem",
+    "title": "Synchronizacja {{version}} ze źródłem",
+    "sourceLabel": "Źródło:",
+    "lastSynced": "Ostatnia synchronizacja {{ago}}",
+    "neverSynced": "Nigdy nie synchronizowano",
+    "changedInRepo": "Zmieniono w repozytorium",
+    "changedLocally": "Edytowano w Covenant",
+    "inSync": "Covenant i repozytorium są zsynchronizowane",
+    "diffLabel": "Różnice między zapisanym dokumentem a kopią z repozytorium",
+    "loadingAria": "Wczytywanie kopii z repozytorium",
+    "loadFailed": "Nie udało się przygotować porównania",
+    "repoBroken": "Kopia z repozytorium nie parsuje się — napraw ją najpierw tam.",
+    "findingsWarning_one": "Kopia z repozytorium ma {{count}} uwagę — synchronizacja i tak ją zapisze.",
+    "findingsWarning_few": "Kopia z repozytorium ma {{count}} uwagi — synchronizacja i tak je zapisze.",
+    "findingsWarning_many": "Kopia z repozytorium ma {{count}} uwag — synchronizacja i tak je zapisze.",
+    "findingsWarning_other": "Kopia z repozytorium ma {{count}} uwag — synchronizacja i tak je zapisze.",
+    "overwriteWarning": "Synchronizacja nadpisze zapisany dokument pokazaną wyżej kopią z repozytorium. Zmiany wprowadzone tylko w Covenant przepadną.",
+    "lockedHint": "Ta wersja jest opublikowana, więc jej dokument nie może się zmienić — zacznij nową wersję od kopii z repozytorium.",
+    "confirm": "Nadpisz zapisany dokument",
+    "newVersion": "Nowa wersja z kopii z repozytorium",
+    "failed": "Synchronizacja nie powiodła się",
+    "invalid": "Kopia z repozytorium została odrzucona — zobacz szczegóły"
+  },
+  "sourceLink": {
+    "action": "Powiąż ze źródłem…",
+    "title": "Źródło wersji {{version}}",
+    "field": "Adres URL w repozytorium",
+    "hint": "Publiczny link https:// do dokumentu w jego repozytorium (adres blob lub raw z GitHuba/GitLaba). Zostaw puste, aby usunąć powiązanie.",
+    "invalid": "Można powiązać tylko adresy https:// bez danych logowania",
+    "save": "Zapisz powiązanie"
   }
 }

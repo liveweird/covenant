@@ -46,9 +46,13 @@ export for the commit back.
   flags,
 - a bilingual (English/Polish) UI with light/dark themes and a ⌘K / Ctrl K command palette (pages,
   actions, and a server-side contract search),
+- breaking-change detection against the active version (openapi-diff, `@asyncapi/diff`, a
+  hand-written ODCS comparer) — a non-major bump that breaks clients is a waivable blocking finding,
+- a per-contract history timeline, and a repo reference per version with sync-from-source
+  (which side moved, a line diff, overwrite or a new version from the repo copy),
 - every quality gate wired, locally and in CI.
 
-Coming next: sync from the Git repository.
+Coming next (milestone 3): search facets, live-endpoint conformance and client generation.
 
 ## The stack
 

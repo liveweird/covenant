@@ -5,6 +5,14 @@ import ch.nokillswit.contracts.ContractResponse
 import ch.nokillswit.contracts.ContractType
 import ch.nokillswit.contracts.DocumentCheckRequest
 import ch.nokillswit.contracts.Lifecycle
+import ch.nokillswit.contracts.SyncRequest
+import ch.nokillswit.contracts.SyncStateResponse
+import ch.nokillswit.contracts.VersionSourceRequest
+import ch.nokillswit.contracts.ContractEventPageResponse
+import ch.nokillswit.contracts.ContractEventType
+import ch.nokillswit.contracts.ImportItem
+import ch.nokillswit.contracts.ImportRequest
+import ch.nokillswit.contracts.ImportResponse
 import ch.nokillswit.contracts.TransitionRequest
 import ch.nokillswit.contracts.VersionContentRequest
 import ch.nokillswit.contracts.VersionCreateRequest
@@ -398,5 +406,112 @@ class ContractVersionTest {
         assertEquals(ContractFixtures.asyncApi3, stub.lastPreviousContent, "the ACTIVE text rides to the checker for ASYNCAPI")
         val major = admin.postJson(path(c), VersionCreateRequest("2.0.0", mqtt)).body<VersionResponse>()
         assertEquals(Severity.INFO, major.findings.single { it.code == "breaking-edit" }.severity)
+    }
+
+    // ---- source references & repo sync (V12) -------------------------------------------------
+
+    private val repoUrl = "https://github.com/acme/contracts/blob/main/petstore.yaml"
+
+    @Test
+    fun `source reference - stamped by a fetched create, set and cleared by writers under the static guards, never a text edit`() =
+        testApplication {
+        usePostgresTestcontainer()
+        val admin = seededClient("vsrc", UserRole.ADMIN)
+        val c = admin.contract("vsrc")
+        val fromRepo = admin.postJson(path(c), VersionCreateRequest("1.0.0", ContractFixtures.openApi, repoUrl)).body<VersionResponse>()
+        assertEquals(repoUrl, fromRepo.sourceUrl)
+        assertTrue(fromRepo.lastSyncedAt > 0 && fromRepo.lastSyncedAt == fromRepo.updatedAt, "a fetched text is in sync with its source")
+        val state = admin.get("${path(c)}/${fromRepo.id}/sync").body<SyncStateResponse>()
+        assertEquals(ContractFixtures.openApi, state.syncedContent)
+        assertEquals(fromRepo.lastSyncedAt, state.lastSyncedAt)
+        val plain = admin.postJson(path(c), VersionCreateRequest("1.1.0", ContractFixtures.openApi)).body<VersionResponse>()
+        assertNull(plain.sourceUrl)
+        assertEquals(0, plain.lastSyncedAt)
+        // The static guards: https only, no credentials — on create and on the source PUT alike.
+        val http = admin.postJson(path(c), VersionCreateRequest("1.2.0", ContractFixtures.openApi, "http://example.com/x.yaml"))
+        assertEquals(HttpStatusCode.BadRequest, http.status)
+        val credentials = admin.putJson("${path(c)}/${plain.id}/source", VersionSourceRequest("https://u:p@example.com/x"))
+        assertEquals(HttpStatusCode.BadRequest, credentials.status)
+        // Setting a reference on the plain version: no sync state yet, updatedAt untouched.
+        val gitlab = "https://gitlab.com/acme/c/-/raw/main/p.yaml"
+        assertEquals(HttpStatusCode.NoContent, admin.putJson("${path(c)}/${plain.id}/source", VersionSourceRequest(gitlab)).status)
+        val linked = admin.get("${path(c)}/${plain.id}").body<VersionResponse>()
+        assertEquals(gitlab, linked.sourceUrl)
+        assertEquals(0, linked.lastSyncedAt)
+        assertEquals(plain.updatedAt, linked.updatedAt, "a reference edit is not a text edit")
+        // Changing the fetched one's reference resets its sync state; a blank value clears the reference.
+        admin.putJson("${path(c)}/${fromRepo.id}/source", VersionSourceRequest("https://github.com/acme/contracts/blob/main/other.yaml"))
+        val reset = admin.get("${path(c)}/${fromRepo.id}/sync").body<SyncStateResponse>()
+        assertEquals(0, reset.lastSyncedAt)
+        assertNull(reset.syncedContent)
+        admin.putJson("${path(c)}/${fromRepo.id}/source", VersionSourceRequest("  "))
+        assertNull(admin.get("${path(c)}/${fromRepo.id}").body<VersionResponse>().sourceUrl)
+        // 404 for a missing version; a stranger is 403 before the body decodes; reads are for everyone.
+        assertEquals(HttpStatusCode.NotFound, admin.putJson("${path(c)}/999999/source", VersionSourceRequest("https://x.example/a")).status)
+        val stranger = seededClient("vsrc-stranger", UserRole.USER)
+        val strangerPut = stranger.putJson("${path(c)}/${plain.id}/source", VersionSourceRequest("http://not-https"))
+        assertEquals(HttpStatusCode.Forbidden, strangerPut.status)
+        assertEquals(HttpStatusCode.OK, stranger.get("${path(c)}/${plain.id}/sync").status)
+        val listed = admin.get(path(c)).body<VersionPageResponse>().items.single { it.id == plain.id }
+        assertEquals(gitlab, listed.sourceUrl)
+        // The history: one VERSION_SOURCE_CHANGED per actual change, carrying the new reference.
+        val events = admin.get("/api/v1/contracts/${c.id}/events").body<ContractEventPageResponse>().items
+        val sourceEvents = events.filter { it.type == ContractEventType.VERSION_SOURCE_CHANGED }
+        assertEquals(3, sourceEvents.size, sourceEvents.toString())
+        assertEquals("", sourceEvents.first().params["sourceUrl"], "newest first — the clear")
+        assertTrue(sourceEvents.any { it.params["sourceUrl"] == gitlab && it.params["version"] == "1.1.0" })
+    }
+
+    @Test
+    fun `sync - the repo copy replaces an editable text waiving soft findings and stamps the state - locked or unlinked refuse`() =
+        testApplication {
+            usePostgresTestcontainer()
+            val admin = seededClient("vsync", UserRole.ADMIN)
+            val c = admin.contract("vsync")
+            val v = admin.postJson(path(c), VersionCreateRequest("1.0.0", ContractFixtures.openApi, repoUrl)).body<VersionResponse>()
+            val localEdit = VersionContentRequest(ContractFixtures.openApi + "\n# local\n")
+            val edited = admin.putJson("${path(c)}/${v.id}/content", localEdit).body<VersionResponse>()
+            assertEquals(v.lastSyncedAt, edited.lastSyncedAt, "a local edit never moves the sync stamp")
+            assertTrue(edited.updatedAt >= edited.lastSyncedAt)
+            // The repo copy carries a soft finding (a broken ${'$'}ref): sync stores it anyway, findings on the row.
+            val synced = admin.postJson("${path(c)}/${v.id}/sync", SyncRequest(ContractFixtures.openApiBrokenRef)).body<VersionResponse>()
+            assertEquals(ContractFixtures.openApiBrokenRef, synced.content)
+            assertTrue(synced.checkErrors > 0)
+            assertEquals(synced.updatedAt, synced.lastSyncedAt)
+            assertEquals(ContractFixtures.openApiBrokenRef, admin.get("${path(c)}/${v.id}/sync").body<SyncStateResponse>().syncedContent)
+            val events = admin.get("/api/v1/contracts/${c.id}/events").body<ContractEventPageResponse>().items
+            assertTrue(events.any { it.type == ContractEventType.VERSION_SYNCED })
+            // HARD stays a 400; a version without a reference is a 400 too.
+            val hard = admin.postJson("${path(c)}/${v.id}/sync", SyncRequest("openapi: 3.1.0\ninfo: [oops\n"))
+            assertEquals(HttpStatusCode.BadRequest, hard.status)
+            val plain = admin.postJson(path(c), VersionCreateRequest("1.1.0", ContractFixtures.openApi)).body<VersionResponse>()
+            val noRef = admin.postJson("${path(c)}/${plain.id}/sync", SyncRequest(ContractFixtures.openApi))
+            assertEquals(HttpStatusCode.BadRequest, noRef.status)
+            assertTrue(noRef.body<ProblemDetail>().detail!!.contains("no source reference"))
+            // The lifecycle lock: 409 from ACTIVE on.
+            admin.postJson("${path(c)}/${v.id}/transition", TransitionRequest(Lifecycle.PROPOSED))
+            admin.postJson("${path(c)}/${v.id}/transition", TransitionRequest(Lifecycle.ACTIVE))
+            assertEquals(HttpStatusCode.Conflict, admin.postJson("${path(c)}/${v.id}/sync", SyncRequest(ContractFixtures.openApi)).status)
+            val stranger = seededClient("vsync-stranger", UserRole.USER)
+            assertEquals(HttpStatusCode.Forbidden, stranger.postJson("${path(c)}/${plain.id}/sync", SyncRequest("oops")).status)
+        }
+
+    @Test
+    fun `import - a fetched item's sourceUrl lands on the new version, stamped as synced`() = testApplication {
+        usePostgresTestcontainer()
+        val admin = seededClient("vimpsrc", UserRole.ADMIN)
+        val c = admin.contract("vimpsrc")
+        val item = ImportItem(
+            systemId = c.system.id, type = ContractType.OPENAPI, name = c.name,
+            version = "1.0.0", content = ContractFixtures.openApi, sourceUrl = repoUrl,
+        )
+        val result = admin.postJson("/api/v1/contracts/import", ImportRequest(listOf(item))).body<ImportResponse>().results.single()
+        val stored = admin.get("${path(c)}/${result.versionId}").body<VersionResponse>()
+        assertEquals(repoUrl, stored.sourceUrl)
+        assertTrue(stored.lastSyncedAt > 0)
+        // A bad reference skips the row like any other 400 — reported, not thrown.
+        val bad = admin.postJson("/api/v1/contracts/import", ImportRequest(listOf(item.copy(version = "1.1.0", sourceUrl = "ftp://nope"))))
+        assertEquals(HttpStatusCode.OK, bad.status)
+        assertEquals(0, admin.get(path(c)).body<VersionPageResponse>().items.count { it.version == "1.1.0" })
     }
 }

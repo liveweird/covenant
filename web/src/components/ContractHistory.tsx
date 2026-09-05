@@ -50,6 +50,10 @@ function describeEvent(event: ContractEvent, t: TFunction): string {
       return t("contracts.history.event.versionRechecked", { version });
     case "VERSION_DELETED":
       return t("contracts.history.event.versionDeleted", { version });
+    case "VERSION_SOURCE_CHANGED":
+      return event.params.sourceUrl ? t("contracts.history.event.versionSourceSet", { version }) : t("contracts.history.event.versionSourceCleared", { version });
+    case "VERSION_SYNCED":
+      return t("contracts.history.event.versionSynced", { version });
     case "IMPORTED":
       return t("contracts.history.event.imported", { version });
     default:
@@ -65,6 +69,8 @@ function detailLine(event: ContractEvent, t: TFunction): string | null {
       return event.params.name ? t("contracts.history.detail.name", { name: event.params.name }) : null;
     case "OWNER_CHANGED":
       return t("contracts.history.detail.owner", { from: ownerRef(event.params["owner.from"], t), to: ownerRef(event.params["owner.to"], t) });
+    case "VERSION_SOURCE_CHANGED":
+      return event.params.sourceUrl ? t("contracts.history.detail.source", { url: event.params.sourceUrl }) : null;
     default:
       return null;
   }
