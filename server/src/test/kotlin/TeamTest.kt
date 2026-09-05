@@ -1,5 +1,9 @@
 package ch.nokillswit
 
+import ch.nokillswit.contracts.ContractCreateRequest
+import ch.nokillswit.contracts.ContractResponse
+import ch.nokillswit.contracts.ContractType
+import ch.nokillswit.contracts.OwnerUpdateRequest
 import ch.nokillswit.plugins.ProblemDetail
 import ch.nokillswit.teams.TeamCreateRequest
 import ch.nokillswit.teams.TeamPageResponse
@@ -222,5 +226,34 @@ class TeamTest {
             assertEquals(HttpStatusCode.BadRequest, admin.postJson("/api/v1/teams", TeamCreateRequest("")).status)
             assertEquals(before, capture.events.count { it.message == "team.created" }, "failed create must not audit")
         }
+    }
+
+    @Test
+    fun `a team that still owns an active contract cannot be deleted until the contract is transferred`() = testApplication {
+        usePostgresTestcontainer()
+        val admin = seededClient("teamowns", UserRole.ADMIN)
+        val team = TestTeams.seed(name("owning"))
+        val other = TestTeams.seed(name("other"))
+        val systemId = TestContracts.seedSystem("teamowns")
+        val created = admin.postJson(
+            "/api/v1/contracts",
+            ContractCreateRequest(systemId, ContractType.ODCS, name("ledger"), null, ownerTeamId = team),
+        )
+        assertEquals(HttpStatusCode.Created, created.status)
+        val contractId = created.body<ContractResponse>().id
+
+        val blocked = admin.delete("/api/v1/teams/$team")
+        assertEquals(HttpStatusCode.Conflict, blocked.status)
+        assertTrue(blocked.body<ProblemDetail>().detail!!.contains("still owns contracts"))
+        assertEquals(HttpStatusCode.OK, admin.get("/api/v1/teams/$team").status, "a refused delete leaves the team active")
+
+        assertEquals(
+            HttpStatusCode.NoContent,
+            admin.putJson("/api/v1/contracts/$contractId/owner", OwnerUpdateRequest(ownerTeamId = other)).status,
+        )
+        assertEquals(HttpStatusCode.NoContent, admin.delete("/api/v1/teams/$team").status)
+        assertEquals(HttpStatusCode.Conflict, admin.delete("/api/v1/teams/$other").status, "the new owner is now the one held")
+        assertEquals(HttpStatusCode.NoContent, admin.delete("/api/v1/contracts/$contractId").status)
+        assertEquals(HttpStatusCode.NoContent, admin.delete("/api/v1/teams/$other").status)
     }
 }

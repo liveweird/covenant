@@ -567,7 +567,7 @@ paths:
       summary: Delete a team (soft)
       description: |
         ADMIN only, guard before the id lookup. Soft delete — the name is freed for reuse. A team
-        that still owns an active contract answers `409` (the rule lands with the contracts feature).
+        that still owns an active contract answers `409` — transfer the contracts first.
       responses:
         '204':
           description: Deleted
@@ -829,7 +829,7 @@ paths:
       operationId: deleteSystem
       summary: Delete a system (soft)
       description: |
-        ADMIN only, guard before the id lookup. Refused with `409` while the system still holds an active contract (the rule lands with the contracts feature).
+        ADMIN only, guard before the id lookup. Refused with `409` while the system still holds an active contract — move or delete them first (the domains → systems rule, one level down).
       responses:
         '204':
           description: Deleted

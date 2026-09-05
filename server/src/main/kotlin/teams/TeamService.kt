@@ -2,6 +2,7 @@ package ch.nokillswit.teams
 
 import ch.nokillswit.authz.ConflictException
 import ch.nokillswit.authz.NotFoundException
+import ch.nokillswit.contracts.ContractService
 import ch.nokillswit.infra.db.containsNormalized
 import ch.nokillswit.infra.paging.PageRequest
 import ch.nokillswit.infra.paging.applyPaging
@@ -121,9 +122,13 @@ class TeamService(private val database: R2dbcDatabase) {
 
     /**
      * Soft delete; the roster rows stay for the record (the table is never read for a deleted
-     * team). The contracts feature adds the 409 while the team still owns an active contract.
+     * team). Refused (409) while the team still owns an active contract — transfer them first.
      */
     suspend fun delete(id: UInt): Int = suspendTransaction(database) {
+        val contracts = ContractService.Contracts
+        val owned = contracts.select(contracts.id)
+            .where { (contracts.ownerTeamId eq id) and (contracts.markedAsDeleted eq false) }.count()
+        if (owned > 0) throw ConflictException("The team still owns contracts — transfer them first")
         Teams.update({ (Teams.id eq id) and active() }) {
             it[markedAsDeleted] = true
             it[updatedAt] = now()

@@ -1,5 +1,8 @@
 package ch.nokillswit
 
+import ch.nokillswit.contracts.ContractCreateRequest
+import ch.nokillswit.contracts.ContractResponse
+import ch.nokillswit.contracts.ContractType
 import ch.nokillswit.plugins.ProblemDetail
 import ch.nokillswit.systems.SystemPageResponse
 import ch.nokillswit.systems.SystemRequest
@@ -112,5 +115,39 @@ class SystemTest {
             admin.delete("/api/v1/systems/${created.id}")
             assertNotNull(capture.awaitEvent { it.message == "system.deleted" && it.hasKeyValue("systemId", created.id.toLong()) })
         }
+    }
+
+    @Test
+    fun `a system that still holds an active contract cannot be deleted and counts it`() = testApplication {
+        usePostgresTestcontainer()
+        val admin = seededClient("sysholds", UserRole.ADMIN)
+        val domain = TestDomains.seed(name("holds"))
+        val systemId = TestSystems.seed(domain, name("held"))
+        val create = admin.postJson(
+            "/api/v1/contracts",
+            ContractCreateRequest(systemId, ContractType.OPENAPI, name("orders"), null, ownerUserId = null, ownerTeamId = null),
+        )
+        assertEquals(HttpStatusCode.BadRequest, create.status, "a contract needs exactly one owner")
+        val me = admin.get("/api/v1/systems/$systemId").body<SystemResponse>()
+        assertEquals(0, me.contractCount)
+
+        val ownerTeam = TestTeams.seed(name("owners"))
+        val created = admin.postJson(
+            "/api/v1/contracts",
+            ContractCreateRequest(systemId, ContractType.OPENAPI, name("orders"), null, ownerTeamId = ownerTeam),
+        )
+        assertEquals(HttpStatusCode.Created, created.status)
+        val contractId = created.body<ContractResponse>().id
+        assertEquals(1, admin.get("/api/v1/systems/$systemId").body<SystemResponse>().contractCount)
+        assertEquals(1, admin.get("/api/v1/systems?domainId=$domain").body<SystemPageResponse>().items.single().contractCount)
+
+        val blocked = admin.delete("/api/v1/systems/$systemId")
+        assertEquals(HttpStatusCode.Conflict, blocked.status)
+        assertTrue(blocked.body<ProblemDetail>().detail!!.contains("still holds contracts"))
+
+        assertEquals(HttpStatusCode.NoContent, admin.delete("/api/v1/contracts/$contractId").status)
+        assertEquals(0, admin.get("/api/v1/systems/$systemId").body<SystemResponse>().contractCount)
+        assertEquals(HttpStatusCode.NoContent, admin.delete("/api/v1/systems/$systemId").status)
+        assertEquals(HttpStatusCode.NoContent, admin.delete("/api/v1/teams/$ownerTeam").status)
     }
 }

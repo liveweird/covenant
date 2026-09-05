@@ -1,5 +1,7 @@
 package ch.nokillswit.systems
 
+import ch.nokillswit.authz.ConflictException
+import ch.nokillswit.contracts.ContractService
 import ch.nokillswit.domains.DomainService
 import ch.nokillswit.infra.db.containsNormalized
 import ch.nokillswit.infra.paging.PageRequest
@@ -49,18 +51,22 @@ class SystemService(private val database: R2dbcDatabase, private val domains: Do
         filter.domainId?.let { predicate = predicate and (Systems.domainId eq it) }
         val total = Systems.selectAll().where { predicate }.count()
         val rows = joined().selectAll().where { predicate }.applyPaging(paging, SORTABLE_COLUMNS).toList()
-        SystemListResult(items = rows.map { it.toResponse() }, total = total)
+        val counts = activeContractCounts(rows.map { it[Systems.id].value })
+        SystemListResult(items = rows.map { it.toResponse(counts[it[Systems.id].value] ?: 0) }, total = total)
     }
 
     /** Every active system with its domain, name-ordered — the tree's second level (registry-scale, unpaged). */
     suspend fun listAll(): List<SystemResponse> = suspendTransaction(database) {
-        joined().selectAll().where { active() }
+        val rows = joined().selectAll().where { active() }
             .orderBy(Systems.name.lowerCase() to SortOrder.ASC, Systems.id to SortOrder.ASC)
-            .map { it.toResponse() }.toList()
+            .toList()
+        val counts = activeContractCounts(rows.map { it[Systems.id].value })
+        rows.map { it.toResponse(counts[it[Systems.id].value] ?: 0) }
     }
 
     suspend fun read(id: UInt): SystemResponse? = suspendTransaction(database) {
-        joined().selectAll().where { (Systems.id eq id) and active() }.toList().singleOrNull()?.toResponse()
+        joined().selectAll().where { (Systems.id eq id) and active() }.toList().singleOrNull()
+            ?.toResponse(activeContractCounts(listOf(id))[id] ?: 0)
     }
 
     /** Creates inside an ACTIVE domain (an unknown one is the client's fault → 400). */
@@ -90,11 +96,14 @@ class SystemService(private val database: R2dbcDatabase, private val domains: Do
     }
 
     /**
-     * Soft delete; the contracts feature adds the 409 while an active contract still points here.
-     * The system's environments (V15) are configuration OF the system and go with it, in the same
-     * transaction (a sanctioned cross-feature write — see persistence.md).
+     * Soft delete — refused (409) while an active contract still points here, so the tree never dangles
+     * (the domains → systems rule, one level down). The system's environments (V15) are configuration OF
+     * the system and go with it, in the same transaction (a sanctioned cross-feature write — see persistence.md).
      */
     suspend fun delete(id: UInt): Int = suspendTransaction(database) {
+        if ((activeContractCounts(listOf(id))[id] ?: 0) > 0) {
+            throw ConflictException("The system still holds contracts — move or delete them first")
+        }
         val rows = Systems.update({ (Systems.id eq id) and active() }) {
             it[markedAsDeleted] = true
             it[updatedAt] = now()
@@ -113,13 +122,26 @@ class SystemService(private val database: R2dbcDatabase, private val domains: Do
         if (!domains.existsActive(domainId)) throw BadRequestException("Unknown or deleted domain id: $domainId")
     }
 
-    private fun ResultRow.toResponse() = SystemResponse(
+    /** One grouped query over the contracts table for the rows' active-contract counts (a sanctioned cross-feature read). */
+    private suspend fun activeContractCounts(ids: List<UInt>): Map<UInt, Int> {
+        if (ids.isEmpty()) return emptyMap()
+        val contracts = ContractService.Contracts
+        val count = contracts.id.count()
+        return contracts.select(contracts.systemId, count)
+            .where { (contracts.systemId inList ids) and (contracts.markedAsDeleted eq false) }
+            .groupBy(contracts.systemId)
+            .map { it[contracts.systemId].value to it[count].toInt() }
+            .toList()
+            .toMap()
+    }
+
+    private fun ResultRow.toResponse(contractCount: Int) = SystemResponse(
         id = this[Systems.id].value,
         domainId = this[Systems.domainId].value,
         domainName = this[DomainService.Domains.name],
         name = this[Systems.name],
         description = this[Systems.description],
-        contractCount = 0,
+        contractCount = contractCount,
         createdAt = this[Systems.createdAt],
         updatedAt = this[Systems.updatedAt],
     )
