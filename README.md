@@ -115,6 +115,53 @@ cd checker && npm ci && npm run dev # optional: the checker from source on :9090
 
 The local JDK is managed by [mise](https://mise.jdx.dev) (`mise.toml`, Temurin 21).
 
+## Configuration (environment variables)
+
+`server/src/main/resources/application.yaml` is the authoritative reference — every setting there is a `$VAR:default` pair, and the table below is generated from it (defaults as shipped; the Docker image additionally sets `KTOR_DEVELOPMENT=false`, `MAIL_TRANSPORT=disabled` and `WEB_STATIC_DIR=/app/web`). Production mode refuses the burned demo keys and the `log` mail transport at startup (`.claude/docs/security.md`).
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `KTOR_DEVELOPMENT` | `true` | Development mode (`true`) vs production mode — HSTS/HTTPS redirect and the fail-closed startup checks. The image ships `false`. |
+| `LOGIN_LOCKOUT_THRESHOLD` | `5` | Consecutive failures per account before `/login` answers 429. |
+| `LOGIN_LOCKOUT_DURATION_SECONDS` | `900` | How long a locked account stays locked. |
+| `LOGIN_RATE_LIMIT_PER_MINUTE` | *(blank)* | Per-IP login bucket; blank follows the mode (10 prod / 1000 dev). |
+| `REFRESH_RATE_LIMIT_PER_MINUTE` | *(blank)* | Per-IP refresh bucket (blank = 30). |
+| `PASSWORD_RESET_RATE_LIMIT_PER_MINUTE` | *(blank)* | Per-IP reset bucket; blank follows the mode (5 prod / 100 dev). |
+| `TRY_RATE_LIMIT_PER_MINUTE` | *(blank)* | Per-IP bucket shared by the four try-it POSTs (blank = 60). |
+| `PASSWORD_RESET_MIN_INTERVAL_SECONDS` | `60` | One reset request per submitted email per interval. |
+| `MFA_CODE_TTL_SECONDS` | `300` | Lifetime of an emailed MFA code. |
+| `MFA_MAX_ATTEMPTS` | `5` | Wrong-code attempts before a challenge dies. |
+| `DATA_ENCRYPTION_KEY` | *(dev key, burned)* | AES-256-GCM key (64 hex) for the environments' stored credentials — the dev default is burned, production refuses it. Back it up apart from the database. |
+| `DATA_ENCRYPTION_KEY_PREVIOUS` | *(blank)* | Decrypt-only fallback during a key rotation (boot once, then remove). |
+| `SECURITY_CSRF_ENABLED` | `false` | CSRF plugin gate — off (bearer JWT, no cookies). |
+| `JWT_SECRET` | `secret` | HMAC key for the access/refresh pair — the placeholder and the compose demo key are burned in production. |
+| `JWT_ISSUER` | `http://0.0.0.0:8082/` | The `iss` claim the verifier requires. |
+| `JWT_AUDIENCE` | `covenant-api` | The `aud` claim the verifier requires. |
+| `JWT_REALM` | `covenant-api` | The `WWW-Authenticate` realm. |
+| `JWT_ACCESS_EXPIRES_IN_SECONDS` | `900` | Access-token lifetime (the API bearer). |
+| `JWT_REFRESH_EXPIRES_IN_SECONDS` | `3600` | Refresh-token lifetime — the idle-session window. |
+| `ADMIN_INITIAL_PASSWORD` | *(blank)* | Rotates the V3 seed admin's `changeme` at startup while it still carries the seed hash. |
+| `HTTP_BEHIND_PROXY` | `false` | Honour `X-Forwarded-*` from a TLS-terminating proxy (rate-limit keys, HTTPS redirect). |
+| `CORS_ALLOWED_HOSTS` | *(blank)* | Comma-separated cross-origin hosts; blank = CORS not installed. |
+| `HTTP_EXPOSE_OPENAPI` | *(blank)* | Serve Swagger UI + the spec at `/openapi`; blank follows the mode. |
+| `CHECKER_URL` | *(blank)* | The lint/semantic checker sidecar; blank = off (every check carries `CHECKER_UNAVAILABLE`). |
+| `CHECKER_TOKEN` | *(blank)* | Shared secret sent as `X-Checker-Token`. |
+| `CHECKER_TIMEOUT_MS` | `20000` | Per-call budget for the sidecar. |
+| `CONTRACT_MAX_DOCUMENT_BYTES` | `2097152` | Ceiling for one contract document (413 above it). |
+| `WEB_STATIC_DIR` | *(blank)* | Directory of the built SPA to serve; blank in local dev (Vite serves it). The image sets `/app/web`. |
+| `MAIL_TRANSPORT` | `log` | `log` (dev only — production refuses it), `smtp`, or `disabled` (email features answer 503; the image default). |
+| `SMTP_HOST` | *(blank)* | SMTP server (required for `smtp`). |
+| `SMTP_PORT` | `587` | SMTP port. |
+| `SMTP_USER` | *(blank)* | SMTP user (optional). |
+| `SMTP_PASSWORD` | *(blank)* | SMTP password (optional). |
+| `SMTP_STARTTLS` | `true` | STARTTLS on the SMTP connection. |
+| `MAIL_FROM` | `covenant@localhost` | Sender address of every outbound email. |
+| `MAIL_APP_URL` | *(blank)* | Absolute URL of this deployment — emails carry a sign-in link when set. |
+| `POSTGRES_JDBC_URL` | `jdbc:postgresql://localhost:5434/covenant` | Flyway's JDBC URL. |
+| `POSTGRES_R2DBC_URL` | `r2dbc:postgresql://localhost:5434/covenant` | The runtime R2DBC URL. |
+| `POSTGRES_USER` | `covenant` | Database user. |
+| `POSTGRES_PASSWORD` | `covenant` | Database password. |
+
 ## Useful Gradle tasks
 
 | Task | What it does |

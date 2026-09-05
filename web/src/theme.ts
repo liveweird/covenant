@@ -27,7 +27,8 @@ const sans =
 // are dark text with a hover underline, chips and badges are light tints, icon controls are
 // neutral gray. One colour at one intensity for one job, so the few purple elements on a
 // screen are the ones that matter. Semantic colours never impersonate the brand: red =
-// blocking error, orange = waived finding, teal = success. The canvas is a quiet near-white
+// blocking error, orange = waived finding, teal = success, yellow = in flight (a PROPOSED
+// version, a PUT/PATCH method badge — the one non-verdict token). The canvas is a quiet near-white
 // (dark: dark-8) that lets white surfaces lift on a soft, diffuse shadow scale. Don't
 // reintroduce stock-blue actions or stock-green success states. A filled 8-shade carries
 // white text in the dark scheme, but is too dark to be SEEN against dark-8 — every place the

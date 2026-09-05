@@ -53,7 +53,7 @@ internal fun containsPattern(raw: String): LikePattern {
 /**
  * Post-commit read-back guard: the create/transition already committed (Location set, audit
  * emitted), so a missing re-read is a server-side anomaly (500 via [error]), never a client
- * 404. Reads `X.read(id).orVanished("CatalogFile", id)`; transitions pass a phase like
+ * 404. Reads `X.read(id).orVanished("Domain", id)`; transitions pass a phase like
  * "after opening".
  */
 fun <T> T?.orVanished(resource: String, id: Any, phase: String = "between create and re-read"): T =

@@ -1,5 +1,6 @@
 package ch.nokillswit.contracts.checks
 
+import ch.nokillswit.authz.caller
 import ch.nokillswit.audit.audit
 import ch.nokillswit.contracts.ContractType
 import ch.nokillswit.contracts.Lifecycle
@@ -117,7 +118,9 @@ class ChecksService(private val checkerProvider: () -> CheckerClient) {
     }
 }
 
-/** Audit the operational fact once per failed sidecar call (host + reason, never the document). */
+/** Audit the operational fact once per failed sidecar call: who was checking what (byUserId + the request path), never the document. */
 fun io.ktor.server.application.ApplicationCall.auditCheckerUnavailable(report: CheckReport) {
-    if (!report.checkerAvailable) audit("checker.unavailable", "path" to request.local.uri)
+    if (!report.checkerAvailable) {
+        audit("checker.unavailable", "byUserId" to caller().userId.toLong(), "path" to request.local.uri)
+    }
 }

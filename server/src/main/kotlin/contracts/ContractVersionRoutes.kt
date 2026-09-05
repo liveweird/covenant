@@ -337,7 +337,7 @@ fun Application.configureContractVersionRoutes() {
 private const val DEFAULT_MAX_DOCUMENT_BYTES = 2L * 1024 * 1024
 
 private fun ApplicationCall.auditCheckerUnavailableFor(version: VersionResponse) {
-    if (!version.checkComplete) audit("checker.unavailable", "path" to request.local.uri)
+    if (!version.checkComplete) audit("checker.unavailable", "byUserId" to caller().userId.toLong(), "path" to request.local.uri)
 }
 
 /** A filename-safe slug: letters, digits, dot, dash, underscore; everything else collapses to `-`. */

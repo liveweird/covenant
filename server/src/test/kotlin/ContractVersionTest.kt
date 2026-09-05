@@ -171,7 +171,7 @@ class ContractVersionTest {
             val v = admin.postJson(path(c), VersionCreateRequest("1.0.0", ContractFixtures.openApi)).body<VersionResponse>()
             assertFalse(v.checkComplete)
             assertEquals("CHECKER_UNAVAILABLE", v.findings.single().code)
-            assertNotNull(capture.awaitEvent { it.message == "checker.unavailable" })
+            assertNotNull(capture.awaitEvent { it.message == "checker.unavailable" && it.hasKeyValue("path", path(c)) })
             // The strict save still succeeded: a missing checker never blocks.
             assertEquals(HttpStatusCode.Created, admin.postJson(path(c), VersionCreateRequest("1.1.0", ContractFixtures.openApi)).status)
             // recheck re-runs the pipeline (the stub still fails — the report stays flagged, but the route works).
