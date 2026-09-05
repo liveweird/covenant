@@ -26,6 +26,7 @@ security:
 tags:
   - name: auth
   - name: users
+  - name: teams
 
 paths:
   /api/v1/login:
@@ -450,6 +451,159 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '500': { $ref: '#/components/responses/InternalServerError' }
 
+  /api/v1/teams:
+    get:
+      tags: [teams]
+      operationId: listTeams
+      summary: List teams
+      description: |
+        Any authenticated user — teams are the ownership unit every contract points at, so the
+        owner pickers and the Teams page read them; every mutation below is ADMIN only.
+
+        - Sortable fields: `id`, `name`, `createdAt`, `updatedAt`. Default `id` ascending.
+        - Filters: `name` (case- and accent-insensitive substring), `memberId` (only teams the
+          user is a member of — the caller's own id yields "my teams").
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - name: name
+          in: query
+          required: false
+          schema: { type: string }
+        - name: memberId
+          in: query
+          required: false
+          schema: { type: integer, format: int32, minimum: 0 }
+      responses:
+        '200':
+          description: A page of teams (rosters collapsed to an active-member count)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamPage'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    post:
+      tags: [teams]
+      operationId: createTeam
+      summary: Create a team
+      description: |
+        ADMIN only (guarded before the body decodes — a non-admin's malformed body is still
+        403). An optional initial roster: every id must be an active user (`400` otherwise). A
+        case-insensitive name clash with an active team is `409`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamCreateRequest'
+      responses:
+        '201':
+          description: Created; `Location` points at the new team
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/teams/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [teams]
+      operationId: getTeam
+      summary: Get a team with its roster
+      description: Any authenticated user. Soft-deleted members stay in the roster, flagged `deleted`.
+      responses:
+        '200':
+          description: The team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    put:
+      tags: [teams]
+      operationId: updateTeam
+      summary: Rename / re-describe a team
+      description: ADMIN only, guard before the id lookup (uniform 403). The roster is managed per member below.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamUpdateRequest'
+      responses:
+        '204':
+          description: Updated
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    delete:
+      tags: [teams]
+      operationId: deleteTeam
+      summary: Delete a team (soft)
+      description: |
+        ADMIN only, guard before the id lookup. Soft delete — the name is freed for reuse. A team
+        that still owns an active contract answers `409` (the rule lands with the contracts feature).
+      responses:
+        '204':
+          description: Deleted
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/teams/{id}/members/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+      - name: userId
+        in: path
+        required: true
+        schema: { type: integer, format: int32, minimum: 0 }
+    post:
+      tags: [teams]
+      operationId: addTeamMember
+      summary: Add a user to a team
+      description: ADMIN only. The user must be active (`404` otherwise); an existing member is `409`.
+      responses:
+        '204':
+          description: Added
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    delete:
+      tags: [teams]
+      operationId: removeTeamMember
+      summary: Remove a user from a team
+      description: ADMIN only. A membership that does not exist is `404` (a soft-deleted member's row can still be removed).
+      responses:
+        '204':
+          description: Removed
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 components:
   securitySchemes:
     bearerAuth:
@@ -486,8 +640,6 @@ components:
         comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
         sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
         always appended as a deterministic tiebreaker.
-    # The shared catalog-file filter set — declared identically by the list and graph
-    # endpoints (the list applies it in SQL, the graph in memory; one semantics).
   responses:
     BadRequest:
       description: Malformed request
@@ -741,6 +893,75 @@ components:
           description: >-
             Required when the caller changes their OWN password (even an admin); omitted
             for an admin resetting somebody else's.
+
+    TeamCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: string, maxLength: 500, nullable: true }
+        memberIds:
+          type: array
+          maxItems: 200
+          items: { type: integer, format: int32, minimum: 0 }
+          description: Optional initial roster — every id must be an active user.
+    TeamUpdateRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: string, maxLength: 500, nullable: true }
+    TeamMemberResponse:
+      type: object
+      required: [userId, name, email, deleted]
+      properties:
+        userId: { type: integer, format: int32, minimum: 0 }
+        name: { type: string }
+        email: { type: string }
+        deleted:
+          type: boolean
+          description: The user was soft-deleted after joining; the row stays for the record.
+    TeamResponse:
+      type: object
+      required: [id, name, members, createdAt, updatedAt]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamMemberResponse'
+        createdAt: { type: integer, format: int64, description: Epoch millis }
+        updatedAt: { type: integer, format: int64, description: Epoch millis }
+    TeamListItem:
+      type: object
+      required: [id, name, memberCount, createdAt, updatedAt]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        memberCount:
+          type: integer
+          minimum: 0
+          description: Active members only.
+        createdAt: { type: integer, format: int64 }
+        updatedAt: { type: integer, format: int64 }
+    TeamPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamListItem'
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Row count after filters, before pagination.
 
     ProblemDetail:
       type: object

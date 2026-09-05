@@ -2,9 +2,9 @@ import { describe, expect, test } from "vitest";
 import { ACCOUNT_NAV, activeNavPath, visibleSections } from "./navigation";
 
 describe("visibleSections", () => {
-  test("a regular session sees Catalog only — the empty Administration section is dropped", () => {
+  test("a regular session sees Catalog and Registries — the empty Administration section is dropped", () => {
     const sections = visibleSections(false);
-    expect(sections.map((s) => s.label)).toEqual(["appShell.section.catalog"]);
+    expect(sections.map((s) => s.label)).toEqual(["appShell.section.catalog", "appShell.section.registries"]);
     expect(sections.flatMap((s) => s.items.map((l) => l.to))).not.toContain("/users");
   });
 
@@ -27,6 +27,7 @@ describe("activeNavPath", () => {
     expect(activeNavPath("/users/new", leaves)).toBe("/users");
     expect(activeNavPath("/users/3/edit", leaves)).toBe("/users");
     expect(activeNavPath("/feature-flags", leaves)).toBe("/feature-flags");
+    expect(activeNavPath("/teams/3", leaves)).toBe("/teams");
   });
 
   test("the root matches only exactly", () => {

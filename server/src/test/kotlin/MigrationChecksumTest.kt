@@ -25,6 +25,7 @@ class MigrationChecksumTest {
         "V3__seed_admin.sql" to 724751517,
         "V4__enable_unaccent_extension.sql" to 242547752,
         "V5__user_disabled_features.sql" to -466290471,
+        "V6__create_teams.sql" to -354462531,
     )
 
     @Test

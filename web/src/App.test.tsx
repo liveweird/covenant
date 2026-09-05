@@ -55,6 +55,8 @@ describe("App shell", () => {
       // Sections are labelled groups, never toggles — every leaf is in the DOM immediately.
       const catalog = await screen.findByRole("group", { name: "Catalog" });
       expect(within(catalog).getByRole("link", { name: "Home" })).toHaveAttribute("href", "/");
+      const registries = screen.getByRole("group", { name: "Registries" });
+      expect(within(registries).getByRole("link", { name: "Teams" })).toHaveAttribute("href", "/teams");
       // Account items live in the header menu, not the sidebar.
       expect(screen.queryByRole("link", { name: "Change password" })).not.toBeInTheDocument();
       // A non-admin session sees no Administration section at all.

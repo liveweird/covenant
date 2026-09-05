@@ -12,6 +12,7 @@ import enAppShell from "./locales/en/appShell.json";
 import enAuth from "./locales/en/auth.json";
 import enChangelog from "./locales/en/changelog.json";
 import enHome from "./locales/en/home.json";
+import enTeams from "./locales/en/teams.json";
 import enUsers from "./locales/en/users.json";
 
 /**
@@ -54,6 +55,7 @@ export const en = {
   auth: enAuth,
   changelog: enChangelog,
   home: enHome,
+  teams: enTeams,
   users: enUsers,
 };
 

@@ -294,6 +294,95 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List teams
+         * @description Any authenticated user — teams are the ownership unit every contract points at, so the
+         *     owner pickers and the Teams page read them; every mutation below is ADMIN only.
+         *
+         *     - Sortable fields: `id`, `name`, `createdAt`, `updatedAt`. Default `id` ascending.
+         *     - Filters: `name` (case- and accent-insensitive substring), `memberId` (only teams the
+         *       user is a member of — the caller's own id yields "my teams").
+         */
+        get: operations["listTeams"];
+        put?: never;
+        /**
+         * Create a team
+         * @description ADMIN only (guarded before the body decodes — a non-admin's malformed body is still
+         *     403). An optional initial roster: every id must be an active user (`400` otherwise). A
+         *     case-insensitive name clash with an active team is `409`.
+         */
+        post: operations["createTeam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Get a team with its roster
+         * @description Any authenticated user. Soft-deleted members stay in the roster, flagged `deleted`.
+         */
+        get: operations["getTeam"];
+        /**
+         * Rename / re-describe a team
+         * @description ADMIN only, guard before the id lookup (uniform 403). The roster is managed per member below.
+         */
+        put: operations["updateTeam"];
+        post?: never;
+        /**
+         * Delete a team (soft)
+         * @description ADMIN only, guard before the id lookup. Soft delete — the name is freed for reuse. A team
+         *     that still owns an active contract answers `409` (the rule lands with the contracts feature).
+         */
+        delete: operations["deleteTeam"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                userId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a user to a team
+         * @description ADMIN only. The user must be active (`404` otherwise); an existing member is `409`.
+         */
+        post: operations["addTeamMember"];
+        /**
+         * Remove a user from a team
+         * @description ADMIN only. A membership that does not exist is `404` (a soft-deleted member's row can still be removed).
+         */
+        delete: operations["removeTeamMember"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -415,6 +504,63 @@ export interface components {
             password: string;
             /** @description Required when the caller changes their OWN password (even an admin); omitted for an admin resetting somebody else's. */
             currentPassword?: string;
+        };
+        TeamCreateRequest: {
+            name: string;
+            description?: string | null;
+            /** @description Optional initial roster — every id must be an active user. */
+            memberIds?: number[];
+        };
+        TeamUpdateRequest: {
+            name: string;
+            description?: string | null;
+        };
+        TeamMemberResponse: {
+            /** Format: int32 */
+            userId: number;
+            name: string;
+            email: string;
+            /** @description The user was soft-deleted after joining; the row stays for the record. */
+            deleted: boolean;
+        };
+        TeamResponse: {
+            /** Format: int32 */
+            id: number;
+            name: string;
+            description?: string | null;
+            members: components["schemas"]["TeamMemberResponse"][];
+            /**
+             * Format: int64
+             * @description Epoch millis
+             */
+            createdAt: number;
+            /**
+             * Format: int64
+             * @description Epoch millis
+             */
+            updatedAt: number;
+        };
+        TeamListItem: {
+            /** Format: int32 */
+            id: number;
+            name: string;
+            description?: string | null;
+            /** @description Active members only. */
+            memberCount: number;
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: int64 */
+            updatedAt: number;
+        };
+        TeamPage: {
+            items: components["schemas"]["TeamListItem"][];
+            page: number;
+            pageSize: number;
+            /**
+             * Format: int64
+             * @description Row count after filters, before pagination.
+             */
+            total: number;
         };
         /** @description RFC 7807 problem detail. Served as `application/problem+json`. */
         ProblemDetail: {
@@ -976,6 +1122,209 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ProblemDetail"];
                 };
             };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listTeams: {
+        parameters: {
+            query?: {
+                /** @description 1-based page index. Defaults to 1. */
+                page?: components["parameters"]["Page"];
+                /** @description Rows per page. Defaults to 20, maximum 100. */
+                pageSize?: components["parameters"]["PageSize"];
+                /**
+                 * @description Sort spec. Format: `field` (ascending) or `-field` (descending). Multiple fields are
+                 *     comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
+                 *     sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
+                 *     always appended as a deterministic tiebreaker.
+                 */
+                sort?: components["parameters"]["Sort"];
+                name?: string;
+                memberId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of teams (rosters collapsed to an active-member count) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    createTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TeamCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Created; `Location` points at the new team */
+            201: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["PayloadTooLarge"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The team */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    updateTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TeamUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    deleteTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    addTeamMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                userId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Added */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    removeTeamMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                userId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];
         };

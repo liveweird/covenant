@@ -14,7 +14,8 @@
   "field": {
     "email": "Email",
     "name": "Name",
-    "role": "Role"
+    "role": "Role",
+    "description": "Description"
   },
   "state": {
     "any": "Any"

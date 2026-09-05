@@ -6,8 +6,9 @@ import io.ktor.server.plugins.BadRequestException
 // Small helpers for the repeated list-endpoint query-param parsing idioms, so every route stops
 // hand-writing `params["x"]?.takeIf { it.isNotBlank() }` and the numeric variants. Ported from
 // Lettuce minus its view-scoped helpers (optionalIncludeIndirect, uintOnlyForView) and the
-// remaining typed scalar parsers (optionalUInt/Long) — each returns with its first Covenant
-// consumer (optionalBoolean arrived with the users-list featureEnabled filter).
+// remaining typed scalar parser (optionalLong) — each returns with its first Covenant consumer
+// (optionalBoolean arrived with the users-list featureEnabled filter, optionalUInt with the
+// teams list's memberId filter).
 
 /**
  * The single value of [name], or null when absent. A repeated key is a 400: repetition is
@@ -24,9 +25,13 @@ fun Parameters.singleValue(name: String): String? {
 /** The param's value, or null when absent or blank. */
 fun Parameters.optionalString(name: String): String? = singleValue(name)?.takeIf { it.isNotBlank() }
 
+/** An unsigned-id param (the `?memberId=` shape): null when absent, 400 when not a non-negative integer. */
+fun Parameters.optionalUInt(name: String): UInt? =
+    optionalString(name)?.let { it.toUIntOrNull() ?: throw BadRequestException("Invalid $name: $it") }
+
 /**
  * Every non-blank value of [name] — for the params whose documented contract makes repetition
- * mean any-of/`IN` (API-LIST-004; the first consumer is the catalog list's `labelValue`).
+ * mean any-of/`IN` (API-LIST-004; the first consumers are the contracts list's `type`/`lifecycle`).
  * Empty when absent or all values are blank.
  */
 fun Parameters.repeatedValues(name: String): List<String> =

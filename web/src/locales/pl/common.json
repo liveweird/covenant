@@ -14,7 +14,8 @@
   "field": {
     "email": "E-mail",
     "name": "Nazwa",
-    "role": "Rola"
+    "role": "Rola",
+    "description": "Opis"
   },
   "state": {
     "any": "Dowolna"
