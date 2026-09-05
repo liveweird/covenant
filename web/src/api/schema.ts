@@ -1203,6 +1203,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contracts/{id}/versions/{vid}/try/http": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send one request to an OpenAPI operation through an environment
+         * @description Any authenticated user. The environment's HTTP base URL replaces the document's `servers[]`;
+         *     the document contributes the method and the path template (an operation it declares — TRACE
+         *     is never offered; a path must equal a declared template, every `{param}` bound from
+         *     `pathParams`). The server sends the request (redirects are never followed — a 3xx is the
+         *     observation; request and response bodies bounded at 1 MiB, the response body shown truncated
+         *     beyond it), strips cookies and hop-by-hop headers both ways, and refuses the caller's
+         *     `Host`/`Content-Length`/`Cookie`/`Proxy-*`-class headers (`400`). The caller MAY type
+         *     credentials into `headers` — they are forwarded, never stored, logged or audited. Whatever the
+         *     target answers is a `200` here with the status shown; a target that cannot be reached is a
+         *     `502`. The `conformance` report measures the request body before sending (warnings) and the
+         *     response — status, media type, declared headers, body against the response schema — as
+         *     `CONFORMANCE` findings, never stored. Rate-limited per client host (`429`). Audited as
+         *     `contract.tried_http` with the host, method, path template, status and duration only.
+         */
+        post: operations["tryHttp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1775,6 +1810,35 @@ export interface components {
             http: components["schemas"]["HttpOperationSummary"][];
             kafka: components["schemas"]["KafkaChannelSummary"][];
             sql: components["schemas"]["SqlDatasetSummary"][];
+        };
+        StringMap: {
+            [key: string]: string;
+        };
+        TryHttpRequest: {
+            /** Format: int32 */
+            environmentId: number;
+            /** @description GET, PUT, POST, DELETE, OPTIONS, HEAD or PATCH — an operation the document declares on `path`. */
+            method: string;
+            /** @description The path template exactly as declared, e.g. `/pets/{id}`. */
+            path: string;
+            pathParams?: components["schemas"]["StringMap"];
+            query?: components["schemas"]["StringMap"];
+            headers?: components["schemas"]["StringMap"];
+            /** @description Defaults to application/json when a body is sent. */
+            contentType?: string | null;
+            body?: string | null;
+        };
+        TryHttpResponse: {
+            /** @description The URL called, without its query string. */
+            url: string;
+            /** Format: int32 */
+            status: number;
+            headers: components["schemas"]["StringMap"];
+            body?: string | null;
+            bodyTruncated: boolean;
+            /** Format: int64 */
+            durationMs: number;
+            conformance: components["schemas"]["ConformanceReport"];
         };
         ConformanceReport: {
             findings: components["schemas"]["Finding"][];
@@ -4240,6 +4304,40 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];
+        };
+    };
+    tryHttp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TryHttpRequest"];
+            };
+        };
+        responses: {
+            /** @description The observation and its conformance report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TryHttpResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            413: components["responses"]["PayloadTooLarge"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            502: components["responses"]["BadGateway"];
         };
     };
 }

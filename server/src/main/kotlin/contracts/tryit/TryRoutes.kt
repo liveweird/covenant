@@ -1,27 +1,80 @@
 package ch.nokillswit.contracts.tryit
 
+import ch.nokillswit.audit.audit
+import ch.nokillswit.authz.BadGatewayException
+import ch.nokillswit.authz.CallerPrincipal
 import ch.nokillswit.authz.caller
 import ch.nokillswit.authz.orNotFound
+import ch.nokillswit.contracts.ContractResponse
+import ch.nokillswit.contracts.ContractService
 import ch.nokillswit.contracts.ContractServiceKey
+import ch.nokillswit.contracts.ContractType
+import ch.nokillswit.contracts.ContractVersionService
 import ch.nokillswit.contracts.ContractVersionServiceKey
 import ch.nokillswit.contracts.ContractsRoute
+import ch.nokillswit.contracts.VersionResponse
 import ch.nokillswit.contracts.checks.DocumentParser
 import ch.nokillswit.contracts.checks.ParseOutcome
-import io.ktor.http.*
+import ch.nokillswit.environments.EnvironmentServiceKey
+import ch.nokillswit.environments.EnvironmentService
+import ch.nokillswit.environments.EnvironmentTargets
+import com.fasterxml.jackson.databind.JsonNode
+import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.*
-import io.ktor.server.auth.*
-import io.ktor.server.resources.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
+import io.ktor.server.auth.authenticate
+import io.ktor.server.plugins.BadRequestException
+import io.ktor.server.plugins.ratelimit.RateLimitName
+import io.ktor.server.plugins.ratelimit.rateLimit
+import io.ktor.server.request.receive
+import io.ktor.server.resources.get
+import io.ktor.server.resources.post
+import io.ktor.server.response.respond
+import io.ktor.server.routing.routing
+
+/** The per-IP bucket the try POSTs share — registered with the others in `configureAuthRoutes`. */
+const val TRY_RATE_LIMIT = "tryIt"
+const val DEFAULT_TRY_LIMIT_PER_MINUTE = 60
+
+/** Everything a try leg needs, resolved in one preamble — the version, its contract, the decrypted targets, the parsed tree. */
+class TryContext(
+    val caller: CallerPrincipal,
+    val contract: ContractResponse,
+    val version: VersionResponse,
+    val targets: EnvironmentTargets,
+    val root: JsonNode,
+)
+
+/**
+ * The shared preamble of every try: version 404 → contract 404 → environment 404 → the environment
+ * must belong to the contract's system (400) → the contract must be of the leg's type (400) → the
+ * stored document must parse (400). The environment's protocol target is the leg's own check.
+ */
+class TryPreamble(
+    private val contracts: ContractService,
+    private val versions: ContractVersionService,
+    private val environments: EnvironmentService,
+) {
+    suspend fun resolve(caller: CallerPrincipal, contractId: UInt, vid: UInt, environmentId: UInt, type: ContractType): TryContext {
+        val version = versions.read(contractId, vid).orNotFound("Version")
+        val contract = contracts.read(contractId, contracts.viewer(caller)).orNotFound("Contract")
+        val targets = environments.resolveTarget(environmentId).orNotFound("Environment")
+        if (targets.systemId != contract.system.id) throw BadRequestException("The environment belongs to another system")
+        if (contract.type != type) throw BadRequestException("This contract is not ${type.name} — the $type leg does not apply")
+        val root = (DocumentParser.parse(version.content) as? ParseOutcome.Parsed)?.root
+            ?: throw BadRequestException("The stored document does not parse")
+        return TryContext(caller, contract, version, targets, root)
+    }
+}
 
 /**
  * The try-it family under a version (milestone 3c). The catalog is a pure read of the stored
- * document; the try POSTs (HTTP, Kafka, SQL) land leg by leg and share one preamble — the
- * version, the environment, the system match, the target's presence, the type match.
+ * document; the try POSTs (HTTP, Kafka, SQL) land leg by leg behind the shared preamble and the
+ * `tryIt` rate-limit bucket. Tries reach the SECURITY audit only — never `contract_events`.
  */
 fun Application.configureTryRoutes() {
     val contractService = attributes[ContractServiceKey]
     val versionService = attributes[ContractVersionServiceKey]
+    val preamble = TryPreamble(contractService, versionService, attributes[EnvironmentServiceKey])
 
     routing {
         authenticate {
@@ -33,6 +86,46 @@ fun Application.configureTryRoutes() {
                 // A stored document parsed at store time; a legacy row that no longer does offers nothing to try.
                 val root = (DocumentParser.parse(version.content) as? ParseOutcome.Parsed)?.root
                 call.respond(HttpStatusCode.OK, if (root == null) TryCatalogResponse(type) else TryCatalog.build(type, root))
+            }
+        }
+        rateLimit(RateLimitName(TRY_RATE_LIMIT)) {
+            authenticate {
+                post<ContractsRoute.Id.Versions.Vid.Try.Http> { route ->
+                    val caller = call.caller()
+                    val contractId = route.parent.parent.parent.parent.id
+                    val request = call.receive<TryHttpRequest>()
+                    val ctx = preamble.resolve(caller, contractId, route.parent.parent.vid, request.environmentId, ContractType.OPENAPI)
+                    val baseUrl = ctx.targets.httpBaseUrl ?: throw BadRequestException("The environment has no HTTP base URL")
+                    val prepared = HttpTry.prepare(request, ctx.root, baseUrl)
+                    val trail = arrayOf(
+                        "byUserId" to caller.userId, "contractId" to contractId, "versionId" to ctx.version.id,
+                        "environmentId" to ctx.targets.id, "host" to prepared.uri.host, "method" to prepared.method,
+                        "pathTemplate" to request.path,
+                    )
+                    val observation = try {
+                        HttpTry.send(prepared)
+                    } catch (e: BadGatewayException) {
+                        audit("contract.tried_http", *trail, "outcome" to "unreachable")
+                        throw e
+                    }
+                    audit(
+                        "contract.tried_http", *trail,
+                        "status" to observation.status, "durationMs" to observation.durationMs, "outcome" to "answered",
+                    )
+                    val schemas = DocumentSchemas.of(ContractType.OPENAPI, ctx.root)
+                    call.respond(
+                        HttpStatusCode.OK,
+                        TryHttpResponse(
+                            url = prepared.uri.toString().substringBefore('?'),
+                            status = observation.status,
+                            headers = observation.headers,
+                            body = observation.body,
+                            bodyTruncated = observation.truncated,
+                            durationMs = observation.durationMs,
+                            conformance = HttpTry.assess(request, prepared, observation, ctx.root, schemas),
+                        ),
+                    )
+                }
             }
         }
     }

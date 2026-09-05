@@ -14,7 +14,7 @@ import com.fasterxml.jackson.databind.JsonNode
  */
 object TryCatalog {
     // TRACE is never offered: it echoes the request (credentials included) and no contract worth trying declares it.
-    private val METHODS = listOf("get", "put", "post", "delete", "options", "head", "patch")
+    internal val METHODS = listOf("get", "put", "post", "delete", "options", "head", "patch")
 
     fun build(type: ContractType, root: JsonNode): TryCatalogResponse = when (type) {
         ContractType.OPENAPI -> TryCatalogResponse(type, http = httpOperations(root))

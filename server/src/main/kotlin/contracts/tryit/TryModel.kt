@@ -97,3 +97,32 @@ data class ConformanceReport(
         )
     }
 }
+
+/** `POST …/try/http`: one request against an OpenAPI operation through the environment's base URL. */
+@Serializable
+data class TryHttpRequest(
+    val environmentId: UInt,
+    /** Upper- or lower-case; must be an operation the document declares on [path]. */
+    val method: String,
+    /** The path TEMPLATE exactly as declared (`/pets/{id}`); every `{param}` comes from [pathParams]. */
+    val path: String,
+    val pathParams: Map<String, String> = emptyMap(),
+    val query: Map<String, String> = emptyMap(),
+    /** Per-call headers — the user MAY type credentials here; they are never stored, logged or audited. */
+    val headers: Map<String, String> = emptyMap(),
+    val contentType: String? = null,
+    val body: String? = null,
+)
+
+@Serializable
+data class TryHttpResponse(
+    /** The URL called WITHOUT its query string (a query may carry a token the user typed). */
+    val url: String,
+    val status: Int,
+    /** Response headers minus cookies and hop-by-hop headers; multi-valued ones joined with `, `. */
+    val headers: Map<String, String>,
+    val body: String?,
+    val bodyTruncated: Boolean,
+    val durationMs: Long,
+    val conformance: ConformanceReport,
+)

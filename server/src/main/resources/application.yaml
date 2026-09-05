@@ -35,8 +35,9 @@ ktor:
       - ch.nokillswit.contracts.ContractRoutesKt.configureContractRoutes
       - ch.nokillswit.contracts.ContractVersionRoutesKt.configureContractVersionRoutes
       - ch.nokillswit.notifications.NotificationRoutesKt.configureNotificationRoutes
-      - ch.nokillswit.contracts.tryit.TryRoutesKt.configureTryRoutes
       - ch.nokillswit.auth.AuthRoutesKt.configureAuthRoutes
+      # after the auth module: the try POSTs ride a RateLimit bucket configureAuthRoutes installs
+      - ch.nokillswit.contracts.tryit.TryRoutesKt.configureTryRoutes
       # — catch-all router
       - ch.nokillswit.plugins.RoutingKt.configureRouting
 
@@ -60,6 +61,9 @@ security:
     # production, 100/min in development — the loginPerMinute rationale); a number pins it.
     # The per-EMAIL reset throttle below is the actual abuse defence in both modes.
     passwordResetPerMinute: "$PASSWORD_RESET_RATE_LIMIT_PER_MINUTE:"
+    # Per-IP bucket shared by the try-it POSTs (the server calling an environment on user command).
+    # Blank keeps the default 60/min in both modes; a number pins it.
+    tryPerMinute: "$TRY_RATE_LIMIT_PER_MINUTE:"
   # Self-service password reset: at most one request per submitted email per interval,
   # uniformly whether or not the account exists. In-memory, per-instance, like the lockout.
   passwordReset:

@@ -48,7 +48,7 @@ export for the commit back.
   actions, and a server-side contract search),
 - breaking-change detection against the active version (openapi-diff, `@asyncapi/diff`, a
   hand-written ODCS comparer) — a non-major bump that breaks clients is a waivable blocking finding,
-- an **Environments** registry (per system: an HTTP base URL, a Kafka cluster, a read-only PostgreSQL database — passwords encrypted at rest, admin-curated) — the targets the upcoming try-it feature reaches,
+- an **Environments** registry (per system: an HTTP base URL, a Kafka cluster, a read-only PostgreSQL database — passwords encrypted at rest, admin-curated) — the targets the **try-it** feature reaches: send a request to an OpenAPI operation through an environment and see the response measured against the contract (status, media type, headers, body against the response schema) as conformance findings; rate-limited (`TRY_RATE_LIMIT_PER_MINUTE`), redirects never followed, credentials typed per call and never stored,
 - facet counts on the catalog filters — every option says how many contracts picking it would yield,
 - in-app notifications: follow a contract and its every event — versions created, edited, published,
   synced, a breaking change waived, the owner changed — lands in your bell (never for your own acts),

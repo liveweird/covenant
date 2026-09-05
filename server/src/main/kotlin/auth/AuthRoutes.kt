@@ -25,6 +25,8 @@ import io.ktor.server.auth.principal
 import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.plugins.CannotTransformContentToTypeException
 import io.ktor.server.plugins.origin
+import ch.nokillswit.contracts.tryit.DEFAULT_TRY_LIMIT_PER_MINUTE
+import ch.nokillswit.contracts.tryit.TRY_RATE_LIMIT
 import io.ktor.server.plugins.ratelimit.RateLimit
 import io.ktor.server.plugins.ratelimit.RateLimitName
 import io.ktor.server.plugins.ratelimit.rateLimit
@@ -179,9 +181,19 @@ fun Application.configureAuthRoutes() {
         ?.getString()?.takeIf { it.isNotBlank() }?.toInt()
         ?: if (developmentMode) 100 else 5
 
+    // The try-it POSTs (contracts/tryit/) make the server call a real environment on user
+    // command; one bucket per client host bounds how fast (default 60/min, pinnable).
+    val tryLimit = environment.config.propertyOrNull("security.rateLimit.tryPerMinute")
+        ?.getString()?.takeIf { it.isNotBlank() }?.toInt()
+        ?: DEFAULT_TRY_LIMIT_PER_MINUTE
+
     // Throttle login to blunt password brute-forcing, and refresh to blunt token abuse: a token
     // bucket per client host.
     install(RateLimit) {
+        register(RateLimitName(TRY_RATE_LIMIT)) {
+            rateLimiter(limit = tryLimit, refillPeriod = 60.seconds)
+            requestKey { call -> call.request.origin.remoteHost }
+        }
         register(RateLimitName(LOGIN_RATE_LIMIT)) {
             rateLimiter(limit = loginLimit, refillPeriod = 60.seconds)
             requestKey { call -> call.request.origin.remoteHost }

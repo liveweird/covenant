@@ -1766,6 +1766,48 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
         '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/{id}/versions/{vid}/try/http:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+      - $ref: '#/components/parameters/VersionId'
+    post:
+      tags: [try-it]
+      operationId: tryHttp
+      summary: Send one request to an OpenAPI operation through an environment
+      description: |
+        Any authenticated user. The environment's HTTP base URL replaces the document's `servers[]`;
+        the document contributes the method and the path template (an operation it declares — TRACE
+        is never offered; a path must equal a declared template, every `{param}` bound from
+        `pathParams`). The server sends the request (redirects are never followed — a 3xx is the
+        observation; request and response bodies bounded at 1 MiB, the response body shown truncated
+        beyond it), strips cookies and hop-by-hop headers both ways, and refuses the caller's
+        `Host`/`Content-Length`/`Cookie`/`Proxy-*`-class headers (`400`). The caller MAY type
+        credentials into `headers` — they are forwarded, never stored, logged or audited. Whatever the
+        target answers is a `200` here with the status shown; a target that cannot be reached is a
+        `502`. The `conformance` report measures the request body before sending (warnings) and the
+        response — status, media type, declared headers, body against the response schema — as
+        `CONFORMANCE` findings, never stored. Rate-limited per client host (`429`). Audited as
+        `contract.tried_http` with the host, method, path template, status and duration only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TryHttpRequest'
+      responses:
+        '200':
+          description: The observation and its conformance report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TryHttpResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '502': { $ref: '#/components/responses/BadGateway' }
 components:
   securitySchemes:
     bearerAuth:
@@ -2637,6 +2679,32 @@ components:
         http: { type: array, items: { $ref: '#/components/schemas/HttpOperationSummary' } }
         kafka: { type: array, items: { $ref: '#/components/schemas/KafkaChannelSummary' } }
         sql: { type: array, items: { $ref: '#/components/schemas/SqlDatasetSummary' } }
+    StringMap:
+      type: object
+      additionalProperties: { type: string }
+    TryHttpRequest:
+      type: object
+      required: [environmentId, method, path]
+      properties:
+        environmentId: { type: integer, format: int32, minimum: 0 }
+        method: { type: string, description: "GET, PUT, POST, DELETE, OPTIONS, HEAD or PATCH — an operation the document declares on `path`." }
+        path: { type: string, description: "The path template exactly as declared, e.g. `/pets/{id}`." }
+        pathParams: { $ref: '#/components/schemas/StringMap' }
+        query: { $ref: '#/components/schemas/StringMap' }
+        headers: { $ref: '#/components/schemas/StringMap' }
+        contentType: { type: string, nullable: true, description: "Defaults to application/json when a body is sent." }
+        body: { type: string, nullable: true, maxLength: 1048576 }
+    TryHttpResponse:
+      type: object
+      required: [url, status, headers, bodyTruncated, durationMs, conformance]
+      properties:
+        url: { type: string, description: "The URL called, without its query string." }
+        status: { type: integer, format: int32 }
+        headers: { $ref: '#/components/schemas/StringMap' }
+        body: { type: string, nullable: true }
+        bodyTruncated: { type: boolean }
+        durationMs: { type: integer, format: int64 }
+        conformance: { $ref: '#/components/schemas/ConformanceReport' }
     ConformanceReport:
       type: object
       required: [findings, errors, warnings, infos]
