@@ -1,0 +1,61 @@
+{
+  "title": "Environments",
+  "intro": "Where the server connects when someone tries a contract: an HTTP base URL, a Kafka cluster or a read-only PostgreSQL database, per system. Administrators curate the list; passwords are stored encrypted and never shown again.",
+  "newEnvironment": "New environment",
+  "createTitle": "New environment",
+  "editTitle": "Edit environment",
+  "empty": "No environments yet",
+  "emptyNoSystems": "Create a system first — every environment belongs to one",
+  "loadFailed": "Could not load the environments",
+  "clearSystemFilter": "Clear system filter",
+  "field": {
+    "system": "System",
+    "httpEnabled": "HTTP target (OpenAPI)",
+    "httpBaseUrl": "Base URL",
+    "httpHint": "Absolute http(s) URL without credentials, query or fragment — it replaces the document's servers.",
+    "kafkaEnabled": "Kafka target (AsyncAPI)",
+    "bootstrapServers": "Bootstrap servers",
+    "securityProtocol": "Security protocol",
+    "saslMechanism": "SASL mechanism",
+    "username": "Username",
+    "password": "Password",
+    "passwordKeep": "Leave blank to keep the stored password",
+    "pgEnabled": "PostgreSQL target (ODCS)",
+    "jdbcUrl": "JDBC URL",
+    "jdbcHint": "jdbc:postgresql://host:port/db — parameters limited to ssl, sslmode, currentSchema, ApplicationName. Use a read-only role.",
+    "pgUsername": "Username",
+    "pgPassword": "Password"
+  },
+  "column": {
+    "targets": "Targets"
+  },
+  "target": {
+    "http": "HTTP",
+    "kafka": "Kafka",
+    "postgres": "PostgreSQL"
+  },
+  "deleteTitle": "Delete environment?",
+  "deleteBody": "\"{{name}}\" ({{system}}) will be deleted with its stored credentials.",
+  "deleteFailed": "Could not delete the environment",
+  "saveForbidden": "Only administrators can edit environments",
+  "saveConflict": "An environment with this name already exists in this system",
+  "saveInvalid": "One or more fields are invalid",
+  "saveGone": "This environment no longer exists — reload the page",
+  "validation": {
+    "nameLength": "Name must be 1–50 characters",
+    "descriptionLength": "Description must be at most 2000 characters",
+    "systemRequired": "Pick a system",
+    "needsTarget": "Enable at least one target",
+    "httpBaseUrl": "Use an absolute http(s) URL without credentials, query or fragment",
+    "bootstrapServers": "Use 1–20 comma-separated host:port entries",
+    "saslMechanism": "Pick a SASL mechanism",
+    "username": "A username is required",
+    "password": "A password is required",
+    "jdbcUrl": "Use jdbc:postgresql://host:port/db with only ssl, sslmode, currentSchema or ApplicationName parameters"
+  },
+  "toast": {
+    "created": "Environment created",
+    "saved": "Environment saved",
+    "deleted": "Environment deleted"
+  }
+}

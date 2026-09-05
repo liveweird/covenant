@@ -91,6 +91,10 @@ the same commit** — this list is the coverage map, the scenario file is the de
   bump → the History section read → teardown through the delete rules (draft deletes, an active
   version blocks the contract, deprecate → retire, then delete); a regular user's read-only tree,
   page and list.
+- [`environments.spec.ts`](scenarios/environments.md) — the try-it targets registry: an admin
+  creates an environment on a throwaway system with HTTP + PostgreSQL targets (the stack's own
+  services), edits it leaving the password blank (the stored secret is kept — the badge stays),
+  deletes it; a regular user's read-only list.
 - [`i18n.spec.ts`](scenarios/i18n.md) — the synced per-user language: a throwaway user
   switches to Polish, the choice survives a reload AND a wiped-device re-login (served from
   the stored value), and the admin's English flips it back; seeded accounts stay English.

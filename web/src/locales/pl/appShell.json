@@ -10,7 +10,8 @@
     "domains": "Domeny",
     "systems": "Systemy",
     "hierarchy": "Hierarchia",
-    "contracts": "Kontrakty"
+    "contracts": "Kontrakty",
+    "environments": "Środowiska"
   },
   "section": {
     "catalog": "Katalog",

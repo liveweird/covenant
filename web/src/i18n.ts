@@ -12,6 +12,7 @@ import enAppShell from "./locales/en/appShell.json";
 import enAuth from "./locales/en/auth.json";
 import enChangelog from "./locales/en/changelog.json";
 import enDomains from "./locales/en/domains.json";
+import enEnvironments from "./locales/en/environments.json";
 import enContracts from "./locales/en/contracts.json";
 import enFindings from "./locales/en/findings.json";
 import enNotifications from "./locales/en/notifications.json";
@@ -61,6 +62,7 @@ export const en = {
   auth: enAuth,
   changelog: enChangelog,
   domains: enDomains,
+  environments: enEnvironments,
   contracts: enContracts,
   findings: enFindings,
   notifications: enNotifications,

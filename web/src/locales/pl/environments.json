@@ -1,0 +1,61 @@
+{
+  "title": "Środowiska",
+  "intro": "Miejsca, z którymi serwer łączy się, gdy ktoś wypróbowuje kontrakt: bazowy adres HTTP, klaster Kafka lub baza PostgreSQL tylko do odczytu, per system. Listę prowadzą administratorzy/rki; hasła są przechowywane zaszyfrowane i nigdy nie są pokazywane ponownie.",
+  "newEnvironment": "Nowe środowisko",
+  "createTitle": "Nowe środowisko",
+  "editTitle": "Edytuj środowisko",
+  "empty": "Brak środowisk",
+  "emptyNoSystems": "Najpierw utwórz system — każde środowisko należy do jednego",
+  "loadFailed": "Nie udało się wczytać środowisk",
+  "clearSystemFilter": "Wyczyść filtr systemu",
+  "field": {
+    "system": "System",
+    "httpEnabled": "Cel HTTP (OpenAPI)",
+    "httpBaseUrl": "Adres bazowy",
+    "httpHint": "Bezwzględny adres http(s) bez danych logowania, zapytania i fragmentu — zastępuje serwery z dokumentu.",
+    "kafkaEnabled": "Cel Kafka (AsyncAPI)",
+    "bootstrapServers": "Serwery bootstrap",
+    "securityProtocol": "Protokół bezpieczeństwa",
+    "saslMechanism": "Mechanizm SASL",
+    "username": "Nazwa użytkownika",
+    "password": "Hasło",
+    "passwordKeep": "Zostaw puste, aby zachować zapisane hasło",
+    "pgEnabled": "Cel PostgreSQL (ODCS)",
+    "jdbcUrl": "Adres JDBC",
+    "jdbcHint": "jdbc:postgresql://host:port/db — parametry ograniczone do ssl, sslmode, currentSchema, ApplicationName. Użyj roli tylko do odczytu.",
+    "pgUsername": "Nazwa użytkownika",
+    "pgPassword": "Hasło"
+  },
+  "column": {
+    "targets": "Cele"
+  },
+  "target": {
+    "http": "HTTP",
+    "kafka": "Kafka",
+    "postgres": "PostgreSQL"
+  },
+  "deleteTitle": "Usunąć środowisko?",
+  "deleteBody": "„{{name}}” ({{system}}) zostanie usunięte razem z zapisanymi danymi logowania.",
+  "deleteFailed": "Nie udało się usunąć środowiska",
+  "saveForbidden": "Tylko administratorzy/rki mogą edytować środowiska",
+  "saveConflict": "Środowisko o tej nazwie już istnieje w tym systemie",
+  "saveInvalid": "Jedno lub więcej pól jest nieprawidłowe",
+  "saveGone": "To środowisko już nie istnieje — odśwież stronę",
+  "validation": {
+    "nameLength": "Nazwa musi mieć 1–50 znaków",
+    "descriptionLength": "Opis może mieć najwyżej 2000 znaków",
+    "systemRequired": "Wybierz system",
+    "needsTarget": "Włącz przynajmniej jeden cel",
+    "httpBaseUrl": "Podaj bezwzględny adres http(s) bez danych logowania, zapytania i fragmentu",
+    "bootstrapServers": "Podaj 1–20 wpisów host:port oddzielonych przecinkami",
+    "saslMechanism": "Wybierz mechanizm SASL",
+    "username": "Nazwa użytkownika jest wymagana",
+    "password": "Hasło jest wymagane",
+    "jdbcUrl": "Podaj jdbc:postgresql://host:port/db tylko z parametrami ssl, sslmode, currentSchema lub ApplicationName"
+  },
+  "toast": {
+    "created": "Środowisko utworzone",
+    "saved": "Środowisko zapisane",
+    "deleted": "Środowisko usunięte"
+  }
+}

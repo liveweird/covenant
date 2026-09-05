@@ -1,7 +1,8 @@
 import type { ParseKeys } from "i18next";
-import { IconFileText, IconFolders, IconHistory, IconKey, IconServer2, IconSitemap, IconToggleLeft, IconUsers, IconUsersGroup, type Icon } from "@tabler/icons-react";
+import { IconFileText, IconFolders, IconHistory, IconKey, IconPlugConnected, IconServer2, IconSitemap, IconToggleLeft, IconUsers, IconUsersGroup, type Icon } from "@tabler/icons-react";
 import { contractsPath, hierarchyPath } from "./contractLinks";
 import { teamsPath } from "./teamLinks";
+import { environmentsPath } from "./environmentLinks";
 
 export type NavLeaf = {
   to: string;
@@ -38,6 +39,7 @@ const NAV_SECTIONS: ReadonlyArray<NavSection> = [
     items: [
       { to: "/domains", label: "appShell.nav.domains", icon: IconFolders },
       { to: "/systems", label: "appShell.nav.systems", icon: IconServer2 },
+      { to: environmentsPath, label: "appShell.nav.environments", icon: IconPlugConnected },
       { to: teamsPath, label: "appShell.nav.teams", icon: IconUsersGroup },
     ],
   },

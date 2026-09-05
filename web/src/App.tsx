@@ -27,6 +27,7 @@ const VersionPage = lazy(() => import("./pages/VersionPage"));
 const VersionDiff = lazy(() => import("./pages/VersionDiff"));
 const Domains = lazy(() => import("./pages/Domains"));
 const Systems = lazy(() => import("./pages/Systems"));
+const Environments = lazy(() => import("./pages/Environments"));
 const Teams = lazy(() => import("./pages/Teams"));
 const TeamDetails = lazy(() => import("./pages/TeamDetails"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
@@ -168,6 +169,7 @@ export default function App() {
             <Route path="contracts/:id/versions/:vid" element={<VersionPage />} />
             <Route path="domains" element={<Domains />} />
             <Route path="systems" element={<Systems />} />
+            <Route path="environments" element={<Environments />} />
             <Route path="teams" element={<Teams />} />
             <Route path="teams/:id" element={<TeamDetails />} />
             <Route path="users" element={<Users />} />
