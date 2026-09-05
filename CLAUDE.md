@@ -31,7 +31,7 @@ Covenant is a **contract repository**: development teams publish and share the c
 
 The catalog is hierarchical: **Domain → System → Contract → Version**. Domains and Systems are ADMIN-curated registries (a System belongs to one Domain); a Contract belongs to one System, has a type (`OPENAPI | ASYNCAPI | ODCS`) and an **owner** — a team, or (less often) an individual user. Every authenticated user reads everything; **writing a contract or its versions requires membership of the owning team, being the owning user, or ADMIN** (ownership transfer is ADMIN-only). Teams are flat (membership only — no management chain). Version rules are strict: numbers are unique per contract and a new version must exceed the highest existing one; the document text is editable only in DRAFT/PROPOSED (a DRAFT may be deleted); from ACTIVE on only the lifecycle moves. Validation is two-tier (Toadie's model): **HARD** findings — unparseable YAML/JSON, a document of the wrong type — are a `400` on every store path; **SOFT** findings (schema, semantic, lint) block a strict save but are waivable with `allowInvalid=true` (the editor's Save-anyway modal; import always waives). Findings are produced by the JVM (Jackson parse, swagger-parser for OpenAPI, networknt JSON Schema validation of AsyncAPI/ODCS against vendored official schemas, Apache Avro for payload schemas) merged with the **checker sidecar**'s verdicts (`checker/`: Spectral rulesets + `@asyncapi/parser`, reached only by the server over an internal network — an unreachable checker yields a report-only `CHECKER_UNAVAILABLE` finding, never a failed request). See `.claude/docs/contract-standards.md` for the formats and `.claude/docs/checker.md` for the sidecar.
 
-**Implemented so far:** the full stack + tooling + auth surface — JWT login with a sliding refresh pair and a revocation blocklist, opt-in email MFA, self-service password reset, per-account lockout and per-IP rate limits, ADMIN-managed accounts and per-user feature flags, the synced per-user UI/email language (EN/PL), the React shell (nav model, command palette, theme, changelog), the checker service (Spectral + `@asyncapi/parser` behind `POST /check`), **flat teams** (ADMIN-curated registry with rosters — the ownership unit), the **Domain → System registries**, and every quality gate. The contract catalog continues feature by feature (contracts/versions → validators → import/diff/export) — each in the shape of the feature template below.
+**Implemented so far:** the full stack + tooling + auth surface — JWT login with a sliding refresh pair and a revocation blocklist, opt-in email MFA, self-service password reset, per-account lockout and per-IP rate limits, ADMIN-managed accounts and per-user feature flags, the synced per-user UI/email language (EN/PL), the React shell (nav model, command palette, theme, changelog), the checker service (Spectral + `@asyncapi/parser` behind `POST /check`), **flat teams** (ADMIN-curated registry with rosters — the ownership unit), the **Domain → System registries**, and the **contract catalog server side** (contracts with team/user ownership and the writer guard, SemVer versions with the lifecycle, the two-tier check pipeline — JVM parse/type gate/schema/semantic validators + the checker sidecar's lint — with the `allowInvalid` waiver, the raw-content download, import report-&-skip with a dry run, the SSRF-guarded URL fetch, export, the per-contract event log and the hierarchy tree), and every quality gate. The contract catalog continues feature by feature (contracts/versions → validators → import/diff/export) — each in the shape of the feature template below.
 
 The architecture deliberately mirrors [Toadie](https://github.com/liveweird/toadie) and [Lettuce](https://github.com/liveweird/lettuce) — **port, don't reinvent**: when adding a capability one of them already has, port its implementation. Pointers: auth/users/MFA/flags/language/mail/paging → `toadie/server/src/main/kotlin/{auth,users,infra}`; the two-tier validation, `allowInvalid` waiver, import report-&-skip pipeline, sync baseline + line diff, SSRF-guarded URL fetch → `toadie/server/src/main/kotlin/catalog/` (+ `toadie/web/src/{hooks/useCatalogFileSave.ts,pages/ImportCatalogFiles.tsx,utils/yamlDiff.ts,components/YamlDiffView.tsx}`); per-record structural event history → `toadie/.../infra/db/EventLog.kt`; flat teams → `lettuce/server/src/main/kotlin/teams/` minus `ManagementChain.kt`/`TeamTree.kt`; AA-tested theme tokens → `lettuce/web/src/themeVariables.ts`; list-page building blocks → `toadie/web/src/{components,hooks}`.
 
@@ -97,18 +97,23 @@ ch.nokillswit
 │                       language (V1: PUT {id}/language, self-or-admin — the ONE synced
 │                       UI+email language; Languages.kt is the SUPPORTED_LANGUAGES whitelist)
 │                       + Validation.kt
-├── contracts/          the contract domain (THE feature reference implementation once it
-│                       lands — today only UrlFetch.kt, Toadie's SSRF-guarded server-side
-│                       fetch of a document URL, guards documented in security.md). Planned
-│                       shape: Contract.kt/ContractVersion.kt (DTOs), ContractValidation.kt,
-│                       ContractAccess.kt (the owner-team/owner-user/ADMIN writer guard),
-│                       ContractService.kt/ContractVersionService.kt (Exposed tables nested
-│                       inside), Lifecycle.kt, SemVer.kt, ContractEvents.kt (+ the EventLog
-│                       clone), Import.kt/ContractImport.kt (report & skip), Tree.kt, the
-│                       route files, and checks/ — Finding.kt, DocumentParser.kt,
-│                       Metadata.kt, the per-type JVM validators, SchemaRegistry.kt (the
-│                       vendored schemas), CheckerClient.kt (the sidecar client + its
-│                       AttributeKey test seam), ChecksService.kt (the orchestration)
+├── contracts/          THE feature reference implementation (V9–V11): Contract.kt/ContractVersion.kt
+│                       (DTOs, sanitizers, validateContractCreate, Ownership), ContractType.kt,
+│                       Lifecycle.kt (the transition matrix + contentEditable/deletable/published),
+│                       SemVer.kt (full 2.0 precedence), ContractAccess.kt (the owner-team/owner-user/
+│                       ADMIN writer guard + requireOwnerAssignable), ContractService.kt (Contracts table;
+│                       the list/tree joins, authorizeWrite reading team_members inside the tx, the
+│                       published-versions 409 on delete, export), ContractVersionService.kt
+│                       (ContractVersions table; SemVer > highest, the HARD/SOFT gate, transitions,
+│                       recomputeLatest), ContractEvents.kt (the EventLog clone), Import.kt (report &
+│                       skip, dry run = the same walk without the store), Tree.kt, UrlFetch.kt (Toadie's
+│                       SSRF-guarded fetch), ContractRoutes.kt + ContractVersionRoutes.kt, and checks/ —
+│                       Finding.kt (severity/source vocabulary, CheckReport), DocumentParser.kt (format
+│                       detection, Jackson YAML with the alias/size caps, the type gate), Metadata.kt,
+│                       OpenApiValidator/AsyncApiValidator/OdcsValidator.kt, VendoredSchemas.kt (offline
+│                       networknt registries over resources/schemas), CheckerClient.kt (the sidecar
+│                       client + its AttributeKey test seam), ChecksService.kt (the pipeline), Checks.kt
+│                       (the module reading checker.url/token/timeoutMs)
 ├── teams/              flat teams (V6): Team.kt (DTOs + sanitizers + validateTeam*), TeamService.kt
 │                       (Teams + the TeamMembers hard-delete join; paged list with name/memberId
 │                       filters and active-member counts; roster read joining users; create with an
@@ -123,7 +128,7 @@ ch.nokillswit
 │                       write's transaction), SystemRoutes.kt — /api/v1/systems, same authz split
 ```
 
-**Feature template — copy `teams/` today, `contracts/` once it lands**: `<feature>/<Entity>.kt` (request/response DTOs + `toResponse`) with the `validateX` free function enforced by route AND service (in the DTO file, or a sibling `<Entity>Validation.kt` once the rules outgrow it), `<Entity>Routes.kt` (`@Resource` typed routes under `/api/v1/...` + `configureXRoutes()` reading services from `attributes`, `audit(...)` on every mutation, authorization BEFORE body decoding so 403 wins over 400), `<Entity>Service.kt` (Exposed `object` table nested inside the service, `suspendTransaction`, soft-delete via `marked_as_deleted` + partial unique indexes, list = count + rows on one predicate), a `V<n>__description.sql` migration (+ its checksum pin in `MigrationChecksumTest`), spec paths in `openapi/documentation.yaml`, `cd web && npm run gen:api` (same commit), lazy pages + `NAV_SECTIONS` entries (`web/src/utils/navigation.ts`), and an e2e spec + scenario doc + coverage-map line. Domain rules for contract features come from `.claude/docs/contract-standards.md`.
+**Feature template — copy `contracts/` (the full shape: ownership guard, sub-collection, checks) or `teams/` (a small registry)**: `<feature>/<Entity>.kt` (request/response DTOs + `toResponse`) with the `validateX` free function enforced by route AND service (in the DTO file, or a sibling `<Entity>Validation.kt` once the rules outgrow it), `<Entity>Routes.kt` (`@Resource` typed routes under `/api/v1/...` + `configureXRoutes()` reading services from `attributes`, `audit(...)` on every mutation, authorization BEFORE body decoding so 403 wins over 400), `<Entity>Service.kt` (Exposed `object` table nested inside the service, `suspendTransaction`, soft-delete via `marked_as_deleted` + partial unique indexes, list = count + rows on one predicate), a `V<n>__description.sql` migration (+ its checksum pin in `MigrationChecksumTest`), spec paths in `openapi/documentation.yaml`, `cd web && npm run gen:api` (same commit), lazy pages + `NAV_SECTIONS` entries (`web/src/utils/navigation.ts`), and an e2e spec + scenario doc + coverage-map line. Domain rules for contract features come from `.claude/docs/contract-standards.md`.
 
 ### The OpenAPI contract
 

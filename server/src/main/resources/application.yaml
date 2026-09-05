@@ -20,6 +20,8 @@ ktor:
       # — infrastructure
       - ch.nokillswit.infra.mail.MailKt.configureMail
       - ch.nokillswit.infra.db.FlywayKt.configureFlyway
+      # Checks before Database: the composition root hands ChecksService to the version service.
+      - ch.nokillswit.contracts.checks.ChecksKt.configureChecks
       - ch.nokillswit.infra.db.DatabaseKt.configureDatabase
       - ch.nokillswit.infra.db.BootstrapKt.configureBootstrap
       # — features
@@ -27,6 +29,8 @@ ktor:
       - ch.nokillswit.teams.TeamRoutesKt.configureTeamRoutes
       - ch.nokillswit.domains.DomainRoutesKt.configureDomainRoutes
       - ch.nokillswit.systems.SystemRoutesKt.configureSystemRoutes
+      - ch.nokillswit.contracts.ContractRoutesKt.configureContractRoutes
+      - ch.nokillswit.contracts.ContractVersionRoutesKt.configureContractVersionRoutes
       - ch.nokillswit.auth.AuthRoutesKt.configureAuthRoutes
       # — catch-all router
       - ch.nokillswit.plugins.RoutingKt.configureRouting
@@ -102,6 +106,20 @@ http:
   # served in development, hidden in production. Set "true" to expose them in a
   # trusted production environment, "false" to hide them even in development.
   exposeOpenApi: "$HTTP_EXPOSE_OPENAPI:"
+
+checker:
+  # The lint/semantic checker sidecar (checker/, .claude/docs/checker.md). Blank = OFF: every
+  # contract check then carries a report-only CHECKER_UNAVAILABLE finding while the JVM's own
+  # syntax/schema gates keep running (production logs a WARN at boot, never refuses to start).
+  url: "$CHECKER_URL:"
+  # Optional shared secret sent as X-Checker-Token — the second fence behind the internal network.
+  token: "$CHECKER_TOKEN:"
+  timeoutMs: "$CHECKER_TIMEOUT_MS:20000"
+
+contracts:
+  # A contract document's ceiling (bytes). Above it the store paths answer 413 before parsing;
+  # well under the 10 MiB request-body backstop (plugins/Http.kt).
+  maxDocumentBytes: "$CONTRACT_MAX_DOCUMENT_BYTES:2097152"
 
 web:
   # When set, the server serves the built React SPA from this directory (static

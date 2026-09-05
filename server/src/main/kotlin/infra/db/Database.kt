@@ -1,6 +1,13 @@
 package ch.nokillswit.infra.db
 
 import ch.nokillswit.auth.TokenBlocklistService
+import ch.nokillswit.contracts.ContractEventService
+import ch.nokillswit.contracts.ContractEventServiceKey
+import ch.nokillswit.contracts.ContractService
+import ch.nokillswit.contracts.ContractServiceKey
+import ch.nokillswit.contracts.ContractVersionService
+import ch.nokillswit.contracts.ContractVersionServiceKey
+import ch.nokillswit.contracts.checks.ChecksServiceKey
 import ch.nokillswit.auth.TokenBlocklistServiceKey
 import ch.nokillswit.domains.DomainService
 import ch.nokillswit.domains.DomainServiceKey
@@ -25,9 +32,16 @@ suspend fun Application.configureDatabase() {
         password = environment.config.property("postgres.password").getString(),
     )
     attributes.put(UserServiceKey, UserService(database))
-    attributes.put(TeamServiceKey, TeamService(database))
+    val teamService = TeamService(database)
+    attributes.put(TeamServiceKey, teamService)
     val domainService = DomainService(database)
     attributes.put(DomainServiceKey, domainService)
     attributes.put(SystemServiceKey, SystemService(database, domainService))
+    // The contract services: the writer guard reads team membership (TeamService), the store
+    // paths run the check pipeline (ChecksService — published by configureChecks, which
+    // application.yaml therefore lists BEFORE this module).
+    attributes.put(ContractServiceKey, ContractService(database, teamService))
+    attributes.put(ContractVersionServiceKey, ContractVersionService(database, attributes[ChecksServiceKey]))
+    attributes.put(ContractEventServiceKey, ContractEventService(database))
     attributes.put(TokenBlocklistServiceKey, TokenBlocklistService(database))
 }

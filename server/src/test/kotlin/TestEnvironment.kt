@@ -42,6 +42,14 @@ import org.jetbrains.exposed.v1.r2dbc.update
  * [overrides] may replace the defaults listed first.
  */
 fun ApplicationTestBuilder.configureApp(vararg overrides: Pair<String, String>) {
+    // The checker sidecar never runs in the suite: the default stub answers "no findings", so a
+    // clean document stores clean; a test needing findings or an outage installs its own stub
+    // (`application { attributes.put(CheckerClientKey, …) }` BEFORE startApplication()).
+    application {
+        if (!attributes.contains(ch.nokillswit.contracts.checks.CheckerClientKey)) {
+            attributes.put(ch.nokillswit.contracts.checks.CheckerClientKey, TestChecker.silent)
+        }
+    }
     environment {
         config = ApplicationConfig("application.yaml").mergeWith(
             MapApplicationConfig(
@@ -301,4 +309,51 @@ object TestSystems {
 
     suspend fun seed(domainId: UInt, name: String, description: String? = null): UInt =
         service.create(ch.nokillswit.systems.SystemRequest(domainId = domainId, name = name, description = description))
+}
+
+/** Checker stubs: silent (no findings), canned findings, or a sidecar outage. */
+object TestChecker {
+    class Stub(private val findings: List<ch.nokillswit.contracts.checks.Finding>, private val fail: Boolean = false) :
+        ch.nokillswit.contracts.checks.CheckerClient {
+        var calls = 0
+        override suspend fun check(
+            type: ch.nokillswit.contracts.ContractType,
+            content: String,
+            previousContent: String?,
+        ): ch.nokillswit.contracts.checks.CheckerResponse {
+            calls++
+            if (fail) throw ch.nokillswit.contracts.checks.CheckerUnavailableException("stub outage")
+            return ch.nokillswit.contracts.checks.CheckerResponse(findings)
+        }
+    }
+
+    val silent = Stub(emptyList())
+
+    fun lint(
+        code: String = "info-contact",
+        severity: ch.nokillswit.contracts.checks.Severity = ch.nokillswit.contracts.checks.Severity.WARN,
+    ) = Stub(
+        listOf(
+            ch.nokillswit.contracts.checks.Finding(
+                severity,
+                ch.nokillswit.contracts.checks.FindingSource.LINT,
+                code,
+                "stub finding $code",
+                "/info",
+                2,
+                1,
+            ),
+        ),
+    )
+
+    fun down() = Stub(emptyList(), fail = true)
+}
+
+/** Direct contract fixtures: a system to hang contracts on, and contract/version seeding past the routes. */
+object TestContracts {
+    /** A fresh domain + system per call — contract names are unique WITHIN a system, so tests isolate by system. */
+    suspend fun seedSystem(prefix: String): UInt {
+        val domain = TestDomains.seed("$prefix-dom-${java.util.UUID.randomUUID().toString().substring(0, 8)}")
+        return TestSystems.seed(domain, "$prefix-sys-${java.util.UUID.randomUUID().toString().substring(0, 8)}")
+    }
 }

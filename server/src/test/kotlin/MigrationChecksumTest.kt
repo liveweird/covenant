@@ -28,6 +28,9 @@ class MigrationChecksumTest {
         "V6__create_teams.sql" to -354462531,
         "V7__create_domains.sql" to 1527503388,
         "V8__create_systems.sql" to -503567615,
+        "V9__create_contracts.sql" to 1757262119,
+        "V10__create_contract_versions.sql" to -928227664,
+        "V11__create_contract_events.sql" to 1147817582,
     )
 
     @Test

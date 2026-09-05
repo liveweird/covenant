@@ -29,6 +29,8 @@ tags:
   - name: teams
   - name: domains
   - name: systems
+  - name: contracts
+  - name: contract-versions
 
 paths:
   /api/v1/login:
@@ -834,6 +836,528 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts:
+    get:
+      tags: [contracts]
+      operationId: listContracts
+      summary: List contracts
+      description: |
+        Any authenticated user. Every row carries `canWrite`, the server's verdict of the writer
+        rule for the caller (owning team member, owning user, or ADMIN).
+
+        - Sortable fields: `id`, `name`, `type`, `createdAt`, `updatedAt`. Default `id` ascending.
+        - Filters: `domainId`, `systemId`, `ownerTeamId`, `ownerUserId` (equality); `type` and
+          `lifecycle` (of the LATEST version) are repeatable any-of params; `q` matches name OR
+          description case- and accent-insensitively; `hasErrors` (strict boolean) selects
+          contracts whose latest version has blocking findings (or none).
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/ContractDomainId'
+        - $ref: '#/components/parameters/ContractSystemId'
+        - $ref: '#/components/parameters/ContractType'
+        - $ref: '#/components/parameters/ContractOwnerTeamId'
+        - $ref: '#/components/parameters/ContractOwnerUserId'
+        - $ref: '#/components/parameters/ContractLifecycle'
+        - $ref: '#/components/parameters/ContractQuery'
+        - $ref: '#/components/parameters/ContractHasErrors'
+      responses:
+        '200':
+          description: A page of contracts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractPage'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    post:
+      tags: [contracts]
+      operationId: createContract
+      summary: Create a contract (no version yet)
+      description: |
+        Any authenticated user may create a contract they can own: the owner is themselves or a
+        team they belong to (ADMIN assigns anyone) — `403` otherwise. Exactly one of
+        `ownerTeamId`/`ownerUserId`; the system must be active (`400`); a case-insensitive name
+        clash within the system is `409`. Type and system are immutable afterwards.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContractCreateRequest'
+      responses:
+        '201':
+          description: Created; `Location` points at the new contract
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/tree:
+    get:
+      tags: [contracts]
+      operationId: getContractTree
+      summary: The Domain → System → Contract hierarchy
+      description: |
+        Any authenticated user. Unpaged — the registries are ADMIN-curated and small; the contract
+        level honours the list's `type`, `lifecycle` and `q` filters, and a domain or system with
+        no matching contract still appears (the spine never hides a container).
+      parameters:
+        - $ref: '#/components/parameters/ContractType'
+        - $ref: '#/components/parameters/ContractLifecycle'
+        - $ref: '#/components/parameters/ContractQuery'
+        - $ref: '#/components/parameters/ContractOwnerTeamId'
+        - $ref: '#/components/parameters/ContractOwnerUserId'
+      responses:
+        '200':
+          description: The tree
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TreeResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/versions/check:
+    post:
+      tags: [contract-versions]
+      operationId: checkDocument
+      summary: Live-check a document without storing it
+      description: |
+        Any authenticated user. The same pipeline every store path runs — syntax → type gate →
+        schema/semantic (JVM) → lint/semantic (the checker sidecar) → cross-checks — returned as
+        findings-so-far: a broken document is a `200` whose report carries the HARD finding, never
+        a `400`. Pass `version` to get the declared-version cross-check. Nothing stored, no audit.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentCheckRequest'
+      responses:
+        '200':
+          description: The check report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckReport'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/import:
+    post:
+      tags: [contract-versions]
+      operationId: importContracts
+      summary: Import documents as new versions (report & skip)
+      description: |
+        Any authenticated user, at most 20 items. Each item is one document landing as a new
+        version of a contract that may or may not exist yet — a new contract needs an assignable
+        owner, an existing one must match the item's type and be writable by the caller. Import
+        ALWAYS waives soft findings (`*_WITH_FINDINGS`); only HARD findings, the SemVer rules, a
+        type mismatch and the writer rule skip an item. Nothing rethrows: the rows ARE the outcome.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportRequest'
+      responses:
+        '200':
+          description: One result row per item, in order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/import/check:
+    post:
+      tags: [contract-versions]
+      operationId: checkImport
+      summary: The import's dry run
+      description: The identical per-item classification with nothing stored — `contractId` is set only for existing contracts, `versionId` never.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportRequest'
+      responses:
+        '200':
+          description: The predicted rows
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/fetch:
+    post:
+      tags: [contract-versions]
+      operationId: fetchDocumentUrl
+      summary: Fetch a document from a public https URL (SSRF-guarded)
+      description: |
+        Any authenticated user. The server issues the outbound GET on the caller's behalf — https
+        only, no userinfo, every resolved address public (loopback/private/link-local/CGNAT/NAT64
+        refused), no redirects, 1 MiB cap. A guard rejection is the uniform `400`; an upstream
+        failure (non-200, redirect, oversize, unreachable) is `502`. GitHub/GitLab blob links are
+        rewritten to raw by the SPA before calling.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FetchUrlRequest'
+      responses:
+        '200':
+          description: The fetched text
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FetchUrlResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+  /api/v1/contracts/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [contracts]
+      operationId: getContract
+      summary: Get a contract
+      description: Any authenticated user; `canWrite` is computed for the caller.
+      responses:
+        '200':
+          description: The contract
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    put:
+      tags: [contracts]
+      operationId: updateContract
+      summary: Rename / re-describe a contract
+      description: Writers only (owning team member, owning user, ADMIN — checked before the body decodes). Type and system are immutable.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContractUpdateRequest'
+      responses:
+        '204':
+          description: Updated
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    delete:
+      tags: [contracts]
+      operationId: deleteContract
+      summary: Delete a contract (soft, with its versions)
+      description: Writers only. Refused with `409` while any version is ACTIVE or DEPRECATED — retire them first.
+      responses:
+        '204':
+          description: Deleted
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/{id}/owner:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    put:
+      tags: [contracts]
+      operationId: transferContractOwner
+      summary: Transfer ownership (ADMIN)
+      description: ADMIN only. Exactly one of `ownerTeamId`/`ownerUserId`, an active team/user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OwnerUpdateRequest'
+      responses:
+        '204':
+          description: Transferred
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/{id}/export:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [contracts]
+      operationId: exportContract
+      summary: The contract with every version's verbatim document
+      description: Any authenticated user. Versions highest first; each carries its lifecycle, format and raw text — the round trip's outbound half.
+      responses:
+        '200':
+          description: The export
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractExportResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/{id}/events:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [contracts]
+      operationId: listContractEvents
+      summary: The contract's structural change history
+      description: |
+        Any authenticated user (whoever reads a contract reads its history). Paged, newest first
+        (`-timestamp,-id`); sortable on `timestamp`/`id` only. Events are structural — type plus
+        a params map the SPA localizes (`version`, `from`/`to`, `owner.from`/`owner.to`, `name`) —
+        never document text.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+      responses:
+        '200':
+          description: A page of events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractEventPage'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/{id}/versions:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [contract-versions]
+      operationId: listContractVersions
+      summary: List a contract's versions (no content)
+      description: |
+        Any authenticated user. Default sort `-version` (highest SemVer first — `version` sorts by
+        the parsed triple, a release above its prereleases); also `id`, `lifecycle`, `createdAt`,
+        `updatedAt`. `lifecycle` is a repeatable any-of filter.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/ContractLifecycle'
+      responses:
+        '200':
+          description: A page of versions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionPage'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    post:
+      tags: [contract-versions]
+      operationId: createContractVersion
+      summary: Add a DRAFT version
+      description: |
+        Writers only. `version` must be SemVer 2.0, unique on the contract (`409`) and greater
+        than every existing version (`400`). The document must pass the HARD gate — parseable,
+        the contract's standard (`400`, never waivable); a SOFT `ERROR` finding blocks unless
+        `allowInvalid=true` (the editor's Save-anyway; the findings are re-obtainable through
+        `POST /contracts/versions/check`). The check report is stored with the text; the
+        response carries content and findings. Documents above 2 MiB are `413`.
+      parameters:
+        - $ref: '#/components/parameters/AllowInvalid'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionCreateRequest'
+      responses:
+        '201':
+          description: Created; `Location` points at the new version
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/{id}/versions/{vid}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+      - $ref: '#/components/parameters/VersionId'
+    get:
+      tags: [contract-versions]
+      operationId: getContractVersion
+      summary: Get a version with its document and findings
+      responses:
+        '200':
+          description: The version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    delete:
+      tags: [contract-versions]
+      operationId: deleteContractVersion
+      summary: Delete a DRAFT version
+      description: Writers only; only a DRAFT may be deleted (`409` otherwise). The contract's latest pointer is recomputed.
+      responses:
+        '204':
+          description: Deleted
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/{id}/versions/{vid}/content:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+      - $ref: '#/components/parameters/VersionId'
+    get:
+      tags: [contract-versions]
+      operationId: getContractVersionContent
+      summary: The raw document text
+      description: |
+        Any authenticated user. `application/yaml` or `application/json` by the stored format;
+        `download=true` adds `Content-Disposition: attachment` with a `<system>__<contract>__<version>.<ext>` filename.
+      parameters:
+        - name: download
+          in: query
+          required: false
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: The document, byte-exact
+          content:
+            application/yaml:
+              schema: { type: string }
+            application/json:
+              # The stored JSON document itself — any shape.
+              schema: {}
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    put:
+      tags: [contract-versions]
+      operationId: updateContractVersionContent
+      summary: Replace the document of a DRAFT/PROPOSED version
+      description: Writers only. `409` from ACTIVE on (the document is read-only — add a version). The same HARD/SOFT gate and `allowInvalid` waiver as create; answers the fresh version (the findings are the product of the save).
+      parameters:
+        - $ref: '#/components/parameters/AllowInvalid'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionContentRequest'
+      responses:
+        '200':
+          description: The updated version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/{id}/versions/{vid}/transition:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+      - $ref: '#/components/parameters/VersionId'
+    post:
+      tags: [contract-versions]
+      operationId: transitionContractVersion
+      summary: Move the version along its lifecycle
+      description: |
+        Writers only. DRAFT → PROPOSED, PROPOSED → DRAFT | ACTIVE, ACTIVE → DEPRECATED,
+        DEPRECATED → RETIRED; anything else is `409`. Several ACTIVE versions may coexist.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransitionRequest'
+      responses:
+        '200':
+          description: The version after the transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/{id}/versions/{vid}/recheck:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+      - $ref: '#/components/parameters/VersionId'
+    post:
+      tags: [contract-versions]
+      operationId: recheckContractVersion
+      summary: Re-run the checks on the stored document
+      description: Writers only — the recovery after a checker outage (`checkComplete = false`). Stores the fresh report; the text is untouched.
+      responses:
+        '200':
+          description: The version with the fresh report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 components:
   securitySchemes:
     bearerAuth:
@@ -870,6 +1394,68 @@ components:
         comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
         sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
         always appended as a deterministic tiebreaker.
+    VersionId:
+      name: vid
+      in: path
+      required: true
+      schema: { type: integer, format: int32, minimum: 0 }
+    AllowInvalid:
+      name: allowInvalid
+      in: query
+      required: false
+      schema: { type: boolean }
+      description: Store despite SOFT `ERROR` findings (the Save-anyway waiver). HARD findings are never waivable.
+    ContractDomainId:
+      name: domainId
+      in: query
+      required: false
+      schema: { type: integer, format: int32, minimum: 0 }
+    ContractSystemId:
+      name: systemId
+      in: query
+      required: false
+      schema: { type: integer, format: int32, minimum: 0 }
+    ContractOwnerTeamId:
+      name: ownerTeamId
+      in: query
+      required: false
+      schema: { type: integer, format: int32, minimum: 0 }
+    ContractOwnerUserId:
+      name: ownerUserId
+      in: query
+      required: false
+      schema: { type: integer, format: int32, minimum: 0 }
+    ContractType:
+      name: type
+      in: query
+      required: false
+      description: Repeatable — any-of over the contract types.
+      schema:
+        type: array
+        items: { $ref: '#/components/schemas/ContractType' }
+      style: form
+      explode: true
+    ContractLifecycle:
+      name: lifecycle
+      in: query
+      required: false
+      description: Repeatable — any-of over lifecycles (the LATEST version's on the contracts list/tree).
+      schema:
+        type: array
+        items: { $ref: '#/components/schemas/Lifecycle' }
+      style: form
+      explode: true
+    ContractQuery:
+      name: q
+      in: query
+      required: false
+      schema: { type: string }
+      description: Case- and accent-insensitive substring over name OR description.
+    ContractHasErrors:
+      name: hasErrors
+      in: query
+      required: false
+      schema: { type: boolean }
   responses:
     BadRequest:
       description: Malformed request
@@ -1256,6 +1842,343 @@ components:
         page: { type: integer, minimum: 1 }
         pageSize: { type: integer, minimum: 1, maximum: 100 }
         total: { type: integer, format: int64, minimum: 0 }
+
+    ContractType:
+      type: string
+      enum: [OPENAPI, ASYNCAPI, ODCS]
+    Lifecycle:
+      type: string
+      enum: [DRAFT, PROPOSED, ACTIVE, DEPRECATED, RETIRED]
+    DocumentFormat:
+      type: string
+      enum: [yaml, json]
+    OwnerKind:
+      type: string
+      enum: [TEAM, USER]
+    OwnerRef:
+      type: object
+      required: [kind, id, name, deleted]
+      properties:
+        kind: { $ref: '#/components/schemas/OwnerKind' }
+        id: { type: integer, format: int32, minimum: 0 }
+        name: { type: string }
+        deleted: { type: boolean }
+    RefSummary:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        name: { type: string }
+    LatestVersionSummary:
+      type: object
+      required: [id, version, lifecycle, checkErrors, checkWarnings, checkComplete]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        version: { type: string }
+        lifecycle: { $ref: '#/components/schemas/Lifecycle' }
+        checkErrors: { type: integer, minimum: 0 }
+        checkWarnings: { type: integer, minimum: 0 }
+        checkComplete: { type: boolean }
+    ContractCreateRequest:
+      type: object
+      required: [systemId, type, name]
+      properties:
+        systemId: { type: integer, format: int32, minimum: 0 }
+        type: { $ref: '#/components/schemas/ContractType' }
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: string, maxLength: 2000, nullable: true }
+        ownerTeamId: { type: integer, format: int32, minimum: 0, nullable: true }
+        ownerUserId: { type: integer, format: int32, minimum: 0, nullable: true }
+    ContractUpdateRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: string, maxLength: 2000, nullable: true }
+    OwnerUpdateRequest:
+      type: object
+      properties:
+        ownerTeamId: { type: integer, format: int32, minimum: 0, nullable: true }
+        ownerUserId: { type: integer, format: int32, minimum: 0, nullable: true }
+    ContractResponse:
+      type: object
+      required: [id, system, domain, type, name, owner, versionCount, canWrite, createdBy, createdAt, updatedAt]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        system: { $ref: '#/components/schemas/RefSummary' }
+        domain: { $ref: '#/components/schemas/RefSummary' }
+        type: { $ref: '#/components/schemas/ContractType' }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        owner: { $ref: '#/components/schemas/OwnerRef' }
+        latestVersion:
+          allOf: [{ $ref: '#/components/schemas/LatestVersionSummary' }]
+          nullable: true
+        versionCount: { type: integer, minimum: 0 }
+        canWrite:
+          type: boolean
+          description: The writer rule for the caller — server-computed, never reimplemented client-side.
+        createdBy: { type: integer, format: int32, minimum: 0 }
+        createdAt: { type: integer, format: int64 }
+        updatedAt: { type: integer, format: int64 }
+    ContractPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContractResponse'
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, format: int64, minimum: 0 }
+    TreeContract:
+      type: object
+      required: [id, name, type, owner, versionCount, canWrite]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        name: { type: string }
+        type: { $ref: '#/components/schemas/ContractType' }
+        owner: { $ref: '#/components/schemas/OwnerRef' }
+        latestVersion:
+          allOf: [{ $ref: '#/components/schemas/LatestVersionSummary' }]
+          nullable: true
+        versionCount: { type: integer, minimum: 0 }
+        canWrite: { type: boolean }
+    TreeSystem:
+      type: object
+      required: [id, name, contracts]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        name: { type: string }
+        contracts:
+          type: array
+          items: { $ref: '#/components/schemas/TreeContract' }
+    TreeDomain:
+      type: object
+      required: [id, name, systems]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        name: { type: string }
+        systems:
+          type: array
+          items: { $ref: '#/components/schemas/TreeSystem' }
+    TreeResponse:
+      type: object
+      required: [domains]
+      properties:
+        domains:
+          type: array
+          items: { $ref: '#/components/schemas/TreeDomain' }
+    ExportedVersion:
+      type: object
+      required: [version, lifecycle, format, content]
+      properties:
+        version: { type: string }
+        lifecycle: { $ref: '#/components/schemas/Lifecycle' }
+        format: { $ref: '#/components/schemas/DocumentFormat' }
+        content: { type: string }
+    ContractExportResponse:
+      type: object
+      required: [contract, versions]
+      properties:
+        contract: { $ref: '#/components/schemas/ContractResponse' }
+        versions:
+          type: array
+          items: { $ref: '#/components/schemas/ExportedVersion' }
+    ContractEventType:
+      type: string
+      enum: [CREATED, UPDATED, OWNER_CHANGED, DELETED, VERSION_CREATED, VERSION_CONTENT_UPDATED, VERSION_TRANSITIONED, VERSION_DELETED, VERSION_RECHECKED, IMPORTED]
+    ContractEventResponse:
+      type: object
+      required: [id, contractId, userId, userName, timestamp, type, params]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        contractId: { type: integer, format: int32, minimum: 0 }
+        userId: { type: integer, format: int32, minimum: 0 }
+        userName: { type: string }
+        timestamp: { type: integer, format: int64 }
+        type: { $ref: '#/components/schemas/ContractEventType' }
+        params:
+          type: object
+          additionalProperties: { type: string }
+    ContractEventPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContractEventResponse'
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, format: int64, minimum: 0 }
+    Severity:
+      type: string
+      enum: [ERROR, WARN, INFO]
+    FindingSource:
+      type: string
+      enum: [SYNTAX, SCHEMA, SEMANTIC, LINT, BREAKING, SYSTEM]
+    Finding:
+      type: object
+      required: [severity, source, code, message]
+      properties:
+        severity: { $ref: '#/components/schemas/Severity' }
+        source: { $ref: '#/components/schemas/FindingSource' }
+        code: { type: string }
+        message: { type: string }
+        path: { type: string, nullable: true, description: A JSON pointer into the document. }
+        line: { type: integer, minimum: 1, nullable: true }
+        column: { type: integer, minimum: 1, nullable: true }
+    CheckReport:
+      type: object
+      required: [findings, errors, warnings, infos, checkerAvailable]
+      properties:
+        format:
+          allOf: [{ $ref: '#/components/schemas/DocumentFormat' }]
+          nullable: true
+        specVersion: { type: string, nullable: true }
+        title: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        findings:
+          type: array
+          items: { $ref: '#/components/schemas/Finding' }
+        errors: { type: integer, minimum: 0 }
+        warnings: { type: integer, minimum: 0 }
+        infos: { type: integer, minimum: 0 }
+        checkerAvailable:
+          type: boolean
+          description: False when the checker sidecar could not be reached — its LINT/SEMANTIC verdicts are missing.
+    DocumentCheckRequest:
+      type: object
+      required: [type, content]
+      properties:
+        type: { $ref: '#/components/schemas/ContractType' }
+        content: { type: string }
+        version: { type: string, nullable: true, description: The SemVer the document is (to be) stored as — drives the version cross-check. }
+    VersionCreateRequest:
+      type: object
+      required: [version, content]
+      properties:
+        version: { type: string, minLength: 5, maxLength: 64, description: SemVer 2.0 }
+        content: { type: string, description: "Raw YAML or JSON text, at most 2 MiB." }
+    VersionContentRequest:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string }
+    TransitionRequest:
+      type: object
+      required: [to]
+      properties:
+        to: { $ref: '#/components/schemas/Lifecycle' }
+    VersionResponse:
+      type: object
+      required: [id, contractId, version, lifecycle, format, content, contentSha256, findings, checkErrors, checkWarnings, checkInfos, checkComplete, checkedAt, createdBy, createdAt, updatedAt]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        contractId: { type: integer, format: int32, minimum: 0 }
+        version: { type: string }
+        lifecycle: { $ref: '#/components/schemas/Lifecycle' }
+        format: { $ref: '#/components/schemas/DocumentFormat' }
+        content: { type: string }
+        contentSha256: { type: string }
+        docTitle: { type: string, nullable: true }
+        docDescription: { type: string, nullable: true }
+        specVersion: { type: string, nullable: true }
+        findings:
+          type: array
+          items: { $ref: '#/components/schemas/Finding' }
+        checkErrors: { type: integer, minimum: 0 }
+        checkWarnings: { type: integer, minimum: 0 }
+        checkInfos: { type: integer, minimum: 0 }
+        checkComplete: { type: boolean }
+        checkedAt: { type: integer, format: int64 }
+        createdBy: { type: integer, format: int32, minimum: 0 }
+        createdAt: { type: integer, format: int64 }
+        updatedAt: { type: integer, format: int64 }
+    VersionListItem:
+      type: object
+      required: [id, contractId, version, lifecycle, format, checkErrors, checkWarnings, checkInfos, checkComplete, createdBy, createdAt, updatedAt]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        contractId: { type: integer, format: int32, minimum: 0 }
+        version: { type: string }
+        lifecycle: { $ref: '#/components/schemas/Lifecycle' }
+        format: { $ref: '#/components/schemas/DocumentFormat' }
+        docTitle: { type: string, nullable: true }
+        specVersion: { type: string, nullable: true }
+        checkErrors: { type: integer, minimum: 0 }
+        checkWarnings: { type: integer, minimum: 0 }
+        checkInfos: { type: integer, minimum: 0 }
+        checkComplete: { type: boolean }
+        createdBy: { type: integer, format: int32, minimum: 0 }
+        createdAt: { type: integer, format: int64 }
+        updatedAt: { type: integer, format: int64 }
+    VersionPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/VersionListItem'
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, format: int64, minimum: 0 }
+    ImportItem:
+      type: object
+      required: [systemId, type, name, version, content]
+      properties:
+        systemId: { type: integer, format: int32, minimum: 0 }
+        type: { $ref: '#/components/schemas/ContractType' }
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: string, maxLength: 2000, nullable: true }
+        ownerTeamId: { type: integer, format: int32, minimum: 0, nullable: true }
+        ownerUserId: { type: integer, format: int32, minimum: 0, nullable: true }
+        version: { type: string }
+        content: { type: string }
+    ImportRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/ImportItem' }
+    ImportStatus:
+      type: string
+      enum: [CREATED, CREATED_WITH_FINDINGS, VERSION_ADDED, VERSION_ADDED_WITH_FINDINGS, INVALID, CONFLICT, FORBIDDEN, ERROR]
+    ImportItemResult:
+      type: object
+      required: [index, name, version, status, errors, warnings]
+      properties:
+        index: { type: integer, minimum: 0 }
+        name: { type: string }
+        version: { type: string }
+        status: { $ref: '#/components/schemas/ImportStatus' }
+        contractId: { type: integer, format: int32, minimum: 0, nullable: true }
+        versionId: { type: integer, format: int32, minimum: 0, nullable: true }
+        message: { type: string, nullable: true }
+        errors: { type: integer, minimum: 0 }
+        warnings: { type: integer, minimum: 0 }
+    ImportResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/ImportItemResult' }
+    FetchUrlRequest:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string, maxLength: 2048, description: An absolute https URL of a public host. }
+    FetchUrlResponse:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string }
 
     ProblemDetail:
       type: object
