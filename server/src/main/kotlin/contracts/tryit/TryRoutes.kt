@@ -30,6 +30,10 @@ import io.ktor.server.resources.get
 import io.ktor.server.resources.post
 import io.ktor.server.response.respond
 import io.ktor.server.routing.routing
+import java.net.URI
+
+/** The host of a `jdbc:postgresql://host:port/db` URL — the one thing about the target the audit records. */
+private fun jdbcHost(jdbcUrl: String): String? = runCatching { URI.create(jdbcUrl.removePrefix("jdbc:")).host }.getOrNull()
 
 /** The per-IP bucket the try POSTs share — registered with the others in `configureAuthRoutes`. */
 const val TRY_RATE_LIMIT = "tryIt"
@@ -123,6 +127,40 @@ fun Application.configureTryRoutes() {
                             bodyTruncated = observation.truncated,
                             durationMs = observation.durationMs,
                             conformance = HttpTry.assess(request, prepared, observation, ctx.root, schemas),
+                        ),
+                    )
+                }
+                post<ContractsRoute.Id.Versions.Vid.Try.Sql> { route ->
+                    val caller = call.caller()
+                    val contractId = route.parent.parent.parent.parent.id
+                    val request = call.receive<TrySqlRequest>()
+                    val ctx = preamble.resolve(caller, contractId, route.parent.parent.vid, request.environmentId, ContractType.ODCS)
+                    val target = ctx.targets.postgres ?: throw BadRequestException("The environment has no PostgreSQL target")
+                    val prepared = SqlTry.prepare(request, ctx.root)
+                    val trail = arrayOf(
+                        "byUserId" to caller.userId, "contractId" to contractId, "versionId" to ctx.version.id,
+                        "environmentId" to ctx.targets.id, "host" to jdbcHost(target.jdbcUrl), "dataset" to prepared.quoted(),
+                    )
+                    val sample = try {
+                        SqlTry.execute(prepared, target)
+                    } catch (e: BadGatewayException) {
+                        audit("contract.tried_sql", *trail, "outcome" to "failed")
+                        throw e
+                    }
+                    val outcome = if (sample.datasetMissing) "dataset_missing" else "sampled"
+                    audit(
+                        "contract.tried_sql", *trail,
+                        "rowCount" to sample.rows.size, "durationMs" to sample.durationMs, "outcome" to outcome,
+                    )
+                    call.respond(
+                        HttpStatusCode.OK,
+                        TrySqlResponse(
+                            statement = prepared.statement,
+                            columns = SqlTry.columns(prepared, sample),
+                            rows = sample.rows,
+                            truncated = sample.truncated,
+                            durationMs = sample.durationMs,
+                            conformance = SqlTry.assess(prepared, sample),
                         ),
                     )
                 }

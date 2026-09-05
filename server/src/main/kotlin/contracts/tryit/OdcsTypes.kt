@@ -49,8 +49,17 @@ object OdcsTypes {
         return FAMILIES[logicalType]?.contains(t) ?: false
     }
 
-    /** @param nullSeen the declared property names for which the sample returned at least one NULL */
-    fun assess(properties: List<DeclaredColumn>, columns: List<SqlColumnMeta>, nullSeen: Set<String>): List<Finding> {
+    /**
+     * @param nullSeen the declared property names for which the sample returned at least one NULL
+     * @param nullabilityKnown false for a VIEW — PostgreSQL's catalog carries no NOT NULL for view columns, so every
+     *   column reads as nullable there and the declared-required-but-nullable rule would only be noise
+     */
+    fun assess(
+        properties: List<DeclaredColumn>,
+        columns: List<SqlColumnMeta>,
+        nullSeen: Set<String>,
+        nullabilityKnown: Boolean = true,
+    ): List<Finding> {
         val findings = mutableListOf<Finding>()
         val byName = columns.associateBy { it.name.lowercase() }
         properties.forEach { p ->
@@ -60,7 +69,7 @@ object OdcsTypes {
                 return@forEach
             }
             findings += typeFindings(p, column)
-            if (p.required && column.nullable) {
+            if (nullabilityKnown && p.required && column.nullable) {
                 val message = "Column '${p.name}' is declared required but the database allows NULL"
                 findings += Conformance.warn(COLUMN_NULLABLE_MISMATCH, message, "${p.pointer}/required")
             }

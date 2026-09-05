@@ -126,3 +126,34 @@ data class TryHttpResponse(
     val durationMs: Long,
     val conformance: ConformanceReport,
 )
+
+/** `POST …/try/sql`: a bounded read-only sample of an ODCS dataset through the environment's PostgreSQL target. */
+@Serializable
+data class TrySqlRequest(
+    val environmentId: UInt,
+    /** A dataset the document declares — its `name` or `physicalName`, optionally `schema.name`. */
+    val dataset: String,
+    val limit: Int = SqlTry.DEFAULT_LIMIT,
+)
+
+@Serializable
+data class SqlColumn(
+    val name: String,
+    /** PostgreSQL's type name (`int4`, `text`, `_text` for arrays, `jsonb`, …). */
+    val dbType: String,
+    val nullable: Boolean,
+    /** The ODCS `logicalType` of the declared property this column matched, when one did. */
+    val declaredLogicalType: String?,
+)
+
+@Serializable
+data class TrySqlResponse(
+    /** The statement as executed (the LIMIT inlined) — never anything the caller wrote. */
+    val statement: String,
+    val columns: List<SqlColumn>,
+    /** Cells as text (`bytea` as base64); NULL stays null; a cell is cut at 4 KiB, the whole sample at 1 MiB. */
+    val rows: List<List<String?>>,
+    val truncated: Boolean,
+    val durationMs: Long,
+    val conformance: ConformanceReport,
+)

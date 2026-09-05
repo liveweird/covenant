@@ -1808,6 +1808,46 @@ paths:
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
         '502': { $ref: '#/components/responses/BadGateway' }
+  /api/v1/contracts/{id}/versions/{vid}/try/sql:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+      - $ref: '#/components/parameters/VersionId'
+    post:
+      tags: [try-it]
+      operationId: trySql
+      summary: Read a bounded sample of an ODCS dataset through an environment
+      description: |
+        Any authenticated user. `SELECT * FROM <dataset> LIMIT n` over a read-only connection to the
+        environment's PostgreSQL target — no user-written SQL: the dataset must be one the document
+        declares (a table or a view, by `name` or `physicalName`, optionally schema-qualified), the
+        identifier is validated and quoted, the limit (1–200) is bound, the connection is read-only
+        at the driver, session and transaction level, capped by a 15 s `statement_timeout`, and
+        rolled back. Cells come back as text (`bytea` as base64) cut at 4 KiB, the sample at 1 MiB.
+        The `conformance` report measures the result's columns against the dataset's declared
+        properties (missing/extra columns, the ODCS logical type against PostgreSQL's type family,
+        `required` against nullability and the sample's NULLs); a relation that does not exist is a
+        `200` with a `DATASET_MISSING` finding. Connection, credential and privilege failures are
+        `502`. Rate-limited per client host (`429`). Audited as `contract.tried_sql` with the host,
+        dataset, row count and duration only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrySqlRequest'
+      responses:
+        '200':
+          description: The sample and its conformance report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrySqlResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '502': { $ref: '#/components/responses/BadGateway' }
 components:
   securitySchemes:
     bearerAuth:
@@ -2703,6 +2743,38 @@ components:
         headers: { $ref: '#/components/schemas/StringMap' }
         body: { type: string, nullable: true }
         bodyTruncated: { type: boolean }
+        durationMs: { type: integer, format: int64 }
+        conformance: { $ref: '#/components/schemas/ConformanceReport' }
+    TrySqlRequest:
+      type: object
+      required: [environmentId, dataset]
+      properties:
+        environmentId: { type: integer, format: int32, minimum: 0 }
+        dataset: { type: string, maxLength: 127, description: "A declared dataset's name or physicalName, optionally `schema.name`." }
+        limit: { type: integer, format: int32, minimum: 1, maximum: 200, default: 50 }
+    SqlColumn:
+      type: object
+      required: [name, dbType, nullable]
+      properties:
+        name: { type: string }
+        dbType: { type: string, description: "PostgreSQL's type name (int4, text, _text for arrays, jsonb, …)." }
+        nullable: { type: boolean }
+        declaredLogicalType: { type: string, nullable: true, description: "The ODCS logicalType of the declared property the column matched." }
+    TrySqlResponse:
+      type: object
+      required: [statement, columns, rows, truncated, durationMs, conformance]
+      properties:
+        statement: { type: string, description: "The statement as executed, the LIMIT inlined." }
+        columns:
+          type: array
+          items: { $ref: '#/components/schemas/SqlColumn' }
+        rows:
+          type: array
+          description: "One array of cells per row — text, or null for SQL NULL."
+          items:
+            type: array
+            items: { type: string, nullable: true }
+        truncated: { type: boolean, description: "The sample hit the 1 MiB cap before the LIMIT." }
         durationMs: { type: integer, format: int64 }
         conformance: { $ref: '#/components/schemas/ConformanceReport' }
     ConformanceReport:

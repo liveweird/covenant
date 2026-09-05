@@ -1238,6 +1238,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contracts/{id}/versions/{vid}/try/sql": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read a bounded sample of an ODCS dataset through an environment
+         * @description Any authenticated user. `SELECT * FROM <dataset> LIMIT n` over a read-only connection to the
+         *     environment's PostgreSQL target — no user-written SQL: the dataset must be one the document
+         *     declares (a table or a view, by `name` or `physicalName`, optionally schema-qualified), the
+         *     identifier is validated and quoted, the limit (1–200) is bound, the connection is read-only
+         *     at the driver, session and transaction level, capped by a 15 s `statement_timeout`, and
+         *     rolled back. Cells come back as text (`bytea` as base64) cut at 4 KiB, the sample at 1 MiB.
+         *     The `conformance` report measures the result's columns against the dataset's declared
+         *     properties (missing/extra columns, the ODCS logical type against PostgreSQL's type family,
+         *     `required` against nullability and the sample's NULLs); a relation that does not exist is a
+         *     `200` with a `DATASET_MISSING` finding. Connection, credential and privilege failures are
+         *     `502`. Rate-limited per client host (`429`). Audited as `contract.tried_sql` with the host,
+         *     dataset, row count and duration only.
+         */
+        post: operations["trySql"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1836,6 +1870,37 @@ export interface components {
             headers: components["schemas"]["StringMap"];
             body?: string | null;
             bodyTruncated: boolean;
+            /** Format: int64 */
+            durationMs: number;
+            conformance: components["schemas"]["ConformanceReport"];
+        };
+        TrySqlRequest: {
+            /** Format: int32 */
+            environmentId: number;
+            /** @description A declared dataset's name or physicalName, optionally `schema.name`. */
+            dataset: string;
+            /**
+             * Format: int32
+             * @default 50
+             */
+            limit: number;
+        };
+        SqlColumn: {
+            name: string;
+            /** @description PostgreSQL's type name (int4, text, _text for arrays, jsonb, …). */
+            dbType: string;
+            nullable: boolean;
+            /** @description The ODCS logicalType of the declared property the column matched. */
+            declaredLogicalType?: string | null;
+        };
+        TrySqlResponse: {
+            /** @description The statement as executed, the LIMIT inlined. */
+            statement: string;
+            columns: components["schemas"]["SqlColumn"][];
+            /** @description One array of cells per row — text, or null for SQL NULL. */
+            rows: (string | null)[][];
+            /** @description The sample hit the 1 MiB cap before the LIMIT. */
+            truncated: boolean;
             /** Format: int64 */
             durationMs: number;
             conformance: components["schemas"]["ConformanceReport"];
@@ -4335,6 +4400,39 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             413: components["responses"]["PayloadTooLarge"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            502: components["responses"]["BadGateway"];
+        };
+    };
+    trySql: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrySqlRequest"];
+            };
+        };
+        responses: {
+            /** @description The sample and its conformance report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrySqlResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
             502: components["responses"]["BadGateway"];
