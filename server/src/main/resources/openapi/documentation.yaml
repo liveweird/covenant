@@ -1,0 +1,765 @@
+openapi: 3.1.0
+info:
+  title: covenant-api
+  version: 1.0.0
+  description: |
+    JWT-authenticated REST API for Covenant — a contract repository where development teams
+    publish and share their integration contracts (OpenAPI, AsyncAPI, ODCS) with SemVer
+    versions and lifecycles. This scaffold exposes the authentication surface and the
+    admin-managed user accounts; the contract catalog (domains, systems, contracts, versions)
+    lands feature by feature.
+
+    Authorization model: every user is implicitly a regular user; additional global roles
+    (`ADMIN`) are carried as the `roles` array and only ever ADD privileges on top of that
+    baseline. `ADMIN` is the management role and owns the whole `/users` surface.
+
+    All error responses use RFC 7807 `application/problem+json` (`ProblemDetail`).
+    Any endpoint may additionally return `500` (`InternalServerError`) on an
+    unexpected server fault.
+servers:
+  - url: http://localhost:8082
+    description: Local dev
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: auth
+  - name: users
+
+paths:
+  /api/v1/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Exchange credentials for a JWT
+      description: |
+        Rate-limited per client IP, and additionally throttled per account: after several
+        consecutive failures for one email (default 5, `LOGIN_LOCKOUT_THRESHOLD`), further
+        attempts for that account — even with the correct password — are rejected with `429`
+        for a lockout window (default 15 min, `LOGIN_LOCKOUT_DURATION_SECONDS`). A successful
+        login resets the counter.
+
+        **Email MFA (opt-in via the `MFA` feature flag):** when the account has MFA enabled,
+        correct credentials answer `200` with an `MfaChallengeResponse` instead of tokens — a
+        6-digit code is emailed to the account, and the client exchanges it together with the
+        `challengeId` at `POST /api/v1/login/mfa` for the ordinary `LoginResponse`. On a
+        deployment without outbound email (`MAIL_TRANSPORT=disabled`) an MFA-enabled login
+        fails closed with `503`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Token issued, or (MFA-enabled accounts) a second-factor challenge
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/LoginResponse'
+                  - $ref: '#/components/schemas/MfaChallengeResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503':
+          description: MFA is enabled for the account but this deployment cannot send email
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/login/mfa:
+    post:
+      tags: [auth]
+      operationId: verifyMfa
+      summary: Exchange an MFA challenge and emailed code for a JWT pair
+      description: |
+        Second login step for MFA-enabled accounts. The `challengeId` comes from the login
+        response, the 6-digit `code` from the email. Challenges are single-use, expire after
+        a short TTL (default 5 min, `MFA_CODE_TTL_SECONDS`), and allow a few attempts
+        (default 5, `MFA_MAX_ATTEMPTS`); every failure mode — unknown challenge, expired,
+        wrong code, attempts exhausted, user gone — answers the uniform `401`. Rate-limited
+        per client IP.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MfaVerifyRequest'
+      responses:
+        '200':
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+
+  /api/v1/refresh:
+    post:
+      tags: [auth]
+      operationId: refresh
+      summary: Exchange a refresh token for a fresh access + refresh pair
+      description: |
+        Pure-sliding session renewal. Accepts a valid, unexpired, non-revoked refresh token and
+        returns a brand-new access token and refresh token (each with a full TTL). The presented
+        refresh token is left valid until its own expiry — it is not rotated out. Requires no
+        `Authorization` header (the access token may already be expired). Returns `401` for a
+        missing/invalid/expired/revoked refresh token, if the user no longer exists, or if the
+        token was minted before the user's most recent password change.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: A fresh token pair
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+
+  /api/v1/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: Revoke the bearer token (server-side denylist)
+      description: |
+        Revokes the access token carried in the `Authorization` header. If a `refreshToken` is
+        supplied in the body, it is revoked too. The body is optional.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      responses:
+        '204':
+          description: Token revoked
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+
+  /api/v1/password-reset:
+    post:
+      tags: [auth]
+      operationId: requestPasswordReset
+      summary: Request a self-service password reset
+      description: |
+        Always answers `202` for a well-formed request, whether or not an account with that
+        email exists (no account enumeration; the actual work happens asynchronously). If the
+        account exists, a new password is generated, its hash replaces the old one (which stops
+        working, and all outstanding refresh tokens are invalidated), and the password is sent
+        to the account's email address. Throttled per submitted email — one request per interval
+        (default 60 s, `PASSWORD_RESET_MIN_INTERVAL_SECONDS`) — uniformly for existing and
+        unknown addresses, and rate-limited per client IP. A soft-deleted account is unknown
+        here (no password is minted, no email sent; the `202` stays uniform). Answers `503` on
+        deployments without outbound email (`MAIL_TRANSPORT=disabled`).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+      responses:
+        '202':
+          description: Accepted — if the account exists, an email is on its way
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '503':
+          description: This deployment cannot send email (password reset unavailable)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/users:
+    get:
+      tags: [users]
+      operationId: listUsers
+      summary: List users (management view)
+      description: |
+        ADMIN only — the whole management surface is admin-gated; regular users keep only
+        their self password change.
+
+        Supports offset pagination, sorting and filtering.
+
+        - Sortable fields: `id`, `name`, `email` (deliberately not `roles` — a set has no
+          order). Default sort is `id` ascending; `id` ascending is always appended as a
+          deterministic tiebreaker.
+        - Filters (optional, whitelisted):
+          - `name` / `email` — case- and accent-insensitive substring matches.
+          - `role` — `ADMIN` (holders of the additional role) or `USER` (plain users).
+          - `feature` + `featureEnabled` — feature-flag state (the pair must come
+            together, `400` otherwise; `featureEnabled` is a strict boolean).
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - name: name
+          in: query
+          required: false
+          schema: { type: string }
+        - name: email
+          in: query
+          required: false
+          schema: { type: string }
+        - name: role
+          in: query
+          required: false
+          schema: { type: string, enum: [ADMIN, USER] }
+        - name: feature
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/Feature' }
+          description: Feature-flag state filter — must be paired with `featureEnabled` (400 otherwise).
+        - name: featureEnabled
+          in: query
+          required: false
+          schema: { type: boolean }
+          description: Strict boolean — only users with `feature` enabled (true) or disabled (false).
+      responses:
+        '200':
+          description: A page of users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPage'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    post:
+      tags: [users]
+      operationId: createUser
+      summary: Create a user
+      description: |
+        ADMIN only. The initial password is CLIENT-generated (the SPA's 96-bit generator) and
+        shown to the admin exactly once — the server stores only the bcrypt hash and no
+        response ever carries plaintext. The email is canonicalized (trimmed + lowercased);
+        a duplicate among active accounts is a `409` (a soft-deleted account frees its email).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreateRequest'
+      responses:
+        '201':
+          description: Created
+          headers:
+            Location:
+              schema: { type: string }
+              description: URL of the new user resource
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Validation error (blank/too-long name or email, password rules)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+
+  /api/v1/users/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [users]
+      operationId: getUser
+      summary: Fetch a user
+      description: Target user or ADMIN (guard-before-read — an unauthorized caller 403s uniformly).
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    put:
+      tags: [users]
+      operationId: updateUser
+      summary: Update a user's name, email, and roles
+      description: |
+        ADMIN only. The password is deliberately not writable here (it has its own endpoint).
+        Demoting the LAST active administrator is a `409` — the management surface must stay
+        reachable. An email already used by another active account is also a `409`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+      responses:
+        '204': { description: Updated }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    delete:
+      tags: [users]
+      operationId: deleteUser
+      summary: Delete a user
+      description: |
+        ADMIN only, soft delete: the account can no longer sign in, outstanding refresh
+        tokens die (`user_gone`), the email is freed for reuse, and the user's catalog files
+        stay with a deleted-creator marker. Deleting YOURSELF is a `403`; deleting the LAST
+        active administrator is a `409`.
+      responses:
+        '204': { description: Deleted }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Caller is not ADMIN, or attempted to delete their own account
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+
+  /api/v1/users/{id}/features:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    put:
+      tags: [users]
+      operationId: setUserDisabledFeatures
+      summary: Replace a user's disabled-feature set (ADMIN only)
+      description: |
+        Per-user feature flags: a **wholesale replace** of the target user's DISABLED set —
+        an empty array re-enables everything (idempotent, a same-set re-PUT is `204` again).
+        **ADMIN-only**; changing one's OWN flags is allowed (the users routes themselves are
+        never feature-gated, so an admin can always find their way back). `MFA` is the one
+        inverted-default flag: users start with it in the disabled set, and a set omitting it
+        — the empty "re-enable everything" array included — ENABLES the login second factor.
+        The set rides the JWT, so a change takes effect at the target's next token refresh
+        (≤15 min) or login. Audited as `user.features_changed` on an actual change.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserFeaturesUpdateRequest'
+      responses:
+        '204': { description: Disabled-feature set replaced }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Caller is not ADMIN
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+
+  /api/v1/users/{id}/language:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    put:
+      tags: [users]
+      operationId: setUserLanguage
+      summary: Set a user's language (target user or ADMIN)
+      description: |
+        The ONE synced per-user language: it drives the UI at sign-in (rides `LoginResponse`,
+        applied by the SPA on login/MFA/refresh) and the language of every email sent to the
+        user (read fresh at send time, so a change takes effect immediately for emails; the
+        UI picks it up at the next sign-in or token refresh). **Target user or ADMIN** — the
+        header language switcher is the self-service writer (switching while signed in also
+        saves here); an admin may fix a mis-set language. Idempotent (a same-value re-PUT is
+        `204` again); an unsupported code is `400`. Audited as `user.language_changed` on an
+        actual change. Set initially at create (`UserCreateRequest.language`, default `en`);
+        the whole-user PUT deliberately never touches it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLanguageUpdateRequest'
+      responses:
+        '204': { description: Language set }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Caller is not the target user and not ADMIN
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+
+  /api/v1/users/{id}/password:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    put:
+      tags: [users]
+      operationId: changeUserPassword
+      summary: Change a user's password
+      description: |
+        Sets a new password for the user (minimum 10 characters). Only the password is
+        changed; no other fields are touched. Requires the caller to be the target user,
+        or to be ADMIN. When the caller changes their OWN password (even an admin),
+        `currentPassword` is required and must match; an admin resetting another user's
+        password omits it. A successful change invalidates all outstanding refresh tokens
+        (already-issued access tokens expire naturally within their TTL).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordUpdateRequest'
+      responses:
+        '204': { description: Password updated }
+        '400':
+          description: New password shorter than 10 characters or longer than 71 UTF-8 bytes
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Caller is not the target user and not ADMIN, or the required current password is missing/incorrect
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      # int32: ids are 32-bit server-side; a non-numeric or out-of-range id is a 400.
+      schema: { type: integer, format: int32, minimum: 0 }
+    Page:
+      name: page
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, default: 1 }
+      description: 1-based page index. Defaults to 1.
+    PageSize:
+      name: pageSize
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      description: Rows per page. Defaults to 20, maximum 100.
+    Sort:
+      name: sort
+      in: query
+      required: false
+      schema: { type: string }
+      description: |
+        Sort spec. Format: `field` (ascending) or `-field` (descending). Multiple fields are
+        comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
+        sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
+        always appended as a deterministic tiebreaker.
+    # The shared catalog-file filter set — declared identically by the list and graph
+    # endpoints (the list applies it in SQL, the graph in memory; one semantics).
+  responses:
+    BadRequest:
+      description: Malformed request
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+    Unauthorized:
+      description: Missing or invalid token
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+    Forbidden:
+      description: Caller is not permitted to perform this action
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+    Conflict:
+      description: Conflict with an existing resource
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+    TooManyRequests:
+      description: >-
+        Throttled — either the per-IP rate-limit bucket is exhausted (generic detail) or, on
+        /login, the per-account lockout is active (account-specific detail). Both carry a
+        ProblemDetail body.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+    PayloadTooLarge:
+      description: >-
+        Request body exceeds the global 10 MiB ceiling — a memory-DoS backstop shared by
+        every endpoint (declared here on the largest-bodied operation; field-level maxLength
+        rules reject oversized values far earlier on ordinary payloads).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+    InternalServerError:
+      description: Unexpected server error
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+    BadGateway:
+      description: >-
+        The upstream request made on the caller's behalf failed (the remote answered non-200,
+        redirected, timed out, or exceeded the size cap).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  schemas:
+    PasswordResetRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string }
+
+    LoginResponse:
+      type: object
+      required: [token, expiresAt, refreshToken, refreshExpiresAt, userId, roles, disabledFeatures, language]
+      properties:
+        token:
+          type: string
+          description: "Short-lived access token; send as the `Authorization: Bearer` value."
+        expiresAt:
+          type: integer
+          format: int64
+          description: Access-token expiry as Unix epoch milliseconds.
+        refreshToken:
+          type: string
+          description: Longer-lived token; POST to /api/v1/refresh to obtain a fresh pair.
+        refreshExpiresAt:
+          type: integer
+          format: int64
+          description: Refresh-token expiry as Unix epoch milliseconds.
+        userId: { type: integer, format: int32, minimum: 0 }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/UserRole' }
+          description: Additional roles of the authenticated user — empty for a regular user.
+        disabledFeatures:
+          type: array
+          items: { $ref: '#/components/schemas/Feature' }
+          description: Per-user feature flags — the admin-disabled set; empty = full access.
+        language:
+          $ref: '#/components/schemas/Language'
+
+    UserRole:
+      type: string
+      enum: [ADMIN]
+      description: >-
+        An additional role. Every user is implicitly a regular user; the array only ever
+        carries privileges added on top of that baseline.
+
+    Feature:
+      type: string
+      enum: [MFA]
+      description: >-
+        A per-user gateable feature. Stored as the DISABLED set (no row = enabled).
+        MFA is the one inverted-default, login-scoped flag: users start with it disabled
+        (email MFA is opt-in), and it gates only the login flow.
+
+    Language:
+      type: string
+      enum: [en, pl]
+      description: >-
+        A supported UI/email language. The ONE synced per-user language (V18) — set at
+        create, changed only via PUT /users/{id}/language; drives the SPA at sign-in and
+        every email sent to the user.
+
+    UserLanguageUpdateRequest:
+      type: object
+      required: [language]
+      properties:
+        language:
+          $ref: '#/components/schemas/Language'
+
+    UserFeaturesUpdateRequest:
+      type: object
+      required: [disabledFeatures]
+      properties:
+        disabledFeatures:
+          type: array
+          items: { $ref: '#/components/schemas/Feature' }
+          description: The complete new DISABLED set — an empty array enables everything.
+
+    MfaChallengeResponse:
+      type: object
+      required: [mfaRequired, challengeId, expiresAt]
+      properties:
+        mfaRequired:
+          type: boolean
+          description: Always true — the discriminator against LoginResponse in the login 200.
+        challengeId:
+          type: string
+          description: Opaque single-use challenge id; send it back with the emailed code.
+        expiresAt:
+          type: integer
+          format: int64
+          description: Challenge (and code) expiry as Unix epoch milliseconds.
+
+    MfaVerifyRequest:
+      type: object
+      required: [challengeId, code]
+      properties:
+        challengeId: { type: string }
+        code:
+          type: string
+          description: The 6-digit code from the sign-in email.
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string }
+
+    LogoutRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          description: Optional refresh token to revoke together with the access token.
+
+    UserCreateRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 50 }
+        email: { type: string, maxLength: 254 }
+        password:
+          type: string
+          minLength: 10
+          description: >-
+            Client-generated; at most 71 UTF-8 bytes (the bcrypt ceiling). Stored only as a
+            hash and never returned.
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/UserRole' }
+          description: Additional roles; omitted/empty = a regular user.
+        language:
+          allOf: [{ $ref: '#/components/schemas/Language' }]
+          nullable: true
+          description: Create-only (the whole-user PUT never touches it); omitted = en.
+
+    UserUpdateRequest:
+      type: object
+      required: [name, email, roles]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 50 }
+        email: { type: string, maxLength: 254 }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/UserRole' }
+
+    UserResponse:
+      type: object
+      required: [id, name, email, roles, disabledFeatures, language]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        name: { type: string }
+        email: { type: string }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/UserRole' }
+          description: Additional roles only — empty for a regular user.
+        disabledFeatures:
+          type: array
+          items: { $ref: '#/components/schemas/Feature' }
+          description: Per-user feature flags — the admin-disabled set; empty = full access.
+        language:
+          $ref: '#/components/schemas/Language'
+
+    UserPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserResponse'
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Row count after filters, before pagination.
+
+    PasswordUpdateRequest:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          minLength: 10
+          description: The new password (at least 10 characters, at most 71 UTF-8 bytes).
+        currentPassword:
+          type: string
+          description: >-
+            Required when the caller changes their OWN password (even an admin); omitted
+            for an admin resetting somebody else's.
+
+    ProblemDetail:
+      type: object
+      description: RFC 7807 problem detail. Served as `application/problem+json`.
+      required: [title, status]
+      properties:
+        type:
+          type: string
+          default: about:blank
+          description: A URI reference identifying the problem type.
+        title:
+          type: string
+          description: Short, human-readable summary of the problem type.
+        status:
+          type: integer
+          description: HTTP status code.
+        detail:
+          type: string
+          description: Human-readable explanation specific to this occurrence.
+        instance:
+          type: string
+          description: URI reference of the specific occurrence (the request path).
