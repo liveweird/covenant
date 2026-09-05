@@ -67,7 +67,7 @@ export default function EnvironmentEditorModal({
   }
 
   return (
-    <Modal opened onClose={onClose} title={target ? t("environments.editTitle") : t("environments.createTitle")} centered size="lg">
+    <Modal closeButtonProps={{ "aria-label": t("common.action.close") }} opened onClose={onClose} title={target ? t("environments.editTitle") : t("environments.createTitle")} centered size="lg">
       <form onSubmit={form.onSubmit(save)} noValidate>
         <Stack>
           <Select label={t("environments.field.system")} data={systemOptions} searchable allowDeselect={false} {...form.getInputProps("systemId")} />

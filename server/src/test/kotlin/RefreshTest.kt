@@ -89,10 +89,11 @@ class RefreshTest {
         val client = jsonClient()
         val session = client.login(email, "pw")
 
-        // JWT iat has second precision and the comparison truncates both sides, so a change in
-        // the same wall-clock second as the mint would NOT invalidate — wait out the boundary.
-        Thread.sleep(1100)
+        // JWT iat has second precision and the comparison truncates both sides, so a change in the
+        // same wall-clock second as the mint would NOT invalidate — stamp the change two seconds
+        // after the mint instead of sleeping the boundary out.
         TestUsers.service.updatePassword(userId, hashPassword("new-password!", cost = 4))
+        TestUsers.stampPasswordChangedAt(userId, System.currentTimeMillis() + 2_000)
 
         val response = client.postJson("/api/v1/refresh", RefreshRequest(session.refreshToken))
         assertEquals(HttpStatusCode.Unauthorized, response.status)

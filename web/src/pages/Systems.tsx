@@ -237,7 +237,7 @@ function SystemEditorModal({
   }
 
   return (
-    <Modal opened onClose={onClose} title={target ? t("systems.editTitle") : t("systems.createTitle")} centered>
+    <Modal closeButtonProps={{ "aria-label": t("common.action.close") }} opened onClose={onClose} title={target ? t("systems.editTitle") : t("systems.createTitle")} centered>
       <form onSubmit={form.onSubmit(save)} noValidate>
         <Stack>
           <Select

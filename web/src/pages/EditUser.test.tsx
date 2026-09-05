@@ -151,11 +151,4 @@ describe("EditUser page", () => {
     expect(screen.getByRole("link", { name: /back to users/i })).toHaveAttribute("href", "/users");
   });
 
-  test("non-admin is redirected away without fetching", () => {
-    localStorage.setItem(ROLES_KEY, "[]");
-    mockGetAndPut(mockFetch);
-    renderEdit();
-    expect(screen.getByTestId("probe")).toHaveTextContent("/");
-    expect(mockFetch).not.toHaveBeenCalled();
-  });
 });

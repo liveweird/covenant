@@ -71,13 +71,6 @@ describe("CreateUser page", () => {
     localStorage.clear();
   });
 
-  test("non-admin is redirected away without fetching", () => {
-    localStorage.setItem(ROLES_KEY, "[]");
-    renderCreate();
-    expect(screen.getByTestId("probe")).toHaveTextContent("/");
-    expect(mockFetch).not.toHaveBeenCalled();
-  });
-
   test("posts a generated password and reveals it once in the confirmation modal", async () => {
     mockPost(mockFetch);
     const user = userEvent.setup();

@@ -1,22 +1,4 @@
-import {
-  ActionIcon,
-  Anchor,
-  AppShell,
-  Autocomplete,
-  Badge,
-  Chip,
-  Fieldset,
-  Menu,
-  Modal,
-  MultiSelect,
-  NavLink,
-  Select,
-  Table,
-  TagsInput,
-  Tooltip,
-  createTheme,
-  type MantineColorsTuple,
-} from "@mantine/core";
+import { ActionIcon, Anchor, AppShell, Autocomplete, Badge, Chip, Code, createTheme, Fieldset, Menu, Modal, MultiSelect, NavLink, Select, Table, TagsInput, Tooltip, type MantineColorsTuple } from "@mantine/core";
 import classes from "./theme.module.css";
 import { foldedOptionsFilter } from "./utils/text";
 
@@ -123,5 +105,9 @@ export const theme = createTheme({
     }),
     Tooltip: Tooltip.extend({ defaultProps: { radius: "md" } }),
     Modal: Modal.extend({ defaultProps: { radius: "md" } }),
+    // Mantine's Code root scrolls (`overflow: auto`), so a long finding code or schema value in a
+    // narrow flex item becomes a scroll region with no keyboard access (axe
+    // scrollable-region-focusable, found by the e2e sweep). Code here is read, never scrolled: wrap it.
+    Code: Code.extend({ styles: { root: { overflow: "visible", whiteSpace: "pre-wrap", overflowWrap: "anywhere" } } }),
   },
 });

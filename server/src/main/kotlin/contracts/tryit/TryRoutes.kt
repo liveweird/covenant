@@ -92,8 +92,10 @@ fun Application.configureTryRoutes() {
                 call.respond(HttpStatusCode.OK, if (root == null) TryCatalogResponse(type) else TryCatalog.build(type, root))
             }
         }
-        rateLimit(RateLimitName(TRY_RATE_LIMIT)) {
-            authenticate {
+        // authenticate OUTSIDE the bucket: an anonymous probe answers 401 without spending a try token
+        // (behind a shared egress IP it could otherwise starve real users' quota).
+        authenticate {
+            rateLimit(RateLimitName(TRY_RATE_LIMIT)) {
                 post<ContractsRoute.Id.Versions.Vid.Try.Http> { route ->
                     val caller = call.caller()
                     val contractId = route.parent.parent.parent.parent.id

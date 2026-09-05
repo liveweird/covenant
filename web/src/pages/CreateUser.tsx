@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link as RouterLink, Navigate, useNavigate } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { Alert, Button, Group, Paper, Stack } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { useQueryClient } from "@tanstack/react-query";
 import { IconMail } from "@tabler/icons-react";
 import { createUser } from "../api/users";
-import { isAdmin } from "../api/session";
 import OneTimePasswordModal from "../components/OneTimePasswordModal";
 import UserFormFields from "../components/UserFormFields";
 import { generatePassword } from "../utils/password";
@@ -32,7 +31,6 @@ export default function CreateUser() {
     validate: userFormValidation(t),
   });
 
-  if (!isAdmin()) return <Navigate to="/" replace />;
 
   async function onSubmit(values: UserFormValues) {
     setError(null);

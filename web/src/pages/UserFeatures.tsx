@@ -45,7 +45,6 @@ export default function UserFeatures() {
           FEATURES.map((f) => [f, overrides[f] ?? !(data.disabledFeatures ?? []).includes(f)]),
         ) as Record<Feature, boolean>);
 
-  if (!isAdmin()) return <Navigate to="/users" replace />;
   if (!idIsValid) return <Navigate to="/users" replace />;
 
   async function onSave() {

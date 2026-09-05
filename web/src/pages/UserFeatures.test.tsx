@@ -116,13 +116,6 @@ describe("UserFeatures page", () => {
     expect(await screen.findByText("User not found.")).toBeInTheDocument();
   });
 
-  test("a non-admin (and a junk id) is redirected to /users", () => {
-    localStorage.setItem(ROLES_KEY, "[]");
-    mockApi();
-    renderPage(7);
-    expect(screen.getByTestId("probe")).toHaveTextContent("/users");
-  });
-
   test("a non-numeric id redirects without fetching the user", () => {
     mockApi();
     renderPage("abc");

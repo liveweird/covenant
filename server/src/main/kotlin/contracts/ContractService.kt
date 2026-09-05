@@ -98,13 +98,18 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
         row.toResponse(viewer, facts(listOf(id), viewer))
     }
 
-    /** Create — the system must be active (400) and the owner assignable by the caller (403); the name clash is the index's 409. */
+    /**
+     * Create — the owner must be assignable by the caller (403) BEFORE the client-supplied ids are checked
+     * (400: an inactive system or owner), so a non-admin naming a team they are not in learns nothing about
+     * whether it exists; the name clash is the index's 409. The shape rules (owner XOR) are the one 400 that
+     * precedes the guard — without a well-formed owner there is nothing to authorize.
+     */
     suspend fun create(request: ContractCreateRequest, caller: CallerPrincipal): UInt = suspendTransaction(database) {
         val ownership = validateContractCreate(request) // re-checked service-side
-        requireActiveSystem(request.systemId)
-        requireActiveOwner(ownership)
         val teamIds = if (caller.isAdmin()) emptySet() else teams.activeTeamIdsOf(caller.userId)
         requireOwnerAssignable(caller, ownership, teamIds)
+        requireActiveSystem(request.systemId)
+        requireActiveOwner(ownership)
         val stamp = now()
         Contracts.insert {
             it[systemId] = request.systemId

@@ -49,7 +49,6 @@ export default function EditUser() {
     });
   }
 
-  if (!isAdmin()) return <Navigate to="/" replace />;
   if (!idIsValid) return <Navigate to="/users" replace />;
 
   async function onSubmit(values: UserFormValues) {

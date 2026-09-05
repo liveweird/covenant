@@ -30,6 +30,9 @@ export default function OneTimePasswordModal({
       centered
       closeOnClickOutside={false}
       closeOnEscape={false}
+      // The footer Close is the ONE way out (a deliberate act); the header X would be a second,
+      // accidental one — and unlabeled, the axe sweep's button-name finding.
+      withCloseButton={false}
     >
       {reveal && (
         <Stack gap="md">

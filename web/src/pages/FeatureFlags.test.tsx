@@ -225,13 +225,6 @@ describe("FeatureFlags page", () => {
     expect(last[0]).toBe("/api/v1/users/2/features");
   });
 
-  test("a non-admin is redirected home", () => {
-    localStorage.setItem(ROLES_KEY, "[]");
-    mockFetch.mockImplementation(() => Promise.resolve(jsonResponse(404, {})));
-    renderPage();
-    expect(screen.getByTestId("probe")).toHaveTextContent("/");
-  });
-
   test("the empty state spans every column", async () => {
     mockFetch.mockImplementation((url: string) =>
       url.startsWith("/api/v1/users")

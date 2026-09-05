@@ -61,14 +61,6 @@ describe("Users page", () => {
     localStorage.clear();
   });
 
-  test("non-admin is redirected away without fetching", () => {
-    localStorage.setItem(ROLES_KEY, "[]");
-    setupMocks(mockFetch, () => usersPage(SEED_USERS));
-    renderPage();
-    expect(screen.getByTestId("probe")).toHaveTextContent("/");
-    expect(mockFetch).not.toHaveBeenCalled();
-  });
-
   test("shows the empty state spanning every column when there are no users", async () => {
     setupMocks(mockFetch, () => usersPage([], 0));
     renderPage();

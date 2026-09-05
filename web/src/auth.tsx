@@ -2,7 +2,7 @@
 // -- the auth store helpers (signIn/signOut/useAuthed) live beside the route guards on purpose; a mixed file opts out of fast-refresh, which is fine for this rarely-edited module
 import { useSyncExternalStore, type ReactElement } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { getToken, TOKEN_KEY } from "./api/session";
+import { getToken, isAdmin, TOKEN_KEY } from "./api/session";
 
 const listeners = new Set<() => void>();
 
@@ -47,6 +47,16 @@ export function RequireAuth(): ReactElement {
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
+  return <Outlet />;
+}
+
+/**
+ * The ADMIN-only route element (wraps the user-management routes in App.tsx): a regular user is sent
+ * home instead of watching the page 403. UX only — the server's `requireAdmin` is the rule; the pages'
+ * queries additionally stay `enabled: isAdmin()` so no request fires for a redirected caller.
+ */
+export function RequireAdmin(): ReactElement {
+  if (!isAdmin()) return <Navigate to="/" replace />;
   return <Outlet />;
 }
 

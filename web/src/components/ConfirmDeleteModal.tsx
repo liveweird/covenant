@@ -21,7 +21,7 @@ export default function ConfirmDeleteModal<T>({
   const { t } = useTranslation();
   const { target, opened, cancelDelete, confirmDelete, mutation } = confirm;
   return (
-    <Modal opened={opened} onClose={cancelDelete} title={title} centered>
+    <Modal closeButtonProps={{ "aria-label": t("common.action.close") }} opened={opened} onClose={cancelDelete} title={title} centered>
       <Stack gap="md">
         {target && <Text>{body(target)}</Text>}
         {mutation.isError && (

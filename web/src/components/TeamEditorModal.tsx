@@ -64,7 +64,7 @@ export default function TeamEditorModal({
   }
 
   return (
-    <Modal opened onClose={onClose} title={target ? t("teams.editTitle") : t("teams.createTitle")} centered>
+    <Modal closeButtonProps={{ "aria-label": t("common.action.close") }} opened onClose={onClose} title={target ? t("teams.editTitle") : t("teams.createTitle")} centered>
       <form onSubmit={form.onSubmit(save)} noValidate>
         <Stack>
           <TextInput

@@ -31,7 +31,7 @@ export default function SourceUrlModal({
 }) {
   const { t } = useTranslation();
   return (
-    <Modal opened={version !== null} onClose={onClose} title={t("versions.sourceLink.title", { version: version?.version ?? "" })} centered>
+    <Modal closeButtonProps={{ "aria-label": t("common.action.close") }} opened={version !== null} onClose={onClose} title={t("versions.sourceLink.title", { version: version?.version ?? "" })} centered>
       {version !== null && <SourceUrlForm contractId={contractId} version={version} onClose={onClose} />}
     </Modal>
   );

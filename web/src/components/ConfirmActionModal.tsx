@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Button, Group, Modal, Stack, Text, type MantineColor } from "@mantine/core";
+import { useTranslation } from "react-i18next";
 
 /**
  * The shared confirm-before-acting modal (Lettuce's, ported with the feature-flags bulk
@@ -28,8 +29,9 @@ export default function ConfirmActionModal({
   loading?: boolean;
   confirmColor?: MantineColor;
 }) {
+  const { t } = useTranslation();
   return (
-    <Modal
+    <Modal closeButtonProps={{ "aria-label": t("common.action.close") }}
       opened={opened}
       onClose={() => {
         if (!loading) onClose();

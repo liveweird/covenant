@@ -4,7 +4,7 @@ import { useDisclosure } from "@mantine/hooks";
 import { Link as RouterLink, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { isAdmin } from "./api/session";
-import { RedirectIfAuthed, RequireAuth } from "./auth";
+import { RedirectIfAuthed, RequireAdmin, RequireAuth } from "./auth";
 import BrandLogo from "./components/BrandLogo";
 import CommandPalette from "./components/CommandPalette";
 import NotificationsButton from "./components/NotificationsButton";
@@ -172,11 +172,14 @@ export default function App() {
             <Route path="environments" element={<Environments />} />
             <Route path="teams" element={<Teams />} />
             <Route path="teams/:id" element={<TeamDetails />} />
-            <Route path="users" element={<Users />} />
-            <Route path="users/new" element={<CreateUser />} />
-            <Route path="users/:id/edit" element={<EditUser />} />
-            <Route path="users/:id/features" element={<UserFeatures />} />
-            <Route path="feature-flags" element={<FeatureFlags />} />
+            {/* The management surface — ADMIN only, guarded once here (the pages no longer redirect themselves). */}
+            <Route element={<RequireAdmin />}>
+              <Route path="users" element={<Users />} />
+              <Route path="users/new" element={<CreateUser />} />
+              <Route path="users/:id/edit" element={<EditUser />} />
+              <Route path="users/:id/features" element={<UserFeatures />} />
+              <Route path="feature-flags" element={<FeatureFlags />} />
+            </Route>
             <Route path="change-password" element={<ChangePassword />} />
             <Route path="changelog" element={<Changelog />} />
             {/* The authenticated catch-all — LAST child, never feature-gated. */}

@@ -196,7 +196,7 @@ function DomainEditorModal({ target, onClose, onSaved }: { target: DomainRespons
   }
 
   return (
-    <Modal opened onClose={onClose} title={target ? t("domains.editTitle") : t("domains.createTitle")} centered>
+    <Modal closeButtonProps={{ "aria-label": t("common.action.close") }} opened onClose={onClose} title={target ? t("domains.editTitle") : t("domains.createTitle")} centered>
       <form onSubmit={form.onSubmit(save)} noValidate>
         <Stack>
           <TextInput label={t("common.field.name")} maxLength={MAX_REGISTRY_NAME_LENGTH} data-autofocus {...form.getInputProps("name")} />

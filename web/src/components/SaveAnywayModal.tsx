@@ -24,7 +24,7 @@ export default function SaveAnywayModal({
   const shown = (findings ?? []).slice(0, 10);
   const more = (findings?.length ?? 0) - shown.length;
   return (
-    <Modal opened={findings !== null} onClose={onCancel} title={t("versions.saveAnyway.title")} centered size="lg">
+    <Modal closeButtonProps={{ "aria-label": t("common.action.close") }} opened={findings !== null} onClose={onCancel} title={t("versions.saveAnyway.title")} centered size="lg">
       <Stack gap="sm">
         <Text size="sm">{t("versions.saveAnyway.intro", { count: findings?.length ?? 0 })}</Text>
         <Stack gap={4}>

@@ -78,7 +78,10 @@ export default function CodeEditor({
         editable.current.of([EditorView.editable.of(!readOnly), EditorState.readOnly.of(readOnly)]),
         hint.current.of(placeholderText ? placeholder(placeholderText) : []),
         covenantEditorTheme,
-        EditorView.contentAttributes.of({ "aria-label": ariaLabel, "aria-readonly": String(readOnly) }),
+        // tabindex: a READ-ONLY editor drops contenteditable, and its scroller would then be a scroll
+        // region with no focusable descendant (axe scrollable-region-focusable) — keyboard users
+        // must still be able to reach and scroll the document.
+        EditorView.contentAttributes.of({ "aria-label": ariaLabel, "aria-readonly": String(readOnly), tabindex: "0" }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) onChangeRef.current?.(update.state.doc.toString());
         }),

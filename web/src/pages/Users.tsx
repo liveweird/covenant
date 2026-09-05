@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Link as RouterLink, Navigate } from "react-router-dom";
+import { Link as RouterLink } from "react-router-dom";
 import { Alert, Badge, Button, Group, Menu, Modal, Select, Stack, Table, Text } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -70,7 +70,6 @@ export default function Users() {
   // The reset flow: confirm → generate client-side → PUT → the one-time reveal modal.
   const reset = useResetPassword();
 
-  if (!isAdmin()) return <Navigate to="/" replace />;
 
   const total = data?.total ?? 0;
   const columnCount = 4;
@@ -261,7 +260,7 @@ export default function Users() {
         )}
       />
 
-      <Modal
+      <Modal closeButtonProps={{ "aria-label": t("common.action.close") }}
         opened={reset.target !== null}
         onClose={() => {
           if (!reset.pending) reset.clearTarget();

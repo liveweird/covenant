@@ -230,6 +230,15 @@ object TestUsers {
         }
     }
 
+    /** Sets `password_changed_at` directly — the refresh test moves it past a token's `iat` instead of sleeping. */
+    suspend fun stampPasswordChangedAt(id: UInt, epochMillis: Long) {
+        suspendTransaction(sharedTestDatabase) {
+            UserService.Users.update({ UserService.Users.id eq id }) {
+                it[UserService.Users.passwordChangedAt] = epochMillis
+            }
+        }
+    }
+
     /**
      * Runs [block] while the users in [soloAdminIds] are the ONLY active admins — every other
      * active ADMIN row (the seed admin and other tests' fixtures included) is temporarily

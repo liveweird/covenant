@@ -53,7 +53,7 @@ export default function SyncVersionModal({
   const { t } = useTranslation();
   const [syncing, setSyncing] = useState(false);
   return (
-    <Modal
+    <Modal closeButtonProps={{ "aria-label": t("common.action.close") }}
       opened={version !== null}
       // The busy guard covers Esc/overlay/the X too — a dismissal mid-POST would unmount the error.
       onClose={() => {
