@@ -1,0 +1,119 @@
+name: ci
+
+# The push/PR gate — every local gate (CLAUDE.md "Commands") re-run on a clean runner:
+# server (detekt + Testcontainers tests + Kover + dependency alignment), web (lint, knip,
+# tests with coverage floors, build), checker (lint, knip, typecheck, tests, build), and the
+# Docker-free e2e statics (typecheck + spec↔scenario parity). The blackbox Playwright suite
+# stays manual (e2e.yml).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Spectral's @scarf/scarf postinstall phones home on install; opt every job out.
+  SCARF_ANALYTICS: "false"
+
+jobs:
+  server:
+    # ubuntu-latest ships a Docker daemon — Testcontainers starts postgres:18-alpine on it.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      # `build` = compile + detekt + test + koverVerify + checkDependencyAlignment (`check`).
+      - run: ./gradlew build --no-daemon --stacktrace
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: server-reports
+          path: server/build/reports/
+          retention-days: 7
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      # --legacy-peer-deps per web/README.md (openapi-typescript declares TS ^5, the repo uses TS 6).
+      - run: npm ci --legacy-peer-deps
+      - run: npm run lint
+      - run: npm run knip
+      - run: npm run test:coverage
+      - run: npm run build
+        env:
+          # The runner's checkout is a detached HEAD; stamp the build from the event instead of
+          # the vite config's `git status` dirty check (see web/CLAUDE.md "Build version stamp").
+          GIT_SHA: ${{ github.sha }}
+
+  checker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: checker
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: checker/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run knip
+      - run: npm run typecheck
+      - run: npm run test:coverage
+      - run: npm run build
+
+  e2e-static:
+    # The two Docker-free e2e gates: Playwright only TRANSPILES TS, and spec↔scenario parity
+    # is the same-commit rule made mechanical (e2e/README.md).
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: e2e
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run check:scenarios
+
+  images:
+    # Dockerfile drift guard on the default branch: both images must still build. Push-only —
+    # the two multi-stage builds are the slowest job here.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The SPA build stage reads the commit sha and time from .git.
+          fetch-depth: 0
+      - run: docker compose build
