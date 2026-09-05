@@ -25,6 +25,8 @@ ktor:
       # — features
       - ch.nokillswit.users.UserRoutesKt.configureUserRoutes
       - ch.nokillswit.teams.TeamRoutesKt.configureTeamRoutes
+      - ch.nokillswit.domains.DomainRoutesKt.configureDomainRoutes
+      - ch.nokillswit.systems.SystemRoutesKt.configureSystemRoutes
       - ch.nokillswit.auth.AuthRoutesKt.configureAuthRoutes
       # — catch-all router
       - ch.nokillswit.plugins.RoutingKt.configureRouting

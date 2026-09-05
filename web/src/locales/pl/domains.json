@@ -1,0 +1,29 @@
+{
+  "title": "Domeny",
+  "intro": "Najwyższy poziom hierarchii kontraktów — obszar biznesowy lub techniczny (płatności, tożsamość, …), który grupuje systemy. Listę prowadzą administratorzy/rki.",
+  "newDomain": "Nowa domena",
+  "createTitle": "Nowa domena",
+  "editTitle": "Edytuj domenę",
+  "empty": "Nie ma jeszcze domen",
+  "loadFailed": "Nie udało się wczytać domen",
+  "column": {
+    "systems": "Systemy"
+  },
+  "deleteTitle": "Usunąć domenę?",
+  "deleteBody": "Domena „{{name}}” zostanie usunięta.",
+  "deleteFailed": "Nie udało się usunąć domeny",
+  "deleteHoldsSystems": "Ta domena nadal zawiera systemy — najpierw je przenieś albo usuń.",
+  "saveForbidden": "Tylko administratorzy/rki mogą edytować domeny",
+  "saveConflict": "Domena o tej nazwie już istnieje",
+  "saveInvalid": "Jedno lub więcej pól jest nieprawidłowe",
+  "saveGone": "Ta domena już nie istnieje — odśwież stronę",
+  "validation": {
+    "nameLength": "Nazwa musi mieć od 1 do 100 znaków",
+    "descriptionLength": "Opis może mieć najwyżej 2000 znaków"
+  },
+  "toast": {
+    "created": "Domena utworzona",
+    "saved": "Domena zapisana",
+    "deleted": "Domena usunięta"
+  }
+}

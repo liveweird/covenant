@@ -7,7 +7,9 @@
     "changePassword": "Zmiana hasła",
     "featureFlags": "Flagi funkcji",
     "changelog": "Historia zmian",
-    "teams": "Zespoły"
+    "teams": "Zespoły",
+    "domains": "Domeny",
+    "systems": "Systemy"
   },
   "section": {
     "catalog": "Katalog",

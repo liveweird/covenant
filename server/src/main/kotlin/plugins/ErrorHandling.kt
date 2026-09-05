@@ -99,6 +99,8 @@ internal fun Throwable.isCharacterNotInRepertoire(): Boolean = hasSqlState(PG_CH
 private val UNIQUE_CONSTRAINT_DETAILS = mapOf(
     "uq_users_email_active" to "A user with this email already exists",
     "uq_teams_name_active" to "A team with this name already exists",
+    "uq_domains_name_active" to "A domain with this name already exists",
+    "uq_systems_domain_name_active" to "A system with this name already exists in this domain",
 )
 
 private fun Throwable.uniqueViolationDetail(): String {

@@ -56,6 +56,8 @@ describe("App shell", () => {
       const catalog = await screen.findByRole("group", { name: "Catalog" });
       expect(within(catalog).getByRole("link", { name: "Home" })).toHaveAttribute("href", "/");
       const registries = screen.getByRole("group", { name: "Registries" });
+      expect(within(registries).getByRole("link", { name: "Domains" })).toHaveAttribute("href", "/domains");
+      expect(within(registries).getByRole("link", { name: "Systems" })).toHaveAttribute("href", "/systems");
       expect(within(registries).getByRole("link", { name: "Teams" })).toHaveAttribute("href", "/teams");
       // Account items live in the header menu, not the sidebar.
       expect(screen.queryByRole("link", { name: "Change password" })).not.toBeInTheDocument();

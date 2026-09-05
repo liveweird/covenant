@@ -1,0 +1,36 @@
+{
+  "title": "Systems",
+  "intro": "The applications and services that expose contracts, each inside one domain. Administrators curate the list.",
+  "newSystem": "New system",
+  "createTitle": "New system",
+  "editTitle": "Edit system",
+  "empty": "No systems yet",
+  "emptyNoDomains": "Create a domain first — every system lives inside one",
+  "loadFailed": "Could not load the systems",
+  "clearDomainFilter": "Clear domain filter",
+  "field": {
+    "domain": "Domain",
+    "domainMoveHint": "Picking another domain moves the system there"
+  },
+  "column": {
+    "contracts": "Contracts"
+  },
+  "deleteTitle": "Delete system?",
+  "deleteBody": "\"{{name}}\" ({{domain}}) will be deleted.",
+  "deleteFailed": "Could not delete the system",
+  "deleteHoldsContracts": "This system still holds contracts — move or delete them first.",
+  "saveForbidden": "Only administrators can edit systems",
+  "saveConflict": "A system with this name already exists in this domain",
+  "saveInvalid": "One or more fields are invalid",
+  "saveGone": "This system no longer exists — reload the page",
+  "validation": {
+    "nameLength": "Name must be 1–100 characters",
+    "descriptionLength": "Description must be at most 2000 characters",
+    "domainRequired": "Pick a domain"
+  },
+  "toast": {
+    "created": "System created",
+    "saved": "System saved",
+    "deleted": "System deleted"
+  }
+}

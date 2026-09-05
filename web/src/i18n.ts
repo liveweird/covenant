@@ -11,7 +11,9 @@ import enCommon from "./locales/en/common.json";
 import enAppShell from "./locales/en/appShell.json";
 import enAuth from "./locales/en/auth.json";
 import enChangelog from "./locales/en/changelog.json";
+import enDomains from "./locales/en/domains.json";
 import enHome from "./locales/en/home.json";
+import enSystems from "./locales/en/systems.json";
 import enTeams from "./locales/en/teams.json";
 import enUsers from "./locales/en/users.json";
 
@@ -54,7 +56,9 @@ export const en = {
   appShell: enAppShell,
   auth: enAuth,
   changelog: enChangelog,
+  domains: enDomains,
   home: enHome,
+  systems: enSystems,
   teams: enTeams,
   users: enUsers,
 };

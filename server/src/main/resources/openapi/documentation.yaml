@@ -27,6 +27,8 @@ tags:
   - name: auth
   - name: users
   - name: teams
+  - name: domains
+  - name: systems
 
 paths:
   /api/v1/login:
@@ -604,6 +606,234 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/domains:
+    get:
+      tags: [domains]
+      operationId: listDomains
+      summary: List domains
+      description: |
+        Any authenticated user — the domain registry is the hierarchy's spine and the pickers'
+        source; every mutation below is ADMIN only.
+
+        - Sortable fields: `id`, `name`, `createdAt`, `updatedAt`. Default `id` ascending.
+        - Filters: `name` (case- and accent-insensitive substring).
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - name: name
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: A page of domains
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DomainPage'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    post:
+      tags: [domains]
+      operationId: createDomain
+      summary: Create a domain
+      description: |
+        ADMIN only (guarded before the body decodes). A case-insensitive name clash with an active domain is `409`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DomainRequest'
+      responses:
+        '201':
+          description: Created; `Location` points at the new domain
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DomainResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/domains/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [domains]
+      operationId: getDomain
+      summary: Get a domain
+      description: Any authenticated user.
+      responses:
+        '200':
+          description: The domain
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DomainResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    put:
+      tags: [domains]
+      operationId: updateDomain
+      summary: Replace a domain
+      description: |
+        ADMIN only, guard before the id lookup (uniform 403). Full replace.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DomainRequest'
+      responses:
+        '204':
+          description: Updated
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    delete:
+      tags: [domains]
+      operationId: deleteDomain
+      summary: Delete a domain (soft)
+      description: |
+        ADMIN only, guard before the id lookup. Refused with `409` while the domain still holds an active system — the tree never dangles.
+      responses:
+        '204':
+          description: Deleted
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/systems:
+    get:
+      tags: [systems]
+      operationId: listSystems
+      summary: List systems
+      description: |
+        Any authenticated user — the system registry is the hierarchy's spine and the pickers'
+        source; every mutation below is ADMIN only.
+
+        - Sortable fields: `id`, `name`, `domainId`, `createdAt`, `updatedAt`. Default `id` ascending.
+        - Filters: `name` (case- and accent-insensitive substring), `domainId` (only systems of that domain).
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - name: name
+          in: query
+          required: false
+          schema: { type: string }
+        - name: domainId
+          in: query
+          required: false
+          schema: { type: integer, format: int32, minimum: 0 }
+      responses:
+        '200':
+          description: A page of systems
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemPage'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    post:
+      tags: [systems]
+      operationId: createSystem
+      summary: Create a system
+      description: |
+        ADMIN only (guarded before the body decodes). `domainId` must be an active domain (`400` otherwise); a case-insensitive name clash with an active system IN THE SAME DOMAIN is `409`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SystemRequest'
+      responses:
+        '201':
+          description: Created; `Location` points at the new system
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/systems/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [systems]
+      operationId: getSystem
+      summary: Get a system
+      description: Any authenticated user.
+      responses:
+        '200':
+          description: The system
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    put:
+      tags: [systems]
+      operationId: updateSystem
+      summary: Replace a system
+      description: |
+        ADMIN only, guard before the id lookup (uniform 403). Full replace — a changed `domainId` MOVES the system to another domain.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SystemRequest'
+      responses:
+        '204':
+          description: Updated
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    delete:
+      tags: [systems]
+      operationId: deleteSystem
+      summary: Delete a system (soft)
+      description: |
+        ADMIN only, guard before the id lookup. Refused with `409` while the system still holds an active contract (the rule lands with the contracts feature).
+      responses:
+        '204':
+          description: Deleted
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 components:
   securitySchemes:
     bearerAuth:
@@ -962,6 +1192,70 @@ components:
           format: int64
           minimum: 0
           description: Row count after filters, before pagination.
+
+    DomainRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: string, maxLength: 2000, nullable: true }
+    DomainResponse:
+      type: object
+      required: [id, name, systemCount, createdAt, updatedAt]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        systemCount:
+          type: integer
+          minimum: 0
+          description: Active systems inside the domain.
+        createdAt: { type: integer, format: int64, description: Epoch millis }
+        updatedAt: { type: integer, format: int64, description: Epoch millis }
+    DomainPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DomainResponse'
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, format: int64, minimum: 0 }
+    SystemRequest:
+      type: object
+      required: [domainId, name]
+      properties:
+        domainId: { type: integer, format: int32, minimum: 0 }
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: string, maxLength: 2000, nullable: true }
+    SystemResponse:
+      type: object
+      required: [id, domainId, domainName, name, contractCount, createdAt, updatedAt]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        domainId: { type: integer, format: int32, minimum: 0 }
+        domainName: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        contractCount:
+          type: integer
+          minimum: 0
+          description: Active contracts inside the system (0 until the contracts feature lands).
+        createdAt: { type: integer, format: int64, description: Epoch millis }
+        updatedAt: { type: integer, format: int64, description: Epoch millis }
+    SystemPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SystemResponse'
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, format: int64, minimum: 0 }
 
     ProblemDetail:
       type: object

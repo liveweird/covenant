@@ -42,9 +42,9 @@ This is a Kotlin/Gradle backend plus three standalone npm workspaces:
   bootstrap.
 - `server/` is the Kotlin/JVM Ktor application. Feature packages live directly under
   `server/src/main/kotlin/`: `auth`, `users`, `teams` (the flat-teams registry with rosters —
-  the feature template), and `contracts` (today only the SSRF-guarded URL fetch; the contract
-  domain grows there — see `CLAUDE.md` "Package layout" for the planned shape), with `domains`
-  and `systems` to follow. Cross-cutting wiring and policy live
+  the feature template), `domains` and `systems` (the Domain → System registries), and
+  `contracts` (today only the SSRF-guarded URL fetch; the contract domain grows there — see
+  `CLAUDE.md` "Package layout" for the planned shape). Cross-cutting wiring and policy live
   in `plugins/`, `audit/`, and `authz/`; database, mail, paging, and shared validation
   infrastructure live in `infra/`.
 - `server/src/main/resources/application.yaml` declaratively registers application modules.

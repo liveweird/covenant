@@ -2,6 +2,10 @@ package ch.nokillswit.infra.db
 
 import ch.nokillswit.auth.TokenBlocklistService
 import ch.nokillswit.auth.TokenBlocklistServiceKey
+import ch.nokillswit.domains.DomainService
+import ch.nokillswit.domains.DomainServiceKey
+import ch.nokillswit.systems.SystemService
+import ch.nokillswit.systems.SystemServiceKey
 import ch.nokillswit.teams.TeamService
 import ch.nokillswit.teams.TeamServiceKey
 import ch.nokillswit.users.UserService
@@ -22,5 +26,8 @@ suspend fun Application.configureDatabase() {
     )
     attributes.put(UserServiceKey, UserService(database))
     attributes.put(TeamServiceKey, TeamService(database))
+    val domainService = DomainService(database)
+    attributes.put(DomainServiceKey, domainService)
+    attributes.put(SystemServiceKey, SystemService(database, domainService))
     attributes.put(TokenBlocklistServiceKey, TokenBlocklistService(database))
 }

@@ -16,6 +16,8 @@ import classes from "./theme.module.css";
 
 const Login = lazy(() => import("./pages/Login"));
 const Home = lazy(() => import("./pages/Home"));
+const Domains = lazy(() => import("./pages/Domains"));
+const Systems = lazy(() => import("./pages/Systems"));
 const Teams = lazy(() => import("./pages/Teams"));
 const TeamDetails = lazy(() => import("./pages/TeamDetails"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
@@ -146,6 +148,8 @@ export default function App() {
         <Route element={<RequireAuth />}>
           <Route element={<Shell />}>
             <Route index element={<Home />} />
+            <Route path="domains" element={<Domains />} />
+            <Route path="systems" element={<Systems />} />
             <Route path="teams" element={<Teams />} />
             <Route path="teams/:id" element={<TeamDetails />} />
             <Route path="users" element={<Users />} />

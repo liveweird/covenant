@@ -1,0 +1,29 @@
+{
+  "title": "Domains",
+  "intro": "The top level of the contract hierarchy — a business or technical area (payments, identity, …) that groups systems. Administrators curate the list.",
+  "newDomain": "New domain",
+  "createTitle": "New domain",
+  "editTitle": "Edit domain",
+  "empty": "No domains yet",
+  "loadFailed": "Could not load the domains",
+  "column": {
+    "systems": "Systems"
+  },
+  "deleteTitle": "Delete domain?",
+  "deleteBody": "\"{{name}}\" will be deleted.",
+  "deleteFailed": "Could not delete the domain",
+  "deleteHoldsSystems": "This domain still holds systems — move or delete them first.",
+  "saveForbidden": "Only administrators can edit domains",
+  "saveConflict": "A domain with this name already exists",
+  "saveInvalid": "One or more fields are invalid",
+  "saveGone": "This domain no longer exists — reload the page",
+  "validation": {
+    "nameLength": "Name must be 1–100 characters",
+    "descriptionLength": "Description must be at most 2000 characters"
+  },
+  "toast": {
+    "created": "Domain created",
+    "saved": "Domain saved",
+    "deleted": "Domain deleted"
+  }
+}

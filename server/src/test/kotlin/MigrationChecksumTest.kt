@@ -26,6 +26,8 @@ class MigrationChecksumTest {
         "V4__enable_unaccent_extension.sql" to 242547752,
         "V5__user_disabled_features.sql" to -466290471,
         "V6__create_teams.sql" to -354462531,
+        "V7__create_domains.sql" to 1527503388,
+        "V8__create_systems.sql" to -503567615,
     )
 
     @Test

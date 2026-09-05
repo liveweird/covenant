@@ -280,3 +280,25 @@ object TestTeams {
         m.selectAll().where { m.teamId eq teamId }.map { it[m.userId].value }.toList().toSet()
     }
 }
+
+/** Direct registry fixtures for the Domain → System hierarchy (unique names per test). */
+object TestDomains {
+    val service: ch.nokillswit.domains.DomainService by lazy { ch.nokillswit.domains.DomainService(sharedTestDatabase) }
+
+    suspend fun seed(name: String, description: String? = null): UInt =
+        service.create(ch.nokillswit.domains.DomainRequest(name = name, description = description))
+
+    suspend fun rawDeleted(id: UInt): Boolean = suspendTransaction(sharedTestDatabase) {
+        val t = ch.nokillswit.domains.DomainService.Domains
+        t.selectAll().where { t.id eq id }.map { it[t.markedAsDeleted] }.toList().single()
+    }
+}
+
+object TestSystems {
+    val service: ch.nokillswit.systems.SystemService by lazy {
+        ch.nokillswit.systems.SystemService(sharedTestDatabase, TestDomains.service)
+    }
+
+    suspend fun seed(domainId: UInt, name: String, description: String? = null): UInt =
+        service.create(ch.nokillswit.systems.SystemRequest(domainId = domainId, name = name, description = description))
+}

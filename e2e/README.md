@@ -45,7 +45,7 @@ from Lettuce, that any new or edited spec must satisfy:
 
 - Each spec's scenario file declares its **Owns** line (exclusive server-side state; "nothing —
   read-only" when applicable). Today: `auth`, `accessibility`, and `changelog` (device-local
-  localStorage only) are read-only; `users` owns its throwaway accounts; `teams` owns its throwaway teams (unique `e2e-team-*` names) and users; `i18n` owns its
+  localStorage only) are read-only; `users` owns its throwaway accounts; `teams` owns its throwaway teams (unique `e2e-team-*` names) and users; `registries` owns its throwaway domains/systems (`e2e-dom-*`/`e2e-sys-*`) and user; `i18n` owns its
   throwaway user (and ONLY that user's language — **seeded accounts must stay English**: every
   login applies the stored language to that session's UI, so a Polish seed admin would flip
   parallel specs mid-run); `password-reset` owns its throwaway account (its reset requests use
@@ -77,7 +77,7 @@ outcomes). **A new or behaviorally changed test lands with its scenario file and
 the same commit** — this list is the coverage map, the scenario file is the design.
 
 - [`accessibility.spec.ts`](scenarios/accessibility.md) — axe WCAG A/AA smoke: login + the
-  authenticated pages (`/`, `/teams`, `/users`, `/users/new`, `/feature-flags`,
+  authenticated pages (`/`, `/domains`, `/systems`, `/teams`, `/users`, `/users/new`, `/feature-flags`,
   `/change-password`, `/changelog`), `color-contrast` included (the theme's tokens are AA-tested in
   `web/src/theme.test.ts`).
 - [`auth.spec.ts`](scenarios/auth.md) — login / logout / invalid credentials / guarded deep link.
@@ -94,6 +94,9 @@ the same commit** — this list is the coverage map, the scenario file is the de
   neutral confirmation + per-email throttle for unknown addresses; the full email roundtrip
   through the compose stack's Mailpit (new password works, old one is dead — skips itself
   without Mailpit).
+- [`registries.spec.ts`](scenarios/registries.md) — the Domain → System registries: two domains,
+  a system inside one, the holds-systems 409 on delete, the move by editing the domain, cleanup;
+  a regular user's read-only pages.
 - [`teams.spec.ts`](scenarios/teams.md) — the flat-teams registry: create through the modal →
   add a member from the searchable picker → rename → remove the member → delete from the list;
   a regular user's read-only list and roster (no New team, no row menu, no picker).

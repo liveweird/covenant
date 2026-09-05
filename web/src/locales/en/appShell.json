@@ -7,7 +7,9 @@
     "changePassword": "Change password",
     "featureFlags": "Feature flags",
     "changelog": "Changelog",
-    "teams": "Teams"
+    "teams": "Teams",
+    "domains": "Domains",
+    "systems": "Systems"
   },
   "section": {
     "catalog": "Catalog",
