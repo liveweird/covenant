@@ -26,6 +26,11 @@ spec:
                 secretKeyRef:
                   name: covenant-secrets
                   key: JWT_SECRET
+            - name: DATA_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: covenant-secrets
+                  key: DATA_ENCRYPTION_KEY
             - name: ADMIN_INITIAL_PASSWORD
               valueFrom:
                 secretKeyRef:

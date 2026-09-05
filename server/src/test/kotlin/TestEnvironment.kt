@@ -83,6 +83,10 @@ fun ApplicationTestBuilder.jsonClient(): HttpClient = createClient { covenantTes
 /** A unique throwaway email so tests never collide on the partial-unique active-email index. */
 fun uniqueEmail(prefix: String) = "$prefix-${java.util.UUID.randomUUID()}@test"
 
+/** A private 64-hex data-encryption key — every production-mode boot needs one (the dev default is burned). */
+fun strongEncryptionKey(): String =
+    java.util.UUID.randomUUID().toString().replace("-", "") + java.util.UUID.randomUUID().toString().replace("-", "")
+
 /** POSTs [body] as JSON — the contentType+setBody ceremony, owned once. */
 suspend inline fun <reified T> HttpClient.postJson(path: String, body: T): HttpResponse =
     post(path) {

@@ -33,7 +33,7 @@ class MailTransportTest {
     fun `production mode refuses to start with the log transport`() = testApplication {
         // Strong JWT secret so the earlier configureSecurity check passes; configureMail runs
         // at the top of the infrastructure group, before Flyway/Bootstrap.
-        configureApp("jwt.secret" to "strong-${UUID.randomUUID()}")
+        configureApp("jwt.secret" to "strong-${UUID.randomUUID()}", "security.encryption.key" to strongEncryptionKey())
         serverConfig { developmentMode = false }
         assertStartupFails("mail.transport") { startApplication() }
     }

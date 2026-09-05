@@ -3,6 +3,7 @@ package ch.nokillswit.infra.db
 import ch.nokillswit.auth.hashPassword
 import ch.nokillswit.users.UserServiceKey
 import io.ktor.server.application.*
+import ch.nokillswit.infra.crypto.EncryptedAtRest
 
 /** The V3 seed account's well-known bcrypt hash (plaintext "changeme"). */
 internal const val SEED_PASSWORD_HASH = "\$2y\$12\$VD60LjzPo00G5MtaWE3h9OrqYUid.MVxc5D7oHsM8oErnD9wuIvya"
@@ -43,4 +44,21 @@ suspend fun Application.configureBootstrap() {
             )
         }
     }
+
+    // Encryption-at-rest backfill (infra/crypto/): rows written before the field cipher existed
+    // still hold plaintext — encrypt them once. While a rotation previousKey is configured, every
+    // row is re-encrypted under the current key instead. THE list of encrypted-at-rest services —
+    // a newly encrypted feature registers here; removing an entry would strand its rows under a
+    // rotated-away key.
+    val rotating = environment.config
+        .propertyOrNull("security.encryption.previousKey")?.getString()?.isNotBlank() == true
+    encryptedAtRestServices().forEach { service ->
+        val encrypted = service.encryptLegacyRows(reencryptAll = rotating)
+        if (encrypted > 0) {
+            log.info("Bootstrap: ${if (rotating) "re-" else ""}encrypted $encrypted ${service.encryptedRowLabel} row(s) at rest")
+        }
+    }
 }
+
+/** Every service owning encrypted-at-rest columns (see EncryptedAtRest) — the environments registry lands next. */
+private fun Application.encryptedAtRestServices(): List<EncryptedAtRest> = emptyList()

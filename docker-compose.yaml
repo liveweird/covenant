@@ -72,6 +72,9 @@ services:
       # It is committed to the repo and therefore BURNED: production mode refuses to start
       # with it. Set your own (e.g. `openssl rand -hex 32`) for any real deployment.
       JWT_SECRET: "${JWT_SECRET:-dev-only-6923ce629cb95ce814e8e2464ca2c40124802f6b7738c1fced65ae115817faa8}"
+      # Demo key for the environments' stored credentials (encrypted at rest). Committed and
+      # therefore BURNED like the JWT key: production mode refuses it. `openssl rand -hex 32`.
+      DATA_ENCRYPTION_KEY: "${DATA_ENCRYPTION_KEY:-384d2d8bbba13a255d5de897de4fa2d7c3029d0563b7a3a1a3a76437861adfca}"
       # Real SMTP delivery into the bundled Mailpit (the image default is MAIL_TRANSPORT=disabled).
       MAIL_TRANSPORT: smtp
       SMTP_HOST: mailpit

@@ -19,6 +19,8 @@ ktor:
       - ch.nokillswit.plugins.ResourcesKt.configureResources
       # — infrastructure
       - ch.nokillswit.infra.mail.MailKt.configureMail
+      # Crypto before Database: the composition root hands the FieldCipher to EnvironmentService.
+      - ch.nokillswit.infra.crypto.CryptoKt.configureCrypto
       - ch.nokillswit.infra.db.FlywayKt.configureFlyway
       # Checks before Database: the composition root hands ChecksService to the version service.
       - ch.nokillswit.contracts.checks.ChecksKt.configureChecks
@@ -67,6 +69,16 @@ security:
   mfa:
     codeTtlSeconds: "$MFA_CODE_TTL_SECONDS:300"
     maxAttempts: "$MFA_MAX_ATTEMPTS:5"
+  # Application-level encryption at rest (infra/crypto/): an AES-256-GCM key (64 hex chars,
+  # `openssl rand -hex 32`) for the try-it environments' stored credentials
+  # (environments.kafka_password / pg_password). The default is a committed dev-only key
+  # (infra/crypto/Crypto.kt — it is on the burned list, so production startup refuses it).
+  # LOSING THIS KEY MEANS LOSING EVERY STORED TARGET CREDENTIAL — back it up apart from the DB.
+  encryption:
+    key: "$DATA_ENCRYPTION_KEY:ef9b766b3b3dc805220826e796b1b907d7b7fb55048940e1b730af61b7f17aa4"
+    # Decrypt-only fallback for key rotation: set the OLD key here and the new one above, boot
+    # once (the startup backfill re-encrypts every row under the new key), then remove it.
+    previousKey: "$DATA_ENCRYPTION_KEY_PREVIOUS:"
   csrf:
     # TEMPLATE PLACEHOLDER — CSRF protection is off by default because this API
     # authenticates via bearer JWT in the Authorization header, which browsers

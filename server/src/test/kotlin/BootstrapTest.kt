@@ -61,7 +61,7 @@ class BootstrapTest {
     fun `production mode refuses to start while seed passwords are active`() = testApplication {
         // No ADMIN_INITIAL_PASSWORD; strong JWT secret so the failure is the seed check.
         configureApp(
-            "jwt.secret" to "strong-${UUID.randomUUID()}",
+            "jwt.secret" to "strong-${UUID.randomUUID()}", "security.encryption.key" to strongEncryptionKey(),
             // The dev-default `log` mail transport is refused in production (see infra/mail).
             "mail.transport" to "disabled",
         )
@@ -76,7 +76,7 @@ class BootstrapTest {
         val newPassword = "rotated-${UUID.randomUUID()}"
         configureApp(
             "bootstrap.adminInitialPassword" to newPassword,
-            "jwt.secret" to "strong-${UUID.randomUUID()}",
+            "jwt.secret" to "strong-${UUID.randomUUID()}", "security.encryption.key" to strongEncryptionKey(),
             // The dev-default `log` mail transport is refused in production (see infra/mail).
             "mail.transport" to "disabled",
         )
