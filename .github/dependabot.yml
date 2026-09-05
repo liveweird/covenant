@@ -1,0 +1,37 @@
+# Weekly dependency bumps, grouped so one PR per workspace per week carries the minor/patch set
+# and majors arrive alone (a major deserves its own review — see the pin rationales in
+# gradle/libs.versions.toml and the version notes in .claude/docs/checker.md).
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      gradle-minor-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    groups:
+      web-minor-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: npm
+    directory: /checker
+    schedule:
+      interval: weekly
+    groups:
+      checker-minor-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: npm
+    directory: /e2e
+    schedule:
+      interval: weekly
+    groups:
+      e2e-minor-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

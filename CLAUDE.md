@@ -18,8 +18,8 @@ Gradle wrapper is at `./gradlew` (use `gradlew.bat` on Windows). JDK 21 toolchai
 - **Run the whole stack with one command: `docker compose up --build`** (only Docker required). See "Running the full stack" below.
 - Frontend: `cd web && npm install --legacy-peer-deps`, then `npm run dev|build|lint|test|test:coverage|knip|gen:api` (details in `web/CLAUDE.md`).
 - Checker sidecar: `cd checker && npm ci`, then `npm run dev|build|lint|knip|typecheck|test|test:coverage` (details in `.claude/docs/checker.md`).
-- E2E: `cd e2e && npm ci && npx playwright install chromium && npm test` (plus `npm run typecheck` and `npm run check:scenarios`).
-- CI: `.github/workflows/ci.yml` re-runs every gate above on push/PR (server, web, checker, e2e statics, image builds on `main`); the blackbox Playwright suite (`e2e.yml`) stays manual.
+- E2E: `cd e2e && npm ci && npx playwright install chromium && npm test` (plus `npm run lint`, `npm run knip`, `npm run typecheck` and `npm run check:scenarios`).
+- CI: `.github/workflows/ci.yml` re-runs every gate above on push/PR (server — incl. the OpenAPI coverage gate, web — incl. the spec → `schema.ts` drift check, checker, e2e statics, image builds on `main`); the blackbox Playwright suite (`e2e.yml`) runs nightly and on demand. Dependabot (`.github/dependabot.yml`) files weekly grouped bumps for every workspace and the actions.
 
 ## Running the full stack
 
@@ -79,7 +79,7 @@ ch.nokillswit
 │                       registry in infra/db/Bootstrap.kt). Owners: environments/ (the try-it credentials)
 ├── infra/db/           Flyway bootstrap + the R2DBC connection/composition root + the seed
 │                       bootstrap (admin rotation, prod fail-closed) + Sql.kt (containsNormalized,
-│                       jsonArrayContains, orVanished) + EventLog.kt/JsonParams.kt (Lettuce's
+│                       orVanished) + EventLog.kt/JsonParams.kt (Lettuce's
 │                       shared per-record audit-event machinery — the EventLogTable base the
 │                       contract history will ride; no clone yet)
 ├── infra/paging/       the shared list-endpoint machinery (PageRequest/parsePaging/applyPaging/

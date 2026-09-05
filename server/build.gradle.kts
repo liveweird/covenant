@@ -158,6 +158,26 @@ tasks.withType<Test> {
     systemProperty("openapi.conformance", System.getProperty("openapi.conformance", "fail"))
 }
 
+// The OpenAPI COVERAGE gate: OpenApiCoverage (test JVM shutdown hook) writes every declared
+// (operation, status) pair the suite never exercised to gaps.txt — minus the statuses shared plugins
+// produce for every route alike (400/401/413/429, pinned once each) and the unforceable 500/default.
+// A non-empty file fails the task, but only when the WHOLE suite ran (a `--tests` filter legitimately
+// leaves most of the spec unexercised).
+tasks.test {
+    val gapsFile = layout.buildDirectory.file("reports/openapi-conformance/gaps.txt")
+    // `--tests` lands in the start parameter's task arguments (the filter's command-line patterns are
+    // internal API); a filtered run is not the whole suite, so the gate stays quiet.
+    val filtered = gradle.startParameter.taskRequests.any { request -> "--tests" in request.args }
+    doLast {
+        if (filtered || filter.includePatterns.isNotEmpty()) return@doLast
+        val gaps = gapsFile.get().asFile.takeIf { it.exists() }?.readLines()?.filter { it.isNotBlank() } ?: emptyList()
+        check(gaps.isEmpty()) {
+            "OpenAPI coverage gate: ${gaps.size} declared (operation, status) pair(s) were never exercised by the suite — " +
+                "add a test per declared status, or trim the spec to what the route can answer:\n  " + gaps.joinToString("\n  ")
+        }
+    }
+}
+
 // Fails the build when a dependency FAMILY that must move as one resolves to several versions on
 // the server runtime classpath — the mixed Netty 4.1/4.2 set Ktor + reactor-netty produced, the
 // OpenTelemetry incubator drifting from the SDK, kotlin-reflect lagging the stdlib, or a Jackson 2

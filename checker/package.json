@@ -12,7 +12,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "knip": "knip",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",

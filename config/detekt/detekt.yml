@@ -2,6 +2,11 @@
 # Policy: fix findings in code first; add a rule override here ONLY for a deliberate repo idiom,
 # and give every override a one-line comment naming that idiom. No baseline file.
 
+# The zero-findings gate, stated rather than inherited: detekt's bundled default is already 0, but a
+# major bump or a `buildUponDefaultConfig = false` must never be able to relax it silently.
+build:
+  maxIssues: 0
+
 complexity:
   # Route registration is declarative by architecture — each feature's configureXxxRoutes lists
   # every endpoint in one function (see "Package layout" in CLAUDE.md), so *Routes.kt files are

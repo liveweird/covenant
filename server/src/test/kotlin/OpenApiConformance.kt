@@ -148,6 +148,16 @@ object OpenApiCoverage {
 
     private val exercised = ConcurrentHashMap.newKeySet<Triple<String, String, Int>>()
 
+    /**
+     * Statuses a SHARED plugin or interceptor produces for every operation alike, each pinned once by
+     * its own test rather than per route: `400` (a malformed id or body — ErrorHandling's negative-segment
+     * intercept and the converter vocabulary; `PayloadValidationTest`), `401` (the JWT challenge —
+     * `AnonymousAccessTest` sweeps it), `413` (`RequestBodyLimit` — `PayloadValidationTest`), `429` (the
+     * per-IP buckets — `RateLimitResponseTest` + one case per bucket), `500`/`default` (the catch-all —
+     * no honest way to force one through the public API).
+     */
+    private val CROSS_CUTTING_STATUSES = setOf("400", "401", "413", "429", "500", "default")
+
     fun record(method: String, path: String, status: Int) {
         val template = templates.firstOrNull { it.regex.matches(path) }?.path ?: "(no template: $path)"
         exercised.add(Triple(method.uppercase(), template, status))
@@ -193,5 +203,22 @@ object OpenApiCoverage {
         val target = Paths.get("build/reports/openapi-conformance/coverage.md")
         Files.createDirectories(target.parent)
         Files.write(target, lines)
+        Files.write(target.resolveSibling("gaps.txt"), gaps())
+    }
+
+    /**
+     * The GATE's input (server/build.gradle.kts fails the full-suite `test` task on a non-empty file):
+     * every declared (operation, status) pair the suite never produced, minus [CROSS_CUTTING_STATUSES].
+     * A new operation therefore needs a test per declared feature status (2xx/3xx, 403, 404, 409, 502,
+     * 503 …), or its status list trimmed to what the route can actually answer.
+     */
+    private fun gaps(): List<String> = OpenApiSpec.parsed.paths.flatMap { (path, item) ->
+        item.readOperationsMap().flatMap { (method, operation) ->
+            val hits = exercised.filter { it.first == method.name && it.second == path }.map { it.third.toString() }.toSet()
+            operation.responses.keys
+                .filterNot { it in CROSS_CUTTING_STATUSES }
+                .filterNot { it in hits }
+                .map { "${method.name} $path $it (${operation.operationId})" }
+        }
     }
 }

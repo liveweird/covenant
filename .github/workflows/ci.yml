@@ -1,10 +1,10 @@
 name: ci
 
 # The push/PR gate — every local gate (CLAUDE.md "Commands") re-run on a clean runner:
-# server (detekt + Testcontainers tests + Kover + dependency alignment), web (lint, knip,
-# tests with coverage floors, build), checker (lint, knip, typecheck, tests, build), and the
-# Docker-free e2e statics (typecheck + spec↔scenario parity). The blackbox Playwright suite
-# stays manual (e2e.yml).
+# server (detekt + Testcontainers tests + Kover + OpenAPI coverage + dependency alignment), web
+# (the spec → schema.ts drift check, lint, knip, tests with coverage floors, build), checker (lint,
+# knip, typecheck, tests, build), and the Docker-free e2e statics (lint, knip, typecheck, spec↔scenario
+# parity). The blackbox Playwright suite runs nightly and on demand (e2e.yml).
 on:
   push:
     branches: [main]
@@ -57,6 +57,13 @@ jobs:
           cache-dependency-path: web/package-lock.json
       # --legacy-peer-deps per web/README.md (openapi-typescript declares TS ^5, the repo uses TS 6).
       - run: npm ci --legacy-peer-deps
+      # The same-commit rule made mechanical: a spec change must land with its regenerated
+      # src/api/schema.ts, or the SPA type-checks against a stale client surface.
+      - name: OpenAPI → schema.ts drift
+        run: |
+          npm run gen:api
+          git diff --exit-code -- src/api/schema.ts \
+            || { echo "::error::web/src/api/schema.ts is stale — run 'cd web && npm run gen:api' and commit the result"; exit 1; }
       - run: npm run lint
       - run: npm run knip
       - run: npm run test:coverage
@@ -87,8 +94,9 @@ jobs:
       - run: npm run build
 
   e2e-static:
-    # The two Docker-free e2e gates: Playwright only TRANSPILES TS, and spec↔scenario parity
-    # is the same-commit rule made mechanical (e2e/README.md).
+    # The Docker-free e2e gates: eslint+sonarjs and knip (the web/checker siblings), typecheck
+    # (Playwright only TRANSPILES TS), and spec↔scenario parity — the same-commit rule made
+    # mechanical (e2e/README.md).
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -102,6 +110,8 @@ jobs:
           cache: npm
           cache-dependency-path: e2e/package-lock.json
       - run: npm ci
+      - run: npm run lint
+      - run: npm run knip
       - run: npm run typecheck
       - run: npm run check:scenarios
 
