@@ -1,0 +1,33 @@
+{
+  "brand": "Covenant",
+  "skipToContent": "Skip to main content",
+  "nav": {
+    "home": "Home",
+    "users": "Users",
+    "changePassword": "Change password",
+    "featureFlags": "Feature flags",
+    "changelog": "Changelog"
+  },
+  "section": {
+    "catalog": "Catalog",
+    "registries": "Registries",
+    "administration": "Administration"
+  },
+  "userMenu": {
+    "open": "Account menu",
+    "language": "Language",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeAuto": "System",
+    "signOut": "Sign out"
+  },
+  "palette": {
+    "open": "Search and jump to…",
+    "placeholder": "Search or jump to a page…",
+    "groupPages": "Pages",
+    "groupActions": "Actions",
+    "groupFiles": "Contracts",
+    "nothingFound": "Nothing found"
+  }
+}
