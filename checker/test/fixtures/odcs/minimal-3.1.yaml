@@ -1,0 +1,6 @@
+apiVersion: v3.1.0
+kind: DataContract
+id: 53581432-6c55-4ba2-a65f-72344a91553a
+version: 1.0.0
+status: active
+name: customer_view

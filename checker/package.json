@@ -1,0 +1,44 @@
+{
+  "name": "covenant-checker",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Covenant's contract lint/semantic sidecar: Spectral + @asyncapi/parser behind POST /check (internal network only)",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/server.js",
+    "lint": "eslint .",
+    "knip": "knip",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@asyncapi/parser": "^3.6.3",
+    "@stoplight/spectral-core": "^1.23.1",
+    "@stoplight/spectral-parsers": "^1.0.5",
+    "@stoplight/spectral-ref-resolver": "^1.0.5",
+    "@stoplight/spectral-rulesets": "^1.22.7",
+    "@stoplight/types": "^13.12.0",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.13.3",
+    "@vitest/coverage-v8": "^4.1.10",
+    "eslint": "^10.8.0",
+    "eslint-plugin-sonarjs": "^4.2.0",
+    "globals": "^17.8.0",
+    "knip": "^6.32.2",
+    "tsx": "^4.23.13",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^4.1.10"
+  }
+}

@@ -1,0 +1,171 @@
+openapi: 3.1.0
+info:
+  title: covenant-checker
+  version: 1.0.0
+  description: |
+    The contract lint/semantic sidecar's contract. Internal: reachable only by the Covenant
+    server over the compose/k8s internal network; optionally fenced by a shared token header.
+    Findings use the vocabulary the server stores verbatim (`contracts/checks/Finding.kt`).
+servers:
+  - url: http://checker:9090
+    description: The compose-internal address
+security:
+  - checkerToken: []
+paths:
+  /healthz:
+    get:
+      operationId: healthz
+      summary: Liveness/readiness probe
+      security: []
+      responses:
+        '200':
+          description: The service is up; lists the engine versions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, engines]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                  engines:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EngineVersion'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /check:
+    post:
+      operationId: check
+      summary: Lint and semantically validate one contract document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckRequest'
+      responses:
+        '200':
+          description: The findings (sorted by severity, line, code; capped at 500) and the engines that produced them.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '504':
+          $ref: '#/components/responses/GatewayTimeout'
+components:
+  securitySchemes:
+    checkerToken:
+      type: apiKey
+      in: header
+      name: X-Checker-Token
+      description: Optional shared secret (CHECKER_TOKEN); skipped when the checker runs without one.
+  schemas:
+    CheckRequest:
+      type: object
+      required: [type, content]
+      properties:
+        type:
+          type: string
+          enum: [OPENAPI, ASYNCAPI, ODCS]
+        content:
+          type: string
+          description: The raw document text (YAML or JSON), at most CHECKER_MAX_BYTES.
+        previousContent:
+          type: string
+          description: Reserved for breaking-change detection (milestone 2).
+    CheckResponse:
+      type: object
+      required: [findings, engine]
+      properties:
+        findings:
+          type: array
+          items:
+            $ref: '#/components/schemas/Finding'
+        engine:
+          type: array
+          items:
+            $ref: '#/components/schemas/EngineVersion'
+    Finding:
+      type: object
+      required: [severity, source, code, message]
+      properties:
+        severity:
+          type: string
+          enum: [ERROR, WARN, INFO]
+        source:
+          type: string
+          enum: [SYNTAX, SCHEMA, SEMANTIC, LINT, BREAKING, SYSTEM]
+        code:
+          type: string
+        message:
+          type: string
+        path:
+          type: string
+          description: A JSON pointer into the document.
+        line:
+          type: integer
+          minimum: 1
+        column:
+          type: integer
+          minimum: 1
+    EngineVersion:
+      type: object
+      required: [name, version]
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+    ProblemDetail:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+  responses:
+    BadRequest:
+      description: Malformed request body or unknown contract type.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    Unauthorized:
+      description: Missing or wrong X-Checker-Token.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    PayloadTooLarge:
+      description: The body exceeds CHECKER_MAX_BYTES.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    GatewayTimeout:
+      description: The engines exceeded CHECKER_TIMEOUT_MS.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    InternalServerError:
+      description: An engine crashed; the server treats it as CHECKER_UNAVAILABLE.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'

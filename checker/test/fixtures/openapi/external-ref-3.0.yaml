@@ -1,0 +1,15 @@
+openapi: 3.0.3
+info:
+  title: Leaky
+  version: 1.0.0
+paths:
+  /things:
+    get:
+      operationId: listThings
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "https://example.com/schemas/thing.json"

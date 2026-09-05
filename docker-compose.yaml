@@ -1,0 +1,99 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: covenant-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: covenant
+      POSTGRES_USER: covenant
+      POSTGRES_PASSWORD: covenant
+    ports:
+      # Host port 5434 (not 5432/5433) so Covenant can run beside Lettuce and Toadie on the
+      # same machine; in-network consumers still use postgres:5432. Loopback-bound: the demo
+      # database is never reachable from the LAN.
+      - "127.0.0.1:5434:5432"
+    volumes:
+      # postgres 18+ images keep data in a versioned subdir of /var/lib/postgresql;
+      # mounting the pre-18 /var/lib/postgresql/data path makes the container unhealthy.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U covenant -d covenant"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mailpit:
+    # Local mail catcher for the demo: password-reset and MFA email lands here.
+    # Read it at http://localhost:8027 (8025 is Lettuce's, 8026 Toadie's).
+    image: axllent/mailpit:v1.30
+    container_name: covenant-mailpit
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8027:8025"
+
+  checker:
+    # The contract lint/semantic sidecar (checker/): Spectral + @asyncapi/parser behind one
+    # POST /check. It sits on the INTERNAL network only — no host port, no route out — so a
+    # $ref in a user document can never make it fetch anything (see .claude/docs/checker.md).
+    build:
+      context: .
+      dockerfile: checker/Dockerfile
+    container_name: covenant-checker
+    restart: unless-stopped
+    networks: [checker-net]
+    read_only: true
+    environment:
+      CHECKER_TOKEN: "${CHECKER_TOKEN:-dev-only-checker-token}"
+    mem_limit: 256m
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: covenant-app
+    restart: unless-stopped
+    networks: [default, checker-net]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      checker:
+        condition: service_healthy
+    environment:
+      POSTGRES_JDBC_URL: jdbc:postgresql://postgres:5432/covenant
+      POSTGRES_R2DBC_URL: r2dbc:postgresql://postgres:5432/covenant
+      POSTGRES_USER: covenant
+      POSTGRES_PASSWORD: covenant
+      # This compose file is the LOCAL DEMO (clone & run over plain http://localhost:8082).
+      # Development mode keeps HSTS/HTTPS-redirect off and tolerates the demo credentials
+      # below. Any real deployment runs the image as shipped (KTOR_DEVELOPMENT=false), which
+      # fail-closes on this JWT key and on the seeded 'changeme' password.
+      KTOR_DEVELOPMENT: "true"
+      # Bundled-demo signing key so tokens can't be forged with the placeholder "secret".
+      # It is committed to the repo and therefore BURNED: production mode refuses to start
+      # with it. Set your own (e.g. `openssl rand -hex 32`) for any real deployment.
+      JWT_SECRET: "${JWT_SECRET:-dev-only-6923ce629cb95ce814e8e2464ca2c40124802f6b7738c1fced65ae115817faa8}"
+      # Real SMTP delivery into the bundled Mailpit (the image default is MAIL_TRANSPORT=disabled).
+      MAIL_TRANSPORT: smtp
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_STARTTLS: "false"
+      MAIL_FROM: covenant@localhost
+      MAIL_APP_URL: http://localhost:8082
+      # The checker sidecar above; the shared token is a second fence behind the network.
+      CHECKER_URL: http://checker:9090
+      CHECKER_TOKEN: "${CHECKER_TOKEN:-dev-only-checker-token}"
+    ports:
+      - "127.0.0.1:8082:8082"
+    # Ceiling for the tuned JVM (SerialGC + -Xmx256m + C1, baked into bin/server): ~270 MiB RSS
+    # under light load, so 512 MiB leaves comfortable headroom and bounds the container.
+    mem_limit: 512m
+
+networks:
+  default: {}
+  checker-net:
+    # No gateway: containers on this network alone cannot reach the internet — the checker's
+    # offline guarantee, layer two (layer one is its own $ref pre-scan).
+    internal: true
+
+volumes:
+  postgres-data:

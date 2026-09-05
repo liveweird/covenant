@@ -1,0 +1,20 @@
+asyncapi: 2.6.0
+info:
+  title: Streetlights
+  version: 1.0.0
+servers:
+  production:
+    url: broker.example.com:9092
+    protocol: kafka
+channels:
+  smartylighting/streetlights/1/0/event/lighting/measured:
+    publish:
+      operationId: receiveLightMeasurement
+      message:
+        name: lightMeasured
+        contentType: application/json
+        payload:
+          type: object
+          properties:
+            lumens:
+              type: integer
