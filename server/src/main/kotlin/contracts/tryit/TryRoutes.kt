@@ -130,6 +130,77 @@ fun Application.configureTryRoutes() {
                         ),
                     )
                 }
+                post<ContractsRoute.Id.Versions.Vid.Try.Kafka.Publish> { route ->
+                    val caller = call.caller()
+                    val contractId = route.parent.parent.parent.parent.parent.id
+                    // Writers only, BEFORE the body decodes: the one try that mutates a real system.
+                    contractService.authorizeWrite(caller, contractId)
+                    val request = call.receive<TryKafkaPublishRequest>()
+                    val vid = route.parent.parent.parent.vid
+                    val ctx = preamble.resolve(caller, contractId, vid, request.environmentId, ContractType.ASYNCAPI)
+                    val target = ctx.targets.kafka ?: throw BadRequestException("The environment has no Kafka cluster")
+                    val prepared = KafkaTry.prepare(ctx.root, request.channel, request.message)
+                    KafkaTry.validateHeaders(request.headers)
+                    val schemas = DocumentSchemas.of(ContractType.ASYNCAPI, ctx.root)
+                    val conformance = KafkaTry.assessPublish(ctx.root, schemas, prepared, request.payload)
+                    val trail = arrayOf(
+                        "byUserId" to caller.userId, "contractId" to contractId, "versionId" to ctx.version.id,
+                        "environmentId" to ctx.targets.id, "bootstrap" to target.bootstrapServers, "topic" to prepared.topic,
+                    )
+                    val published = try {
+                        KafkaTry.publish(target, prepared, request)
+                    } catch (e: BadGatewayException) {
+                        audit("contract.tried_kafka_publish", *trail, "outcome" to "failed")
+                        throw e
+                    }
+                    audit(
+                        "contract.tried_kafka_publish", *trail,
+                        "partition" to published.metadata.partition(), "offset" to published.metadata.offset(), "outcome" to "published",
+                    )
+                    call.respond(
+                        HttpStatusCode.OK,
+                        TryKafkaPublishResponse(
+                            topic = prepared.topic,
+                            partition = published.metadata.partition(),
+                            offset = published.metadata.offset(),
+                            timestamp = published.metadata.timestamp(),
+                            durationMs = published.durationMs,
+                            conformance = conformance,
+                        ),
+                    )
+                }
+                post<ContractsRoute.Id.Versions.Vid.Try.Kafka.Read> { route ->
+                    val caller = call.caller()
+                    val contractId = route.parent.parent.parent.parent.parent.id
+                    val request = call.receive<TryKafkaReadRequest>()
+                    val vid = route.parent.parent.parent.vid
+                    val ctx = preamble.resolve(caller, contractId, vid, request.environmentId, ContractType.ASYNCAPI)
+                    val target = ctx.targets.kafka ?: throw BadRequestException("The environment has no Kafka cluster")
+                    val prepared = KafkaTry.prepare(ctx.root, request.channel, request.message)
+                    val trail = arrayOf(
+                        "byUserId" to caller.userId, "contractId" to contractId, "versionId" to ctx.version.id,
+                        "environmentId" to ctx.targets.id, "bootstrap" to target.bootstrapServers, "topic" to prepared.topic,
+                    )
+                    val read = try {
+                        KafkaTry.read(target, prepared, request.limit)
+                    } catch (e: BadGatewayException) {
+                        audit("contract.tried_kafka_read", *trail, "outcome" to "failed")
+                        throw e
+                    }
+                    audit("contract.tried_kafka_read", *trail, "count" to read.records.size, "outcome" to "read")
+                    val views = read.records.map { KafkaTry.view(it) }
+                    val schemas = DocumentSchemas.of(ContractType.ASYNCAPI, ctx.root)
+                    call.respond(
+                        HttpStatusCode.OK,
+                        TryKafkaReadResponse(
+                            topic = prepared.topic,
+                            messages = views,
+                            reachedEnd = read.reachedEnd,
+                            durationMs = read.durationMs,
+                            conformance = KafkaTry.assessRead(ctx.root, schemas, prepared, views),
+                        ),
+                    )
+                }
                 post<ContractsRoute.Id.Versions.Vid.Try.Sql> { route ->
                     val caller = call.caller()
                     val contractId = route.parent.parent.parent.parent.id

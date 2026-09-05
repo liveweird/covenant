@@ -30,6 +30,10 @@ reactor-netty = "1.3.7"
 r2dbc-postgresql = "1.1.2.RELEASE"
 swagger-request-validator = "3.0.0"
 testcontainers = "2.0.5"
+# The try-it Kafka leg (contracts/tryit/KafkaTry.kt): the KRaft-era client — no Jackson, Netty or
+# OpenTelemetry on its transitive set (only slf4j + the zstd/lz4/snappy codecs, KEPT so a read of a
+# compressed topic decompresses); checkDependencyAlignment logs the runtime classpath after a bump.
+kafka-clients = "4.3.1"
 
 # Contract validation (2026-09-05). All three build against Jackson 2.22.1; the jackson-bom
 # platform pins the whole com.fasterxml.jackson family to it and checkDependencyAlignment guards
@@ -76,6 +80,8 @@ r2dbc-postgresql = { module = "org.postgresql:r2dbc-postgresql", version.ref = "
 reactor-netty-core = { module = "io.projectreactor.netty:reactor-netty-core", version.ref = "reactor-netty" }
 swagger-request-validator-core = { module = "com.atlassian.oai:openapi-request-validator-core", version.ref = "swagger-request-validator" }
 testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql", version.ref = "testcontainers" }
+testcontainers-kafka = { module = "org.testcontainers:testcontainers-kafka", version.ref = "testcontainers" }
+kafka-clients = { module = "org.apache.kafka:kafka-clients", version.ref = "kafka-clients" }
 
 [plugins]
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }

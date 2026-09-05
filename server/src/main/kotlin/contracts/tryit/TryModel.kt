@@ -157,3 +157,62 @@ data class TrySqlResponse(
     val durationMs: Long,
     val conformance: ConformanceReport,
 )
+
+/** `POST …/try/kafka/publish` (contract writers only): one record onto the channel's topic through the environment's cluster. */
+@Serializable
+data class TryKafkaPublishRequest(
+    val environmentId: UInt,
+    /** The channel as the catalog names it (the 3.x key, the 2.x address). */
+    val channel: String,
+    /** The message name to validate against — required when the channel declares several. */
+    val message: String? = null,
+    val key: String? = null,
+    val headers: Map<String, String> = emptyMap(),
+    /** The payload text — JSON for JSON-Schema and Avro payloads (Avro is validated, then sent as JSON bytes verbatim). */
+    val payload: String,
+)
+
+@Serializable
+data class TryKafkaPublishResponse(
+    val topic: String,
+    val partition: Int,
+    val offset: Long,
+    val timestamp: Long,
+    val durationMs: Long,
+    val conformance: ConformanceReport,
+)
+
+/** `POST …/try/kafka/read`: the newest records of the channel's topic — bounded, never committed. */
+@Serializable
+data class TryKafkaReadRequest(
+    val environmentId: UInt,
+    val channel: String,
+    val message: String? = null,
+    val limit: Int = KafkaTry.DEFAULT_READ_LIMIT,
+)
+
+@Serializable
+data class KafkaRecordView(
+    val partition: Int,
+    val offset: Long,
+    val timestamp: Long,
+    val key: String?,
+    val headers: Map<String, String>,
+    /** UTF-8 text, or base64 when the bytes are not valid UTF-8 (see [encoding]); cut at 64 KiB. */
+    val payload: String?,
+    /** `utf8` or `base64`. */
+    val encoding: String,
+    val truncated: Boolean,
+)
+
+@Serializable
+data class TryKafkaReadResponse(
+    val topic: String,
+    /** Newest first. */
+    val messages: List<KafkaRecordView>,
+    /** True when every partition was read up to its end offset at the time of the read. */
+    val reachedEnd: Boolean,
+    val durationMs: Long,
+    /** Per-record findings carry paths under `/messages/{i}/payload`. */
+    val conformance: ConformanceReport,
+)

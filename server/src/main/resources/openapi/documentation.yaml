@@ -1848,6 +1848,82 @@ paths:
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
         '502': { $ref: '#/components/responses/BadGateway' }
+  /api/v1/contracts/{id}/versions/{vid}/try/kafka/publish:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+      - $ref: '#/components/parameters/VersionId'
+    post:
+      tags: [try-it]
+      operationId: tryKafkaPublish
+      summary: Publish one record onto an AsyncAPI channel's topic through an environment
+      description: |
+        **Contract writers only** (the owning team's members, the owning user, ADMIN — checked
+        before the body decodes): the one try that mutates a real system with the environment's
+        stored principal. The topic is the channel's address (a templated address is refused);
+        the message named — or the channel's only one — gives the payload schema. The payload
+        (≤ 256 KiB, `413` beyond) is measured BEFORE sending and sent regardless (a JSON-Schema
+        payload as-is; an Avro payload validated through Avro's JSON decoder and sent as its JSON
+        encoding, with a `PAYLOAD_SENT_AS_JSON` note). Idempotent producer, `acks=all`, 10 s
+        delivery timeout. The client configuration is composed server-side from the environment's
+        enumerated fields — no request ever carries Kafka client properties. Cluster failures are
+        classified `502`s. Rate-limited per client host (`429`). Audited as
+        `contract.tried_kafka_publish` (bootstrap, topic, partition, offset).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TryKafkaPublishRequest'
+      responses:
+        '200':
+          description: Where the record landed and its conformance report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TryKafkaPublishResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+  /api/v1/contracts/{id}/versions/{vid}/try/kafka/read:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+      - $ref: '#/components/parameters/VersionId'
+    post:
+      tags: [try-it]
+      operationId: tryKafkaRead
+      summary: Read the newest records of an AsyncAPI channel's topic through an environment
+      description: |
+        Any authenticated user. A bounded tail read (`limit` 1–50, newest first) over every
+        partition of the channel's topic, with NO consumer group — nothing is committed and the
+        cluster keeps no trace of the read; topics are never auto-created (an unknown topic is a
+        `502`). Payloads come back as UTF-8 text (or base64 when not valid UTF-8), cut at 64 KiB;
+        each is measured against the message's payload schema (paths `/messages/{i}/payload`).
+        Rate-limited per client host (`429`). Audited as `contract.tried_kafka_read` (bootstrap,
+        topic, count).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TryKafkaReadRequest'
+      responses:
+        '200':
+          description: The records and their conformance report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TryKafkaReadResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '502': { $ref: '#/components/responses/BadGateway' }
 components:
   securitySchemes:
     bearerAuth:
@@ -2775,6 +2851,58 @@ components:
             type: array
             items: { type: string, nullable: true }
         truncated: { type: boolean, description: "The sample hit the 1 MiB cap before the LIMIT." }
+        durationMs: { type: integer, format: int64 }
+        conformance: { $ref: '#/components/schemas/ConformanceReport' }
+    TryKafkaPublishRequest:
+      type: object
+      required: [environmentId, channel, payload]
+      properties:
+        environmentId: { type: integer, format: int32, minimum: 0 }
+        channel: { type: string, description: "The channel as the catalog names it (the 3.x key, the 2.x address)." }
+        message: { type: string, nullable: true, description: "The message name — required when the channel declares several." }
+        key: { type: string, nullable: true }
+        headers: { $ref: '#/components/schemas/StringMap' }
+        payload: { type: string, maxLength: 262144 }
+    TryKafkaPublishResponse:
+      type: object
+      required: [topic, partition, offset, timestamp, durationMs, conformance]
+      properties:
+        topic: { type: string }
+        partition: { type: integer, format: int32 }
+        offset: { type: integer, format: int64 }
+        timestamp: { type: integer, format: int64 }
+        durationMs: { type: integer, format: int64 }
+        conformance: { $ref: '#/components/schemas/ConformanceReport' }
+    TryKafkaReadRequest:
+      type: object
+      required: [environmentId, channel]
+      properties:
+        environmentId: { type: integer, format: int32, minimum: 0 }
+        channel: { type: string }
+        message: { type: string, nullable: true }
+        limit: { type: integer, format: int32, minimum: 1, maximum: 50, default: 10 }
+    KafkaRecordView:
+      type: object
+      required: [partition, offset, timestamp, headers, encoding, truncated]
+      properties:
+        partition: { type: integer, format: int32 }
+        offset: { type: integer, format: int64 }
+        timestamp: { type: integer, format: int64 }
+        key: { type: string, nullable: true }
+        headers: { $ref: '#/components/schemas/StringMap' }
+        payload: { type: string, nullable: true, description: "UTF-8 text, or base64 (see encoding); cut at 64 KiB." }
+        encoding: { type: string, enum: [utf8, base64] }
+        truncated: { type: boolean }
+    TryKafkaReadResponse:
+      type: object
+      required: [topic, messages, reachedEnd, durationMs, conformance]
+      properties:
+        topic: { type: string }
+        messages:
+          type: array
+          description: Newest first.
+          items: { $ref: '#/components/schemas/KafkaRecordView' }
+        reachedEnd: { type: boolean }
         durationMs: { type: integer, format: int64 }
         conformance: { $ref: '#/components/schemas/ConformanceReport' }
     ConformanceReport:

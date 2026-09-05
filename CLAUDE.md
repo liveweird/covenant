@@ -127,8 +127,10 @@ ch.nokillswit
 │                       TryModel.kt (the catalog + report DTOs), TryCatalog.kt (what a document offers to
 │                       try, pure over the tree), Conformance.kt (DocumentSchemas — the in-document offline
 │                       networknt registry with the OpenAPI dialects — HttpConformance, PayloadConformance),
-│                       OdcsTypes.kt (logicalType ↔ PostgreSQL type families), TryRoutes.kt
-│                       (GET …/{vid}/try; the try POSTs land leg by leg)
+│                       OdcsTypes.kt (logicalType ↔ PostgreSQL type families), HttpTry.kt / SqlTry.kt /
+│                       KafkaTry.kt + KafkaClients.kt (the three legs — the server calls the environment,
+│                       never the SPA), TryRoutes.kt (GET …/{vid}/try + the four try POSTs behind the
+│                       shared TryPreamble and the tryIt RateLimit bucket)
 ├── notifications/      in-app notifications (V14, Lettuce's, ported minus flags/email): Notification.kt (the
 │                       NotificationType whitelist + DTOs), NotificationService.kt (createAll/read/seen/unseen/
 │                       seenAll/soft delete/paged list on ONE predicate), NotificationRoutes.kt — /api/v1/notifications,

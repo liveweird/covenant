@@ -1272,6 +1272,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contracts/{id}/versions/{vid}/try/kafka/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish one record onto an AsyncAPI channel's topic through an environment
+         * @description **Contract writers only** (the owning team's members, the owning user, ADMIN — checked
+         *     before the body decodes): the one try that mutates a real system with the environment's
+         *     stored principal. The topic is the channel's address (a templated address is refused);
+         *     the message named — or the channel's only one — gives the payload schema. The payload
+         *     (≤ 256 KiB, `413` beyond) is measured BEFORE sending and sent regardless (a JSON-Schema
+         *     payload as-is; an Avro payload validated through Avro's JSON decoder and sent as its JSON
+         *     encoding, with a `PAYLOAD_SENT_AS_JSON` note). Idempotent producer, `acks=all`, 10 s
+         *     delivery timeout. The client configuration is composed server-side from the environment's
+         *     enumerated fields — no request ever carries Kafka client properties. Cluster failures are
+         *     classified `502`s. Rate-limited per client host (`429`). Audited as
+         *     `contract.tried_kafka_publish` (bootstrap, topic, partition, offset).
+         */
+        post: operations["tryKafkaPublish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/{id}/versions/{vid}/try/kafka/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read the newest records of an AsyncAPI channel's topic through an environment
+         * @description Any authenticated user. A bounded tail read (`limit` 1–50, newest first) over every
+         *     partition of the channel's topic, with NO consumer group — nothing is committed and the
+         *     cluster keeps no trace of the read; topics are never auto-created (an unknown topic is a
+         *     `502`). Payloads come back as UTF-8 text (or base64 when not valid UTF-8), cut at 64 KiB;
+         *     each is measured against the message's payload schema (paths `/messages/{i}/payload`).
+         *     Rate-limited per client host (`429`). Audited as `contract.tried_kafka_read` (bootstrap,
+         *     topic, count).
+         */
+        post: operations["tryKafkaRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1901,6 +1963,64 @@ export interface components {
             rows: (string | null)[][];
             /** @description The sample hit the 1 MiB cap before the LIMIT. */
             truncated: boolean;
+            /** Format: int64 */
+            durationMs: number;
+            conformance: components["schemas"]["ConformanceReport"];
+        };
+        TryKafkaPublishRequest: {
+            /** Format: int32 */
+            environmentId: number;
+            /** @description The channel as the catalog names it (the 3.x key, the 2.x address). */
+            channel: string;
+            /** @description The message name — required when the channel declares several. */
+            message?: string | null;
+            key?: string | null;
+            headers?: components["schemas"]["StringMap"];
+            payload: string;
+        };
+        TryKafkaPublishResponse: {
+            topic: string;
+            /** Format: int32 */
+            partition: number;
+            /** Format: int64 */
+            offset: number;
+            /** Format: int64 */
+            timestamp: number;
+            /** Format: int64 */
+            durationMs: number;
+            conformance: components["schemas"]["ConformanceReport"];
+        };
+        TryKafkaReadRequest: {
+            /** Format: int32 */
+            environmentId: number;
+            channel: string;
+            message?: string | null;
+            /**
+             * Format: int32
+             * @default 10
+             */
+            limit: number;
+        };
+        KafkaRecordView: {
+            /** Format: int32 */
+            partition: number;
+            /** Format: int64 */
+            offset: number;
+            /** Format: int64 */
+            timestamp: number;
+            key?: string | null;
+            headers: components["schemas"]["StringMap"];
+            /** @description UTF-8 text, or base64 (see encoding); cut at 64 KiB. */
+            payload?: string | null;
+            /** @enum {string} */
+            encoding: "utf8" | "base64";
+            truncated: boolean;
+        };
+        TryKafkaReadResponse: {
+            topic: string;
+            /** @description Newest first. */
+            messages: components["schemas"]["KafkaRecordView"][];
+            reachedEnd: boolean;
             /** Format: int64 */
             durationMs: number;
             conformance: components["schemas"]["ConformanceReport"];
@@ -4428,6 +4548,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TrySqlResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            502: components["responses"]["BadGateway"];
+        };
+    };
+    tryKafkaPublish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TryKafkaPublishRequest"];
+            };
+        };
+        responses: {
+            /** @description Where the record landed and its conformance report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TryKafkaPublishResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            413: components["responses"]["PayloadTooLarge"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            502: components["responses"]["BadGateway"];
+        };
+    };
+    tryKafkaRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TryKafkaReadRequest"];
+            };
+        };
+        responses: {
+            /** @description The records and their conformance report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TryKafkaReadResponse"];
                 };
             };
             400: components["responses"]["BadRequest"];

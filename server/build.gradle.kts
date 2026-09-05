@@ -127,6 +127,8 @@ dependencies {
         exclude(group = "com.github.luben")
         exclude(group = "org.apache.commons", module = "commons-compress")
     }
+    // The try-it Kafka leg (contracts/tryit/KafkaTry.kt) — see the `kafka-clients` catalog note.
+    implementation(libs.kafka.clients)
     // Server -> checker sidecar HTTP client (contracts/checks/CheckerClient.kt): the JDK engine
     // avoids a second Netty consumer on the runtime classpath.
     implementation(ktorLibs.client.core)
@@ -137,6 +139,7 @@ dependencies {
     testImplementation(ktorLibs.server.testHost)
     testImplementation(libs.swagger.request.validator.core)
     testImplementation(libs.testcontainers.postgresql)
+    testImplementation(libs.testcontainers.kafka)
 }
 
 // Every test-client interaction with /api/ is validated against the OpenAPI spec (see
