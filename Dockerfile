@@ -49,5 +49,14 @@ ENV KTOR_DEVELOPMENT=false
 # No outbound email unless the deployment opts in: a real deployment sets
 # MAIL_TRANSPORT=smtp with real SMTP_* settings (production mode refuses `log`).
 ENV MAIL_TRANSPORT=disabled
+# Run as an unprivileged fixed uid (the checker image does the same as `node`); the k8s pod pins
+# runAsUser to this id, and nothing under /app is written at runtime (logs go to stdout).
+RUN groupadd --system --gid 10001 covenant \
+    && useradd --system --uid 10001 --gid covenant --home-dir /app --shell /usr/sbin/nologin covenant \
+    && chown -R covenant:covenant /app
+USER 10001
 EXPOSE 8082
+# /api/v1/health is the liveness probe (process up); /api/v1/ready adds the database round trip.
+HEALTHCHECK --interval=15s --timeout=3s --start-period=45s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:8082/api/v1/health >/dev/null || exit 1
 ENTRYPOINT ["/app/bin/server"]

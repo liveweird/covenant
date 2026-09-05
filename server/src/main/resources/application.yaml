@@ -26,6 +26,9 @@ ktor:
       - ch.nokillswit.contracts.checks.ChecksKt.configureChecks
       - ch.nokillswit.infra.db.DatabaseKt.configureDatabase
       - ch.nokillswit.infra.db.BootstrapKt.configureBootstrap
+      # Public liveness/readiness probes (/api/v1/health, /api/v1/ready); after Database (the probe
+      # round-trips it).
+      - ch.nokillswit.plugins.HealthKt.configureHealth
       # — features
       - ch.nokillswit.users.UserRoutesKt.configureUserRoutes
       - ch.nokillswit.teams.TeamRoutesKt.configureTeamRoutes
@@ -64,6 +67,11 @@ security:
     # Per-IP bucket shared by the try-it POSTs (the server calling an environment on user command).
     # Blank keeps the default 60/min in both modes; a number pins it.
     tryPerMinute: "$TRY_RATE_LIMIT_PER_MINUTE:"
+  # Not configurable, stated for the operator: the JWT blocklist (auth/TokenBlocklistService.kt)
+  # serves revocation verdicts through a 30-second in-memory cache per instance. A logout revokes
+  # on the instance that handled it immediately; on a SECOND instance the token would keep working
+  # for up to 30 s — the deployment is single-replica (k8s/app-deployment.yaml), like the throttles
+  # above assume; scale out only after moving these to a shared store.
   # Self-service password reset: at most one request per submitted email per interval,
   # uniformly whether or not the account exists. In-memory, per-instance, like the lockout.
   passwordReset:

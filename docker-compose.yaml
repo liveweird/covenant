@@ -21,6 +21,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    # Bounded like the app and the checker; the demo's data volume is tiny.
+    mem_limit: 512m
 
   mailpit:
     # Local mail catcher for the demo: password-reset and MFA email lands here.
@@ -30,6 +32,7 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:8027:8025"
+    mem_limit: 128m
 
   checker:
     # The contract lint/semantic sidecar (checker/): Spectral + @asyncapi/parser behind one
@@ -87,6 +90,14 @@ services:
       CHECKER_TOKEN: "${CHECKER_TOKEN:-dev-only-checker-token}"
     ports:
       - "127.0.0.1:8082:8082"
+    # Mirrors the image's HEALTHCHECK (stated here so `depends_on: service_healthy` and the e2e
+    # global setup can wait on the app the way the app waits on postgres and the checker).
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8082/api/v1/health >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
     # Ceiling for the tuned JVM (SerialGC + -Xmx256m + C1, baked into bin/server): ~270 MiB RSS
     # under light load, so 512 MiB leaves comfortable headroom and bounds the container.
     mem_limit: 512m

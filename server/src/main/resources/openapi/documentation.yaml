@@ -24,6 +24,7 @@ security:
   - bearerAuth: []
 
 tags:
+  - name: health
   - name: auth
   - name: users
   - name: teams
@@ -36,6 +37,45 @@ tags:
   - name: notifications
 
 paths:
+  /api/v1/health:
+    get:
+      tags: [health]
+      operationId: health
+      summary: Liveness probe
+      description: |
+        Public and unauthenticated (the container HEALTHCHECK and the k8s liveness probe call it):
+        `200` proves the process answers requests. It touches nothing — use `/api/v1/ready` for the
+        database round trip.
+      security: []
+      responses:
+        '200':
+          description: The process is up
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthResponse' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/ready:
+    get:
+      tags: [health]
+      operationId: ready
+      summary: Readiness probe
+      description: |
+        Public and unauthenticated (the k8s readiness probe and the e2e global setup call it): `200`
+        once a database round trip succeeds within a short budget, `503` while it does not — the pod
+        leaves the Service until the database is back.
+      security: []
+      responses:
+        '200':
+          description: The app and its database answer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthResponse' }
+        '503':
+          description: The database did not answer within the probe's budget
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
   /api/v1/login:
     post:
       tags: [auth]
@@ -2104,6 +2144,14 @@ components:
           schema: { $ref: '#/components/schemas/ProblemDetail' }
 
   schemas:
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          description: Always `ok` on a 200 — a failed probe is a problem body, never a status word.
+          example: ok
     PasswordResetRequest:
       type: object
       required: [email]

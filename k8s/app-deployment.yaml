@@ -15,6 +15,14 @@ spec:
       labels:
         io.kompose.service: app
     spec:
+      # The same hardening as the checker pod: the image runs as uid 10001 (Dockerfile), the root
+      # filesystem is read-only (the JVM only needs a writable /tmp), no privilege escalation.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - env:
             # Secrets come from the `covenant-secrets` Secret — see k8s/secret.yaml for how to
@@ -116,19 +124,30 @@ spec:
               memory: "320Mi"
             limits:
               memory: "512Mi"
-          # The image sets WEB_STATIC_DIR, so / serves the SPA. Initial delays
-          # cover JVM boot + Flyway; until postgres is ready the app restarts,
-          # which the rollout absorbs.
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          # /api/v1/ready round-trips the database (SELECT 1) — the pod leaves the Service while
+          # postgres is unreachable; /api/v1/health only proves the process answers. Initial delays
+          # cover JVM boot + Flyway; until postgres is ready the app restarts, which the rollout absorbs.
           readinessProbe:
             httpGet:
-              path: /
+              path: /api/v1/ready
               port: 8082
             initialDelaySeconds: 15
             periodSeconds: 5
           livenessProbe:
             httpGet:
-              path: /
+              path: /api/v1/health
               port: 8082
             initialDelaySeconds: 30
             periodSeconds: 10
+      volumes:
+        - name: tmp
+          emptyDir: {}
       restartPolicy: Always

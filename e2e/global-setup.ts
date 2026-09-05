@@ -10,9 +10,9 @@ export const STARTED_MARKER = resolve(here, ".playwright", "stack-started");
 
 async function responds(url: string): Promise<boolean> {
   try {
-    const res = await fetch(url, { redirect: "manual" });
-    // Any HTTP response (the SPA index or a redirect) means the server is accepting connections.
-    return res.status > 0;
+    // The readiness probe: 200 only once the app answers AND its database round trip works.
+    const res = await fetch(`${url}/api/v1/ready`, { redirect: "manual" });
+    return res.ok;
   } catch {
     return false;
   }

@@ -10,4 +10,5 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 100Mi
+      # Postgres 18's fresh cluster alone is ~40 MiB; contracts are capped at 2 MiB each.
+      storage: 1Gi

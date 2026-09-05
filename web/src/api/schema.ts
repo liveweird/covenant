@@ -4,6 +4,50 @@
  */
 
 export interface paths {
+    "/api/v1/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Liveness probe
+         * @description Public and unauthenticated (the container HEALTHCHECK and the k8s liveness probe call it):
+         *     `200` proves the process answers requests. It touches nothing — use `/api/v1/ready` for the
+         *     database round trip.
+         */
+        get: operations["health"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Readiness probe
+         * @description Public and unauthenticated (the k8s readiness probe and the e2e global setup call it): `200`
+         *     once a database round trip succeeds within a short budget, `503` while it does not — the pod
+         *     leaves the Service until the database is back.
+         */
+        get: operations["ready"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/login": {
         parameters: {
             query?: never;
@@ -348,7 +392,7 @@ export interface paths {
         /**
          * Delete a team (soft)
          * @description ADMIN only, guard before the id lookup. Soft delete — the name is freed for reuse. A team
-         *     that still owns an active contract answers `409` (the rule lands with the contracts feature).
+         *     that still owns an active contract answers `409` — transfer the contracts first.
          */
         delete: operations["deleteTeam"];
         options?: never;
@@ -491,7 +535,7 @@ export interface paths {
         post?: never;
         /**
          * Delete a system (soft)
-         * @description ADMIN only, guard before the id lookup. Refused with `409` while the system still holds an active contract (the rule lands with the contracts feature).
+         * @description ADMIN only, guard before the id lookup. Refused with `409` while the system still holds an active contract — move or delete them first (the domains → systems rule, one level down).
          */
         delete: operations["deleteSystem"];
         options?: never;
@@ -1366,6 +1410,13 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        HealthResponse: {
+            /**
+             * @description Always `ok` on a 200 — a failed probe is a problem body, never a status word.
+             * @example ok
+             */
+            status: string;
+        };
         PasswordResetRequest: {
             /** Format: email */
             email: string;
@@ -2803,6 +2854,57 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    health: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The process is up */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    ready: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The app and its database answer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+            500: components["responses"]["InternalServerError"];
+            /** @description The database did not answer within the probe's budget */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
     login: {
         parameters: {
             query?: never;

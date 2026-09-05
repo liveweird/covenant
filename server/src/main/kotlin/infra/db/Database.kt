@@ -18,6 +18,7 @@ import ch.nokillswit.teams.TeamServiceKey
 import ch.nokillswit.users.UserService
 import ch.nokillswit.users.UserServiceKey
 import io.ktor.server.application.*
+import io.ktor.util.AttributeKey
 import org.jetbrains.exposed.v1.r2dbc.R2dbcDatabase
 import ch.nokillswit.notifications.NotificationServiceKey
 import ch.nokillswit.notifications.NotificationService
@@ -28,6 +29,9 @@ import ch.nokillswit.contracts.ContractActivity
 import ch.nokillswit.infra.crypto.FieldCipherKey
 import ch.nokillswit.environments.EnvironmentServiceKey
 import ch.nokillswit.environments.EnvironmentService
+
+/** The connected database itself — read by the readiness probe (plugins/Health.kt); services get it injected. */
+val R2dbcDatabaseKey = AttributeKey<R2dbcDatabase>("R2dbcDatabase")
 
 /**
  * The DI composition root: connects the one R2DBC database and publishes every service into
@@ -41,6 +45,7 @@ suspend fun Application.configureDatabase() {
         password = environment.config.property("postgres.password").getString(),
     )
     val userService = UserService(database)
+    attributes.put(R2dbcDatabaseKey, database)
     attributes.put(UserServiceKey, userService)
     val teamService = TeamService(database)
     attributes.put(TeamServiceKey, teamService)
