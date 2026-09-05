@@ -44,7 +44,10 @@ describe("EditContract page", () => {
     await user.click(screen.getByLabelText("Owner", { selector: "input" }));
     await user.click(await screen.findByRole("option", { name: "Admin User (admin@covenant.local)" }));
     await user.click(screen.getByRole("button", { name: /^save$/i }));
-    await waitFor(() => expect(findCall(mockFetch, "PUT", "/api/v1/contracts/5/owner")).toBeDefined());
+    // The save PUTs the record, then the owner transfer, then navigates — two round trips through the
+    // fetch mock. On a cold CI runner they overran waitFor's default second (a flaky failure at the
+    // 0.5.1 release); the bound stays finite, just wider than the runner is slow.
+    await waitFor(() => expect(findCall(mockFetch, "PUT", "/api/v1/contracts/5/owner")).toBeDefined(), { timeout: 5_000 });
     expect(bodyOf(findCall(mockFetch, "PUT", "/api/v1/contracts/5"))).toEqual({ name: "orders-api-v2", description: "Orders" });
     expect(bodyOf(findCall(mockFetch, "PUT", "/api/v1/contracts/5/owner"))).toEqual({ ownerTeamId: null, ownerUserId: 1 });
     expect(await screen.findByRole("heading", { level: 2, name: "Contract page" })).toBeInTheDocument();
