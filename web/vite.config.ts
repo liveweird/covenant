@@ -69,13 +69,13 @@ export default defineConfig({
         '**/*.d.ts',
       ],
       // Floors set just below current measured coverage so they gate regressions without
-      // blocking unrelated work. Raise as coverage improves, never lower (re-measure with
-      // `npm run test:coverage` after the scaffold prune).
+      // blocking unrelated work. Raise as coverage improves, never lower.
+      // (2026-09-05 scaffold measure: actuals lines 96.49 / statements 93.41 / functions 89.7 / branches 88.43)
       thresholds: {
-        lines: 90,
-        statements: 88,
-        functions: 85,
-        branches: 80,
+        lines: 95,
+        statements: 92,
+        functions: 88,
+        branches: 86,
       },
     },
   },

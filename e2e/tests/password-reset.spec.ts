@@ -1,12 +1,12 @@
 import { createUserViaUi, deleteUserRow, expect, login, signOut, test, uniqueText } from "./helpers";
 
 // Self-service password reset: the "Forgot password?" flow on the login screen.
-// The full email roundtrip needs the compose stack's Mailpit catcher (http://localhost:8026 —
+// The full email roundtrip needs the compose stack's Mailpit catcher (http://localhost:8027 —
 // 8025 is Lettuce's); when it is unreachable (e.g. a dev stack on the log transport) that one
 // test skips itself. The dev stack lifts the per-IP reset bucket (100/min, the login-bucket
 // idiom), so back-to-back runs never trip it; the per-email throttle is exercised explicitly.
 
-const MAILPIT = "http://localhost:8026";
+const MAILPIT = "http://localhost:8027";
 
 function uniqueEmail(prefix: string): string {
   return `${uniqueText(prefix).toLowerCase().replace(/[^a-z0-9-]/g, "-")}@covenant.local`;

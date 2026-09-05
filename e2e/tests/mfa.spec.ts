@@ -10,11 +10,11 @@ import {
 } from "./helpers";
 
 // Email MFA (opt-in via the per-user MFA feature flag) + the feature-flags admin surfaces.
-// The full sign-in roundtrip needs the compose stack's Mailpit catcher (http://localhost:8026);
+// The full sign-in roundtrip needs the compose stack's Mailpit catcher (http://localhost:8027);
 // that test skips itself when Mailpit is unreachable. NEVER touch the seed admin's MFA flag —
 // enabling it would make every other spec's login demand a code.
 
-const MAILPIT = "http://localhost:8026";
+const MAILPIT = "http://localhost:8027";
 
 test("admin toggles a user's MFA on the feature-flags screen and the per-user editor", async ({
   page,

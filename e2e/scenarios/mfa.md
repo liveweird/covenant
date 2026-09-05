@@ -23,7 +23,7 @@
 
 ## Scenario: an MFA-enabled account signs in with the emailed code
 
-*Skips itself when Mailpit (`http://localhost:8026`) is unreachable.*
+*Skips itself when Mailpit (`http://localhost:8027`) is unreachable.*
 
 1. The admin creates a throwaway user, enables their MFA in the per-user editor, and signs
    out.
