@@ -1,0 +1,22 @@
+# The k8s twin of the compose `checker-net` (internal: true): only the app may talk to the
+# checker, and the checker may talk to nobody — a `$ref` in a user document can never make it
+# fetch anything, whatever the parser libraries would do on their own (.claude/docs/checker.md).
+# Requires a CNI that enforces NetworkPolicy (OrbStack's does).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: checker-isolation
+  namespace: covenant
+spec:
+  podSelector:
+    matchLabels:
+      io.kompose.service: checker
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              io.kompose.service: app
+      ports:
+        - port: 9090
+  egress: []

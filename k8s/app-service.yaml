@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    io.kompose.service: app
+  name: app
+  namespace: covenant
+spec:
+  # OrbStack provisions local LoadBalancers; `kubectl -n covenant port-forward svc/app` is
+  # the fallback. Port 8082 (not 8080/8081) so Covenant's LB can coexist with Lettuce's and Toadie's.
+  type: LoadBalancer
+  ports:
+    - name: "8082"
+      port: 8082
+      targetPort: 8082
+  selector:
+    io.kompose.service: app

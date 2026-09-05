@@ -1,0 +1,129 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    io.kompose.service: app
+  name: app
+  namespace: covenant
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: app
+  template:
+    metadata:
+      labels:
+        io.kompose.service: app
+    spec:
+      containers:
+        - env:
+            # Secrets come from the `covenant-secrets` Secret — see k8s/secret.yaml for how to
+            # create it (never commit real values). The app fail-closes on placeholder/burned
+            # JWT secrets and on unrotated seed passwords, so a misconfigured deploy crash-loops
+            # instead of running with a backdoor.
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: covenant-secrets
+                  key: JWT_SECRET
+            - name: ADMIN_INITIAL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: covenant-secrets
+                  key: ADMIN_INITIAL_PASSWORD
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: covenant-secrets
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: covenant-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_JDBC_URL
+              value: jdbc:postgresql://postgres:5432/covenant
+            - name: POSTGRES_R2DBC_URL
+              value: r2dbc:postgresql://postgres:5432/covenant
+            # The checker sidecar (k8s/checker-*.yaml): lint/semantic findings ride the JVM's
+            # own syntax/schema verdicts; unreachable = a CHECKER_UNAVAILABLE finding, never a
+            # failed request. The shared token is the second fence behind the NetworkPolicy.
+            - name: CHECKER_URL
+              value: http://checker:9090
+            - name: CHECKER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: covenant-secrets
+                  key: CHECKER_TOKEN
+                  optional: true
+            # Production posture (the image default). For throwaway local-cluster testing over
+            # plain HTTP (no TLS ingress), set this to "true" — HTTPS redirect / HSTS turn off
+            # and the seed credentials are tolerated, exactly like the compose demo.
+            - name: KTOR_DEVELOPMENT
+              value: "false"
+            # The app sits behind an ingress / LB that must terminate TLS and set
+            # X-Forwarded-For + X-Forwarded-Proto (and strip client-supplied values), so rate
+            # limiting keys on the real client IP and the HTTPS redirect sees the real scheme.
+            - name: HTTP_BEHIND_PROXY
+              value: "true"
+            # Outbound email (no consumer feature yet — password reset / MFA arrive with
+            # their Lettuce ports). Ships disabled — set "smtp" plus real SMTP_HOST/
+            # MAIL_FROM/MAIL_APP_URL to enable (production refuses the `log` transport).
+            # SMTP credentials come from the Secret.
+            - name: MAIL_TRANSPORT
+              value: "disabled"
+            - name: SMTP_HOST
+              value: ""
+            - name: SMTP_PORT
+              value: "587"
+            - name: SMTP_STARTTLS
+              value: "true"
+            - name: MAIL_FROM
+              value: "covenant@localhost"
+            - name: MAIL_APP_URL
+              value: ""
+            - name: SMTP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: covenant-secrets
+                  key: SMTP_USER
+                  optional: true
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: covenant-secrets
+                  key: SMTP_PASSWORD
+                  optional: true
+          # Built locally with `docker build -t covenant-app:latest .`; OrbStack's
+          # Kubernetes shares the Docker image store, so IfNotPresent uses it
+          # directly (`:latest` would otherwise default to Always → registry pull).
+          image: covenant-app:latest
+          imagePullPolicy: IfNotPresent
+          name: covenant-app
+          ports:
+            - containerPort: 8082
+              protocol: TCP
+          # Sized for the tuned JVM baked into the image (SerialGC + -Xmx256m + C1): ~270 MiB RSS
+          # under light load. Request covers steady state; the 512 MiB limit bounds it with headroom.
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "320Mi"
+            limits:
+              memory: "512Mi"
+          # The image sets WEB_STATIC_DIR, so / serves the SPA. Initial delays
+          # cover JVM boot + Flyway; until postgres is ready the app restarts,
+          # which the rollout absorbs.
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8082
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8082
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      restartPolicy: Always
