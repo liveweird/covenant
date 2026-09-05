@@ -11,6 +11,7 @@ import ContractHistory from "../components/ContractHistory";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import EditPageLoadState from "../components/EditPageLoadState";
 import EmptyState from "../components/EmptyState";
+import FollowButton from "../components/FollowButton";
 import LifecyclePill from "../components/LifecyclePill";
 import OwnerChip from "../components/OwnerChip";
 import PageHeader from "../components/PageHeader";
@@ -105,6 +106,7 @@ export default function ContractDetails() {
         backTo={{ to: contractsPath, label: t("contracts.backToList") }}
         actions={
           <>
+            <FollowButton contract={data} />
             {data.versionCount >= 2 && (
               <Button component={RouterLink} to={versionDiffPath(id)} variant="default" leftSection={<IconArrowsDiff size={16} />}>
                 {t("versions.compare")}

@@ -1,0 +1,29 @@
+{
+  "title": "Notifications",
+  "unread_one": "{{count}} unread",
+  "unread_other": "{{count}} unread",
+  "loadError": "Could not load the notifications",
+  "empty": "No notifications yet — follow a contract to hear about its changes.",
+  "markSeen": "Mark as seen",
+  "markAllSeen": "Mark all as seen",
+  "markSeenAria": "Mark notification {{id}} as seen",
+  "markUnseen": "Mark as unseen",
+  "markUnseenAria": "Mark notification {{id}} as unseen",
+  "goTo": "Open",
+  "goToAria": "Open the subject of notification {{id}}",
+  "delete": "Delete",
+  "deleteAria": "Delete notification {{id}}",
+  "event": {
+    "CONTRACT_UPDATED": "{{actor}} updated the details of {{contractName}}.",
+    "CONTRACT_OWNER_CHANGED": "{{actor}} changed the owner of {{contractName}}.",
+    "CONTRACT_DELETED": "{{actor}} deleted the contract {{contractName}}.",
+    "VERSION_CREATED": "{{actor}} created version {{version}} of {{contractName}}.",
+    "VERSION_CONTENT_UPDATED": "{{actor}} edited the document of {{contractName}} {{version}}.",
+    "VERSION_TRANSITIONED": "{{actor}} moved {{contractName}} {{version}} from {{from}} to {{to}}.",
+    "VERSION_DELETED": "{{actor}} deleted version {{version}} of {{contractName}}.",
+    "VERSION_SYNCED": "{{actor}} synced {{contractName}} {{version}} from its source.",
+    "VERSION_SOURCE_CHANGED": "{{actor}} changed the source link of {{contractName}} {{version}}.",
+    "VERSION_IMPORTED": "{{actor}} imported version {{version}} of {{contractName}}.",
+    "VERSION_BREAKING_STORED": "{{contractName}} {{version}} was stored with a breaking change and no major bump."
+  }
+}

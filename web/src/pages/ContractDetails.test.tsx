@@ -52,6 +52,25 @@ describe("ContractDetails page", () => {
     expect(within(history).getByText("Contract created (OpenAPI)")).toBeInTheDocument();
   });
 
+  test("Follow puts the subscription and the button reflects the server's flag", async () => {
+    serve(mockFetch, {
+      "GET /api/v1/contracts/5": { status: 200, body: CONTRACT },
+      "GET /api/v1/contracts/5/versions?": { status: 200, body: VERSION_PAGE },
+      "GET /api/v1/contracts/5/events?": { status: 200, body: EVENTS_PAGE },
+      "PUT /api/v1/contracts/5/subscription": { status: 204 },
+    });
+    const user = userEvent.setup();
+    renderPage();
+    const follow = await screen.findByRole("button", { name: "Follow · 0" });
+    expect(follow).toHaveAttribute("aria-pressed", "false");
+    await user.click(follow);
+    await waitFor(() => expect(findCall(mockFetch, "PUT", "/api/v1/contracts/5/subscription")).toBeDefined());
+    serve(mockFetch, { "GET /api/v1/contracts/5": { status: 200, body: { ...CONTRACT, subscribed: true, subscriberCount: 1 } }, "GET /api/v1/contracts/5/versions?": { status: 200, body: VERSION_PAGE }, "GET /api/v1/contracts/5/events?": { status: 200, body: EVENTS_PAGE } });
+    const { unmount } = renderPage();
+    expect(await screen.findAllByRole("button", { name: "Following · 1" })).not.toHaveLength(0);
+    unmount();
+  });
+
   test("a reader has no write actions; the More menu still exports", async () => {
     serve(mockFetch, {
       "GET /api/v1/contracts/5": { status: 200, body: { ...CONTRACT, canWrite: false } },

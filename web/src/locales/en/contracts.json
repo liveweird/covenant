@@ -135,5 +135,11 @@
       "owner": "From {{from}} to {{to}}",
       "source": "Source: {{url}}"
     }
+  },
+  "follow": {
+    "follow": "Follow",
+    "following": "Following",
+    "count": "{{count}} followers",
+    "failed": "Could not update the follow"
   }
 }

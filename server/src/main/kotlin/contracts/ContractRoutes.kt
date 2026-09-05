@@ -1,6 +1,7 @@
 package ch.nokillswit.contracts
 
 import ch.nokillswit.audit.audit
+import ch.nokillswit.authz.NotFoundException
 import ch.nokillswit.authz.caller
 import ch.nokillswit.authz.orNotFound
 import ch.nokillswit.authz.requireAdmin
@@ -39,6 +40,10 @@ class ContractsRoute {
     class Tree(val parent: ContractsRoute = ContractsRoute())
 
     @Serializable
+    @Resource("facets")
+    class Facets(val parent: ContractsRoute = ContractsRoute())
+
+    @Serializable
     @Resource("import")
     class Import(val parent: ContractsRoute = ContractsRoute()) {
         @Serializable
@@ -72,6 +77,10 @@ class ContractsRoute {
         @Serializable
         @Resource("events")
         class Events(val parent: Id)
+
+        @Serializable
+        @Resource("subscription")
+        class Subscription(val parent: Id)
 
         @Serializable
         @Resource("versions")
@@ -125,7 +134,9 @@ internal fun ApplicationCall.contractFilter(): ContractListFilter {
 
 fun Application.configureContractRoutes() {
     val contractService = attributes[ContractServiceKey]
+    val activity = attributes[ContractActivityKey]
     val eventService = attributes[ContractEventServiceKey]
+    val subscriptions = attributes[ContractSubscriptionServiceKey]
 
     routing {
         authenticate {
@@ -142,6 +153,10 @@ fun Application.configureContractRoutes() {
                 val viewer = contractService.viewer(call.caller())
                 call.respond(HttpStatusCode.OK, contractService.tree(call.contractFilter(), viewer))
             }
+            get<ContractsRoute.Facets> {
+                call.caller()
+                call.respond(HttpStatusCode.OK, contractService.facets(call.contractFilter()))
+            }
             post<ContractsRoute> {
                 val caller = call.caller()
                 val request = sanitizedContractCreate(call.receive())
@@ -155,7 +170,7 @@ fun Application.configureContractRoutes() {
                     "type" to request.type.name,
                     "owner" to ownershipOf(request.ownerTeamId, request.ownerUserId).asParam(),
                 )
-                eventService.record(
+                activity.record(
                     id,
                     caller.userId,
                     ContractEventType.CREATED,
@@ -168,6 +183,19 @@ fun Application.configureContractRoutes() {
                 val viewer = contractService.viewer(call.caller())
                 call.respond(HttpStatusCode.OK, contractService.read(route.id, viewer).orNotFound("Contract"))
             }
+            // Following: whoever may read a contract may follow it — idempotent, 404 for a missing one.
+            put<ContractsRoute.Id.Subscription> { route ->
+                val caller = call.caller()
+                if (!subscriptions.subscribe(route.parent.id, caller.userId)) throw NotFoundException("Contract not found")
+                audit("contract.subscribed", "byUserId" to caller.userId.toLong(), "contractId" to route.parent.id.toLong())
+                call.respond(HttpStatusCode.NoContent)
+            }
+            delete<ContractsRoute.Id.Subscription> { route ->
+                val caller = call.caller()
+                subscriptions.unsubscribe(route.parent.id, caller.userId).orNotFound("Subscription")
+                audit("contract.unsubscribed", "byUserId" to caller.userId.toLong(), "contractId" to route.parent.id.toLong())
+                call.respond(HttpStatusCode.NoContent)
+            }
             put<ContractsRoute.Id> { route ->
                 val caller = call.caller()
                 contractService.authorizeWrite(caller, route.id)
@@ -175,7 +203,7 @@ fun Application.configureContractRoutes() {
                 validateContractUpdate(request)
                 contractService.update(route.id, request).orNotFound("Contract")
                 audit("contract.updated", "byUserId" to caller.userId.toLong(), "contractId" to route.id.toLong())
-                eventService.record(route.id, caller.userId, ContractEventType.UPDATED, mapOf("name" to request.name))
+                activity.record(route.id, caller.userId, ContractEventType.UPDATED, mapOf("name" to request.name))
                 call.respond(HttpStatusCode.NoContent)
             }
             put<ContractsRoute.Id.Owner> { route ->
@@ -191,7 +219,7 @@ fun Application.configureContractRoutes() {
                     "from" to previous.asParam(),
                     "to" to ownership.asParam(),
                 )
-                eventService.record(
+                activity.record(
                     route.parent.id, caller.userId, ContractEventType.OWNER_CHANGED,
                     mapOf("owner.from" to previous.asParam(), "owner.to" to ownership.asParam()),
                 )
@@ -203,7 +231,7 @@ fun Application.configureContractRoutes() {
                 contractService.delete(route.id).orNotFound("Contract")
                 audit("contract.deleted", "byUserId" to caller.userId.toLong(), "contractId" to route.id.toLong())
                 // The deletion event lands in a history the API can no longer reach — kept for the record.
-                eventService.record(route.id, caller.userId, ContractEventType.DELETED)
+                activity.record(route.id, caller.userId, ContractEventType.DELETED)
                 call.respond(HttpStatusCode.NoContent)
             }
             get<ContractsRoute.Id.Export> { route ->

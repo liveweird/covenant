@@ -94,6 +94,10 @@ the same commit** — this list is the coverage map, the scenario file is the de
 - [`i18n.spec.ts`](scenarios/i18n.md) — the synced per-user language: a throwaway user
   switches to Polish, the choice survives a reload AND a wiped-device re-login (served from
   the stored value), and the admin's English flips it back; seeded accounts stay English.
+- [`notifications.spec.ts`](scenarios/notifications.md) — following a contract: a throwaway user
+  follows it, the admin saves a version, the follower's bell announces it (the actor hears
+  nothing), Open lands on the version and marks it seen, unseen + Mark all as seen drive the
+  badge; teardown of the contract, registries and user.
 - [`mfa.spec.ts`](scenarios/mfa.md) — email MFA + the flags surfaces: the /feature-flags
   row switch and per-user editor round-trip a throwaway user's MFA flag; an MFA-enabled
   account signs in through the emailed 6-digit code via Mailpit (skips itself without it).

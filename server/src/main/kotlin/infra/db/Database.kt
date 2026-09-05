@@ -19,6 +19,12 @@ import ch.nokillswit.users.UserService
 import ch.nokillswit.users.UserServiceKey
 import io.ktor.server.application.*
 import org.jetbrains.exposed.v1.r2dbc.R2dbcDatabase
+import ch.nokillswit.notifications.NotificationServiceKey
+import ch.nokillswit.notifications.NotificationService
+import ch.nokillswit.contracts.ContractSubscriptionServiceKey
+import ch.nokillswit.contracts.ContractSubscriptionService
+import ch.nokillswit.contracts.ContractActivityKey
+import ch.nokillswit.contracts.ContractActivity
 
 /**
  * The DI composition root: connects the one R2DBC database and publishes every service into
@@ -31,7 +37,8 @@ suspend fun Application.configureDatabase() {
         user = environment.config.property("postgres.user").getString(),
         password = environment.config.property("postgres.password").getString(),
     )
-    attributes.put(UserServiceKey, UserService(database))
+    val userService = UserService(database)
+    attributes.put(UserServiceKey, userService)
     val teamService = TeamService(database)
     attributes.put(TeamServiceKey, teamService)
     val domainService = DomainService(database)
@@ -40,8 +47,20 @@ suspend fun Application.configureDatabase() {
     // The contract services: the writer guard reads team membership (TeamService), the store
     // paths run the check pipeline (ChecksService — published by configureChecks, which
     // application.yaml therefore lists BEFORE this module).
-    attributes.put(ContractServiceKey, ContractService(database, teamService))
+    val contractService = ContractService(database, teamService)
+    attributes.put(ContractServiceKey, contractService)
     attributes.put(ContractVersionServiceKey, ContractVersionService(database, attributes[ChecksServiceKey]))
-    attributes.put(ContractEventServiceKey, ContractEventService(database))
+    val eventService = ContractEventService(database)
+    attributes.put(ContractEventServiceKey, eventService)
+    // Followers + their notifications: the routes record every contract mutation through
+    // ContractActivity (notifications, then the history event — see persistence.md).
+    val subscriptionService = ContractSubscriptionService(database)
+    attributes.put(ContractSubscriptionServiceKey, subscriptionService)
+    val notificationService = NotificationService(database)
+    attributes.put(NotificationServiceKey, notificationService)
+    attributes.put(
+        ContractActivityKey,
+        ContractActivity(contractService, userService, subscriptionService, notificationService, eventService),
+    )
     attributes.put(TokenBlocklistServiceKey, TokenBlocklistService(database))
 }

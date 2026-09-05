@@ -270,6 +270,12 @@ object TestSeedState {
 }
 
 /** Direct team fixtures — roster reads past the routes (the soft-delete assertions) and quick seeding. */
+object TestNotifications {
+    val service: ch.nokillswit.notifications.NotificationService by lazy {
+        ch.nokillswit.notifications.NotificationService(sharedTestDatabase)
+    }
+}
+
 object TestTeams {
     val service: ch.nokillswit.teams.TeamService by lazy { ch.nokillswit.teams.TeamService(sharedTestDatabase) }
 

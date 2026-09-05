@@ -7,6 +7,7 @@ import { isAdmin } from "./api/session";
 import { RedirectIfAuthed, RequireAuth } from "./auth";
 import BrandLogo from "./components/BrandLogo";
 import CommandPalette from "./components/CommandPalette";
+import NotificationsButton from "./components/NotificationsButton";
 import LoadingBlock from "./components/LoadingBlock";
 import UserMenu from "./components/UserMenu";
 import VersionStamp from "./components/VersionStamp";
@@ -95,6 +96,7 @@ function Shell() {
           </Group>
           <Group gap="sm" wrap="nowrap">
             <CommandPalette />
+            <NotificationsButton />
             <UserMenu />
           </Group>
         </Group>

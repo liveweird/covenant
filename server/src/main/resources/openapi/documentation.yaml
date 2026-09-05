@@ -31,6 +31,7 @@ tags:
   - name: systems
   - name: contracts
   - name: contract-versions
+  - name: notifications
 
 paths:
   /api/v1/login:
@@ -903,6 +904,33 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/facets:
+    get:
+      tags: [contracts]
+      operationId: getContractFacets
+      summary: Facet counts for the contracts filters
+      description: |
+        Any authenticated user. The SAME filter parameters as the list and the tree. Classic
+        faceting: each dimension is counted with every OTHER filter applied and its own dimension
+        lifted, so a count says what picking that value would yield. `lifecycle` counts the latest
+        version's state, with `NONE` for contracts that have no version yet; `hasErrors` splits the
+        matching contracts into those whose latest version has errors and the rest.
+      parameters:
+        - $ref: '#/components/parameters/ContractType'
+        - $ref: '#/components/parameters/ContractLifecycle'
+        - $ref: '#/components/parameters/ContractQuery'
+        - $ref: '#/components/parameters/ContractOwnerTeamId'
+        - $ref: '#/components/parameters/ContractOwnerUserId'
+      responses:
+        '200':
+          description: The facet counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacetsResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
   /api/v1/contracts/tree:
     get:
       tags: [contracts]
@@ -1438,6 +1466,157 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/{id}/subscription:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    put:
+      tags: [contracts]
+      operationId: subscribeContract
+      summary: Follow the contract
+      description: |
+        Any authenticated user — whoever may read a contract may follow it. Idempotent. From then
+        on every event on the contract (versions created, edited, published, synced, deleted; the
+        owner changed; the contract deleted; a version stored with a waived breaking change) is an
+        in-app notification for the follower — never for the actor themselves.
+      responses:
+        '204': { description: Following }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    delete:
+      tags: [contracts]
+      operationId: unsubscribeContract
+      summary: Stop following the contract
+      description: Any authenticated user; `404` when the caller was not following.
+      responses:
+        '204': { description: No longer following }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/notifications:
+    get:
+      tags: [notifications]
+      operationId: listNotifications
+      summary: List the caller's notifications
+      description: |
+        Lists notifications addressed to the calling user (`recipientId` = caller). The list is
+        always scoped to the caller, ADMIN included — there is no cross-user view. Notifications
+        are minted as a side-effect of contract events for the contract's followers; there is no
+        create endpoint. Sortable fields: `id`, `timestamp` (default `-timestamp`, newest first;
+        `id` ascending appended as the tiebreaker). Filter `wasSeen` — `true`/`false`. The SPA's
+        badge is the `total` of a `pageSize=1&wasSeen=false` query.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - name: wasSeen
+          in: query
+          required: false
+          schema: { type: boolean }
+          description: Restrict to seen (`true`) or unseen (`false`) notifications.
+      responses:
+        '200':
+          description: A page of notifications
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPage'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/notifications/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [notifications]
+      operationId: getNotification
+      summary: Fetch a notification
+      description: Recipient-only (ADMIN included) — a missing row is `404`, another user's `403`.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Caller is not the recipient
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    delete:
+      tags: [notifications]
+      operationId: deleteNotification
+      summary: Delete a notification
+      description: Recipient-only. Soft-deletes the row; it disappears from every read.
+      responses:
+        '204': { description: Deleted }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Caller is not the recipient
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/notifications/{id}/seen:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    post:
+      tags: [notifications]
+      operationId: markNotificationSeen
+      summary: Mark a notification as seen
+      description: Sets `wasSeen` to `true`. Idempotent. Recipient-only.
+      responses:
+        '204': { description: Marked as seen }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Caller is not the recipient
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/notifications/{id}/unseen:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    post:
+      tags: [notifications]
+      operationId: markNotificationUnseen
+      summary: Mark a notification as unseen
+      description: Sets `wasSeen` to `false`. Idempotent. Recipient-only.
+      responses:
+        '204': { description: Marked as unseen }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Caller is not the recipient
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/notifications/seen-all:
+    post:
+      tags: [notifications]
+      operationId: markAllNotificationsSeen
+      summary: Mark all of the caller's notifications as seen
+      description: |
+        Sets `wasSeen` to `true` for every one of the caller's still-unseen notifications in one
+        request. Idempotent and intrinsically caller-scoped (no `{id}`). Deliberately asymmetric:
+        un-seeing is a per-notification action.
+      responses:
+        '204': { description: All of the caller's notifications marked as seen }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '500': { $ref: '#/components/responses/InternalServerError' }
 components:
   securitySchemes:
@@ -1983,8 +2162,10 @@ components:
         ownerUserId: { type: integer, format: int32, minimum: 0, nullable: true }
     ContractResponse:
       type: object
-      required: [id, system, domain, type, name, owner, versionCount, canWrite, createdBy, createdAt, updatedAt]
+      required: [id, system, domain, type, name, owner, versionCount, canWrite, createdBy, createdAt, updatedAt, subscribed, subscriberCount]
       properties:
+        subscribed: { type: boolean, description: "Whether the CALLER follows the contract — every event on it then reaches their bell." }
+        subscriberCount: { type: integer, minimum: 0 }
         id: { type: integer, format: int32, minimum: 0 }
         system: { $ref: '#/components/schemas/RefSummary' }
         domain: { $ref: '#/components/schemas/RefSummary' }
@@ -2013,10 +2194,41 @@ components:
         page: { type: integer, minimum: 1 }
         pageSize: { type: integer, minimum: 1, maximum: 100 }
         total: { type: integer, format: int64, minimum: 0 }
+    FacetCount:
+      type: object
+      required: [value, count]
+      properties:
+        value: { type: string, description: "An enum name, or `NONE` for contracts without a version (lifecycle facet)." }
+        count: { type: integer, format: int64, minimum: 0 }
+    NamedFacetCount:
+      type: object
+      required: [id, name, count]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        name: { type: string }
+        count: { type: integer, format: int64, minimum: 0 }
+    ErrorFacets:
+      type: object
+      required: [withErrors, clean]
+      properties:
+        withErrors: { type: integer, format: int64, minimum: 0 }
+        clean: { type: integer, format: int64, minimum: 0 }
+    FacetsResponse:
+      type: object
+      required: [type, lifecycle, domain, system, ownerTeam, hasErrors]
+      properties:
+        type: { type: array, items: { $ref: '#/components/schemas/FacetCount' } }
+        lifecycle: { type: array, items: { $ref: '#/components/schemas/FacetCount' } }
+        domain: { type: array, items: { $ref: '#/components/schemas/NamedFacetCount' } }
+        system: { type: array, items: { $ref: '#/components/schemas/NamedFacetCount' } }
+        ownerTeam: { type: array, items: { $ref: '#/components/schemas/NamedFacetCount' } }
+        hasErrors: { $ref: '#/components/schemas/ErrorFacets' }
     TreeContract:
       type: object
-      required: [id, name, type, owner, versionCount, canWrite]
+      required: [id, name, type, owner, versionCount, canWrite, subscribed, subscriberCount]
       properties:
+        subscribed: { type: boolean, description: "Whether the CALLER follows the contract — every event on it then reaches their bell." }
+        subscriberCount: { type: integer, minimum: 0 }
         id: { type: integer, format: int32, minimum: 0 }
         name: { type: string }
         type: { $ref: '#/components/schemas/ContractType' }
@@ -2091,6 +2303,35 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ContractEventResponse'
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, format: int64, minimum: 0 }
+    NotificationType:
+      type: string
+      enum: [CONTRACT_UPDATED, CONTRACT_OWNER_CHANGED, CONTRACT_DELETED, VERSION_CREATED, VERSION_CONTENT_UPDATED, VERSION_TRANSITIONED, VERSION_DELETED, VERSION_SYNCED, VERSION_SOURCE_CHANGED, VERSION_IMPORTED, VERSION_BREAKING_STORED]
+      description: The notification kind; the SPA renders it in the viewer's language. A kind a client build does not know renders as its raw name.
+    NotificationResponse:
+      type: object
+      required: [id, recipientId, timestamp, type, params, wasSeen]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        recipientId: { type: integer, format: int32, minimum: 0 }
+        timestamp: { type: integer, format: int64, description: Epoch millis when the notification was minted. Server-set. }
+        type: { $ref: '#/components/schemas/NotificationType' }
+        params:
+          type: object
+          additionalProperties: { type: string }
+          description: The interpolation values — `contractName`, `actor`, and the event's `version`/`from`/`to`/`name` when present. Never document text.
+        link: { type: string, nullable: true, description: A language-independent SPA path (the contract or the version). }
+        wasSeen: { type: boolean }
+    NotificationPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationResponse'
         page: { type: integer, minimum: 1 }
         pageSize: { type: integer, minimum: 1, maximum: 100 }
         total: { type: integer, format: int64, minimum: 0 }

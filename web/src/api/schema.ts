@@ -533,6 +533,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contracts/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Facet counts for the contracts filters
+         * @description Any authenticated user. The SAME filter parameters as the list and the tree. Classic
+         *     faceting: each dimension is counted with every OTHER filter applied and its own dimension
+         *     lifted, so a count says what picking that value would yield. `lifecycle` counts the latest
+         *     version's state, with `NONE` for contracts that have no version yet; `hasErrors` splits the
+         *     matching contracts into those whose latest version has errors and the rest.
+         */
+        get: operations["getContractFacets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contracts/tree": {
         parameters: {
             query?: never;
@@ -939,6 +963,152 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contracts/{id}/subscription": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Follow the contract
+         * @description Any authenticated user — whoever may read a contract may follow it. Idempotent. From then
+         *     on every event on the contract (versions created, edited, published, synced, deleted; the
+         *     owner changed; the contract deleted; a version stored with a waived breaking change) is an
+         *     in-app notification for the follower — never for the actor themselves.
+         */
+        put: operations["subscribeContract"];
+        post?: never;
+        /**
+         * Stop following the contract
+         * @description Any authenticated user; `404` when the caller was not following.
+         */
+        delete: operations["unsubscribeContract"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the caller's notifications
+         * @description Lists notifications addressed to the calling user (`recipientId` = caller). The list is
+         *     always scoped to the caller, ADMIN included — there is no cross-user view. Notifications
+         *     are minted as a side-effect of contract events for the contract's followers; there is no
+         *     create endpoint. Sortable fields: `id`, `timestamp` (default `-timestamp`, newest first;
+         *     `id` ascending appended as the tiebreaker). Filter `wasSeen` — `true`/`false`. The SPA's
+         *     badge is the `total` of a `pageSize=1&wasSeen=false` query.
+         */
+        get: operations["listNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Fetch a notification
+         * @description Recipient-only (ADMIN included) — a missing row is `404`, another user's `403`.
+         */
+        get: operations["getNotification"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a notification
+         * @description Recipient-only. Soft-deletes the row; it disappears from every read.
+         */
+        delete: operations["deleteNotification"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/{id}/seen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark a notification as seen
+         * @description Sets `wasSeen` to `true`. Idempotent. Recipient-only.
+         */
+        post: operations["markNotificationSeen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/{id}/unseen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark a notification as unseen
+         * @description Sets `wasSeen` to `false`. Idempotent. Recipient-only.
+         */
+        post: operations["markNotificationUnseen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/seen-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark all of the caller's notifications as seen
+         * @description Sets `wasSeen` to `true` for every one of the caller's still-unseen notifications in one
+         *     request. Idempotent and intrinsically caller-scoped (no `{id}`). Deliberately asymmetric:
+         *     un-seeing is a per-notification action.
+         */
+        post: operations["markAllNotificationsSeen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1232,6 +1402,9 @@ export interface components {
             ownerUserId?: number | null;
         };
         ContractResponse: {
+            /** @description Whether the CALLER follows the contract — every event on it then reaches their bell. */
+            subscribed: boolean;
+            subscriberCount: number;
             /** Format: int32 */
             id: number;
             system: components["schemas"]["RefSummary"];
@@ -1258,7 +1431,37 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        FacetCount: {
+            /** @description An enum name, or `NONE` for contracts without a version (lifecycle facet). */
+            value: string;
+            /** Format: int64 */
+            count: number;
+        };
+        NamedFacetCount: {
+            /** Format: int32 */
+            id: number;
+            name: string;
+            /** Format: int64 */
+            count: number;
+        };
+        ErrorFacets: {
+            /** Format: int64 */
+            withErrors: number;
+            /** Format: int64 */
+            clean: number;
+        };
+        FacetsResponse: {
+            type: components["schemas"]["FacetCount"][];
+            lifecycle: components["schemas"]["FacetCount"][];
+            domain: components["schemas"]["NamedFacetCount"][];
+            system: components["schemas"]["NamedFacetCount"][];
+            ownerTeam: components["schemas"]["NamedFacetCount"][];
+            hasErrors: components["schemas"]["ErrorFacets"];
+        };
         TreeContract: {
+            /** @description Whether the CALLER follows the contract — every event on it then reaches their bell. */
+            subscribed: boolean;
+            subscriberCount: number;
             /** Format: int32 */
             id: number;
             name: string;
@@ -1312,6 +1515,37 @@ export interface components {
         };
         ContractEventPage: {
             items: components["schemas"]["ContractEventResponse"][];
+            page: number;
+            pageSize: number;
+            /** Format: int64 */
+            total: number;
+        };
+        /**
+         * @description The notification kind; the SPA renders it in the viewer's language. A kind a client build does not know renders as its raw name.
+         * @enum {string}
+         */
+        NotificationType: "CONTRACT_UPDATED" | "CONTRACT_OWNER_CHANGED" | "CONTRACT_DELETED" | "VERSION_CREATED" | "VERSION_CONTENT_UPDATED" | "VERSION_TRANSITIONED" | "VERSION_DELETED" | "VERSION_SYNCED" | "VERSION_SOURCE_CHANGED" | "VERSION_IMPORTED" | "VERSION_BREAKING_STORED";
+        NotificationResponse: {
+            /** Format: int32 */
+            id: number;
+            /** Format: int32 */
+            recipientId: number;
+            /**
+             * Format: int64
+             * @description Epoch millis when the notification was minted. Server-set.
+             */
+            timestamp: number;
+            type: components["schemas"]["NotificationType"];
+            /** @description The interpolation values — `contractName`, `actor`, and the event's `version`/`from`/`to`/`name` when present. Never document text. */
+            params: {
+                [key: string]: string;
+            };
+            /** @description A language-independent SPA path (the contract or the version). */
+            link?: string | null;
+            wasSeen: boolean;
+        };
+        NotificationPage: {
+            items: components["schemas"]["NotificationResponse"][];
             page: number;
             pageSize: number;
             /** Format: int64 */
@@ -2659,6 +2893,38 @@ export interface operations {
             500: components["responses"]["InternalServerError"];
         };
     };
+    getContractFacets: {
+        parameters: {
+            query?: {
+                /** @description Repeatable — any-of over the contract types. */
+                type?: components["parameters"]["ContractType"];
+                /** @description Repeatable — any-of over lifecycles (the LATEST version's on the contracts list/tree). */
+                lifecycle?: components["parameters"]["ContractLifecycle"];
+                /** @description Case- and accent-insensitive substring over name OR description. */
+                q?: components["parameters"]["ContractQuery"];
+                ownerTeamId?: components["parameters"]["ContractOwnerTeamId"];
+                ownerUserId?: components["parameters"]["ContractOwnerUserId"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The facet counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FacetsResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
     getContractTree: {
         parameters: {
             query?: {
@@ -3325,6 +3591,245 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             413: components["responses"]["PayloadTooLarge"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    subscribeContract: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Following */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    unsubscribeContract: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No longer following */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listNotifications: {
+        parameters: {
+            query?: {
+                /** @description 1-based page index. Defaults to 1. */
+                page?: components["parameters"]["Page"];
+                /** @description Rows per page. Defaults to 20, maximum 100. */
+                pageSize?: components["parameters"]["PageSize"];
+                /**
+                 * @description Sort spec. Format: `field` (ascending) or `-field` (descending). Multiple fields are
+                 *     comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
+                 *     sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
+                 *     always appended as a deterministic tiebreaker.
+                 */
+                sort?: components["parameters"]["Sort"];
+                /** @description Restrict to seen (`true`) or unseen (`false`) notifications. */
+                wasSeen?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of notifications */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getNotification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            /** @description Caller is not the recipient */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    deleteNotification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            /** @description Caller is not the recipient */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    markNotificationSeen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Marked as seen */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            /** @description Caller is not the recipient */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    markNotificationUnseen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Marked as unseen */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            /** @description Caller is not the recipient */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    markAllNotificationsSeen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description All of the caller's notifications marked as seen */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalServerError"];
         };
     };

@@ -4,6 +4,9 @@ import ch.nokillswit.contracts.ContractCreateRequest
 import ch.nokillswit.contracts.ContractPageResponse
 import ch.nokillswit.contracts.ContractResponse
 import ch.nokillswit.contracts.ContractType
+import ch.nokillswit.contracts.FacetsResponse
+import ch.nokillswit.contracts.FacetCount
+import ch.nokillswit.contracts.ErrorFacets
 import ch.nokillswit.contracts.ContractUpdateRequest
 import ch.nokillswit.contracts.Lifecycle
 import ch.nokillswit.contracts.OwnerKind
@@ -338,5 +341,35 @@ class ContractTest {
             admin.delete("/api/v1/contracts/${c.id}")
             assertNotNull(capture.awaitEvent { it.message == "contract.deleted" && it.hasKeyValue("contractId", c.id.toLong()) })
         }
+    }
+
+    @Test
+    fun `facets - each dimension counts with its own filter lifted and every other filter applied`() = testApplication {
+        usePostgresTestcontainer()
+        val admin = seededClient("facets", UserRole.ADMIN)
+        val systemId = TestContracts.seedSystem("facets")
+        val teamId = TestTeams.seed(name("fac-team"))
+        val first = ContractCreateRequest(systemId, ContractType.OPENAPI, name("fac"), null, ownerTeamId = teamId)
+        val a = admin.postJson("/api/v1/contracts", first).body<ContractResponse>()
+        admin.postJson("/api/v1/contracts", ContractCreateRequest(systemId, ContractType.OPENAPI, name("fac"), null, ownerTeamId = teamId))
+        admin.postJson("/api/v1/contracts", ContractCreateRequest(systemId, ContractType.ODCS, name("fac"), null, ownerTeamId = teamId))
+        val domainId = a.domain.id
+        val all = admin.get("/api/v1/contracts/facets?domainId=$domainId").body<FacetsResponse>()
+        assertEquals(listOf(FacetCount("ODCS", 1), FacetCount("OPENAPI", 2)), all.type)
+        assertEquals(listOf(FacetCount("NONE", 3)), all.lifecycle, "no versions yet — every contract sits in the NONE bucket")
+        assertEquals(systemId, all.system.single().id)
+        assertEquals(3, all.system.single().count)
+        assertEquals(3, all.ownerTeam.single { it.id == teamId }.count)
+        assertEquals(ErrorFacets(withErrors = 0, clean = 3), all.hasErrors)
+        // With the type narrowed: the type facet itself is unchanged (its own dimension is lifted),
+        // every other dimension counts only the ODCS contract.
+        val typed = admin.get("/api/v1/contracts/facets?domainId=$domainId&type=ODCS").body<FacetsResponse>()
+        assertEquals(all.type, typed.type)
+        assertEquals(1, typed.system.single().count)
+        assertEquals(1, typed.domain.single { it.id == domainId }.count, "the domain facet lifts the domain filter and applies the type")
+        assertEquals(1, typed.ownerTeam.single { it.id == teamId }.count)
+        assertEquals(ErrorFacets(withErrors = 0, clean = 1), typed.hasErrors)
+        assertEquals(HttpStatusCode.BadRequest, admin.get("/api/v1/contracts/facets?type=NOPE").status)
+        assertEquals(HttpStatusCode.Unauthorized, jsonClient().get("/api/v1/contracts/facets").status)
     }
 }

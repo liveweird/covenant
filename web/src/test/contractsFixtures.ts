@@ -25,6 +25,8 @@ export const CONTRACT = {
   latestVersion: LATEST,
   versionCount: 2,
   canWrite: true,
+  subscribed: false,
+  subscriberCount: 0,
   createdBy: 1,
   createdAt: 1,
   updatedAt: 2,
@@ -47,7 +49,7 @@ export const EVENTS_PAGE = { items: [EVENT, { ...EVENT, id: 30, type: "CREATED" 
 export const CLEAN_REPORT = { format: "yaml", specVersion: "3.1.0", title: "Orders", description: null, declaredVersion: "1.1.0", findings: [], errors: 0, warnings: 0, infos: 0, checkerAvailable: true };
 export const TREE = {
   domains: [
-    { id: 1, name: "Payments", systems: [{ id: 7, name: "gateway", contracts: [{ id: 5, name: "orders-api", type: "OPENAPI", owner: OWNER_TEAM, latestVersion: LATEST, versionCount: 2, canWrite: true }] }] },
+    { id: 1, name: "Payments", systems: [{ id: 7, name: "gateway", contracts: [{ id: 5, name: "orders-api", type: "OPENAPI", owner: OWNER_TEAM, latestVersion: LATEST, versionCount: 2, canWrite: true, subscribed: false, subscriberCount: 0 }] }] },
     { id: 2, name: "Identity", systems: [] },
   ],
 };

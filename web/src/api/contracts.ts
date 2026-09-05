@@ -62,6 +62,14 @@ export async function getContractTree(f: ContractFilters = {}): Promise<TreeResp
   return jsonRequest<TreeResponse>(`/api/v1/contracts/tree${params ? `?${params}` : ""}`);
 }
 
+export type ContractFacets = components["schemas"]["FacetsResponse"];
+
+/** The facet counts behind the filter controls — the same filters as the list/tree; each dimension counts with its own filter lifted. */
+export async function getContractFacets(f: ContractFilters = {}): Promise<ContractFacets> {
+  const params = buildQuery(filterParams(f));
+  return jsonRequest<ContractFacets>(`/api/v1/contracts/facets${params ? `?${params}` : ""}`);
+}
+
 export async function getContract(id: number): Promise<ContractResponse> {
   return jsonRequest<ContractResponse>(`/api/v1/contracts/${id}`);
 }
@@ -105,6 +113,15 @@ export type ContractEvent = ContractEventPage["items"][number];
 export async function listContractEvents(id: number, page: number, pageSize: number): Promise<ContractEventPage> {
   const params = buildQuery({ page, pageSize });
   return jsonRequest<ContractEventPage>(`/api/v1/contracts/${id}/events?${params}`);
+}
+
+/** Follow the contract — idempotent; every event on it then reaches the caller's bell. */
+export async function subscribeContract(id: number): Promise<void> {
+  await voidRequest(`/api/v1/contracts/${id}/subscription`, { method: "PUT" });
+}
+
+export async function unsubscribeContract(id: number): Promise<void> {
+  await voidRequest(`/api/v1/contracts/${id}/subscription`, { method: "DELETE" });
 }
 
 /** The server-side fetch of a public document URL (https only, no private hosts — the server guards). */

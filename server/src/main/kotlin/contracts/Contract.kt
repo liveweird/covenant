@@ -71,12 +71,43 @@ data class ContractResponse(
     val versionCount: Int,
     /** Server-computed for the caller — the SPA never reimplements the writer rule. */
     val canWrite: Boolean,
+    /** Whether the CALLER follows the contract (V13); every event on it then reaches their bell. */
+    val subscribed: Boolean,
+    val subscriberCount: Int,
     val createdBy: UInt,
     val createdAt: Long,
     val updatedAt: Long,
 )
 
 typealias ContractPageResponse = PageResponse<ContractResponse>
+
+/** One facet bucket — a value (an enum name, or `NONE` for "no version yet") and how many contracts land in it. */
+@Serializable
+data class FacetCount(val value: String, val count: Long)
+
+@Serializable
+data class NamedFacetCount(val id: UInt, val name: String, val count: Long)
+
+@Serializable
+data class ErrorFacets(val withErrors: Long, val clean: Long)
+
+/**
+ * Facet counts for the contracts list/tree (milestone 3). Classic faceting: each dimension is
+ * counted with every OTHER filter applied and its own dimension lifted, so a count answers
+ * "what would I get by picking this value".
+ */
+@Serializable
+data class FacetsResponse(
+    val type: List<FacetCount>,
+    /** Of the latest version; `NONE` = contracts without a version. */
+    val lifecycle: List<FacetCount>,
+    val domain: List<NamedFacetCount>,
+    val system: List<NamedFacetCount>,
+    val ownerTeam: List<NamedFacetCount>,
+    val hasErrors: ErrorFacets,
+)
+
+enum class FacetDimension { TYPE, LIFECYCLE, DOMAIN, SYSTEM, OWNER_TEAM, HAS_ERRORS }
 
 data class ContractListFilter(
     val domainId: UInt? = null,
@@ -89,7 +120,17 @@ data class ContractListFilter(
     /** Substring over name OR description (case- and accent-insensitive). */
     val q: String? = null,
     val hasErrors: Boolean? = null,
-)
+) {
+    /** The same filter with one dimension lifted — the facet of that dimension counts across all its values. */
+    fun lifting(dimension: FacetDimension): ContractListFilter = when (dimension) {
+        FacetDimension.TYPE -> copy(types = emptyList())
+        FacetDimension.LIFECYCLE -> copy(lifecycles = emptyList())
+        FacetDimension.DOMAIN -> copy(domainId = null)
+        FacetDimension.SYSTEM -> copy(systemId = null)
+        FacetDimension.OWNER_TEAM -> copy(ownerTeamId = null)
+        FacetDimension.HAS_ERRORS -> copy(hasErrors = null)
+    }
+}
 
 data class ContractListResult(val items: List<ContractResponse>, val total: Long)
 

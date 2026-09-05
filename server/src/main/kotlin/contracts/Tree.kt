@@ -17,6 +17,8 @@ data class TreeContract(
     val latestVersion: LatestVersionSummary?,
     val versionCount: Int,
     val canWrite: Boolean,
+    val subscribed: Boolean,
+    val subscriberCount: Int,
 )
 
 @Serializable

@@ -3,6 +3,7 @@ package ch.nokillswit.contracts
 import ch.nokillswit.audit.audit
 import ch.nokillswit.authz.caller
 import ch.nokillswit.authz.orNotFound
+import ch.nokillswit.contracts.checks.BreakingChanges
 import ch.nokillswit.contracts.checks.ChecksServiceKey
 import ch.nokillswit.contracts.checks.DocumentFormat
 import ch.nokillswit.contracts.checks.auditCheckerUnavailable
@@ -36,7 +37,7 @@ private val WITH_FINDINGS = setOf(ImportStatus.CREATED_WITH_FINDINGS, ImportStat
 fun Application.configureContractVersionRoutes() {
     val contractService = attributes[ContractServiceKey]
     val versionService = attributes[ContractVersionServiceKey]
-    val eventService = attributes[ContractEventServiceKey]
+    val activity = attributes[ContractActivityKey]
     val checks = attributes[ChecksServiceKey]
     val importer = ContractImporter(contractService, versionService, checks)
     val maxDocumentBytes = environment.config.propertyOrNull(
@@ -83,11 +84,13 @@ fun Application.configureContractVersionRoutes() {
                     "waivedFindings" to saved.waived.size,
                 )
                 call.auditCheckerUnavailableFor(saved.response)
-                eventService.record(
+                activity.record(
                     contractId,
                     caller.userId,
                     ContractEventType.VERSION_CREATED,
                     mapOf("version" to saved.response.version),
+                    versionId = saved.response.id,
+                    breaking = saved.response.storedBreaking(),
                 )
                 call.response.header(
                     HttpHeaders.Location,
@@ -136,11 +139,13 @@ fun Application.configureContractVersionRoutes() {
                     "waivedFindings" to saved.waived.size,
                 )
                 call.auditCheckerUnavailableFor(saved.response)
-                eventService.record(
+                activity.record(
                     contractId,
                     caller.userId,
                     ContractEventType.VERSION_CONTENT_UPDATED,
                     mapOf("version" to saved.response.version),
+                    versionId = saved.response.id,
+                    breaking = saved.response.storedBreaking(),
                 )
                 call.respond(HttpStatusCode.OK, saved.response)
             }
@@ -159,9 +164,10 @@ fun Application.configureContractVersionRoutes() {
                     "from" to from.name,
                     "to" to request.to.name,
                 )
-                eventService.record(
+                activity.record(
                     contractId, caller.userId, ContractEventType.VERSION_TRANSITIONED,
                     mapOf("version" to response.version, "from" to from.name, "to" to request.to.name),
+                    versionId = response.id,
                 )
                 call.respond(HttpStatusCode.OK, response)
             }
@@ -182,9 +188,10 @@ fun Application.configureContractVersionRoutes() {
                         "version" to change.version,
                         "host" to (sourceUrl?.let { URI(it).host } ?: ""),
                     )
-                    eventService.record(
+                    activity.record(
                         contractId, caller.userId, ContractEventType.VERSION_SOURCE_CHANGED,
                         mapOf("version" to change.version, "sourceUrl" to (sourceUrl ?: "")),
+                        versionId = route.parent.vid,
                     )
                 }
                 call.respond(HttpStatusCode.NoContent)
@@ -214,7 +221,10 @@ fun Application.configureContractVersionRoutes() {
                 )
                 call.auditCheckerUnavailableFor(saved.response)
                 // Recorded even when the repo copy matched: pulling it IS the act (it stamps the sync state).
-                eventService.record(contractId, caller.userId, ContractEventType.VERSION_SYNCED, mapOf("version" to saved.response.version))
+                activity.record(
+                    contractId, caller.userId, ContractEventType.VERSION_SYNCED, mapOf("version" to saved.response.version),
+                    versionId = saved.response.id, breaking = saved.response.storedBreaking(),
+                )
                 call.respond(HttpStatusCode.OK, saved.response)
             }
             post<ContractsRoute.Id.Versions.Vid.Recheck> { route ->
@@ -230,7 +240,7 @@ fun Application.configureContractVersionRoutes() {
                     "versionId" to response.id.toLong(),
                 )
                 call.auditCheckerUnavailableFor(response)
-                eventService.record(contractId, caller.userId, ContractEventType.VERSION_RECHECKED, mapOf("version" to response.version))
+                activity.record(contractId, caller.userId, ContractEventType.VERSION_RECHECKED, mapOf("version" to response.version))
                 call.respond(HttpStatusCode.OK, response)
             }
             delete<ContractsRoute.Id.Versions.Vid> { route ->
@@ -245,7 +255,7 @@ fun Application.configureContractVersionRoutes() {
                     "versionId" to route.vid.toLong(),
                     "version" to version,
                 )
-                eventService.record(contractId, caller.userId, ContractEventType.VERSION_DELETED, mapOf("version" to version))
+                activity.record(contractId, caller.userId, ContractEventType.VERSION_DELETED, mapOf("version" to version))
                 call.respond(HttpStatusCode.NoContent)
             }
             post<ContractsRoute.Versions.Check> {
@@ -285,7 +295,10 @@ fun Application.configureContractVersionRoutes() {
                         "version" to row.version,
                         "withFindings" to (row.status in WITH_FINDINGS),
                     )
-                    eventService.record(contractId, caller.userId, ContractEventType.IMPORTED, mapOf("version" to row.version))
+                    activity.record(
+                        contractId, caller.userId, ContractEventType.IMPORTED, mapOf("version" to row.version),
+                        versionId = row.versionId, breaking = row.message?.contains(BreakingChanges.CODE_WITHOUT_MAJOR_BUMP) == true,
+                    )
                 }
                 call.respond(HttpStatusCode.OK, ImportResponse(results))
             }
@@ -319,3 +332,6 @@ private fun ApplicationCall.auditCheckerUnavailableFor(version: VersionResponse)
 
 /** A filename-safe slug: letters, digits, dot, dash, underscore; everything else collapses to `-`. */
 internal fun slug(raw: String): String = raw.replace(Regex("[^A-Za-z0-9._-]+"), "-").trim('-').ifEmpty { "document" }
+
+/** Whether the stored report carries the waived breaking gate — the one verdict followers are told about. */
+private fun VersionResponse.storedBreaking(): Boolean = findings.any { it.code == BreakingChanges.CODE_WITHOUT_MAJOR_BUMP }

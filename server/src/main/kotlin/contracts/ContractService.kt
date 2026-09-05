@@ -88,14 +88,14 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
         val predicate = buildPredicate(filter) and active()
         val total = joined().selectAll().where { predicate }.count()
         val rows = joined().selectAll().where { predicate }.applyPaging(paging, SORTABLE_COLUMNS).toList()
-        val counts = versionCounts(rows.map { it[Contracts.id].value })
-        ContractListResult(items = rows.map { it.toResponse(viewer, counts) }, total = total)
+        val facts = facts(rows.map { it[Contracts.id].value }, viewer)
+        ContractListResult(items = rows.map { it.toResponse(viewer, facts) }, total = total)
     }
 
     suspend fun read(id: UInt, viewer: Viewer): ContractResponse? = suspendTransaction(database) {
         val row = joined().selectAll().where { (Contracts.id eq id) and active() }.toList().singleOrNull()
             ?: return@suspendTransaction null
-        row.toResponse(viewer, versionCounts(listOf(id)))
+        row.toResponse(viewer, facts(listOf(id), viewer))
     }
 
     /** Create — the system must be active (400) and the owner assignable by the caller (403); the name clash is the index's 409. */
@@ -206,6 +206,41 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
         ).where { (Contracts.id eq id) and active() }.map { ContractType.valueOf(it[Contracts.type]) }.toList().singleOrNull()
     }
 
+    /** The facet counts behind the list/tree filters — six group-bys over the shared predicate, one transaction. */
+    suspend fun facets(filter: ContractListFilter): FacetsResponse = suspendTransaction(database) {
+        val v = ContractVersionService.ContractVersions
+        val n = Contracts.id.count()
+        fun rows(dimension: FacetDimension, vararg groups: Expression<*>) =
+            joined().select(listOf(*groups, n)).where { buildPredicate(filter.lifting(dimension)) and active() }.groupBy(*groups)
+        val type = rows(FacetDimension.TYPE, Contracts.type).map { FacetCount(it[Contracts.type], it[n]) }.toList()
+        val lifecycle = rows(FacetDimension.LIFECYCLE, latest[v.lifecycle])
+            .map { FacetCount(it.getOrNull(latest[v.lifecycle]) ?: NO_VERSION_FACET, it[n]) }.toList()
+        val domains = DomainService.Domains
+        val domain = rows(FacetDimension.DOMAIN, domains.id, domains.name)
+            .map { NamedFacetCount(it[domains.id].value, it[domains.name], it[n]) }.toList()
+        val systems = SystemService.Systems
+        val system = rows(FacetDimension.SYSTEM, systems.id, systems.name)
+            .map { NamedFacetCount(it[systems.id].value, it[systems.name], it[n]) }.toList()
+        val teamId = ownerTeams[TeamService.Teams.id]
+        val teamName = ownerTeams[TeamService.Teams.name]
+        val ownerTeam = joined().select(teamId, teamName, n)
+            .where { buildPredicate(filter.lifting(FacetDimension.OWNER_TEAM)) and active() and Contracts.ownerTeamId.isNotNull() }
+            .groupBy(teamId, teamName)
+            .map { NamedFacetCount(it[teamId].value, it[teamName], it[n]) }.toList()
+        val errors = latest[v.checkErrors]
+        val lifted = buildPredicate(filter.lifting(FacetDimension.HAS_ERRORS)) and active()
+        val withErrors = joined().selectAll().where { lifted and (errors greater 0) }.count()
+        val clean = joined().selectAll().where { lifted and ((errors eq 0) or errors.isNull()) }.count()
+        FacetsResponse(
+            type = type.sortedBy { it.value },
+            lifecycle = lifecycle.sortedBy { it.value },
+            domain = domain.sortedBy { it.name.lowercase() },
+            system = system.sortedBy { it.name.lowercase() },
+            ownerTeam = ownerTeam.sortedBy { it.name.lowercase() },
+            hasErrors = ErrorFacets(withErrors, clean),
+        )
+    }
+
     /** Domain → System → Contract, for the hierarchy page — registry-scale, unpaged; the filters narrow the contracts. */
     suspend fun tree(filter: ContractListFilter, viewer: Viewer): TreeResponse = suspendTransaction(database) {
         val domains = DomainService.Domains
@@ -217,8 +252,8 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
         val predicate = buildPredicate(filter) and active()
         val contractRows = joined().selectAll().where { predicate }
             .orderBy(Contracts.name.lowerCase() to SortOrder.ASC, Contracts.id to SortOrder.ASC).toList()
-        val counts = versionCounts(contractRows.map { it[Contracts.id].value })
-        val bySystem = contractRows.groupBy({ it[Contracts.systemId].value }, { it.toTreeContract(viewer, counts) })
+        val facts = facts(contractRows.map { it[Contracts.id].value }, viewer)
+        val bySystem = contractRows.groupBy({ it[Contracts.systemId].value }, { it.toTreeContract(viewer, facts) })
         val systemsByDomain = systemRows.groupBy { it[systems.domainId].value }
         TreeResponse(
             domains = domainRows.map { d ->
@@ -259,6 +294,25 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
         }
     }
 
+    /** The contract's name for a notification's params — deleted rows included (the deletion itself notifies). */
+    suspend fun nameOf(id: UInt): String? = suspendTransaction(database) {
+        Contracts.select(Contracts.name).where { Contracts.id eq id }.map { it[Contracts.name] }.toList().singleOrNull()
+    }
+
+    /** The per-row aggregates one read gathers beside the join: version counts, follower counts, the caller's follows (V13). */
+    private data class RowFacts(val versionCounts: Map<UInt, Int>, val subscriberCounts: Map<UInt, Int>, val subscribed: Set<UInt>)
+
+    private suspend fun facts(ids: List<UInt>, viewer: Viewer): RowFacts {
+        if (ids.isEmpty()) return RowFacts(emptyMap(), emptyMap(), emptySet())
+        val s = ContractSubscriptionService.ContractSubscriptions
+        val count = s.userId.count()
+        val subscriberCounts = s.select(s.contractId, count).where { s.contractId inList ids }.groupBy(s.contractId)
+            .map { it[s.contractId].value to it[count].toInt() }.toList().toMap()
+        val subscribed = s.select(s.contractId).where { (s.contractId inList ids) and (s.userId eq viewer.caller.userId) }
+            .map { it[s.contractId].value }.toList().toSet()
+        return RowFacts(versionCounts(ids), subscriberCounts, subscribed)
+    }
+
     private suspend fun versionCounts(ids: List<UInt>): Map<UInt, Int> {
         if (ids.isEmpty()) return emptyMap()
         val v = ContractVersionService.ContractVersions
@@ -267,6 +321,10 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
             .where { (v.contractId inList ids) and (v.markedAsDeleted eq false) }
             .groupBy(v.contractId)
             .map { it[v.contractId].value to it[count].toInt() }.toList().toMap()
+    }
+
+    private companion object {
+        const val NO_VERSION_FACET = "NONE"
     }
 
     private fun buildPredicate(filter: ContractListFilter): Op<Boolean> {
@@ -318,7 +376,7 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
         )
     }
 
-    private fun ResultRow.toResponse(viewer: Viewer, counts: Map<UInt, Int>): ContractResponse {
+    private fun ResultRow.toResponse(viewer: Viewer, facts: RowFacts): ContractResponse {
         val id = this[Contracts.id].value
         return ContractResponse(
             id = id,
@@ -329,15 +387,17 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
             description = this[Contracts.description],
             owner = owner(),
             latestVersion = latestVersion(),
-            versionCount = counts[id] ?: 0,
+            versionCount = facts.versionCounts[id] ?: 0,
             canWrite = canWriteContract(viewer.caller, ownership(), viewer.teamIds),
+            subscribed = id in facts.subscribed,
+            subscriberCount = facts.subscriberCounts[id] ?: 0,
             createdBy = this[Contracts.createdBy].value,
             createdAt = this[Contracts.createdAt],
             updatedAt = this[Contracts.updatedAt],
         )
     }
 
-    private fun ResultRow.toTreeContract(viewer: Viewer, counts: Map<UInt, Int>): TreeContract {
+    private fun ResultRow.toTreeContract(viewer: Viewer, facts: RowFacts): TreeContract {
         val id = this[Contracts.id].value
         return TreeContract(
             id = id,
@@ -345,8 +405,10 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
             type = ContractType.valueOf(this[Contracts.type]),
             owner = owner(),
             latestVersion = latestVersion(),
-            versionCount = counts[id] ?: 0,
+            versionCount = facts.versionCounts[id] ?: 0,
             canWrite = canWriteContract(viewer.caller, ownership(), viewer.teamIds),
+            subscribed = id in facts.subscribed,
+            subscriberCount = facts.subscriberCounts[id] ?: 0,
         )
     }
 }

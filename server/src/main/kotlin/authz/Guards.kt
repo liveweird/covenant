@@ -26,3 +26,8 @@ fun requireSelfOrAdmin(caller: CallerPrincipal, targetUserId: UInt) {
     if (caller.isAdmin()) return
     if (caller.userId != targetUserId) throw ForbiddenException("Caller may only act on their own user")
 }
+
+/** Notifications are personal: recipient-only for everyone — ADMIN (a management role) included. */
+fun requireNotificationRecipient(caller: CallerPrincipal, recipientId: UInt) {
+    if (caller.userId != recipientId) throw ForbiddenException("Caller may only access their own notifications")
+}

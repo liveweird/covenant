@@ -14,6 +14,7 @@ import enChangelog from "./locales/en/changelog.json";
 import enDomains from "./locales/en/domains.json";
 import enContracts from "./locales/en/contracts.json";
 import enFindings from "./locales/en/findings.json";
+import enNotifications from "./locales/en/notifications.json";
 import enHierarchy from "./locales/en/hierarchy.json";
 import enSystems from "./locales/en/systems.json";
 import enTeams from "./locales/en/teams.json";
@@ -62,6 +63,7 @@ export const en = {
   domains: enDomains,
   contracts: enContracts,
   findings: enFindings,
+  notifications: enNotifications,
   hierarchy: enHierarchy,
   systems: enSystems,
   teams: enTeams,

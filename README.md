@@ -48,6 +48,9 @@ export for the commit back.
   actions, and a server-side contract search),
 - breaking-change detection against the active version (openapi-diff, `@asyncapi/diff`, a
   hand-written ODCS comparer) — a non-major bump that breaks clients is a waivable blocking finding,
+- facet counts on the catalog filters — every option says how many contracts picking it would yield,
+- in-app notifications: follow a contract and its every event — versions created, edited, published,
+  synced, a breaking change waived, the owner changed — lands in your bell (never for your own acts),
 - a per-contract history timeline, and a repo reference per version with sync-from-source
   (which side moved, a line diff, overwrite or a new version from the repo copy),
 - every quality gate wired, locally and in CI.

@@ -4,7 +4,7 @@ import { Link as RouterLink } from "react-router-dom";
 import { ActionIcon, Alert, Box, Button, Group, Stack, Text, Tooltip } from "@mantine/core";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { IconChevronDown, IconChevronRight, IconChevronsDown, IconChevronsUp, IconFileImport, IconFolders, IconPlus, IconServer2, IconSitemap } from "@tabler/icons-react";
-import { getContractTree, type TreeContract, type TreeDomain, type TreeSystem } from "../api/contracts";
+import { getContractFacets, getContractTree, type TreeContract, type TreeDomain, type TreeSystem } from "../api/contracts";
 import CheckSummaryBadges from "../components/CheckSummaryBadges";
 import ContractFilterControls from "../components/ContractFilterControls";
 import ContractNameLink from "../components/ContractNameLink";
@@ -105,6 +105,12 @@ export default function Hierarchy() {
   const { t } = useTranslation();
   const filters = useContractFilterState(SETTINGS_KEY);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  // The facet counts ride the same filters; a stale count while the next one loads beats a flicker.
+  const facets = useQuery({
+    queryKey: ["contracts", "facets", filters.values],
+    queryFn: () => getContractFacets(filters.values),
+    placeholderData: keepPreviousData,
+  });
   const { data, isPending, isError, error } = useQuery({
     queryKey: ["contracts", "tree", filters.values],
     queryFn: () => getContractTree(filters.values),
@@ -155,7 +161,7 @@ export default function Hierarchy() {
           </Group>
         }
       >
-        <ContractFilterControls filters={filters} />
+        <ContractFilterControls filters={filters} facets={facets.data ?? null} />
       </FilterPanel>
       {isError && (
         <Alert color="red" variant="light" title={t("hierarchy.loadFailed")}>

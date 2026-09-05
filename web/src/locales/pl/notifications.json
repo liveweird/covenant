@@ -1,0 +1,31 @@
+{
+  "title": "Powiadomienia",
+  "unread_one": "{{count}} nieprzeczytane",
+  "unread_few": "{{count}} nieprzeczytane",
+  "unread_many": "{{count}} nieprzeczytanych",
+  "unread_other": "{{count}} nieprzeczytanych",
+  "loadError": "Nie udało się wczytać powiadomień",
+  "empty": "Brak powiadomień — obserwuj kontrakt, aby dowiadywać się o jego zmianach.",
+  "markSeen": "Oznacz jako przeczytane",
+  "markAllSeen": "Oznacz wszystkie jako przeczytane",
+  "markSeenAria": "Oznacz powiadomienie {{id}} jako przeczytane",
+  "markUnseen": "Oznacz jako nieprzeczytane",
+  "markUnseenAria": "Oznacz powiadomienie {{id}} jako nieprzeczytane",
+  "goTo": "Otwórz",
+  "goToAria": "Otwórz temat powiadomienia {{id}}",
+  "delete": "Usuń",
+  "deleteAria": "Usuń powiadomienie {{id}}",
+  "event": {
+    "CONTRACT_UPDATED": "{{actor}} zaktualizował/a dane kontraktu {{contractName}}.",
+    "CONTRACT_OWNER_CHANGED": "{{actor}} zmienił/a właściciela kontraktu {{contractName}}.",
+    "CONTRACT_DELETED": "{{actor}} usunął/ęła kontrakt {{contractName}}.",
+    "VERSION_CREATED": "{{actor}} utworzył/a wersję {{version}} kontraktu {{contractName}}.",
+    "VERSION_CONTENT_UPDATED": "{{actor}} edytował/a dokument {{contractName}} {{version}}.",
+    "VERSION_TRANSITIONED": "{{actor}} przeniósł/osła {{contractName}} {{version}} z {{from}} do {{to}}.",
+    "VERSION_DELETED": "{{actor}} usunął/ęła wersję {{version}} kontraktu {{contractName}}.",
+    "VERSION_SYNCED": "{{actor}} zsynchronizował/a {{contractName}} {{version}} ze źródłem.",
+    "VERSION_SOURCE_CHANGED": "{{actor}} zmienił/a powiązanie ze źródłem {{contractName}} {{version}}.",
+    "VERSION_IMPORTED": "{{actor}} zaimportował/a wersję {{version}} kontraktu {{contractName}}.",
+    "VERSION_BREAKING_STORED": "{{contractName}} {{version}} zapisano ze zmianą łamiącą bez podniesienia wersji głównej."
+  }
+}

@@ -3,7 +3,7 @@ import { Link as RouterLink } from "react-router-dom";
 import { Alert, Button, Group, Menu, Stack, Table, Text, Tooltip } from "@mantine/core";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconFileImport, IconFileText, IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
-import { deleteContract, listContracts, type ContractResponse } from "../api/contracts";
+import { deleteContract, getContractFacets, listContracts, type ContractResponse } from "../api/contracts";
 import CheckSummaryBadges from "../components/CheckSummaryBadges";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import ContractFilterControls from "../components/ContractFilterControls";
@@ -41,6 +41,12 @@ export default function Contracts() {
   const { page, setPage, pageSize, setPageSize, sortField, sortDir, sortParam, toggleSort } =
     usePagedSort<SortField>("name", filters.deps, { key: SETTINGS_KEY, sortFields: SORT_FIELDS });
 
+  // The facet counts ride the same filters; a stale count while the next one loads beats a flicker.
+  const facets = useQuery({
+    queryKey: ["contracts", "facets", filters.values],
+    queryFn: () => getContractFacets(filters.values),
+    placeholderData: keepPreviousData,
+  });
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["contracts", "list", page, pageSize, sortParam, filters.values],
     queryFn: () => listContracts({ page, pageSize, sort: sortParam, ...filters.values }),
@@ -71,7 +77,7 @@ export default function Contracts() {
         }
       />
       <FilterPanel activeFilterCount={filters.activeCount} storageKey={SETTINGS_KEY}>
-        <ContractFilterControls filters={filters} />
+        <ContractFilterControls filters={filters} facets={facets.data ?? null} />
       </FilterPanel>
       {isError && (
         <Alert color="red" variant="light" title={t("contracts.loadFailed")}>

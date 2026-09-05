@@ -135,5 +135,11 @@
       "owner": "Z {{from}} na {{to}}",
       "source": "Źródło: {{url}}"
     }
+  },
+  "follow": {
+    "follow": "Obserwuj",
+    "following": "Obserwujesz",
+    "count": "Obserwujących: {{count}}",
+    "failed": "Nie udało się zmienić obserwowania"
   }
 }
