@@ -27,5 +27,6 @@
   "jumpTo": "Przejdź do linii {{line}}, kolumny {{column}}",
   "incompleteTitle": "Sprawdzenia niepełne",
   "incompleteBody": "Moduł lint i sprawdzeń semantycznych był niedostępny — wykonano tylko wbudowane sprawdzenia składni i schematu. Uruchom sprawdzenia ponownie później.",
-  "hard": "Składnia"
+  "hard": "Składnia",
+  "baseline": "Porównano z aktywną wersją {{version}} pod kątem zmian łamiących"
 }

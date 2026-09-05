@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { renderWithProviders, screen, waitFor, within } from "../test/render";
 import { Route, Routes } from "react-router-dom";
 import ContractDetails from "./ContractDetails";
-import { calledUrl, CONTRACT, findCall, serve, signIn, VERSION_PAGE, type FetchMock } from "../test/contractsFixtures";
+import { calledUrl, CONTRACT, EVENTS_PAGE, findCall, serve, signIn, VERSION_PAGE, type FetchMock } from "../test/contractsFixtures";
 
 function renderPage() {
   return renderWithProviders(
@@ -35,6 +35,7 @@ describe("ContractDetails page", () => {
     serve(mockFetch, {
       "GET /api/v1/contracts/5": { status: 200, body: CONTRACT },
       "GET /api/v1/contracts/5/versions?": { status: 200, body: VERSION_PAGE },
+      "GET /api/v1/contracts/5/events?": { status: 200, body: EVENTS_PAGE },
     });
     renderPage();
     expect(await screen.findByRole("heading", { level: 2, name: "orders-api" })).toBeInTheDocument();
@@ -46,12 +47,16 @@ describe("ContractDetails page", () => {
     expect(screen.getByRole("link", { name: "Compare versions" })).toHaveAttribute("href", "/contracts/5/diff");
     expect(calledUrl(mockFetch, "GET", (u) => u.startsWith("/api/v1/contracts/5/versions?") && u.includes("sort=-version"))).toBeDefined();
     expect(screen.getByText("Active")).toBeInTheDocument();
+    const history = await screen.findByRole("region", { name: "History" });
+    expect(within(history).getByText("Version 1.0.0: Proposed → Active")).toBeInTheDocument();
+    expect(within(history).getByText("Contract created (OpenAPI)")).toBeInTheDocument();
   });
 
   test("a reader has no write actions; the More menu still exports", async () => {
     serve(mockFetch, {
       "GET /api/v1/contracts/5": { status: 200, body: { ...CONTRACT, canWrite: false } },
       "GET /api/v1/contracts/5/versions?": { status: 200, body: VERSION_PAGE },
+      "GET /api/v1/contracts/5/events?": { status: 200, body: EVENTS_PAGE },
       "GET /api/v1/contracts/5/export": { status: 200, body: { contract: CONTRACT, versions: [] } },
     });
     const user = userEvent.setup();
@@ -74,6 +79,7 @@ describe("ContractDetails page", () => {
     serve(mockFetch, {
       "GET /api/v1/contracts/5": { status: 200, body: CONTRACT },
       "GET /api/v1/contracts/5/versions?": { status: 200, body: VERSION_PAGE },
+      "GET /api/v1/contracts/5/events?": { status: 200, body: EVENTS_PAGE },
       "DELETE /api/v1/contracts/5/versions/11": { status: 204 },
     });
     const user = userEvent.setup();
@@ -93,6 +99,7 @@ describe("ContractDetails page", () => {
     serve(mockFetch, {
       "GET /api/v1/contracts/5": { status: 200, body: CONTRACT },
       "GET /api/v1/contracts/5/versions?": { status: 200, body: VERSION_PAGE },
+      "GET /api/v1/contracts/5/events?": { status: 200, body: EVENTS_PAGE },
       "GET /api/v1/contracts/5/versions/10/content": () => ({ status: 200, body: { raw: true } }),
     });
     const user = userEvent.setup();
@@ -106,6 +113,7 @@ describe("ContractDetails page", () => {
     serve(mockFetch, {
       "GET /api/v1/contracts/5": { status: 200, body: CONTRACT },
       "GET /api/v1/contracts/5/versions?": { status: 200, body: VERSION_PAGE },
+      "GET /api/v1/contracts/5/events?": { status: 200, body: EVENTS_PAGE },
       "DELETE /api/v1/contracts/5": { status: 409, body: { title: "Conflict", status: 409 } },
     });
     const user = userEvent.setup();

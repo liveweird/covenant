@@ -113,6 +113,13 @@ dependencies {
     implementation(libs.jackson.dataformat.yaml)
     implementation(libs.jackson.module.kotlin)
     implementation(libs.swagger.parser.v3)
+    // Breaking-change detection between OpenAPI versions. The aggregator parser (+ its Swagger 2.0
+    // converter) and the HTML renderer are dead weight here — see the `openapi-diff` catalog note.
+    implementation(libs.openapi.diff.core) {
+        exclude(group = "io.swagger.parser.v3", module = "swagger-parser")
+        exclude(group = "io.swagger.parser.v3", module = "swagger-parser-v2-converter")
+        exclude(group = "com.j2html")
+    }
     implementation(libs.json.schema.validator)
     implementation(libs.avro) {
         exclude(group = "org.xerial.snappy")

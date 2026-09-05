@@ -82,7 +82,11 @@ components:
           description: The raw document text (YAML or JSON), at most CHECKER_MAX_BYTES.
         previousContent:
           type: string
-          description: Reserved for breaking-change detection (milestone 2).
+          description: |
+            The ACTIVE version's text the JVM chose as the breaking-change baseline. ASYNCAPI only:
+            it adds one BREAKING finding per breaking change @asyncapi/diff reports (minted WARN —
+            the JVM settles WARN vs INFO by the MAJOR bump and adds its gate), or a single INFO
+            `asyncapi-diff-skipped` when the pair cannot be compared. Ignored for other types.
     CheckResponse:
       type: object
       required: [findings, engine]

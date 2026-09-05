@@ -57,6 +57,8 @@ data class CheckReport(
     val infos: Int,
     /** False when the checker sidecar could not be reached — its LINT/SEMANTIC verdicts are missing. */
     val checkerAvailable: Boolean,
+    /** The ACTIVE version the document was compared against for breaking changes; null when none applied. */
+    val baselineVersion: String? = null,
 ) {
     val hardFindings: List<Finding> get() = findings.filter { it.hard }
     val softErrors: List<Finding> get() = findings.filter { !it.hard && it.severity == Severity.ERROR }
@@ -67,6 +69,7 @@ data class CheckReport(
             metadata: DocumentMetadata?,
             findings: List<Finding>,
             checkerAvailable: Boolean,
+            baselineVersion: String? = null,
         ): CheckReport {
             val sorted = findings.sortedWith(
                 compareBy<Finding>({ it.severity.ordinal }, { it.line ?: Int.MAX_VALUE }, { it.code }),
@@ -92,6 +95,7 @@ data class CheckReport(
                 warnings = capped.count { it.severity == Severity.WARN },
                 infos = capped.count { it.severity == Severity.INFO },
                 checkerAvailable = checkerAvailable,
+                baselineVersion = baselineVersion,
             )
         }
     }

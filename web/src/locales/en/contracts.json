@@ -109,5 +109,27 @@
     "deleted": "Contract deleted",
     "exported": "Export downloaded",
     "imported": "Document imported"
+  },
+  "history": {
+    "title": "History",
+    "empty": "No history yet.",
+    "ownerTeam": "team #{{id}}",
+    "ownerUser": "person #{{id}}",
+    "event": {
+      "created": "Contract created ({{type}})",
+      "updated": "Details updated",
+      "ownerChanged": "Owner changed",
+      "deleted": "Contract deleted",
+      "versionCreated": "Version {{version}} created",
+      "versionContentUpdated": "Version {{version}}: document updated",
+      "versionTransitioned": "Version {{version}}: {{from}} → {{to}}",
+      "versionRechecked": "Version {{version}} re-checked",
+      "versionDeleted": "Version {{version}} deleted",
+      "imported": "Version {{version}} imported"
+    },
+    "detail": {
+      "name": "Name: {{name}}",
+      "owner": "From {{from}} to {{to}}"
+    }
   }
 }

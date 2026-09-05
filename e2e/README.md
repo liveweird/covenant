@@ -87,8 +87,10 @@ the same commit** — this list is the coverage map, the scenario file is the de
 - [`contracts.spec.ts`](scenarios/contracts.md) — the core loop: import an OpenAPI document as a
   contract's first version (name/version prefilled from the document) → a minor version with a
   broken `$ref` stored through Save-anyway → the two compared → 1.0.0 proposed and activated (text
-  locked) → downloaded → teardown through the delete rules (draft deletes, an active version blocks
-  the contract, deprecate → retire, then delete); a regular user's read-only tree, page and list.
+  locked) → downloaded → a breaking change against it flagged by the live check until the Major
+  bump → the History section read → teardown through the delete rules (draft deletes, an active
+  version blocks the contract, deprecate → retire, then delete); a regular user's read-only tree,
+  page and list.
 - [`i18n.spec.ts`](scenarios/i18n.md) — the synced per-user language: a throwaway user
   switches to Polish, the choice survives a reload AND a wiped-device re-login (served from
   the stored value), and the admin's English flips it back; seeded accounts stay English.

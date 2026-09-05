@@ -2,6 +2,7 @@ package ch.nokillswit.contracts
 
 import ch.nokillswit.authz.ConflictException
 import ch.nokillswit.authz.NotFoundException
+import ch.nokillswit.contracts.checks.Baseline
 import ch.nokillswit.contracts.checks.CheckReport
 import ch.nokillswit.contracts.checks.ChecksService
 import ch.nokillswit.contracts.checks.DocumentFormat
@@ -98,7 +99,10 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
         allowInvalid: Boolean,
     ): VersionSaveResult {
         val semver = SemVer.parse(request.version)
-        val report = checks.check(type, request.content, declaredVersion = request.version, lifecycle = Lifecycle.DRAFT)
+        val baseline = baselineFor(contractId, semver)
+        val report = checks.check(
+            type, request.content, declaredVersion = request.version, lifecycle = Lifecycle.DRAFT, baseline = baseline,
+        )
         val waived = requireOrWaive(report, allowInvalid)
         return suspendTransaction(database) {
             requireContract(contractId)
@@ -154,7 +158,8 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
         if (!current.lifecycle.contentEditable) throw ConflictException(
             "A ${current.lifecycle} version's document is read-only — create a new version instead",
         )
-        val report = checks.check(type, content, declaredVersion = current.version, lifecycle = current.lifecycle)
+        val baseline = baselineFor(contractId, SemVer.parse(current.version))
+        val report = checks.check(type, content, declaredVersion = current.version, lifecycle = current.lifecycle, baseline = baseline)
         val waived = requireOrWaive(report, allowInvalid)
         return suspendTransaction(database) {
             val stamp = now()
@@ -191,7 +196,10 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
         val current = suspendTransaction(
             database,
         ) { rowOf(contractId, versionId)?.toResponse() } ?: throw NotFoundException("Version not found")
-        val report = checks.check(type, current.content, declaredVersion = current.version, lifecycle = current.lifecycle)
+        val baseline = baselineFor(contractId, SemVer.parse(current.version))
+        val report = checks.check(
+            type, current.content, declaredVersion = current.version, lifecycle = current.lifecycle, baseline = baseline,
+        )
         return suspendTransaction(database) {
             ContractVersions.update({ (ContractVersions.id eq versionId) and active() }) {
                 it[findings] = json.encodeToString(findingsSerializer, report.findings)
@@ -241,6 +249,22 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
 
     /** The highest active version of a contract, in full SemVer precedence — or null. */
     suspend fun highestOf(contractId: UInt): SemVer? = suspendTransaction(database) { highest(contractId) }
+
+    /**
+     * The breaking-change baseline for a candidate: the contract's highest ACTIVE version strictly
+     * BELOW it (a recheck of an older version compares against ITS predecessor, never a successor);
+     * no `below` = the highest ACTIVE version. Null when nothing is published yet.
+     */
+    suspend fun baselineFor(contractId: UInt, below: SemVer?): Baseline? = suspendTransaction(database) {
+        val v = ContractVersions
+        v.select(v.version, v.content)
+            .where { (v.contractId eq contractId) and (v.lifecycle eq Lifecycle.ACTIVE.name) and active() }
+            .map { SemVer.parse(it[v.version]) to it[v.content] }
+            .toList()
+            .filter { (semver, _) -> below == null || semver < below }
+            .maxByOrNull { it.first }
+            ?.let { (semver, content) -> Baseline(semver, content) }
+    }
 
     // ---- internals -----------------------------------------------------------------------
 

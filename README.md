@@ -16,8 +16,8 @@ No new standard is invented: a contract *version* is the standard document itsel
 byte-exact. Around it Covenant adds what the standards leave to the team — **SemVer versions**,
 a **lifecycle** (draft → proposed → active → deprecated → retired), **ownership** (a team, or an
 individual user), a searchable **Domain → System → Contract** hierarchy, and **validation**:
-syntax, schema, semantic and lint checks on every document, with breaking-change detection
-between versions to follow. Contracts live and are edited in Git; Covenant works like a catalog —
+syntax, schema, semantic and lint checks on every document, and **breaking-change detection**
+against the active version (a non-major bump that breaks clients is a waivable blocking finding). Contracts live and are edited in Git; Covenant works like a catalog —
 import (paste, file, or a Git blob URL), view and edit in a code editor, validate, diff versions,
 export for the commit back.
 
@@ -48,9 +48,7 @@ export for the commit back.
   actions, and a server-side contract search),
 - every quality gate wired, locally and in CI.
 
-Coming next: breaking-change detection between versions (openapi-diff, `@asyncapi/diff`) as a
-waivable finding on non-major bumps, sync from the Git repository, and the per-contract history
-timeline.
+Coming next: sync from the Git repository.
 
 ## The stack
 

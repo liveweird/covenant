@@ -53,7 +53,9 @@ export default function VersionPage() {
   const stored = version.data;
   const text = editing ? (draft ?? stored?.content ?? "") : (stored?.content ?? "");
   const type = contract.data?.type ?? "OPENAPI";
-  const check = useDocumentCheck({ type, content: editing ? text : "", version: stored?.version ?? null });
+  // Naming the contract adds the breaking-change comparison against its highest ACTIVE version
+  // (an unparsable URL id is NaN, which the hook's JSON body carries as null — no branch needed).
+  const check = useDocumentCheck({ type, content: editing ? text : "", version: stored?.version ?? null, contractId: id });
   const storedFindings = stored?.findings;
   const liveFindings = check.findings;
   const findings = useMemo(() => (editing ? liveFindings : (storedFindings ?? [])), [editing, liveFindings, storedFindings]);
@@ -170,6 +172,7 @@ export default function VersionPage() {
                 mode={editing ? "live" : "stored"}
                 checked={!editing || check.checked}
                 checkComplete={editing ? (check.report?.checkerAvailable ?? true) : stored.checkComplete}
+                baselineVersion={check.report?.baselineVersion}
                 onJump={(f) => f.line != null && setJump({ line: f.line, column: f.column, nonce: Date.now() })}
               />
             </Paper>

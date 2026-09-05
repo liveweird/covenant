@@ -316,12 +316,15 @@ object TestChecker {
     class Stub(private val findings: List<ch.nokillswit.contracts.checks.Finding>, private val fail: Boolean = false) :
         ch.nokillswit.contracts.checks.CheckerClient {
         var calls = 0
+        /** What the last call carried as the breaking-change baseline (ASYNCAPI only, by the pipeline's rule). */
+        var lastPreviousContent: String? = null
         override suspend fun check(
             type: ch.nokillswit.contracts.ContractType,
             content: String,
             previousContent: String?,
         ): ch.nokillswit.contracts.checks.CheckerResponse {
             calls++
+            lastPreviousContent = previousContent
             if (fail) throw ch.nokillswit.contracts.checks.CheckerUnavailableException("stub outage")
             return ch.nokillswit.contracts.checks.CheckerResponse(findings)
         }

@@ -7,6 +7,7 @@ import { deleteContract, exportContract, getContract } from "../api/contracts";
 import { ApiError } from "../api/http";
 import { deleteVersion, listVersions, type VersionListItem } from "../api/versions";
 import CheckSummaryBadges from "../components/CheckSummaryBadges";
+import ContractHistory from "../components/ContractHistory";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import EditPageLoadState from "../components/EditPageLoadState";
 import EmptyState from "../components/EmptyState";
@@ -279,6 +280,7 @@ export default function ContractDetails() {
         </Table.Tbody>
       </Table>
       <PaginationBar total={versions.data?.total ?? 0} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} />
+      <ContractHistory contractId={id} />
       <ConfirmDeleteModal
         confirm={removeVersion}
         title={t("versions.deleteTitle")}

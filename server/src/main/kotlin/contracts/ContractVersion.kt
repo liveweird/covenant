@@ -31,6 +31,8 @@ data class DocumentCheckRequest(
     val content: String,
     /** When known, the SemVer the document is (to be) stored as — drives the version cross-check. */
     val version: String? = null,
+    /** When known, the contract the document belongs to — its highest ACTIVE version below `version` is the breaking baseline. */
+    val contractId: UInt? = null,
 )
 
 @Serializable

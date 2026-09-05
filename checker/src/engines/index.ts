@@ -35,4 +35,5 @@ export const ENGINES: readonly EngineVersion[] = [
   { name: "@stoplight/spectral-core", version: versionOf("@stoplight/spectral-core") },
   { name: "@stoplight/spectral-rulesets", version: versionOf("@stoplight/spectral-rulesets") },
   { name: "@asyncapi/parser", version: versionOf("@asyncapi/parser") },
+  { name: "@asyncapi/diff", version: versionOf("@asyncapi/diff") },
 ];

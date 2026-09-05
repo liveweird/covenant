@@ -29,7 +29,17 @@
      locked).
 8. They download the document from the More menu.
    - *Expected*: the file is named `<system>__<contract>__1.0.0.yaml`.
-9. Teardown through the rules: the 1.1.0 draft deletes from its row; deleting the contract is
+9. They start another new version, paste the document with the required `Pet.name` property
+   removed, and bump Minor (1.2.0).
+   - *Expected*: the findings panel says it compared against active version 1.0.0 and lists the
+     `CHANGED_RESPONSE` breaking change plus the blocking `BREAKING_WITHOUT_MAJOR_BUMP` finding.
+10. They bump Major (2.0.0).
+    - *Expected*: the blocking finding disappears while the breaking change stays listed as a
+      note; they go back without saving.
+11. Back on the contract page they read the History section.
+    - *Expected*: it lists "Version 1.0.0: Proposed → Active", "Version 1.1.0 created" and
+      "Version 1.0.0 imported" as localized lines.
+12. Teardown through the rules: the 1.1.0 draft deletes from its row; deleting the contract is
    refused while 1.0.0 is active ("still has active or deprecated versions"); they deprecate and
    retire 1.0.0 (each behind a confirm), delete the contract, then the system, domain and team.
    - *Expected*: each step lands where described; the contract delete returns to the list.

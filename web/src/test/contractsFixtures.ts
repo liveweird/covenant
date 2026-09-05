@@ -42,6 +42,8 @@ export const FINDING = { severity: "WARN" as const, source: "LINT" as const, cod
 export const SOFT_ERROR = { severity: "ERROR" as const, source: "SCHEMA" as const, code: "OAS_PARSE", message: "paths is required", path: "/", line: 1, column: 1 };
 export const VERSION = { ...VERSION_ITEM, content: CONTENT, contentSha256: "a".repeat(64), docDescription: null, findings: [FINDING], checkedAt: 2 };
 export const OLD_VERSION = { ...OLD_VERSION_ITEM, content: OLD_CONTENT, contentSha256: "b".repeat(64), docDescription: null, findings: [], checkedAt: 2 };
+export const EVENT = { id: 31, contractId: 5, userId: 1, userName: "Ada Admin", timestamp: 1_700_000_000_000, type: "VERSION_TRANSITIONED" as const, params: { version: "1.0.0", from: "PROPOSED", to: "ACTIVE" } };
+export const EVENTS_PAGE = { items: [EVENT, { ...EVENT, id: 30, type: "CREATED" as const, params: { name: "orders-api", type: "OPENAPI" } }], page: 1, pageSize: 10, total: 2 };
 export const CLEAN_REPORT = { format: "yaml", specVersion: "3.1.0", title: "Orders", description: null, declaredVersion: "1.1.0", findings: [], errors: 0, warnings: 0, infos: 0, checkerAvailable: true };
 export const TREE = {
   domains: [

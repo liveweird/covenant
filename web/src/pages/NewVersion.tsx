@@ -65,7 +65,9 @@ export default function NewVersion() {
   const effectiveContent =
     content ?? (copyFrom != null ? (source.data?.content ?? "") : type ? blankTemplate(type, effectiveVersion, contract.data?.name ?? "") : "");
   const format = detectFormat(effectiveContent);
-  const check = useDocumentCheck({ type: type ?? "OPENAPI", content: type ? effectiveContent : "", version: effectiveVersion || null });
+  // Naming the contract adds the breaking-change comparison against its highest ACTIVE version
+  // (an unparsable URL id is NaN, which the hook's JSON body carries as null — no branch needed).
+  const check = useDocumentCheck({ type: type ?? "OPENAPI", content: type ? effectiveContent : "", version: effectiveVersion || null, contractId: id });
   const diagnostics = useMemo(() => toDiagnostics(check.findings, effectiveContent), [check.findings, effectiveContent]);
 
   const versionError = (() => {
@@ -188,6 +190,7 @@ export default function NewVersion() {
                 mode="live"
                 checked={check.checked}
                 checkComplete={check.report?.checkerAvailable ?? true}
+                baselineVersion={check.report?.baselineVersion}
                 onJump={(f) => f.line != null && setJump({ line: f.line, column: f.column, nonce: Date.now() })}
               />
             </Paper>

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import { check } from "../src/check.ts";
+import type { Finding } from "../src/findings.ts";
 
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
 
@@ -73,5 +74,41 @@ describe("check — ODCS", () => {
   test("is accepted and answers no findings (the JVM owns ODCS in milestone 1)", async () => {
     const { findings } = await check({ type: "ODCS", content: fixture("odcs/minimal-3.1.yaml") });
     expect(findings).toEqual([]);
+  });
+});
+
+describe("check — ASYNCAPI breaking changes (previousContent)", () => {
+  const current = fixture("asyncapi/streetlights-3.0.yaml");
+  const breaking = (findings: Finding[]) => findings.filter((f) => f.source === "BREAKING");
+
+  test("the same document, and a bumped info.version, carry no BREAKING findings", async () => {
+    const same = await check({ type: "ASYNCAPI", content: current, previousContent: current });
+    expect(breaking(same.findings)).toEqual([]);
+    const bumped = await check({ type: "ASYNCAPI", content: current.replace("version: 1.0.0", "version: 2.0.0"), previousContent: current });
+    expect(breaking(bumped.findings)).toEqual([]);
+  });
+
+  test("a changed server protocol is one WARN BREAKING edit fact at its pointer, before → after in the message", async () => {
+    const { findings } = await check({ type: "ASYNCAPI", content: current.replace("protocol: kafka", "protocol: mqtt"), previousContent: current });
+    expect(breaking(findings)).toEqual([
+      { severity: "WARN", source: "BREAKING", code: "breaking-edit", path: "/servers/production/protocol", message: "Changed /servers/production/protocol (kafka → mqtt)" },
+    ]);
+  });
+
+  test("a baseline of another AsyncAPI major version is a single INFO skip, never a failure", async () => {
+    const { findings } = await check({ type: "ASYNCAPI", content: current, previousContent: fixture("asyncapi/streetlights-2.6.yaml") });
+    expect(breaking(findings)).toEqual([expect.objectContaining({ severity: "INFO", source: "BREAKING", code: "asyncapi-diff-skipped" })]);
+  });
+
+  test("an unparseable baseline is skipped too", async () => {
+    const { findings } = await check({ type: "ASYNCAPI", content: current, previousContent: "asyncapi: 3.0.0\ninfo: [oops\n" });
+    expect(breaking(findings).map((f) => f.code)).toEqual(["asyncapi-diff-skipped"]);
+  });
+
+  test("OPENAPI ignores previousContent — the JVM computes its breaking changes", async () => {
+    const doc = fixture("openapi/petstore-3.1.yaml");
+    const plain = await check({ type: "OPENAPI", content: doc });
+    const withPrevious = await check({ type: "OPENAPI", content: doc, previousContent: doc.replace("/pets", "/animals") });
+    expect(withPrevious.findings).toEqual(plain.findings);
   });
 });

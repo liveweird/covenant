@@ -567,9 +567,13 @@ export interface paths {
         /**
          * Live-check a document without storing it
          * @description Any authenticated user. The same pipeline every store path runs — syntax → type gate →
-         *     schema/semantic (JVM) → lint/semantic (the checker sidecar) → cross-checks — returned as
-         *     findings-so-far: a broken document is a `200` whose report carries the HARD finding, never
-         *     a `400`. Pass `version` to get the declared-version cross-check. Nothing stored, no audit.
+         *     schema/semantic (JVM) → lint/semantic (the checker sidecar) → breaking changes →
+         *     cross-checks — returned as findings-so-far: a broken document is a `200` whose report
+         *     carries the HARD finding, never a `400`. Pass `version` to get the declared-version
+         *     cross-check; pass `contractId` too and the document is compared against that contract's
+         *     highest ACTIVE version below `version` (the report's `baselineVersion`): each breaking
+         *     change is a `BREAKING` finding — INFO once `version` carries the MAJOR bump, otherwise
+         *     WARN plus one soft ERROR `BREAKING_WITHOUT_MAJOR_BUMP`. Nothing stored, no audit.
          */
         post: operations["checkDocument"];
         delete?: never;
@@ -1282,12 +1286,16 @@ export interface components {
             infos: number;
             /** @description False when the checker sidecar could not be reached — its LINT/SEMANTIC verdicts are missing. */
             checkerAvailable: boolean;
+            /** @description The ACTIVE version the document was compared against for breaking changes; null when none applied. */
+            baselineVersion?: string | null;
         };
         DocumentCheckRequest: {
             type: components["schemas"]["ContractType"];
             content: string;
             /** @description The SemVer the document is (to be) stored as — drives the version cross-check. */
             version?: string | null;
+            /** @description The contract the document belongs to — its highest ACTIVE version below `version` becomes the breaking-change baseline. */
+            contractId?: number | null;
         };
         VersionCreateRequest: {
             /** @description SemVer 2.0 */

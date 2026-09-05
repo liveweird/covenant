@@ -100,8 +100,12 @@ class ContractImporter(
             val rejection =
                 if (existingId != null) rejectExisting(base, item, semver, existingId, caller) else rejectNew(item, caller, seenBefore)
             if (rejection != null) return rejection
-            // The check runs in both modes: the dry run reports the findings it WOULD store.
-            val report = checks.check(item.type, item.content, declaredVersion = item.version, lifecycle = Lifecycle.DRAFT)
+            // The check runs in both modes: the dry run reports the findings it WOULD store — the
+            // breaking-change baseline included, when the contract already has an ACTIVE version.
+            val baseline = existingId?.let { versions.baselineFor(it, semver) }
+            val report = checks.check(
+                item.type, item.content, declaredVersion = item.version, lifecycle = Lifecycle.DRAFT, baseline = baseline,
+            )
             if (report.hardFindings.isNotEmpty()) {
                 return base.copy(status = ImportStatus.INVALID, message = report.hardFindings.joinToString("; ") { it.message })
             }

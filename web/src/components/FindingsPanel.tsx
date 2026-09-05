@@ -27,6 +27,7 @@ export default function FindingsPanel({
   mode,
   checked = true,
   checkComplete = true,
+  baselineVersion = null,
   onJump,
 }: {
   findings: readonly Finding[];
@@ -34,6 +35,8 @@ export default function FindingsPanel({
   /** Live mode: whether a check has answered yet. */
   checked?: boolean;
   checkComplete?: boolean;
+  /** Live mode: the ACTIVE version the document was compared against for breaking changes, when one applied. */
+  baselineVersion?: string | null;
   /** Called with a positioned finding — the editor scrolls to it. Omitted for a text-less view. */
   onJump?: (finding: Finding) => void;
 }) {
@@ -61,6 +64,11 @@ export default function FindingsPanel({
           ))}
         </Group>
       </Group>
+      {baselineVersion && (
+        <Text size="xs" c="dimmed">
+          {t("findings.baseline", { version: baselineVersion })}
+        </Text>
+      )}
       {!checkComplete && (
         <Alert color="orange" variant="light" title={t("findings.incompleteTitle")}>
           {t("findings.incompleteBody")}

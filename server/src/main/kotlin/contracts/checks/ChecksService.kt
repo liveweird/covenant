@@ -18,7 +18,11 @@ val ChecksServiceKey = AttributeKey<ChecksService>("ChecksService")
  * 4. the JVM validator for the type (SOFT: SCHEMA/SEMANTIC);
  * 5. the checker sidecar for OPENAPI/ASYNCAPI (SOFT: LINT/SEMANTIC) — any failure becomes one
  *    `SYSTEM WARN CHECKER_UNAVAILABLE` finding and `checkerAvailable = false`, never an error;
- * 6. cross-checks (INFO: the document's declared version vs the stored SemVer, ODCS status vs
+ * 6. the breaking-change step when a `baseline` (the contract's highest ACTIVE version below the
+ *    candidate) is known — openapi-diff / the checker's `@asyncapi/diff` pass / `OdcsBreaking`
+ *    report the facts, `BreakingChanges.settle` decides WARN vs INFO by the MAJOR bump and adds
+ *    the soft `ERROR` `BREAKING_WITHOUT_MAJOR_BUMP` when the bump is missing;
+ * 7. cross-checks (INFO: the document's declared version vs the stored SemVer, ODCS status vs
  *    the lifecycle), merge, cap, count.
  *
  * Synchronous on purpose: a 2 MiB document parses in milliseconds and the checker budget is
@@ -34,6 +38,7 @@ class ChecksService(private val checkerProvider: () -> CheckerClient) {
         content: String,
         declaredVersion: String? = null,
         lifecycle: Lifecycle? = null,
+        baseline: Baseline? = null,
     ): CheckReport {
         val parsed = when (val outcome = DocumentParser.parse(content)) {
             is ParseOutcome.Failed -> return CheckReport.of(outcome.format, null, listOf(outcome.finding), checkerAvailable = true)
@@ -52,7 +57,10 @@ class ChecksService(private val checkerProvider: () -> CheckerClient) {
         var checkerAvailable = true
         if (type != ContractType.ODCS) {
             try {
-                findings += checkerProvider().check(type, content).findings
+                // The baseline rides along for ASYNCAPI only — the checker's `@asyncapi/diff` pass
+                // answers BREAKING findings for it; the JVM computes the OPENAPI/ODCS facts itself.
+                val previous = baseline?.content?.takeIf { type == ContractType.ASYNCAPI }
+                findings += checkerProvider().check(type, content, previous).findings
             } catch (e: CheckerUnavailableException) {
                 checkerAvailable = false
                 log.warn("checker unavailable: {}", e.message)
@@ -62,8 +70,12 @@ class ChecksService(private val checkerProvider: () -> CheckerClient) {
                 )
             }
         }
+        if (baseline != null) {
+            findings += BreakingChanges.facts(type, baseline, content, parsed.root)
+        }
         findings += crossChecks(type, parsed, declaredVersion, lifecycle)
-        return CheckReport.of(parsed.format, metadata, findings, checkerAvailable)
+        val settled = if (baseline != null) BreakingChanges.settle(findings, baseline, declaredVersion) else findings
+        return CheckReport.of(parsed.format, metadata, settled, checkerAvailable, baseline?.version?.toString())
     }
 
     private fun crossChecks(

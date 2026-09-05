@@ -109,5 +109,27 @@
     "deleted": "Usunięto kontrakt",
     "exported": "Pobrano eksport",
     "imported": "Zaimportowano dokument"
+  },
+  "history": {
+    "title": "Historia",
+    "empty": "Brak historii.",
+    "ownerTeam": "zespół #{{id}}",
+    "ownerUser": "osoba #{{id}}",
+    "event": {
+      "created": "Kontrakt utworzony ({{type}})",
+      "updated": "Zaktualizowano dane",
+      "ownerChanged": "Zmieniono właściciela",
+      "deleted": "Kontrakt usunięty",
+      "versionCreated": "Wersja {{version}} utworzona",
+      "versionContentUpdated": "Wersja {{version}}: zaktualizowano dokument",
+      "versionTransitioned": "Wersja {{version}}: {{from}} → {{to}}",
+      "versionRechecked": "Wersja {{version}} sprawdzona ponownie",
+      "versionDeleted": "Wersja {{version}} usunięta",
+      "imported": "Wersja {{version}} zaimportowana"
+    },
+    "detail": {
+      "name": "Nazwa: {{name}}",
+      "owner": "Z {{from}} na {{to}}"
+    }
   }
 }

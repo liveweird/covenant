@@ -1,8 +1,9 @@
 // The contract catalog's core loop: an admin builds the hierarchy (domain, system, team),
 // imports an OpenAPI document as a contract's first version, adds a minor version with a
 // semantic error through Save-anyway, compares the two, publishes the first (DRAFT → PROPOSED →
-// ACTIVE — the text locks), downloads it, and tears everything down through the lifecycle's
-// exit (deprecate → retire) and the delete rules. A second test pins the read-only view of a
+// ACTIVE — the text locks), sees a breaking change against it flagged until the MAJOR bump,
+// downloads it, reads the history, and tears everything down through the lifecycle's exit (deprecate → retire) and
+// the delete rules. A second test pins the read-only view of a
 // regular user. Owns: its throwaway domain/system/team/contract/user (unique `e2e-*` names).
 import type { Page } from "@playwright/test";
 import { createUserViaUi, deleteUserRow, expect, login, openFilters, rowOperation, signOut, test, uniqueText } from "./helpers";
@@ -45,6 +46,9 @@ components:
         name:
           type: string
 `;
+
+/** The required `Pet.name` gone from the response schema — a breaking change against an ACTIVE version. */
+const NARROWED = (title: string, version: string) => PETSTORE(title, version).replace("        name:\n          type: string\n", "");
 
 /** A broken internal $ref — swagger-parser reports it as a SEMANTIC error, the soft kind Save-anyway waives. */
 const BROKEN_REF = (title: string, version: string) => PETSTORE(title, version).replace("#/components/schemas/Pet", "#/components/schemas/Missing");
@@ -176,8 +180,31 @@ test("admin imports a contract, iterates a version through Save-anyway, compares
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("menuitem", { name: "Download" }).click()]);
   expect(download.suggestedFilename()).toMatch(new RegExp(`__${contractName}__1\\.0\\.0\\.yaml$`));
 
-  // Teardown through the rules: the draft deletes; the contract refuses while 1.0.0 is active.
+  // A breaking change against the ACTIVE 1.0.0: the live check compares against it and blocks
+  // the minor bump with BREAKING_WITHOUT_MAJOR_BUMP; the Major bump turns the facts into notes.
   await page.getByRole("link", { name: "Back to the contract" }).click();
+  await page.getByRole("link", { name: "New version" }).click();
+  await fillEditor(page, NARROWED(contractName, "1.2.0"));
+  await page.getByRole("button", { name: "Minor" }).click();
+  await expect(page.getByLabel("Version", { exact: true })).toHaveValue("1.2.0");
+  const findings = page.getByRole("region", { name: "Findings" });
+  await expect(findings).toContainText("Compared against active version 1.0.0 for breaking changes");
+  await expect(findings).toContainText("BREAKING_WITHOUT_MAJOR_BUMP");
+  await expect(findings).toContainText("CHANGED_RESPONSE");
+  await page.getByRole("button", { name: "Major" }).click();
+  await expect(page.getByLabel("Version", { exact: true })).toHaveValue("2.0.0");
+  await expect(findings).not.toContainText("BREAKING_WITHOUT_MAJOR_BUMP");
+  await expect(findings).toContainText("CHANGED_RESPONSE");
+  await page.getByRole("link", { name: "Back to the contract" }).click();
+
+  // The history: every step so far is a localized line, newest first.
+  const history = page.getByRole("region", { name: "History" });
+  await expect(history).toContainText("Version 1.0.0: Proposed → Active");
+  await expect(history).toContainText("Version 1.1.0 created");
+  await expect(history).toContainText("Version 1.0.0 imported");
+
+  // Teardown through the rules (already on the contract page): the draft deletes; the contract
+  // refuses while 1.0.0 is active.
   await rowOperation(page, "1.1.0", "Delete version 1.1.0");
   await confirmDelete(page, /\/versions\/\d+$/);
   await expect(page.getByRole("link", { name: "Open version 1.1.0" })).toHaveCount(0);

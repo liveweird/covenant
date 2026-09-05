@@ -98,6 +98,15 @@ export async function checkImportContracts(items: ImportItem[]): Promise<ImportI
   return response.results;
 }
 
+export type ContractEventPage = paths["/api/v1/contracts/{id}/events"]["get"]["responses"]["200"]["content"]["application/json"];
+export type ContractEvent = ContractEventPage["items"][number];
+
+/** The contract's structural history — paged, newest first (the server's default sort; never re-sorted here). */
+export async function listContractEvents(id: number, page: number, pageSize: number): Promise<ContractEventPage> {
+  const params = buildQuery({ page, pageSize });
+  return jsonRequest<ContractEventPage>(`/api/v1/contracts/${id}/events?${params}`);
+}
+
 /** The server-side fetch of a public document URL (https only, no private hosts — the server guards). */
 export async function fetchContractUrl(url: string): Promise<string> {
   const response = await jsonRequest<FetchUrlResponse>("/api/v1/contracts/fetch", { method: "POST", body: JSON.stringify({ url }) });

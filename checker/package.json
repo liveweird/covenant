@@ -20,6 +20,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@asyncapi/diff": "^0.5.0",
     "@asyncapi/parser": "^3.6.3",
     "@stoplight/spectral-core": "^1.23.1",
     "@stoplight/spectral-parsers": "^1.0.5",

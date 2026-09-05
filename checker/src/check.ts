@@ -1,5 +1,5 @@
 import { parseDocument } from "yaml";
-import { validateAsyncApi } from "./engines/asyncapi.ts";
+import { breakingAsyncApi, validateAsyncApi } from "./engines/asyncapi.ts";
 import { lintAsyncApi, lintOpenApi } from "./engines/spectral.ts";
 import { ENGINES, type EngineVersion } from "./engines/index.ts";
 import { CONTRACT_TYPES, finalizeFindings, type ContractType, type Finding } from "./findings.ts";
@@ -29,7 +29,9 @@ export function isCheckRequest(value: unknown): value is CheckRequest {
 
 /**
  * The dispatch: parse once (YAML reads JSON too) for the `$ref` pre-scan and the Swagger 2.0
- * refusal, then the engines per type. Unparseable text is not the checker's finding to make —
+ * refusal, then the engines per type — for ASYNCAPI with a `previousContent` (the ACTIVE version
+ * the JVM chose as the breaking-change baseline) the @asyncapi/diff pass runs beside them; the
+ * JVM computes OPENAPI/ODCS breaking changes itself and never sends a previous document for them. Unparseable text is not the checker's finding to make —
  * the JVM's SYNTAX gate rejected it before calling — but a stray one still answers, as SYNTAX.
  */
 export async function check(request: CheckRequest): Promise<CheckResponse> {
@@ -68,8 +70,12 @@ async function collect(request: CheckRequest): Promise<Finding[]> {
       }
       return lintOpenApi(request.content);
     case "ASYNCAPI": {
-      const [semantic, lint] = await Promise.all([validateAsyncApi(request.content), lintAsyncApi(request.content)]);
-      return [...semantic, ...lint];
+      const [semantic, lint, breaking] = await Promise.all([
+        validateAsyncApi(request.content),
+        lintAsyncApi(request.content),
+        request.previousContent === undefined ? [] : breakingAsyncApi(request.previousContent, request.content),
+      ]);
+      return [...semantic, ...lint, ...breaking];
     }
     case "ODCS":
       // The JVM's JSON Schema validation is the whole ODCS gate in milestone 1.

@@ -201,11 +201,11 @@ fun Application.configureContractVersionRoutes() {
                 // HARD ones included as findings, never a 400 for document problems. No audit.
                 val request = call.receive<DocumentCheckRequest>()
                 requireDocumentSize(request.content)
-                val report = checks.check(
-                    request.type,
-                    request.content,
-                    declaredVersion = request.version?.trim()?.takeIf { it.isNotEmpty() },
-                )
+                val declared = request.version?.trim()?.takeIf { it.isNotEmpty() }
+                // Naming the contract adds the breaking-change step against its highest ACTIVE
+                // version below the candidate (an unknown id simply has no baseline — no 404 here).
+                val baseline = request.contractId?.let { versionService.baselineFor(it, declared?.let(SemVer::parseOrNull)) }
+                val report = checks.check(request.type, request.content, declaredVersion = declared, baseline = baseline)
                 call.auditCheckerUnavailable(report)
                 call.respond(HttpStatusCode.OK, report)
             }

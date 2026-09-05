@@ -57,6 +57,8 @@ describe("NewVersion page", () => {
     expect(screen.getByText("Use strict SemVer, e.g. 1.2.0 or 2.0.0-rc.1")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save draft" })).toBeDisabled();
     await waitFor(() => expect(calledUrl(mockFetch, "POST", (u) => u === "/api/v1/contracts/versions/check")).toBeDefined());
+    // The contract is named so the server compares against its ACTIVE version for breaking changes.
+    expect(bodyOf(findCall(mockFetch, "POST", "/api/v1/contracts/versions/check"))).toMatchObject({ contractId: 5 });
   });
 
   test("a blank start renders the type's template; the strict save posts and lands on the version", async () => {
