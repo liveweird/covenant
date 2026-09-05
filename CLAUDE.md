@@ -69,6 +69,7 @@ ch.nokillswit
 │                       ErrorHandling (RFC 7807), OpenTelemetry, AutoHeadResponse, Resources,
 │                       Routing (SPA catch-all)
 │                       + Health (the public /api/v1/health and /api/v1/ready probes, after Database)
+│                       + RateLimits (every per-IP bucket and its name — login, refresh, reset, MFA, try-it)
 ├── infra/mail/         outbound email (Lettuce's, ported): Mailer/SmtpMailer/LogMailer +
 │                       LocalizedText/PasswordEmail (the recipient-language content layer) +
 │                       configureMail — MAIL_TRANSPORT log/smtp/disabled, the log-transport
@@ -80,13 +81,16 @@ ch.nokillswit
 │                       check — one check per concern file), EncryptedAtRest + reencryptRows (the boot backfill
 │                       registry in infra/db/Bootstrap.kt). Owners: environments/ (the try-it credentials)
 ├── infra/db/           Flyway bootstrap + the R2DBC connection/composition root + the seed
+│                       bootstrap + SoftDelete.kt (the SoftDeletable table trait — ONE active() predicate, nowMillis(),
+│                       activeCountsBy, requireActive — the checkup removed seven private copies) + …
 │                       bootstrap (admin rotation, prod fail-closed) + Sql.kt (containsNormalized,
 │                       orVanished) + EventLog.kt/JsonParams.kt (Lettuce's
 │                       shared per-record audit-event machinery — the EventLogTable base the
 │                       contract history rides — the clone is `contracts/ContractEvents.kt`)
 ├── infra/paging/       the shared list-endpoint machinery (PageRequest/parsePaging/applyPaging/
 │                       PageResponse + the strict query-param readers) — Lettuce's, ported verbatim
-├── infra/validation/   cross-feature input helpers (sanitizeSingleLine — trim + control-char 400)
+├── infra/validation/   cross-feature input helpers (sanitizeSingleLine — trim + control-char 400; sanitizedDescription and
+│                       requireNameAndDescription — the one name/description rule every registry enforces)
 ├── audit/              security audit trail: `audit(event, fields…)` → AUDIT-marked structured logs
 ├── authz/              CallerPrincipal + guards (requireAdmin, requireSelfOrAdmin) + typed
 │                       HTTP exceptions (401/403/404/409/429/502)

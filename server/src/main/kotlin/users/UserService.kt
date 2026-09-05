@@ -6,6 +6,8 @@ import ch.nokillswit.infra.paging.applyPaging
 import io.ktor.util.AttributeKey
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
+import ch.nokillswit.infra.db.SoftDeletable
+import ch.nokillswit.infra.db.active
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.dao.id.UIntIdTable
 import org.jetbrains.exposed.v1.r2dbc.*
@@ -42,7 +44,7 @@ private val SORTABLE_COLUMNS: Map<String, Column<*>> = mapOf(
 val USER_SORT_FIELDS: Set<String> = SORTABLE_COLUMNS.keys
 
 class UserService(private val database: R2dbcDatabase) {
-    object Users : UIntIdTable() {
+    object Users : UIntIdTable(), SoftDeletable {
         val name = varchar("name", length = 50)
         // Uniqueness is enforced by a partial unique index (active rows only) in migration V1,
         // so a soft-deleted user frees its email. Exposed table defs are query-only (not DDL),
@@ -51,7 +53,7 @@ class UserService(private val database: R2dbcDatabase) {
         val passwordHash = varchar("password_hash", length = 255)
         // Single-column role storage (CHECK in V1); UserRole.USER is the baseline.
         val role = varchar("role", length = 20).default(UserRole.USER.name)
-        val markedAsDeleted = bool("marked_as_deleted").default(false)
+        override val markedAsDeleted = bool("marked_as_deleted").default(false)
         val passwordChangedAt = long("password_changed_at").default(0)
         // Per-user language (V18): sign-in UI language + the language of every email sent
         // to the user. No CHECK — SUPPORTED_LANGUAGES is the whitelist.
@@ -90,7 +92,7 @@ class UserService(private val database: R2dbcDatabase) {
 
     suspend fun read(id: UInt): User? = suspendTransaction(database) {
         Users.selectAll()
-            .where { (Users.id eq id) and active() }
+            .where { (Users.id eq id) and Users.active() }
             .toList()
             .singleOrNull()
             ?.let { it.toUser(featuresOf(it[Users.id].value)) }
@@ -100,7 +102,7 @@ class UserService(private val database: R2dbcDatabase) {
         // Stored emails are canonical; folding the argument too is defense-in-depth so a
         // caller that skipped canonicalEmail still matches.
         Users.selectAll()
-            .where { (Users.email eq canonicalEmail(email)) and active() }
+            .where { (Users.email eq canonicalEmail(email)) and Users.active() }
             .toList()
             .singleOrNull()
             ?.let { it[Users.id].value to it.toUser(featuresOf(it[Users.id].value)) }
@@ -109,7 +111,7 @@ class UserService(private val database: R2dbcDatabase) {
     // The plaintext rules (min length, bcrypt byte ceiling) are route-side by necessity:
     // only the bcrypt hash ever reaches the service.
     suspend fun updatePassword(id: UInt, passwordHash: String): Int = suspendTransaction(database) {
-        Users.update({ (Users.id eq id) and active() }) {
+        Users.update({ (Users.id eq id) and Users.active() }) {
             it[this.passwordHash] = passwordHash
             // Invalidates outstanding refresh tokens: /refresh rejects iat < passwordChangedAt.
             it[passwordChangedAt] = System.currentTimeMillis()
@@ -122,14 +124,14 @@ class UserService(private val database: R2dbcDatabase) {
      */
     suspend fun setLanguage(id: UInt, language: String): Int = suspendTransaction(database) {
         validateLanguage(language) // re-checked service-side so direct callers stay guarded
-        Users.update({ (Users.id eq id) and active() }) {
+        Users.update({ (Users.id eq id) and Users.active() }) {
             it[Users.language] = language
         }
     }
 
     suspend fun list(filter: UserListFilter, paging: PageRequest): UserListResult =
         suspendTransaction(database) {
-            val predicate: Op<Boolean> = buildPredicate(filter) and active()
+            val predicate: Op<Boolean> = buildPredicate(filter) and Users.active()
             val total = Users.selectAll().where { predicate }.count()
             val rows = Users.selectAll()
                 .where { predicate }
@@ -151,7 +153,7 @@ class UserService(private val database: R2dbcDatabase) {
      */
     suspend fun setDisabledFeatures(id: UInt, features: Set<Feature>): Int = suspendTransaction(database) {
         val exists = Users.select(Users.id)
-            .where { (Users.id eq id) and active() }
+            .where { (Users.id eq id) and Users.active() }
             .toList()
             .isNotEmpty()
         if (!exists) return@suspendTransaction 0
@@ -182,7 +184,7 @@ class UserService(private val database: R2dbcDatabase) {
             if (existingRole == UserRole.ADMIN && role != UserRole.ADMIN && lockedActiveAdminCount() <= 1) {
                 return@suspendTransaction GuardedMutation.LAST_ADMIN
             }
-            val rows = Users.update({ (Users.id eq id) and active() }) {
+            val rows = Users.update({ (Users.id eq id) and Users.active() }) {
                 it[Users.name] = name
                 // Canonical identity, folded here too (defense-in-depth like findWithIdByEmail).
                 it[Users.email] = canonicalEmail(email)
@@ -200,7 +202,7 @@ class UserService(private val database: R2dbcDatabase) {
         if (existingRole == UserRole.ADMIN && lockedActiveAdminCount() <= 1) {
             return@suspendTransaction GuardedMutation.LAST_ADMIN
         }
-        val rows = Users.update({ (Users.id eq id) and active() }) {
+        val rows = Users.update({ (Users.id eq id) and Users.active() }) {
             it[markedAsDeleted] = true
         }
         if (rows == 0) GuardedMutation.NOT_FOUND else GuardedMutation.DONE
@@ -209,12 +211,12 @@ class UserService(private val database: R2dbcDatabase) {
     /** Backs the routes' fast-path 409 pre-checks (the ordering gate; correctness lives in
      *  the guarded mutations above). */
     suspend fun countActiveAdmins(): Long = suspendTransaction(database) {
-        Users.selectAll().where { (Users.role eq UserRole.ADMIN.name) and active() }.count()
+        Users.selectAll().where { (Users.role eq UserRole.ADMIN.name) and Users.active() }.count()
     }
 
     private suspend fun activeRole(id: UInt): UserRole? =
         Users.select(Users.role)
-            .where { (Users.id eq id) and active() }
+            .where { (Users.id eq id) and Users.active() }
             .toList()
             .singleOrNull()
             ?.let { UserRole.valueOf(it[Users.role]) }
@@ -224,7 +226,7 @@ class UserService(private val database: R2dbcDatabase) {
     // so a demoted/deleted row no longer counts. Admins are few — counting in memory is fine.
     private suspend fun lockedActiveAdminCount(): Int =
         Users.selectAll()
-            .where { (Users.role eq UserRole.ADMIN.name) and active() }
+            .where { (Users.role eq UserRole.ADMIN.name) and Users.active() }
             .forUpdate()
             .toList()
             .size
@@ -251,7 +253,7 @@ class UserService(private val database: R2dbcDatabase) {
     /** Bootstrap: rotate a user's password only while they still carry [expectedHash]. */
     suspend fun rotatePasswordIfHashMatches(email: String, expectedHash: String, newHash: String): Int =
         suspendTransaction(database) {
-            Users.update({ (Users.email eq email) and (Users.passwordHash eq expectedHash) and active() }) {
+            Users.update({ (Users.email eq email) and (Users.passwordHash eq expectedHash) and Users.active() }) {
                 it[passwordHash] = newHash
                 it[passwordChangedAt] = System.currentTimeMillis()
             }
@@ -259,10 +261,8 @@ class UserService(private val database: R2dbcDatabase) {
 
     /** Bootstrap: how many active accounts still carry [hash] (the well-known seed password). */
     suspend fun countActiveWithPasswordHash(hash: String): Long = suspendTransaction(database) {
-        Users.selectAll().where { (Users.passwordHash eq hash) and active() }.count()
+        Users.selectAll().where { (Users.passwordHash eq hash) and Users.active() }.count()
     }
-
-    private fun active(): Op<Boolean> = Users.markedAsDeleted eq false
 
     private suspend fun featuresOf(id: UInt): Set<Feature> =
         UserDisabledFeatures.selectAll()

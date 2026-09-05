@@ -2,6 +2,8 @@ package ch.nokillswit.contracts
 
 import ch.nokillswit.infra.paging.PageResponse
 import ch.nokillswit.infra.validation.sanitizeSingleLine
+import ch.nokillswit.infra.validation.requireNameAndDescription
+import ch.nokillswit.infra.validation.sanitizedDescription
 import io.ktor.server.plugins.BadRequestException
 import kotlinx.serialization.Serializable
 
@@ -143,21 +145,16 @@ data class Ownership(val teamId: UInt?, val userId: UInt?) {
 
 fun sanitizedContractCreate(request: ContractCreateRequest) = request.copy(
     name = sanitizeSingleLine(request.name, "Name"),
-    description = request.description?.let { sanitizeSingleLine(it, "Description") }?.takeIf { it.isNotBlank() },
+    description = sanitizedDescription(request.description),
 )
 
 fun sanitizedContractUpdate(request: ContractUpdateRequest) = ContractUpdateRequest(
     name = sanitizeSingleLine(request.name, "Name"),
-    description = request.description?.let { sanitizeSingleLine(it, "Description") }?.takeIf { it.isNotBlank() },
+    description = sanitizedDescription(request.description),
 )
 
 fun validateContractNameAndDescription(name: String, description: String?) {
-    if (name.isBlank() || name.length > MAX_CONTRACT_NAME_LENGTH) {
-        throw BadRequestException("Name must be 1-$MAX_CONTRACT_NAME_LENGTH characters")
-    }
-    if (description != null && description.length > MAX_CONTRACT_DESCRIPTION_LENGTH) {
-        throw BadRequestException("Description must be at most $MAX_CONTRACT_DESCRIPTION_LENGTH characters")
-    }
+    requireNameAndDescription(name, description, MAX_CONTRACT_NAME_LENGTH, MAX_CONTRACT_DESCRIPTION_LENGTH)
 }
 
 /** Exactly one owner side — the wire twin of the V9 CHECK. */

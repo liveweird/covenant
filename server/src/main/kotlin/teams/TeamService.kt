@@ -11,6 +11,9 @@ import io.ktor.server.plugins.BadRequestException
 import io.ktor.util.AttributeKey
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
+import ch.nokillswit.infra.db.SoftDeletable
+import ch.nokillswit.infra.db.active
+import ch.nokillswit.infra.db.nowMillis
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.dao.id.UIntIdTable
 import org.jetbrains.exposed.v1.r2dbc.*
@@ -29,14 +32,14 @@ private val SORTABLE_COLUMNS: Map<String, Column<*>> = mapOf(
 val TEAM_SORT_FIELDS: Set<String> = SORTABLE_COLUMNS.keys
 
 class TeamService(private val database: R2dbcDatabase) {
-    object Teams : UIntIdTable("teams") {
+    object Teams : UIntIdTable("teams"), SoftDeletable {
         // Case-folded name uniqueness rides the partial unique index uq_teams_name_active
         // (V6, active rows only) — Exposed defs are query-only, so no `.uniqueIndex()` here.
         val name = varchar("name", length = MAX_TEAM_NAME_LENGTH)
         val description = varchar("description", length = MAX_TEAM_DESCRIPTION_LENGTH).nullable()
         val createdAt = long("created_at")
         val updatedAt = long("updated_at")
-        val markedAsDeleted = bool("marked_as_deleted").default(false)
+        override val markedAsDeleted = bool("marked_as_deleted").default(false)
     }
 
     /** The membership join (hard-delete, V6). Read by the contract authorization inside ITS transaction. */
@@ -46,12 +49,8 @@ class TeamService(private val database: R2dbcDatabase) {
         override val primaryKey = PrimaryKey(teamId, userId)
     }
 
-    private fun active(): Op<Boolean> = Teams.markedAsDeleted eq false
-
-    private fun now() = System.currentTimeMillis()
-
     suspend fun list(filter: TeamListFilter, paging: PageRequest): TeamListResult = suspendTransaction(database) {
-        val predicate = buildPredicate(filter) and active()
+        val predicate = buildPredicate(filter) and Teams.active()
         val total = Teams.selectAll().where { predicate }.count()
         val rows = Teams.selectAll().where { predicate }.applyPaging(paging, SORTABLE_COLUMNS).toList()
         val counts = activeMemberCounts(rows.map { it[Teams.id].value })
@@ -73,7 +72,7 @@ class TeamService(private val database: R2dbcDatabase) {
 
     /** The team with its roster (soft-deleted members kept, flagged), or null when missing/deleted. */
     suspend fun read(id: UInt): TeamResponse? = suspendTransaction(database) {
-        val row = Teams.selectAll().where { (Teams.id eq id) and active() }.toList().singleOrNull()
+        val row = Teams.selectAll().where { (Teams.id eq id) and Teams.active() }.toList().singleOrNull()
             ?: return@suspendTransaction null
         TeamResponse(
             id = id,
@@ -94,7 +93,7 @@ class TeamService(private val database: R2dbcDatabase) {
         validateTeamCreate(request) // re-checked service-side so direct callers stay guarded
         val members = request.memberIds.orEmpty()
         requireActiveUsers(members)
-        val stamp = now()
+        val stamp = nowMillis()
         val id = Teams.insert {
             it[name] = request.name
             it[description] = request.description
@@ -113,10 +112,10 @@ class TeamService(private val database: R2dbcDatabase) {
     /** Name/description replace; the roster is managed per member. Returns the affected-row count (0 → 404). */
     suspend fun update(id: UInt, request: TeamUpdateRequest): Int = suspendTransaction(database) {
         validateTeamUpdate(request)
-        Teams.update({ (Teams.id eq id) and active() }) {
+        Teams.update({ (Teams.id eq id) and Teams.active() }) {
             it[name] = request.name
             it[description] = request.description
-            it[updatedAt] = now()
+            it[updatedAt] = nowMillis()
         }
     }
 
@@ -129,9 +128,9 @@ class TeamService(private val database: R2dbcDatabase) {
         val owned = contracts.select(contracts.id)
             .where { (contracts.ownerTeamId eq id) and (contracts.markedAsDeleted eq false) }.count()
         if (owned > 0) throw ConflictException("The team still owns contracts — transfer them first")
-        Teams.update({ (Teams.id eq id) and active() }) {
+        Teams.update({ (Teams.id eq id) and Teams.active() }) {
             it[markedAsDeleted] = true
-            it[updatedAt] = now()
+            it[updatedAt] = nowMillis()
         }
     }
 
@@ -147,14 +146,14 @@ class TeamService(private val database: R2dbcDatabase) {
             it[TeamMembers.teamId] = teamId
             it[TeamMembers.userId] = userId
         }
-        Teams.update({ Teams.id eq teamId }) { it[updatedAt] = now() }
+        Teams.update({ Teams.id eq teamId }) { it[updatedAt] = nowMillis() }
     }
 
     /** Removes one membership row (a soft-deleted user's row included); returns the row count (0 → 404). */
     suspend fun removeMember(teamId: UInt, userId: UInt): Int = suspendTransaction(database) {
         requireActiveTeam(teamId)
         val removed = TeamMembers.deleteWhere { (TeamMembers.teamId eq teamId) and (TeamMembers.userId eq userId) }
-        if (removed > 0) Teams.update({ Teams.id eq teamId }) { it[updatedAt] = now() }
+        if (removed > 0) Teams.update({ Teams.id eq teamId }) { it[updatedAt] = nowMillis() }
         removed
     }
 
@@ -165,7 +164,7 @@ class TeamService(private val database: R2dbcDatabase) {
     suspend fun activeTeamIdsOf(userId: UInt): Set<UInt> =
         TeamMembers.innerJoin(Teams)
             .select(TeamMembers.teamId)
-            .where { (TeamMembers.userId eq userId) and active() }
+            .where { (TeamMembers.userId eq userId) and Teams.active() }
             .map { it[TeamMembers.teamId].value }
             .toList()
             .toSet()
@@ -199,7 +198,7 @@ class TeamService(private val database: R2dbcDatabase) {
     }
 
     private suspend fun requireActiveTeam(teamId: UInt) {
-        val exists = Teams.select(Teams.id).where { (Teams.id eq teamId) and active() }.count() > 0
+        val exists = Teams.select(Teams.id).where { (Teams.id eq teamId) and Teams.active() }.count() > 0
         if (!exists) throw NotFoundException("Team not found")
     }
 

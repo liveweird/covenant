@@ -61,6 +61,9 @@ class HttpCheckerClient(
         expectSuccess = false
     }
 
+    /** Releases the Java engine's executor — called once, when the application stops. */
+    fun close() = client.close()
+
     override suspend fun check(type: ContractType, content: String, previousContent: String?): CheckerResponse {
         val response = try {
             client.post("${baseUrl.trimEnd('/')}/check") {

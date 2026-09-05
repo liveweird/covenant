@@ -15,6 +15,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import ch.nokillswit.infra.db.SoftDeletable
+import ch.nokillswit.infra.db.active
+import ch.nokillswit.infra.db.nowMillis
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.dao.id.UIntIdTable
 import org.jetbrains.exposed.v1.r2dbc.*
@@ -40,7 +43,7 @@ val VERSION_DEFAULT_SORT: List<SortField> = listOf(SortField("version", descendi
 data class VersionSaveResult(val response: VersionResponse, val waived: List<Finding>)
 
 class ContractVersionService(private val database: R2dbcDatabase, private val checks: ChecksService) {
-    object ContractVersions : UIntIdTable("contract_versions") {
+    object ContractVersions : UIntIdTable("contract_versions"), SoftDeletable {
         val contractId = reference("contract_id", ContractService.Contracts)
         val version = varchar("version", length = SemVer.MAX_LENGTH)
         val semverMajor = integer("semver_major")
@@ -63,7 +66,7 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
         val createdBy = reference("created_by", ch.nokillswit.users.UserService.Users)
         val createdAt = long("created_at")
         val updatedAt = long("updated_at")
-        val markedAsDeleted = bool("marked_as_deleted").default(false)
+        override val markedAsDeleted = bool("marked_as_deleted").default(false)
         // V12 — the repo reference and the sync baseline (row state beside the byte-exact text).
         val sourceUrl = varchar("source_url", length = MAX_FETCH_URL_LENGTH).nullable()
         val lastSyncedAt = long("last_synced_at").default(0)
@@ -73,12 +76,8 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
     private val json = Json
     private val findingsSerializer = ListSerializer(Finding.serializer())
 
-    private fun active(): Op<Boolean> = ContractVersions.markedAsDeleted eq false
-
-    private fun now() = System.currentTimeMillis()
-
     suspend fun list(contractId: UInt, filter: VersionListFilter, paging: PageRequest): VersionListResult = suspendTransaction(database) {
-        var predicate: Op<Boolean> = (ContractVersions.contractId eq contractId) and active()
+        var predicate: Op<Boolean> = (ContractVersions.contractId eq contractId) and ContractVersions.active()
         if (filter.lifecycles.isNotEmpty()) predicate = predicate and (ContractVersions.lifecycle inList filter.lifecycles.map { it.name })
         val total = ContractVersions.selectAll().where { predicate }.count()
         val rows = ContractVersions.selectAll().where { predicate }.applySemverSort(paging).toList()
@@ -119,7 +118,7 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
                     "Version ${request.version} must be greater than the highest existing version $top",
                 )
             }
-            val stamp = now()
+            val stamp = nowMillis()
             val id = ContractVersions.insert {
                 it[ContractVersions.contractId] = contractId
                 it[version] = request.version
@@ -182,7 +181,7 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
         val row = rowOf(contractId, versionId) ?: return@suspendTransaction null
         val previous = row[ContractVersions.sourceUrl]
         if (previous != next) {
-            ContractVersions.update({ (ContractVersions.id eq versionId) and active() }) {
+            ContractVersions.update({ (ContractVersions.id eq versionId) and ContractVersions.active() }) {
                 it[ContractVersions.sourceUrl] = next
                 it[lastSyncedAt] = 0
                 it[syncedContent] = null
@@ -216,10 +215,10 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
         val report = checks.check(type, content, declaredVersion = current.version, lifecycle = current.lifecycle, baseline = baseline)
         val waived = requireOrWaive(report, allowInvalid)
         return suspendTransaction(database) {
-            val stamp = now()
+            val stamp = nowMillis()
             val rows = ContractVersions.update(
                 {
-                    (ContractVersions.id eq versionId) and (ContractVersions.contractId eq contractId) and active() and
+                    (ContractVersions.id eq versionId) and (ContractVersions.contractId eq contractId) and ContractVersions.active() and
                         (ContractVersions.lifecycle inList Lifecycle.entries.filter { it.contentEditable }.map { it.name })
                 },
             ) {
@@ -260,13 +259,13 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
             type, current.content, declaredVersion = current.version, lifecycle = current.lifecycle, baseline = baseline,
         )
         return suspendTransaction(database) {
-            ContractVersions.update({ (ContractVersions.id eq versionId) and active() }) {
+            ContractVersions.update({ (ContractVersions.id eq versionId) and ContractVersions.active() }) {
                 it[findings] = json.encodeToString(findingsSerializer, report.findings)
                 it[checkErrors] = report.errors
                 it[checkWarnings] = report.warnings
                 it[checkInfos] = report.infos
                 it[checkComplete] = report.checkerAvailable
-                it[checkedAt] = now()
+                it[checkedAt] = nowMillis()
             }
             rowOf(contractId, versionId)!!.toResponse()
         }
@@ -282,10 +281,10 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
         val from = Lifecycle.valueOf(row[ContractVersions.lifecycle])
         from.requireTransitionTo(to)
         val rows = ContractVersions.update(
-            { (ContractVersions.id eq versionId) and active() and (ContractVersions.lifecycle eq from.name) },
+            { (ContractVersions.id eq versionId) and ContractVersions.active() and (ContractVersions.lifecycle eq from.name) },
         ) {
             it[lifecycle] = to.name
-            it[updatedAt] = now()
+            it[updatedAt] = nowMillis()
         }
         if (rows == 0) throw ConflictException("The version changed underneath you — reload and retry")
         from to rowOf(contractId, versionId)!!.toResponse()
@@ -298,9 +297,9 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
         if (!lifecycle.deletable) throw ConflictException(
             "Only a DRAFT version may be deleted — a $lifecycle version is part of the contract's history",
         )
-        ContractVersions.update({ (ContractVersions.id eq versionId) and active() }) {
+        ContractVersions.update({ (ContractVersions.id eq versionId) and ContractVersions.active() }) {
             it[markedAsDeleted] = true
-            it[updatedAt] = now()
+            it[updatedAt] = nowMillis()
         }
         recomputeLatest(contractId)
         row[ContractVersions.version]
@@ -317,7 +316,7 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
     suspend fun baselineFor(contractId: UInt, below: SemVer?): Baseline? = suspendTransaction(database) {
         val v = ContractVersions
         v.select(v.version, v.content)
-            .where { (v.contractId eq contractId) and (v.lifecycle eq Lifecycle.ACTIVE.name) and active() }
+            .where { (v.contractId eq contractId) and (v.lifecycle eq Lifecycle.ACTIVE.name) and ContractVersions.active() }
             .map { SemVer.parse(it[v.version]) to it[v.content] }
             .toList()
             .filter { (semver, _) -> below == null || semver < below }
@@ -352,12 +351,12 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
 
     private suspend fun versionExists(contractId: UInt, version: String): Boolean =
         ContractVersions.select(ContractVersions.id)
-            .where { (ContractVersions.contractId eq contractId) and (ContractVersions.version eq version) and active() }
+            .where { (ContractVersions.contractId eq contractId) and (ContractVersions.version eq version) and ContractVersions.active() }
             .count() > 0
 
     private suspend fun highest(contractId: UInt): SemVer? =
         ContractVersions.select(ContractVersions.version)
-            .where { (ContractVersions.contractId eq contractId) and active() }
+            .where { (ContractVersions.contractId eq contractId) and ContractVersions.active() }
             .map { SemVer.parse(it[ContractVersions.version]) }
             .toList()
             .maxOrNull()
@@ -365,7 +364,7 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
     /** The denormalized pointer on `contracts` (V10) — the highest active version's id, or null. */
     private suspend fun recomputeLatest(contractId: UInt) {
         val top = ContractVersions.select(ContractVersions.id, ContractVersions.version)
-            .where { (ContractVersions.contractId eq contractId) and active() }
+            .where { (ContractVersions.contractId eq contractId) and ContractVersions.active() }
             .map { it[ContractVersions.id].value to SemVer.parse(it[ContractVersions.version]) }
             .toList()
             .maxByOrNull { it.second }
@@ -375,7 +374,7 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
 
     private suspend fun rowOf(contractId: UInt, versionId: UInt): ResultRow? =
         ContractVersions.selectAll()
-            .where { (ContractVersions.id eq versionId) and (ContractVersions.contractId eq contractId) and active() }
+            .where { (ContractVersions.id eq versionId) and (ContractVersions.contractId eq contractId) and ContractVersions.active() }
             .toList().singleOrNull()
 
     /** `version` sorts by the parsed triple (prerelease NULL = release, ranked above); other fields as usual. */

@@ -1,6 +1,8 @@
 package ch.nokillswit.environments
 
 import ch.nokillswit.infra.validation.sanitizeSingleLine
+import ch.nokillswit.infra.validation.requireNameAndDescription
+import ch.nokillswit.infra.validation.sanitizedDescription
 import io.ktor.server.plugins.BadRequestException
 import java.net.URI
 import java.net.URISyntaxException
@@ -25,7 +27,7 @@ private const val MAX_PORT = 65535
 
 fun sanitizedEnvironmentRequest(request: EnvironmentRequest): EnvironmentRequest = request.copy(
     name = sanitizeSingleLine(request.name, "Name"),
-    description = request.description?.let { sanitizeSingleLine(it, "Description") }?.takeIf { it.isNotBlank() },
+    description = sanitizedDescription(request.description),
     httpBaseUrl = request.httpBaseUrl?.trim()?.takeIf { it.isNotBlank() }?.trimEnd('/'),
     kafka = request.kafka?.let { k ->
         k.copy(
@@ -44,12 +46,7 @@ fun sanitizedEnvironmentRequest(request: EnvironmentRequest): EnvironmentRequest
  *   create, or a PUT onto a row that has none stored (the service knows; the route passes `false`).
  */
 fun validateEnvironmentRequest(request: EnvironmentRequest, passwordRequired: Boolean) {
-    if (request.name.isBlank() || request.name.length > MAX_ENVIRONMENT_NAME_LENGTH) {
-        throw BadRequestException("Name must be 1-$MAX_ENVIRONMENT_NAME_LENGTH characters")
-    }
-    if (request.description != null && request.description.length > MAX_ENVIRONMENT_DESCRIPTION_LENGTH) {
-        throw BadRequestException("Description must be at most $MAX_ENVIRONMENT_DESCRIPTION_LENGTH characters")
-    }
+    requireNameAndDescription(request.name, request.description, MAX_ENVIRONMENT_NAME_LENGTH, MAX_ENVIRONMENT_DESCRIPTION_LENGTH)
     if (request.httpBaseUrl == null && request.kafka == null && request.postgres == null) {
         throw BadRequestException(ENVIRONMENT_NEEDS_TARGET)
     }

@@ -2,6 +2,8 @@ package ch.nokillswit.teams
 
 import ch.nokillswit.infra.paging.PageResponse
 import ch.nokillswit.infra.validation.sanitizeSingleLine
+import ch.nokillswit.infra.validation.requireNameAndDescription
+import ch.nokillswit.infra.validation.sanitizedDescription
 import io.ktor.server.plugins.BadRequestException
 import kotlinx.serialization.Serializable
 
@@ -74,23 +76,18 @@ data class TeamListResult(val items: List<TeamListItem>, val total: Long)
 /** Trims the scalars (the sanitizer convention — control characters are a 400). */
 fun sanitizedTeamCreate(request: TeamCreateRequest): TeamCreateRequest = TeamCreateRequest(
     name = sanitizeSingleLine(request.name, "Name"),
-    description = request.description?.let { sanitizeSingleLine(it, "Description") }?.takeIf { it.isNotBlank() },
+    description = sanitizedDescription(request.description),
     memberIds = request.memberIds?.distinct(),
 )
 
 fun sanitizedTeamUpdate(request: TeamUpdateRequest): TeamUpdateRequest = TeamUpdateRequest(
     name = sanitizeSingleLine(request.name, "Name"),
-    description = request.description?.let { sanitizeSingleLine(it, "Description") }?.takeIf { it.isNotBlank() },
+    description = sanitizedDescription(request.description),
 )
 
 /** The team rules — enforced by the route AND re-checked by the service. */
 fun validateTeam(name: String, description: String?) {
-    if (name.isBlank() || name.length > MAX_TEAM_NAME_LENGTH) {
-        throw BadRequestException("Name must be 1-$MAX_TEAM_NAME_LENGTH characters")
-    }
-    if (description != null && description.length > MAX_TEAM_DESCRIPTION_LENGTH) {
-        throw BadRequestException("Description must be at most $MAX_TEAM_DESCRIPTION_LENGTH characters")
-    }
+    requireNameAndDescription(name, description, MAX_TEAM_NAME_LENGTH, MAX_TEAM_DESCRIPTION_LENGTH)
 }
 
 fun validateTeamCreate(request: TeamCreateRequest) {

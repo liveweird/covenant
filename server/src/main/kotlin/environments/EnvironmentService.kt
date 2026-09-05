@@ -7,10 +7,13 @@ import ch.nokillswit.infra.db.containsNormalized
 import ch.nokillswit.infra.paging.PageRequest
 import ch.nokillswit.infra.paging.applyPaging
 import ch.nokillswit.systems.SystemService
-import io.ktor.server.plugins.BadRequestException
 import io.ktor.util.AttributeKey
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
+import ch.nokillswit.infra.db.SoftDeletable
+import ch.nokillswit.infra.db.active
+import ch.nokillswit.infra.db.requireActive
+import ch.nokillswit.infra.db.nowMillis
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.dao.id.UIntIdTable
 import org.jetbrains.exposed.v1.r2dbc.*
@@ -35,7 +38,7 @@ val ENVIRONMENT_SORT_FIELDS: Set<String> = SORTABLE_COLUMNS.keys
  * only path that decrypts, for the try services.
  */
 class EnvironmentService(private val database: R2dbcDatabase, private val cipher: FieldCipher) : EncryptedAtRest {
-    object Environments : UIntIdTable("environments") {
+    object Environments : UIntIdTable("environments"), SoftDeletable {
         val systemId = reference("system_id", SystemService.Systems)
         // uq_environments_system_name_active (V15): (system_id, LOWER(name)) among active rows.
         val name = varchar("name", length = MAX_ENVIRONMENT_NAME_LENGTH)
@@ -51,7 +54,7 @@ class EnvironmentService(private val database: R2dbcDatabase, private val cipher
         val pgPassword = text("pg_password").nullable() // encrypted at rest
         val createdAt = long("created_at")
         val updatedAt = long("updated_at")
-        val markedAsDeleted = bool("marked_as_deleted").default(false)
+        override val markedAsDeleted = bool("marked_as_deleted").default(false)
     }
 
     override val encryptedRowLabel = "environment credential"
@@ -60,14 +63,10 @@ class EnvironmentService(private val database: R2dbcDatabase, private val cipher
         cipher.reencryptRows(Environments, listOf(Environments.kafkaPassword, Environments.pgPassword), reencryptAll)
     }
 
-    private fun active(): Op<Boolean> = Environments.markedAsDeleted eq false
-
-    private fun now() = System.currentTimeMillis()
-
     private fun joined() = Environments.innerJoin(SystemService.Systems)
 
     suspend fun list(filter: EnvironmentListFilter, paging: PageRequest): EnvironmentListResult = suspendTransaction(database) {
-        var predicate: Op<Boolean> = active()
+        var predicate: Op<Boolean> = Environments.active()
         filter.name?.takeIf { it.isNotBlank() }?.let { predicate = predicate and Environments.name.containsNormalized(it) }
         filter.systemId?.let { predicate = predicate and (Environments.systemId eq it) }
         val total = Environments.selectAll().where { predicate }.count()
@@ -76,12 +75,12 @@ class EnvironmentService(private val database: R2dbcDatabase, private val cipher
     }
 
     suspend fun read(id: UInt): EnvironmentResponse? = suspendTransaction(database) {
-        joined().selectAll().where { (Environments.id eq id) and active() }.toList().singleOrNull()?.toResponse()
+        joined().selectAll().where { (Environments.id eq id) and Environments.active() }.toList().singleOrNull()?.toResponse()
     }
 
     /** The decrypted targets for the try services — null for a missing/deleted environment. */
     suspend fun resolveTarget(id: UInt): EnvironmentTargets? = suspendTransaction(database) {
-        Environments.selectAll().where { (Environments.id eq id) and active() }.toList().singleOrNull()?.let { row ->
+        Environments.selectAll().where { (Environments.id eq id) and Environments.active() }.toList().singleOrNull()?.let { row ->
             EnvironmentTargets(
                 id = row[Environments.id].value,
                 systemId = row[Environments.systemId].value,
@@ -107,7 +106,7 @@ class EnvironmentService(private val database: R2dbcDatabase, private val cipher
     suspend fun create(request: EnvironmentRequest): UInt = suspendTransaction(database) {
         validateEnvironmentRequest(request, passwordRequired = true)
         requireSystem(request.systemId)
-        val stamp = now()
+        val stamp = nowMillis()
         Environments.insert {
             it[systemId] = request.systemId
             it[name] = request.name
@@ -132,7 +131,7 @@ class EnvironmentService(private val database: R2dbcDatabase, private val cipher
      * V15 index → 409. Returns the affected row count (0 = missing/deleted).
      */
     suspend fun update(id: UInt, request: EnvironmentRequest): Int = suspendTransaction(database) {
-        val current = Environments.selectAll().where { (Environments.id eq id) and active() }.toList().singleOrNull()
+        val current = Environments.selectAll().where { (Environments.id eq id) and Environments.active() }.toList().singleOrNull()
             ?: return@suspendTransaction 0
         val kafkaStored = current[Environments.kafkaPassword] != null
         val pgStored = current[Environments.pgPassword] != null
@@ -140,7 +139,7 @@ class EnvironmentService(private val database: R2dbcDatabase, private val cipher
         request.kafka?.let { validateEnvironmentRequest(request.copy(postgres = null), passwordRequired = !kafkaStored) }
         request.postgres?.let { validateEnvironmentRequest(request.copy(kafka = null), passwordRequired = !pgStored) }
         requireSystem(request.systemId)
-        Environments.update({ (Environments.id eq id) and active() }) {
+        Environments.update({ (Environments.id eq id) and Environments.active() }) {
             it[systemId] = request.systemId
             it[name] = request.name
             it[description] = request.description
@@ -161,22 +160,18 @@ class EnvironmentService(private val database: R2dbcDatabase, private val cipher
                 request.postgres.password != null -> cipher.encrypt(request.postgres.password)
                 else -> current[Environments.pgPassword]
             }
-            it[updatedAt] = now()
+            it[updatedAt] = nowMillis()
         }
     }
 
     suspend fun delete(id: UInt): Int = suspendTransaction(database) {
-        Environments.update({ (Environments.id eq id) and active() }) {
+        Environments.update({ (Environments.id eq id) and Environments.active() }) {
             it[markedAsDeleted] = true
-            it[updatedAt] = now()
+            it[updatedAt] = nowMillis()
         }
     }
 
-    private suspend fun requireSystem(systemId: UInt) {
-        val s = SystemService.Systems
-        val ok = s.select(s.id).where { (s.id eq systemId) and (s.markedAsDeleted eq false) }.count() > 0
-        if (!ok) throw BadRequestException("Unknown or deleted system id: $systemId")
-    }
+    private suspend fun requireSystem(systemId: UInt) = SystemService.Systems.requireActive(systemId, "system")
 
     private fun ResultRow.toResponse() = EnvironmentResponse(
         id = this[Environments.id].value,

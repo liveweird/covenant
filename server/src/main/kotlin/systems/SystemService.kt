@@ -10,6 +10,10 @@ import io.ktor.server.plugins.BadRequestException
 import io.ktor.util.AttributeKey
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
+import ch.nokillswit.infra.db.SoftDeletable
+import ch.nokillswit.infra.db.active
+import ch.nokillswit.infra.db.activeCountsBy
+import ch.nokillswit.infra.db.nowMillis
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.dao.id.UIntIdTable
 import org.jetbrains.exposed.v1.r2dbc.*
@@ -29,24 +33,20 @@ private val SORTABLE_COLUMNS: Map<String, Column<*>> = mapOf(
 val SYSTEM_SORT_FIELDS: Set<String> = SORTABLE_COLUMNS.keys
 
 class SystemService(private val database: R2dbcDatabase, private val domains: DomainService) {
-    object Systems : UIntIdTable("systems") {
+    object Systems : UIntIdTable("systems"), SoftDeletable {
         val domainId = reference("domain_id", DomainService.Domains)
         // uq_systems_domain_name_active (V8): (domain_id, LOWER(name)) among active rows.
         val name = varchar("name", length = MAX_SYSTEM_NAME_LENGTH)
         val description = varchar("description", length = MAX_SYSTEM_DESCRIPTION_LENGTH).nullable()
         val createdAt = long("created_at")
         val updatedAt = long("updated_at")
-        val markedAsDeleted = bool("marked_as_deleted").default(false)
+        override val markedAsDeleted = bool("marked_as_deleted").default(false)
     }
-
-    private fun active(): Op<Boolean> = Systems.markedAsDeleted eq false
-
-    private fun now() = System.currentTimeMillis()
 
     private fun joined() = Systems.innerJoin(DomainService.Domains)
 
     suspend fun list(filter: SystemListFilter, paging: PageRequest): SystemListResult = suspendTransaction(database) {
-        var predicate: Op<Boolean> = active()
+        var predicate: Op<Boolean> = Systems.active()
         filter.name?.takeIf { it.isNotBlank() }?.let { predicate = predicate and Systems.name.containsNormalized(it) }
         filter.domainId?.let { predicate = predicate and (Systems.domainId eq it) }
         val total = Systems.selectAll().where { predicate }.count()
@@ -57,7 +57,7 @@ class SystemService(private val database: R2dbcDatabase, private val domains: Do
 
     /** Every active system with its domain, name-ordered — the tree's second level (registry-scale, unpaged). */
     suspend fun listAll(): List<SystemResponse> = suspendTransaction(database) {
-        val rows = joined().selectAll().where { active() }
+        val rows = joined().selectAll().where { Systems.active() }
             .orderBy(Systems.name.lowerCase() to SortOrder.ASC, Systems.id to SortOrder.ASC)
             .toList()
         val counts = activeContractCounts(rows.map { it[Systems.id].value })
@@ -65,7 +65,7 @@ class SystemService(private val database: R2dbcDatabase, private val domains: Do
     }
 
     suspend fun read(id: UInt): SystemResponse? = suspendTransaction(database) {
-        joined().selectAll().where { (Systems.id eq id) and active() }.toList().singleOrNull()
+        joined().selectAll().where { (Systems.id eq id) and Systems.active() }.toList().singleOrNull()
             ?.toResponse(activeContractCounts(listOf(id))[id] ?: 0)
     }
 
@@ -73,7 +73,7 @@ class SystemService(private val database: R2dbcDatabase, private val domains: Do
     suspend fun create(request: SystemRequest): UInt = suspendTransaction(database) {
         validateSystemRequest(request)
         requireDomain(request.domainId)
-        val stamp = now()
+        val stamp = nowMillis()
         Systems.insert {
             it[domainId] = request.domainId
             it[name] = request.name
@@ -87,11 +87,11 @@ class SystemService(private val database: R2dbcDatabase, private val domains: Do
     suspend fun update(id: UInt, request: SystemRequest): Int = suspendTransaction(database) {
         validateSystemRequest(request)
         requireDomain(request.domainId)
-        Systems.update({ (Systems.id eq id) and active() }) {
+        Systems.update({ (Systems.id eq id) and Systems.active() }) {
             it[domainId] = request.domainId
             it[name] = request.name
             it[description] = request.description
-            it[updatedAt] = now()
+            it[updatedAt] = nowMillis()
         }
     }
 
@@ -104,15 +104,15 @@ class SystemService(private val database: R2dbcDatabase, private val domains: Do
         if ((activeContractCounts(listOf(id))[id] ?: 0) > 0) {
             throw ConflictException("The system still holds contracts — move or delete them first")
         }
-        val rows = Systems.update({ (Systems.id eq id) and active() }) {
+        val rows = Systems.update({ (Systems.id eq id) and Systems.active() }) {
             it[markedAsDeleted] = true
-            it[updatedAt] = now()
+            it[updatedAt] = nowMillis()
         }
         if (rows > 0) {
             val e = EnvironmentService.Environments
             e.update({ (e.systemId eq id) and (e.markedAsDeleted eq false) }) {
                 it[e.markedAsDeleted] = true
-                it[e.updatedAt] = now()
+                it[e.updatedAt] = nowMillis()
             }
         }
         rows
@@ -123,17 +123,8 @@ class SystemService(private val database: R2dbcDatabase, private val domains: Do
     }
 
     /** One grouped query over the contracts table for the rows' active-contract counts (a sanctioned cross-feature read). */
-    private suspend fun activeContractCounts(ids: List<UInt>): Map<UInt, Int> {
-        if (ids.isEmpty()) return emptyMap()
-        val contracts = ContractService.Contracts
-        val count = contracts.id.count()
-        return contracts.select(contracts.systemId, count)
-            .where { (contracts.systemId inList ids) and (contracts.markedAsDeleted eq false) }
-            .groupBy(contracts.systemId)
-            .map { it[contracts.systemId].value to it[count].toInt() }
-            .toList()
-            .toMap()
-    }
+    private suspend fun activeContractCounts(ids: List<UInt>): Map<UInt, Int> =
+        ContractService.Contracts.activeCountsBy(ContractService.Contracts.systemId, ids)
 
     private fun ResultRow.toResponse(contractCount: Int) = SystemResponse(
         id = this[Systems.id].value,

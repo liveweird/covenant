@@ -47,7 +47,6 @@ object KafkaTry {
     private val CLOSE_TIMEOUT: Duration = Duration.ofSeconds(2)
     private const val POLL_MS = 250L
     private const val READ_BUDGET_MS = 5_000L
-    private const val NANOS_PER_MILLI = 1_000_000L
     const val PAYLOAD_SENT_AS_JSON = "PAYLOAD_SENT_AS_JSON"
 
     class Prepared(val topic: String, val message: KafkaMessageSummary?)
@@ -106,7 +105,7 @@ object KafkaTry {
             val producer = KafkaProducer<ByteArray, ByteArray>(KafkaClients.producer(target))
             try {
                 val metadata = producer.send(record).get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                Published(metadata, elapsed(started))
+                Published(metadata, elapsedMs(started))
             } finally {
                 producer.close(CLOSE_TIMEOUT) // bounded: a wedged connection must not hold the request thread
             }
@@ -186,7 +185,7 @@ object KafkaTry {
         val newestFirst = collected.sortedWith(
             compareByDescending<ConsumerRecord<ByteArray, ByteArray>> { it.timestamp() }.thenByDescending { it.offset() },
         )
-        return Read(newestFirst.take(limit), reachedEnd, elapsed(started))
+        return Read(newestFirst.take(limit), reachedEnd, elapsedMs(started))
     }
 
     private fun utf8OrNull(bytes: ByteArray): String? = try {
@@ -197,8 +196,6 @@ object KafkaTry {
     } catch (_: CharacterCodingException) {
         null
     }
-
-    private fun elapsed(started: Long) = (System.nanoTime() - started) / NANOS_PER_MILLI
 
     private fun classify(e: Throwable): String = when (e) {
         is AuthenticationException -> "The environment's cluster refused the credentials"

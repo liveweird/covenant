@@ -101,7 +101,7 @@ object HttpTry {
             contentType = response.headers().firstValue("content-type").orElse(null),
             body = text.takeIf { bytes.isNotEmpty() },
             truncated = truncated,
-            durationMs = (System.nanoTime() - started) / NANOS_PER_MILLI,
+            durationMs = elapsedMs(started),
         )
     }
 
@@ -169,6 +169,5 @@ object HttpTry {
 
     private fun encode(value: String) = URLEncoder.encode(value, Charsets.UTF_8).replace("+", "%20")
 
-    private const val NANOS_PER_MILLI = 1_000_000L
     const val UNREACHABLE = "The environment could not be reached"
 }

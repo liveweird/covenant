@@ -2,7 +2,8 @@ package ch.nokillswit.systems
 
 import ch.nokillswit.infra.paging.PageResponse
 import ch.nokillswit.infra.validation.sanitizeSingleLine
-import io.ktor.server.plugins.BadRequestException
+import ch.nokillswit.infra.validation.requireNameAndDescription
+import ch.nokillswit.infra.validation.sanitizedDescription
 import kotlinx.serialization.Serializable
 
 /**
@@ -43,15 +44,10 @@ data class SystemListResult(val items: List<SystemResponse>, val total: Long)
 fun sanitizedSystemRequest(request: SystemRequest): SystemRequest = SystemRequest(
     domainId = request.domainId,
     name = sanitizeSingleLine(request.name, "Name"),
-    description = request.description?.let { sanitizeSingleLine(it, "Description") }?.takeIf { it.isNotBlank() },
+    description = sanitizedDescription(request.description),
 )
 
 /** The system rules — enforced by the route AND re-checked by the service (the domain's existence is the service's). */
 fun validateSystemRequest(request: SystemRequest) {
-    if (request.name.isBlank() || request.name.length > MAX_SYSTEM_NAME_LENGTH) {
-        throw BadRequestException("Name must be 1-$MAX_SYSTEM_NAME_LENGTH characters")
-    }
-    if (request.description != null && request.description.length > MAX_SYSTEM_DESCRIPTION_LENGTH) {
-        throw BadRequestException("Description must be at most $MAX_SYSTEM_DESCRIPTION_LENGTH characters")
-    }
+    requireNameAndDescription(request.name, request.description, MAX_SYSTEM_NAME_LENGTH, MAX_SYSTEM_DESCRIPTION_LENGTH)
 }

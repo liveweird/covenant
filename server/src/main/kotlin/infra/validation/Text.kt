@@ -13,3 +13,14 @@ fun sanitizeSingleLine(value: String, field: String): String {
     }
     return trimmed
 }
+
+/** The optional description every registry carries: trimmed, control characters a 400, blank = absent. */
+fun sanitizedDescription(raw: String?): String? = raw?.let { sanitizeSingleLine(it, "Description") }?.takeIf { it.isNotBlank() }
+
+/** The name/description length rule every registry enforces — one wording, so the SPA's messages never drift per area. */
+fun requireNameAndDescription(name: String, description: String?, maxName: Int, maxDescription: Int) {
+    if (name.isBlank() || name.length > maxName) throw BadRequestException("Name must be 1-$maxName characters")
+    if (description != null && description.length > maxDescription) {
+        throw BadRequestException("Description must be at most $maxDescription characters")
+    }
+}

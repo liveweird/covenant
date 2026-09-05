@@ -11,10 +11,14 @@ import ch.nokillswit.infra.paging.applyPaging
 import ch.nokillswit.systems.SystemService
 import ch.nokillswit.teams.TeamService
 import ch.nokillswit.users.UserService
-import io.ktor.server.plugins.BadRequestException
 import io.ktor.util.AttributeKey
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
+import ch.nokillswit.infra.db.SoftDeletable
+import ch.nokillswit.infra.db.active
+import ch.nokillswit.infra.db.activeCountsBy
+import ch.nokillswit.infra.db.requireActive
+import ch.nokillswit.infra.db.nowMillis
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.dao.id.UIntIdTable
 import org.jetbrains.exposed.v1.r2dbc.*
@@ -36,7 +40,7 @@ val CONTRACT_SORT_FIELDS: Set<String> = SORTABLE_COLUMNS.keys
 data class Viewer(val caller: CallerPrincipal, val teamIds: Set<UInt>)
 
 class ContractService(private val database: R2dbcDatabase, private val teams: TeamService) {
-    object Contracts : UIntIdTable("contracts") {
+    object Contracts : UIntIdTable("contracts"), SoftDeletable {
         val systemId = reference("system_id", SystemService.Systems)
         val type = varchar("type", length = 20)
         val name = varchar("name", length = MAX_CONTRACT_NAME_LENGTH)
@@ -46,7 +50,7 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
         val createdBy = reference("created_by", UserService.Users)
         val createdAt = long("created_at")
         val updatedAt = long("updated_at")
-        val markedAsDeleted = bool("marked_as_deleted").default(false)
+        override val markedAsDeleted = bool("marked_as_deleted").default(false)
         // The denormalized "highest active version" pointer (V10) — a plain integer column here
         // (no reference(): the versions table references contracts, and Exposed dislikes cycles).
         val latestVersionId = uinteger("latest_version_id").nullable()
@@ -63,10 +67,6 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
         .join(ownerTeams, JoinType.LEFT, onColumn = Contracts.ownerTeamId, otherColumn = ownerTeams[TeamService.Teams.id])
         .join(ownerUsers, JoinType.LEFT, onColumn = Contracts.ownerUserId, otherColumn = ownerUsers[UserService.Users.id])
         .join(latest, JoinType.LEFT, onColumn = Contracts.latestVersionId, otherColumn = latest[ContractVersionService.ContractVersions.id])
-
-    private fun active(): Op<Boolean> = Contracts.markedAsDeleted eq false
-
-    private fun now() = System.currentTimeMillis()
 
     /** The caller's active team set — read once per request, then handed to every `canWrite`. */
     suspend fun viewer(caller: CallerPrincipal): Viewer =
@@ -85,7 +85,7 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
     }
 
     suspend fun list(filter: ContractListFilter, paging: PageRequest, viewer: Viewer): ContractListResult = suspendTransaction(database) {
-        val predicate = buildPredicate(filter) and active()
+        val predicate = buildPredicate(filter) and Contracts.active()
         val total = joined().selectAll().where { predicate }.count()
         val rows = joined().selectAll().where { predicate }.applyPaging(paging, SORTABLE_COLUMNS).toList()
         val facts = facts(rows.map { it[Contracts.id].value }, viewer)
@@ -93,7 +93,7 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
     }
 
     suspend fun read(id: UInt, viewer: Viewer): ContractResponse? = suspendTransaction(database) {
-        val row = joined().selectAll().where { (Contracts.id eq id) and active() }.toList().singleOrNull()
+        val row = joined().selectAll().where { (Contracts.id eq id) and Contracts.active() }.toList().singleOrNull()
             ?: return@suspendTransaction null
         row.toResponse(viewer, facts(listOf(id), viewer))
     }
@@ -110,7 +110,7 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
         requireOwnerAssignable(caller, ownership, teamIds)
         requireActiveSystem(request.systemId)
         requireActiveOwner(ownership)
-        val stamp = now()
+        val stamp = nowMillis()
         Contracts.insert {
             it[systemId] = request.systemId
             it[type] = request.type.name
@@ -126,10 +126,10 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
 
     suspend fun update(id: UInt, request: ContractUpdateRequest): Int = suspendTransaction(database) {
         validateContractUpdate(request)
-        Contracts.update({ (Contracts.id eq id) and active() }) {
+        Contracts.update({ (Contracts.id eq id) and Contracts.active() }) {
             it[name] = request.name
             it[description] = request.description
-            it[updatedAt] = now()
+            it[updatedAt] = nowMillis()
         }
     }
 
@@ -137,10 +137,10 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
     suspend fun transferOwner(id: UInt, ownership: Ownership): Ownership? = suspendTransaction(database) {
         val previous = ownershipOf(id) ?: return@suspendTransaction null
         requireActiveOwner(ownership)
-        Contracts.update({ (Contracts.id eq id) and active() }) {
+        Contracts.update({ (Contracts.id eq id) and Contracts.active() }) {
             it[ownerTeamId] = ownership.teamId
             it[ownerUserId] = ownership.userId
-            it[updatedAt] = now()
+            it[updatedAt] = nowMillis()
         }
         previous
     }
@@ -158,8 +158,8 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
             }
             .count()
         if (published > 0) throw ConflictException("The contract still has active or deprecated versions — retire them first")
-        val stamp = now()
-        val rows = Contracts.update({ (Contracts.id eq id) and active() }) {
+        val stamp = nowMillis()
+        val rows = Contracts.update({ (Contracts.id eq id) and Contracts.active() }) {
             it[markedAsDeleted] = true
             it[latestVersionId] = null
             it[updatedAt] = stamp
@@ -201,14 +201,14 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
     /** Whether a contract with this (system, name) is active — the import's existence probe (by id). */
     suspend fun findActiveId(systemId: UInt, name: String): UInt? = suspendTransaction(database) {
         Contracts.select(Contracts.id)
-            .where { (Contracts.systemId eq systemId) and (Contracts.name.lowerCase() eq name.lowercase()) and active() }
+            .where { (Contracts.systemId eq systemId) and (Contracts.name.lowerCase() eq name.lowercase()) and Contracts.active() }
             .map { it[Contracts.id].value }.toList().singleOrNull()
     }
 
     suspend fun typeOf(id: UInt): ContractType? = suspendTransaction(database) {
         Contracts.select(
             Contracts.type,
-        ).where { (Contracts.id eq id) and active() }.map { ContractType.valueOf(it[Contracts.type]) }.toList().singleOrNull()
+        ).where { (Contracts.id eq id) and Contracts.active() }.map { ContractType.valueOf(it[Contracts.type]) }.toList().singleOrNull()
     }
 
     /** The facet counts behind the list/tree filters — six group-bys over the shared predicate, one transaction. */
@@ -216,7 +216,7 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
         val v = ContractVersionService.ContractVersions
         val n = Contracts.id.count()
         fun rows(dimension: FacetDimension, vararg groups: Expression<*>) =
-            joined().select(listOf(*groups, n)).where { buildPredicate(filter.lifting(dimension)) and active() }.groupBy(*groups)
+            joined().select(listOf(*groups, n)).where { buildPredicate(filter.lifting(dimension)) and Contracts.active() }.groupBy(*groups)
         val type = rows(FacetDimension.TYPE, Contracts.type).map { FacetCount(it[Contracts.type], it[n]) }.toList()
         val lifecycle = rows(FacetDimension.LIFECYCLE, latest[v.lifecycle])
             .map { FacetCount(it.getOrNull(latest[v.lifecycle]) ?: NO_VERSION_FACET, it[n]) }.toList()
@@ -229,11 +229,13 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
         val teamId = ownerTeams[TeamService.Teams.id]
         val teamName = ownerTeams[TeamService.Teams.name]
         val ownerTeam = joined().select(teamId, teamName, n)
-            .where { buildPredicate(filter.lifting(FacetDimension.OWNER_TEAM)) and active() and Contracts.ownerTeamId.isNotNull() }
+            .where {
+                buildPredicate(filter.lifting(FacetDimension.OWNER_TEAM)) and Contracts.active() and Contracts.ownerTeamId.isNotNull()
+            }
             .groupBy(teamId, teamName)
             .map { NamedFacetCount(it[teamId].value, it[teamName], it[n]) }.toList()
         val errors = latest[v.checkErrors]
-        val lifted = buildPredicate(filter.lifting(FacetDimension.HAS_ERRORS)) and active()
+        val lifted = buildPredicate(filter.lifting(FacetDimension.HAS_ERRORS)) and Contracts.active()
         val withErrors = joined().selectAll().where { lifted and (errors greater 0) }.count()
         val clean = joined().selectAll().where { lifted and ((errors eq 0) or errors.isNull()) }.count()
         FacetsResponse(
@@ -254,7 +256,7 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
             .orderBy(domains.name.lowerCase() to SortOrder.ASC, domains.id to SortOrder.ASC).toList()
         val systemRows = systems.selectAll().where { systems.markedAsDeleted eq false }
             .orderBy(systems.name.lowerCase() to SortOrder.ASC, systems.id to SortOrder.ASC).toList()
-        val predicate = buildPredicate(filter) and active()
+        val predicate = buildPredicate(filter) and Contracts.active()
         val contractRows = joined().selectAll().where { predicate }
             .orderBy(Contracts.name.lowerCase() to SortOrder.ASC, Contracts.id to SortOrder.ASC).toList()
         val facts = facts(contractRows.map { it[Contracts.id].value }, viewer)
@@ -276,27 +278,15 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
 
     private suspend fun ownershipOf(id: UInt): Ownership? =
         Contracts.select(Contracts.ownerTeamId, Contracts.ownerUserId)
-            .where { (Contracts.id eq id) and active() }
+            .where { (Contracts.id eq id) and Contracts.active() }
             .map { Ownership(it[Contracts.ownerTeamId]?.value, it[Contracts.ownerUserId]?.value) }
             .toList().singleOrNull()
 
-    private suspend fun requireActiveSystem(systemId: UInt) {
-        val systems = SystemService.Systems
-        val ok = systems.select(systems.id).where { (systems.id eq systemId) and (systems.markedAsDeleted eq false) }.count() > 0
-        if (!ok) throw BadRequestException("Unknown or deleted system id: $systemId")
-    }
+    private suspend fun requireActiveSystem(systemId: UInt) = SystemService.Systems.requireActive(systemId, "system")
 
     private suspend fun requireActiveOwner(ownership: Ownership) {
-        ownership.teamId?.let { teamId ->
-            val ok = TeamService.Teams.select(TeamService.Teams.id)
-                .where { (TeamService.Teams.id eq teamId) and (TeamService.Teams.markedAsDeleted eq false) }.count() > 0
-            if (!ok) throw BadRequestException("Unknown or deleted team id: $teamId")
-        }
-        ownership.userId?.let { userId ->
-            val ok = UserService.Users.select(UserService.Users.id)
-                .where { (UserService.Users.id eq userId) and (UserService.Users.markedAsDeleted eq false) }.count() > 0
-            if (!ok) throw BadRequestException("Unknown or deleted user id: $userId")
-        }
+        ownership.teamId?.let { TeamService.Teams.requireActive(it, "team") }
+        ownership.userId?.let { UserService.Users.requireActive(it, "user") }
     }
 
     /** The contract's name for a notification's params — deleted rows included (the deletion itself notifies). */
@@ -318,15 +308,8 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
         return RowFacts(versionCounts(ids), subscriberCounts, subscribed)
     }
 
-    private suspend fun versionCounts(ids: List<UInt>): Map<UInt, Int> {
-        if (ids.isEmpty()) return emptyMap()
-        val v = ContractVersionService.ContractVersions
-        val count = v.id.count()
-        return v.select(v.contractId, count)
-            .where { (v.contractId inList ids) and (v.markedAsDeleted eq false) }
-            .groupBy(v.contractId)
-            .map { it[v.contractId].value to it[count].toInt() }.toList().toMap()
-    }
+    private suspend fun versionCounts(ids: List<UInt>): Map<UInt, Int> =
+        ContractVersionService.ContractVersions.activeCountsBy(ContractVersionService.ContractVersions.contractId, ids)
 
     private companion object {
         const val NO_VERSION_FACET = "NONE"

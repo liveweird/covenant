@@ -33,7 +33,6 @@ object SqlTry {
     private const val SOCKET_TIMEOUT_SECONDS = "20"
     private val IDENTIFIER = Regex("[A-Za-z_][A-Za-z0-9_$]{0,62}")
     private val TABLE_LIKE = setOf("table", "view")
-    private const val NANOS_PER_MILLI = 1_000_000L
 
     class Prepared(
         val schema: String?,
@@ -99,7 +98,7 @@ object SqlTry {
         } catch (e: SQLException) {
             when {
                 e.sqlState == UNDEFINED_TABLE ->
-                    Sample(emptyList(), emptyList(), false, emptySet(), elapsed(started), datasetMissing = true)
+                    Sample(emptyList(), emptyList(), false, emptySet(), elapsedMs(started), datasetMissing = true)
                 else -> throw BadGatewayException(classify(e))
             }
         }
@@ -169,7 +168,7 @@ object SqlTry {
             }
             rows += row
         }
-        return Sample(columns, rows, truncated, nullSeen, elapsed(started), datasetMissing = false)
+        return Sample(columns, rows, truncated, nullSeen, elapsedMs(started), datasetMissing = false)
     }
 
     private fun cell(rs: ResultSet, meta: ResultSetMetaData, i: Int): String? {
@@ -179,8 +178,6 @@ object SqlTry {
         } ?: return null
         return if (text.length > MAX_CELL_CHARS) text.take(MAX_CELL_CHARS) + "…" else text
     }
-
-    private fun elapsed(started: Long) = (System.nanoTime() - started) / NANOS_PER_MILLI
 
     private fun classify(e: SQLException): String = when {
         e.sqlState == INSUFFICIENT_PRIVILEGE -> "The environment's database role may not read this dataset"

@@ -216,3 +216,8 @@ data class TryKafkaReadResponse(
     /** Per-record findings carry paths under `/messages/{i}/payload`. */
     val conformance: ConformanceReport,
 )
+
+internal const val NANOS_PER_MILLI = 1_000_000L
+
+/** Milliseconds since a `System.nanoTime()` mark — every leg's `durationMs`. */
+internal fun elapsedMs(startedNanos: Long): Long = (System.nanoTime() - startedNanos) / NANOS_PER_MILLI

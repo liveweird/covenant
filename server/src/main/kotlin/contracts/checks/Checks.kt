@@ -21,7 +21,7 @@ fun Application.configureChecks() {
         if (!development) log.warn("checker.url is blank: contract lint/semantic checks are OFF; every check reports CHECKER_UNAVAILABLE")
         DisabledCheckerClient
     } else {
-        HttpCheckerClient(url, token, timeoutMs)
+        HttpCheckerClient(url, token, timeoutMs).also { client -> monitor.subscribe(ApplicationStopped) { client.close() } }
     }
     // Resolved at CALL time, not here: the test seam (`application { attributes.put(CheckerClientKey, stub) }`)
     // runs after the config modules, exactly like Toadie's ContractUrlFetcherKey.
