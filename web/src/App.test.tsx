@@ -41,7 +41,7 @@ describe("App shell", () => {
 
     test("renders the brand and the home page at /", async () => {
       renderApp("/");
-      expect(await screen.findByRole("heading", { level: 2, name: "Home" })).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { level: 2, name: "Hierarchy" })).toBeInTheDocument();
       expect(screen.getByText("Covenant")).toBeInTheDocument();
     });
 
@@ -54,7 +54,8 @@ describe("App shell", () => {
       renderApp("/");
       // Sections are labelled groups, never toggles — every leaf is in the DOM immediately.
       const catalog = await screen.findByRole("group", { name: "Catalog" });
-      expect(within(catalog).getByRole("link", { name: "Home" })).toHaveAttribute("href", "/");
+      expect(within(catalog).getByRole("link", { name: "Hierarchy" })).toHaveAttribute("href", "/");
+      expect(within(catalog).getByRole("link", { name: "Contracts" })).toHaveAttribute("href", "/contracts");
       const registries = screen.getByRole("group", { name: "Registries" });
       expect(within(registries).getByRole("link", { name: "Domains" })).toHaveAttribute("href", "/domains");
       expect(within(registries).getByRole("link", { name: "Systems" })).toHaveAttribute("href", "/systems");
@@ -101,7 +102,7 @@ describe("App shell", () => {
     test("shows no dot when the current version was already seen", async () => {
       localStorage.setItem("covenant.changelog", JSON.stringify({ seenVersion: APP_VERSION }));
       renderApp("/");
-      await screen.findByRole("heading", { level: 2, name: "Home" });
+      await screen.findByRole("heading", { level: 2, name: "Hierarchy" });
       expect(screen.queryByTitle("What's new")).not.toBeInTheDocument();
     });
 

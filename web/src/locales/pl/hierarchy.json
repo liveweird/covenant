@@ -1,0 +1,13 @@
+{
+  "title": "Hierarchia",
+  "intro": "Domeny, ich systemy i kontrakty, które każdy system udostępnia.",
+  "treeAria": "Hierarchia kontraktów",
+  "toggleAria": "Zwiń/rozwiń {{name}}",
+  "expandAll": "Rozwiń wszystko",
+  "collapseAll": "Zwiń wszystko",
+  "contractCount": "{{count}} kontraktów",
+  "noSystems": "Brak systemów w tej domenie",
+  "noContracts": "Brak kontraktów",
+  "empty": "Brak domen — administratorzy tworzą je na stronie Domeny",
+  "loadFailed": "Nie udało się wczytać hierarchii"
+}

@@ -15,7 +15,15 @@ import { activeNavPath, visibleSections, type NavLeaf } from "./utils/navigation
 import classes from "./theme.module.css";
 
 const Login = lazy(() => import("./pages/Login"));
-const Home = lazy(() => import("./pages/Home"));
+const Hierarchy = lazy(() => import("./pages/Hierarchy"));
+const Contracts = lazy(() => import("./pages/Contracts"));
+const CreateContract = lazy(() => import("./pages/CreateContract"));
+const EditContract = lazy(() => import("./pages/EditContract"));
+const ContractDetails = lazy(() => import("./pages/ContractDetails"));
+const ImportContract = lazy(() => import("./pages/ImportContract"));
+const NewVersion = lazy(() => import("./pages/NewVersion"));
+const VersionPage = lazy(() => import("./pages/VersionPage"));
+const VersionDiff = lazy(() => import("./pages/VersionDiff"));
 const Domains = lazy(() => import("./pages/Domains"));
 const Systems = lazy(() => import("./pages/Systems"));
 const Teams = lazy(() => import("./pages/Teams"));
@@ -147,7 +155,15 @@ export default function App() {
         />
         <Route element={<RequireAuth />}>
           <Route element={<Shell />}>
-            <Route index element={<Home />} />
+            <Route index element={<Hierarchy />} />
+            <Route path="contracts" element={<Contracts />} />
+            <Route path="contracts/new" element={<CreateContract />} />
+            <Route path="contracts/import" element={<ImportContract />} />
+            <Route path="contracts/:id" element={<ContractDetails />} />
+            <Route path="contracts/:id/edit" element={<EditContract />} />
+            <Route path="contracts/:id/diff" element={<VersionDiff />} />
+            <Route path="contracts/:id/versions/new" element={<NewVersion />} />
+            <Route path="contracts/:id/versions/:vid" element={<VersionPage />} />
             <Route path="domains" element={<Domains />} />
             <Route path="systems" element={<Systems />} />
             <Route path="teams" element={<Teams />} />

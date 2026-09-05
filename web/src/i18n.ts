@@ -12,10 +12,13 @@ import enAppShell from "./locales/en/appShell.json";
 import enAuth from "./locales/en/auth.json";
 import enChangelog from "./locales/en/changelog.json";
 import enDomains from "./locales/en/domains.json";
-import enHome from "./locales/en/home.json";
+import enContracts from "./locales/en/contracts.json";
+import enFindings from "./locales/en/findings.json";
+import enHierarchy from "./locales/en/hierarchy.json";
 import enSystems from "./locales/en/systems.json";
 import enTeams from "./locales/en/teams.json";
 import enUsers from "./locales/en/users.json";
+import enVersions from "./locales/en/versions.json";
 
 /**
  * The build-time supported-language set. Adding a language: a complete `locales/<lang>/`
@@ -57,10 +60,13 @@ export const en = {
   auth: enAuth,
   changelog: enChangelog,
   domains: enDomains,
-  home: enHome,
+  contracts: enContracts,
+  findings: enFindings,
+  hierarchy: enHierarchy,
   systems: enSystems,
   teams: enTeams,
   users: enUsers,
+  versions: enVersions,
 };
 
 // Every non-EN bundle is assembled from its locales/<lang>/ folder — adding a language never

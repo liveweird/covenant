@@ -1,0 +1,113 @@
+{
+  "title": "Contracts",
+  "intro": "Every contract in the catalog — APIs, event streams and data views — with its owner and its latest version.",
+  "newContract": "New contract",
+  "import": "Import",
+  "createTitle": "New contract",
+  "createIntro": "Where the contract lives, what it is called and who owns it. The first version's document comes next.",
+  "editTitle": "Edit {{name}}",
+  "backToList": "Back to contracts",
+  "backToContract": "Back to the contract",
+  "openAria": "Open contract {{name}}",
+  "empty": "No contracts yet — create one or import a document",
+  "emptyFiltered": "No contracts match the filters",
+  "loadFailed": "Could not load the contracts",
+  "notFound": "This contract does not exist (or was deleted).",
+  "noVersions": "no versions",
+  "more": "More",
+  "moreActions": "More actions",
+  "export": "Export (JSON)",
+  "field": {
+    "type": "Type",
+    "typeHint": "The standard the documents follow — fixed once the contract exists",
+    "typeLocked": "The type cannot change: every version is validated against it",
+    "system": "System",
+    "systemHint": "The application or service exposing this contract",
+    "systemLocked": "A contract stays in the system it was created in",
+    "domain": "Domain",
+    "owner": "Owner",
+    "ownerHint": "A team you belong to, or yourself; administrators may pick anyone",
+    "ownerLocked": "Only an administrator can transfer ownership",
+    "ownerTransferHint": "Picking another owner transfers the contract",
+    "nameHint": "Unique within the system, case-insensitive"
+  },
+  "section": {
+    "placement": "Placement",
+    "identity": "Identity",
+    "ownership": "Ownership"
+  },
+  "owner": {
+    "TEAM": "Team",
+    "USER": "Person",
+    "teams": "Teams",
+    "users": "People",
+    "me": "{{name}} (you)",
+    "pick": "Pick an owner…",
+    "nothingFound": "No matching owner",
+    "deleted": "deleted"
+  },
+  "filter": {
+    "q": "Search",
+    "clearQ": "Clear search",
+    "ownerTeam": "Owning team",
+    "hasErrors": "Only with errors"
+  },
+  "column": {
+    "latest": "Latest version",
+    "updated": "Updated"
+  },
+  "validation": {
+    "systemRequired": "Pick a system",
+    "nameLength": "Name must be 1–100 characters",
+    "descriptionLength": "Description must be at most 2000 characters",
+    "ownerRequired": "Pick an owner"
+  },
+  "saveForbidden": "You cannot edit this contract — only its owners and administrators can",
+  "saveConflict": "A contract with this name already exists in this system",
+  "saveInvalid": "One or more fields are invalid",
+  "saveGone": "This contract no longer exists — reload the page",
+  "deleteTitle": "Delete contract?",
+  "deleteBody": "\"{{name}}\" and its {{count}} version(s) will be deleted.",
+  "deleteFailed": "Could not delete the contract",
+  "deleteHasPublished": "This contract still has active or deprecated versions — retire them first.",
+  "importTitle": "Import a document",
+  "importIntro": "Paste, upload or fetch a contract document. It lands as a new version — of the contract with that name in the picked system, or of a new contract.",
+  "importNameHint": "Prefilled from the document's title",
+  "importVersionHint": "Prefilled from the document's declared version",
+  "importOwnerHint": "Needed only when the contract does not exist yet",
+  "importPlaceholder": "Paste the OpenAPI, AsyncAPI or ODCS document here…",
+  "importHint": "Check predicts the outcome without storing anything; Import stores the document, waiving soft findings.",
+  "importCheck": "Check",
+  "importRun": "Import",
+  "importFailed": "Import failed",
+  "importInvalid": "The request was refused — check the fields",
+  "importOpenVersion": "Open the version",
+  "importOpenContract": "Open the contract",
+  "importStatus": {
+    "CREATED": "Contract created with its first version",
+    "CREATED_WITH_FINDINGS": "Contract created — the version carries findings",
+    "VERSION_ADDED": "Version added",
+    "VERSION_ADDED_WITH_FINDINGS": "Version added — it carries findings",
+    "INVALID": "Not imported — the document or the version was rejected",
+    "CONFLICT": "Not imported — this version already exists",
+    "FORBIDDEN": "Not imported — you cannot write this contract",
+    "ERROR": "Not imported — storing failed"
+  },
+  "importCheckStatus": {
+    "CREATED": "Would create the contract with this version",
+    "CREATED_WITH_FINDINGS": "Would create the contract — the version would carry findings",
+    "VERSION_ADDED": "Would add this version",
+    "VERSION_ADDED_WITH_FINDINGS": "Would add this version — it would carry findings",
+    "INVALID": "Would be rejected — the document or the version",
+    "CONFLICT": "Would be rejected — this version already exists",
+    "FORBIDDEN": "Would be refused — you cannot write this contract",
+    "ERROR": "Could not be predicted"
+  },
+  "toast": {
+    "created": "Contract created",
+    "saved": "Contract saved",
+    "deleted": "Contract deleted",
+    "exported": "Export downloaded",
+    "imported": "Document imported"
+  }
+}

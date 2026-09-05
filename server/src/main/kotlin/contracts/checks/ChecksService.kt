@@ -42,7 +42,7 @@ class ChecksService(private val checkerProvider: () -> CheckerClient) {
         DocumentParser.typeGate(type, parsed.root)?.let { gate ->
             return CheckReport.of(parsed.format, null, listOf(gate), checkerAvailable = true)
         }
-        val metadata = Metadata.extract(type, parsed.root)
+        val metadata = Metadata.extract(type, parsed.root).copy(declaredVersion = Metadata.declaredVersion(type, parsed.root))
         val findings = mutableListOf<Finding>()
         findings += when (type) {
             ContractType.OPENAPI -> OpenApiValidator.validate(content)

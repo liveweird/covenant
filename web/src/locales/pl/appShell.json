@@ -2,14 +2,15 @@
   "brand": "Covenant",
   "skipToContent": "Przejdź do treści",
   "nav": {
-    "home": "Start",
     "users": "Użytkownicy/czki",
     "changePassword": "Zmiana hasła",
     "featureFlags": "Flagi funkcji",
     "changelog": "Historia zmian",
     "teams": "Zespoły",
     "domains": "Domeny",
-    "systems": "Systemy"
+    "systems": "Systemy",
+    "hierarchy": "Hierarchia",
+    "contracts": "Kontrakty"
   },
   "section": {
     "catalog": "Katalog",
@@ -30,7 +31,10 @@
     "placeholder": "Szukaj lub przejdź do strony…",
     "groupPages": "Strony",
     "groupActions": "Akcje",
-    "groupFiles": "Kontrakty",
-    "nothingFound": "Nic nie znaleziono"
+    "nothingFound": "Nic nie znaleziono",
+    "groupContracts": "Kontrakty",
+    "newContract": "Nowy kontrakt",
+    "importContract": "Importuj dokument",
+    "searchHint": "Wpisz co najmniej dwa znaki, aby wyszukać kontrakty"
   }
 }

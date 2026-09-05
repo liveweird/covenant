@@ -57,6 +57,17 @@ export default defineConfig([
       'max-depth': ['error', 5],
       // The drill-down link builders (userXxxLink + DrillDownOpts tail params) carry 6.
       'max-params': ['error', 8],
+      // The editor rides its own lazy chunk: only components/CodeEditor.tsx (+ its theme sibling)
+      // may import CodeMirror — everything else talks to it through LazyCodeEditor's props and
+      // the pure utils/findingDiagnostics.ts.
+      'no-restricted-imports': [
+        'error',
+        { patterns: [{ group: ['@codemirror/*', '@lezer/*'], message: 'Only components/CodeEditor.tsx may import CodeMirror — use LazyCodeEditor.' }] },
+      ],
     },
+  },
+  {
+    files: ['src/components/CodeEditor.tsx', 'src/components/codeEditorTheme.ts'],
+    rules: { 'no-restricted-imports': 'off' },
   },
 ])

@@ -49,6 +49,8 @@ data class CheckReport(
     val specVersion: String?,
     val title: String?,
     val description: String?,
+    /** The version the DOCUMENT itself claims (`info.version` / ODCS `version`) — the import form's prefill. */
+    val declaredVersion: String?,
     val findings: List<Finding>,
     val errors: Int,
     val warnings: Int,
@@ -84,6 +86,7 @@ data class CheckReport(
                 specVersion = metadata?.specVersion,
                 title = metadata?.title,
                 description = metadata?.description,
+                declaredVersion = metadata?.declaredVersion,
                 findings = capped,
                 errors = capped.count { it.severity == Severity.ERROR },
                 warnings = capped.count { it.severity == Severity.WARN },
@@ -95,4 +98,4 @@ data class CheckReport(
 }
 
 /** What Covenant reads out of a document for display; truncated to the column widths at write time. */
-data class DocumentMetadata(val specVersion: String?, val title: String?, val description: String?)
+data class DocumentMetadata(val specVersion: String?, val title: String?, val description: String?, val declaredVersion: String? = null)

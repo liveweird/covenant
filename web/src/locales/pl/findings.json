@@ -1,0 +1,30 @@
+{
+  "title": "Uwagi",
+  "listAria": "Uwagi",
+  "count": {
+    "ERROR": "{{count}} błędów",
+    "WARN": "{{count}} ostrzeżeń",
+    "INFO": "{{count}} informacji"
+  },
+  "severity": {
+    "ERROR": "Błąd",
+    "WARN": "Ostrzeżenie",
+    "INFO": "Informacja"
+  },
+  "source": {
+    "SYNTAX": "Składnia",
+    "SCHEMA": "Schemat",
+    "SEMANTIC": "Semantyka",
+    "LINT": "Lint",
+    "BREAKING": "Zmiana łamiąca",
+    "SYSTEM": "System"
+  },
+  "waiting": "Sprawdzanie dokumentu…",
+  "checking": "Sprawdzanie…",
+  "clean": "Brak uwag — dokument przechodzi wszystkie sprawdzenia",
+  "cleanShort": "czysty",
+  "noneMatch": "Żadna uwaga nie pasuje do wybranych filtrów",
+  "jumpTo": "Przejdź do linii {{line}}, kolumny {{column}}",
+  "incompleteTitle": "Sprawdzenia niepełne",
+  "incompleteBody": "Moduł lint i sprawdzeń semantycznych był niedostępny — wykonano tylko wbudowane sprawdzenia składni i schematu. Uruchom sprawdzenia ponownie później."
+}

@@ -2040,6 +2040,10 @@ components:
         specVersion: { type: string, nullable: true }
         title: { type: string, nullable: true }
         description: { type: string, nullable: true }
+        declaredVersion:
+          type: string
+          nullable: true
+          description: The version the document itself claims (`info.version`, ODCS `version`) — the import form's prefill.
         findings:
           type: array
           items: { $ref: '#/components/schemas/Finding' }

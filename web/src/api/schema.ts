@@ -499,6 +499,384 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contracts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List contracts
+         * @description Any authenticated user. Every row carries `canWrite`, the server's verdict of the writer
+         *     rule for the caller (owning team member, owning user, or ADMIN).
+         *
+         *     - Sortable fields: `id`, `name`, `type`, `createdAt`, `updatedAt`. Default `id` ascending.
+         *     - Filters: `domainId`, `systemId`, `ownerTeamId`, `ownerUserId` (equality); `type` and
+         *       `lifecycle` (of the LATEST version) are repeatable any-of params; `q` matches name OR
+         *       description case- and accent-insensitively; `hasErrors` (strict boolean) selects
+         *       contracts whose latest version has blocking findings (or none).
+         */
+        get: operations["listContracts"];
+        put?: never;
+        /**
+         * Create a contract (no version yet)
+         * @description Any authenticated user may create a contract they can own: the owner is themselves or a
+         *     team they belong to (ADMIN assigns anyone) — `403` otherwise. Exactly one of
+         *     `ownerTeamId`/`ownerUserId`; the system must be active (`400`); a case-insensitive name
+         *     clash within the system is `409`. Type and system are immutable afterwards.
+         */
+        post: operations["createContract"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Domain → System → Contract hierarchy
+         * @description Any authenticated user. Unpaged — the registries are ADMIN-curated and small; the contract
+         *     level honours the list's `type`, `lifecycle` and `q` filters, and a domain or system with
+         *     no matching contract still appears (the spine never hides a container).
+         */
+        get: operations["getContractTree"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/versions/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Live-check a document without storing it
+         * @description Any authenticated user. The same pipeline every store path runs — syntax → type gate →
+         *     schema/semantic (JVM) → lint/semantic (the checker sidecar) → cross-checks — returned as
+         *     findings-so-far: a broken document is a `200` whose report carries the HARD finding, never
+         *     a `400`. Pass `version` to get the declared-version cross-check. Nothing stored, no audit.
+         */
+        post: operations["checkDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import documents as new versions (report & skip)
+         * @description Any authenticated user, at most 20 items. Each item is one document landing as a new
+         *     version of a contract that may or may not exist yet — a new contract needs an assignable
+         *     owner, an existing one must match the item's type and be writable by the caller. Import
+         *     ALWAYS waives soft findings (`*_WITH_FINDINGS`); only HARD findings, the SemVer rules, a
+         *     type mismatch and the writer rule skip an item. Nothing rethrows: the rows ARE the outcome.
+         */
+        post: operations["importContracts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/import/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The import's dry run
+         * @description The identical per-item classification with nothing stored — `contractId` is set only for existing contracts, `versionId` never.
+         */
+        post: operations["checkImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/fetch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fetch a document from a public https URL (SSRF-guarded)
+         * @description Any authenticated user. The server issues the outbound GET on the caller's behalf — https
+         *     only, no userinfo, every resolved address public (loopback/private/link-local/CGNAT/NAT64
+         *     refused), no redirects, 1 MiB cap. A guard rejection is the uniform `400`; an upstream
+         *     failure (non-200, redirect, oversize, unreachable) is `502`. GitHub/GitLab blob links are
+         *     rewritten to raw by the SPA before calling.
+         */
+        post: operations["fetchDocumentUrl"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Get a contract
+         * @description Any authenticated user; `canWrite` is computed for the caller.
+         */
+        get: operations["getContract"];
+        /**
+         * Rename / re-describe a contract
+         * @description Writers only (owning team member, owning user, ADMIN — checked before the body decodes). Type and system are immutable.
+         */
+        put: operations["updateContract"];
+        post?: never;
+        /**
+         * Delete a contract (soft, with its versions)
+         * @description Writers only. Refused with `409` while any version is ACTIVE or DEPRECATED — retire them first.
+         */
+        delete: operations["deleteContract"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/{id}/owner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Transfer ownership (ADMIN)
+         * @description ADMIN only. Exactly one of `ownerTeamId`/`ownerUserId`, an active team/user.
+         */
+        put: operations["transferContractOwner"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The contract with every version's verbatim document
+         * @description Any authenticated user. Versions highest first; each carries its lifecycle, format and raw text — the round trip's outbound half.
+         */
+        get: operations["exportContract"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/{id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The contract's structural change history
+         * @description Any authenticated user (whoever reads a contract reads its history). Paged, newest first
+         *     (`-timestamp,-id`); sortable on `timestamp`/`id` only. Events are structural — type plus
+         *     a params map the SPA localizes (`version`, `from`/`to`, `owner.from`/`owner.to`, `name`) —
+         *     never document text.
+         */
+        get: operations["listContractEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List a contract's versions (no content)
+         * @description Any authenticated user. Default sort `-version` (highest SemVer first — `version` sorts by
+         *     the parsed triple, a release above its prereleases); also `id`, `lifecycle`, `createdAt`,
+         *     `updatedAt`. `lifecycle` is a repeatable any-of filter.
+         */
+        get: operations["listContractVersions"];
+        put?: never;
+        /**
+         * Add a DRAFT version
+         * @description Writers only. `version` must be SemVer 2.0, unique on the contract (`409`) and greater
+         *     than every existing version (`400`). The document must pass the HARD gate — parseable,
+         *     the contract's standard (`400`, never waivable); a SOFT `ERROR` finding blocks unless
+         *     `allowInvalid=true` (the editor's Save-anyway; the findings are re-obtainable through
+         *     `POST /contracts/versions/check`). The check report is stored with the text; the
+         *     response carries content and findings. Documents above 2 MiB are `413`.
+         */
+        post: operations["createContractVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/{id}/versions/{vid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        /** Get a version with its document and findings */
+        get: operations["getContractVersion"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a DRAFT version
+         * @description Writers only; only a DRAFT may be deleted (`409` otherwise). The contract's latest pointer is recomputed.
+         */
+        delete: operations["deleteContractVersion"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/{id}/versions/{vid}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The raw document text
+         * @description Any authenticated user. `application/yaml` or `application/json` by the stored format;
+         *     `download=true` adds `Content-Disposition: attachment` with a `<system>__<contract>__<version>.<ext>` filename.
+         */
+        get: operations["getContractVersionContent"];
+        /**
+         * Replace the document of a DRAFT/PROPOSED version
+         * @description Writers only. `409` from ACTIVE on (the document is read-only — add a version). The same HARD/SOFT gate and `allowInvalid` waiver as create; answers the fresh version (the findings are the product of the save).
+         */
+        put: operations["updateContractVersionContent"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/{id}/versions/{vid}/transition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move the version along its lifecycle
+         * @description Writers only. DRAFT → PROPOSED, PROPOSED → DRAFT | ACTIVE, ACTIVE → DEPRECATED,
+         *     DEPRECATED → RETIRED; anything else is `409`. Several ACTIVE versions may coexist.
+         */
+        post: operations["transitionContractVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/{id}/versions/{vid}/recheck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-run the checks on the stored document
+         * @description Writers only — the recovery after a checker outage (`checkComplete = false`). Stores the fresh report; the text is untouched.
+         */
+        post: operations["recheckContractVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -741,6 +1119,284 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        /** @enum {string} */
+        ContractType: "OPENAPI" | "ASYNCAPI" | "ODCS";
+        /** @enum {string} */
+        Lifecycle: "DRAFT" | "PROPOSED" | "ACTIVE" | "DEPRECATED" | "RETIRED";
+        /** @enum {string} */
+        DocumentFormat: "yaml" | "json";
+        /** @enum {string} */
+        OwnerKind: "TEAM" | "USER";
+        OwnerRef: {
+            kind: components["schemas"]["OwnerKind"];
+            /** Format: int32 */
+            id: number;
+            name: string;
+            deleted: boolean;
+        };
+        RefSummary: {
+            /** Format: int32 */
+            id: number;
+            name: string;
+        };
+        LatestVersionSummary: {
+            /** Format: int32 */
+            id: number;
+            version: string;
+            lifecycle: components["schemas"]["Lifecycle"];
+            checkErrors: number;
+            checkWarnings: number;
+            checkComplete: boolean;
+        };
+        ContractCreateRequest: {
+            /** Format: int32 */
+            systemId: number;
+            type: components["schemas"]["ContractType"];
+            name: string;
+            description?: string | null;
+            /** Format: int32 */
+            ownerTeamId?: number | null;
+            /** Format: int32 */
+            ownerUserId?: number | null;
+        };
+        ContractUpdateRequest: {
+            name: string;
+            description?: string | null;
+        };
+        OwnerUpdateRequest: {
+            /** Format: int32 */
+            ownerTeamId?: number | null;
+            /** Format: int32 */
+            ownerUserId?: number | null;
+        };
+        ContractResponse: {
+            /** Format: int32 */
+            id: number;
+            system: components["schemas"]["RefSummary"];
+            domain: components["schemas"]["RefSummary"];
+            type: components["schemas"]["ContractType"];
+            name: string;
+            description?: string | null;
+            owner: components["schemas"]["OwnerRef"];
+            latestVersion?: components["schemas"]["LatestVersionSummary"] | null;
+            versionCount: number;
+            /** @description The writer rule for the caller — server-computed, never reimplemented client-side. */
+            canWrite: boolean;
+            /** Format: int32 */
+            createdBy: number;
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: int64 */
+            updatedAt: number;
+        };
+        ContractPage: {
+            items: components["schemas"]["ContractResponse"][];
+            page: number;
+            pageSize: number;
+            /** Format: int64 */
+            total: number;
+        };
+        TreeContract: {
+            /** Format: int32 */
+            id: number;
+            name: string;
+            type: components["schemas"]["ContractType"];
+            owner: components["schemas"]["OwnerRef"];
+            latestVersion?: components["schemas"]["LatestVersionSummary"] | null;
+            versionCount: number;
+            canWrite: boolean;
+        };
+        TreeSystem: {
+            /** Format: int32 */
+            id: number;
+            name: string;
+            contracts: components["schemas"]["TreeContract"][];
+        };
+        TreeDomain: {
+            /** Format: int32 */
+            id: number;
+            name: string;
+            systems: components["schemas"]["TreeSystem"][];
+        };
+        TreeResponse: {
+            domains: components["schemas"]["TreeDomain"][];
+        };
+        ExportedVersion: {
+            version: string;
+            lifecycle: components["schemas"]["Lifecycle"];
+            format: components["schemas"]["DocumentFormat"];
+            content: string;
+        };
+        ContractExportResponse: {
+            contract: components["schemas"]["ContractResponse"];
+            versions: components["schemas"]["ExportedVersion"][];
+        };
+        /** @enum {string} */
+        ContractEventType: "CREATED" | "UPDATED" | "OWNER_CHANGED" | "DELETED" | "VERSION_CREATED" | "VERSION_CONTENT_UPDATED" | "VERSION_TRANSITIONED" | "VERSION_DELETED" | "VERSION_RECHECKED" | "IMPORTED";
+        ContractEventResponse: {
+            /** Format: int32 */
+            id: number;
+            /** Format: int32 */
+            contractId: number;
+            /** Format: int32 */
+            userId: number;
+            userName: string;
+            /** Format: int64 */
+            timestamp: number;
+            type: components["schemas"]["ContractEventType"];
+            params: {
+                [key: string]: string;
+            };
+        };
+        ContractEventPage: {
+            items: components["schemas"]["ContractEventResponse"][];
+            page: number;
+            pageSize: number;
+            /** Format: int64 */
+            total: number;
+        };
+        /** @enum {string} */
+        Severity: "ERROR" | "WARN" | "INFO";
+        /** @enum {string} */
+        FindingSource: "SYNTAX" | "SCHEMA" | "SEMANTIC" | "LINT" | "BREAKING" | "SYSTEM";
+        Finding: {
+            severity: components["schemas"]["Severity"];
+            source: components["schemas"]["FindingSource"];
+            code: string;
+            message: string;
+            /** @description A JSON pointer into the document. */
+            path?: string | null;
+            line?: number | null;
+            column?: number | null;
+        };
+        CheckReport: {
+            format?: components["schemas"]["DocumentFormat"] | null;
+            specVersion?: string | null;
+            title?: string | null;
+            description?: string | null;
+            /** @description The version the document itself claims (`info.version`, ODCS `version`) — the import form's prefill. */
+            declaredVersion?: string | null;
+            findings: components["schemas"]["Finding"][];
+            errors: number;
+            warnings: number;
+            infos: number;
+            /** @description False when the checker sidecar could not be reached — its LINT/SEMANTIC verdicts are missing. */
+            checkerAvailable: boolean;
+        };
+        DocumentCheckRequest: {
+            type: components["schemas"]["ContractType"];
+            content: string;
+            /** @description The SemVer the document is (to be) stored as — drives the version cross-check. */
+            version?: string | null;
+        };
+        VersionCreateRequest: {
+            /** @description SemVer 2.0 */
+            version: string;
+            /** @description Raw YAML or JSON text, at most 2 MiB. */
+            content: string;
+        };
+        VersionContentRequest: {
+            content: string;
+        };
+        TransitionRequest: {
+            to: components["schemas"]["Lifecycle"];
+        };
+        VersionResponse: {
+            /** Format: int32 */
+            id: number;
+            /** Format: int32 */
+            contractId: number;
+            version: string;
+            lifecycle: components["schemas"]["Lifecycle"];
+            format: components["schemas"]["DocumentFormat"];
+            content: string;
+            contentSha256: string;
+            docTitle?: string | null;
+            docDescription?: string | null;
+            specVersion?: string | null;
+            findings: components["schemas"]["Finding"][];
+            checkErrors: number;
+            checkWarnings: number;
+            checkInfos: number;
+            checkComplete: boolean;
+            /** Format: int64 */
+            checkedAt: number;
+            /** Format: int32 */
+            createdBy: number;
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: int64 */
+            updatedAt: number;
+        };
+        VersionListItem: {
+            /** Format: int32 */
+            id: number;
+            /** Format: int32 */
+            contractId: number;
+            version: string;
+            lifecycle: components["schemas"]["Lifecycle"];
+            format: components["schemas"]["DocumentFormat"];
+            docTitle?: string | null;
+            specVersion?: string | null;
+            checkErrors: number;
+            checkWarnings: number;
+            checkInfos: number;
+            checkComplete: boolean;
+            /** Format: int32 */
+            createdBy: number;
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: int64 */
+            updatedAt: number;
+        };
+        VersionPage: {
+            items: components["schemas"]["VersionListItem"][];
+            page: number;
+            pageSize: number;
+            /** Format: int64 */
+            total: number;
+        };
+        ImportItem: {
+            /** Format: int32 */
+            systemId: number;
+            type: components["schemas"]["ContractType"];
+            name: string;
+            description?: string | null;
+            /** Format: int32 */
+            ownerTeamId?: number | null;
+            /** Format: int32 */
+            ownerUserId?: number | null;
+            version: string;
+            content: string;
+        };
+        ImportRequest: {
+            items: components["schemas"]["ImportItem"][];
+        };
+        /** @enum {string} */
+        ImportStatus: "CREATED" | "CREATED_WITH_FINDINGS" | "VERSION_ADDED" | "VERSION_ADDED_WITH_FINDINGS" | "INVALID" | "CONFLICT" | "FORBIDDEN" | "ERROR";
+        ImportItemResult: {
+            index: number;
+            name: string;
+            version: string;
+            status: components["schemas"]["ImportStatus"];
+            /** Format: int32 */
+            contractId?: number | null;
+            /** Format: int32 */
+            versionId?: number | null;
+            message?: string | null;
+            errors: number;
+            warnings: number;
+        };
+        ImportResponse: {
+            results: components["schemas"]["ImportItemResult"][];
+        };
+        FetchUrlRequest: {
+            /** @description An absolute https URL of a public host. */
+            url: string;
+        };
+        FetchUrlResponse: {
+            content: string;
+        };
         /** @description RFC 7807 problem detail. Served as `application/problem+json`. */
         ProblemDetail: {
             /**
@@ -854,6 +1510,20 @@ export interface components {
          *     always appended as a deterministic tiebreaker.
          */
         Sort: string;
+        VersionId: number;
+        /** @description Store despite SOFT `ERROR` findings (the Save-anyway waiver). HARD findings are never waivable. */
+        AllowInvalid: boolean;
+        ContractDomainId: number;
+        ContractSystemId: number;
+        ContractOwnerTeamId: number;
+        ContractOwnerUserId: number;
+        /** @description Repeatable — any-of over the contract types. */
+        ContractType: components["schemas"]["ContractType"][];
+        /** @description Repeatable — any-of over lifecycles (the LATEST version's on the contracts list/tree). */
+        ContractLifecycle: components["schemas"]["Lifecycle"][];
+        /** @description Case- and accent-insensitive substring over name OR description. */
+        ContractQuery: string;
+        ContractHasErrors: boolean;
     };
     requestBodies: never;
     headers: never;
@@ -1804,6 +2474,661 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listContracts: {
+        parameters: {
+            query?: {
+                /** @description 1-based page index. Defaults to 1. */
+                page?: components["parameters"]["Page"];
+                /** @description Rows per page. Defaults to 20, maximum 100. */
+                pageSize?: components["parameters"]["PageSize"];
+                /**
+                 * @description Sort spec. Format: `field` (ascending) or `-field` (descending). Multiple fields are
+                 *     comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
+                 *     sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
+                 *     always appended as a deterministic tiebreaker.
+                 */
+                sort?: components["parameters"]["Sort"];
+                domainId?: components["parameters"]["ContractDomainId"];
+                systemId?: components["parameters"]["ContractSystemId"];
+                /** @description Repeatable — any-of over the contract types. */
+                type?: components["parameters"]["ContractType"];
+                ownerTeamId?: components["parameters"]["ContractOwnerTeamId"];
+                ownerUserId?: components["parameters"]["ContractOwnerUserId"];
+                /** @description Repeatable — any-of over lifecycles (the LATEST version's on the contracts list/tree). */
+                lifecycle?: components["parameters"]["ContractLifecycle"];
+                /** @description Case- and accent-insensitive substring over name OR description. */
+                q?: components["parameters"]["ContractQuery"];
+                hasErrors?: components["parameters"]["ContractHasErrors"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of contracts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    createContract: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContractCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Created; `Location` points at the new contract */
+            201: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["PayloadTooLarge"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getContractTree: {
+        parameters: {
+            query?: {
+                /** @description Repeatable — any-of over the contract types. */
+                type?: components["parameters"]["ContractType"];
+                /** @description Repeatable — any-of over lifecycles (the LATEST version's on the contracts list/tree). */
+                lifecycle?: components["parameters"]["ContractLifecycle"];
+                /** @description Case- and accent-insensitive substring over name OR description. */
+                q?: components["parameters"]["ContractQuery"];
+                ownerTeamId?: components["parameters"]["ContractOwnerTeamId"];
+                ownerUserId?: components["parameters"]["ContractOwnerUserId"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The tree */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TreeResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    checkDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description The check report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckReport"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            413: components["responses"]["PayloadTooLarge"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    importContracts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportRequest"];
+            };
+        };
+        responses: {
+            /** @description One result row per item, in order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            413: components["responses"]["PayloadTooLarge"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    checkImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportRequest"];
+            };
+        };
+        responses: {
+            /** @description The predicted rows */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            413: components["responses"]["PayloadTooLarge"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    fetchDocumentUrl: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FetchUrlRequest"];
+            };
+        };
+        responses: {
+            /** @description The fetched text */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FetchUrlResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+            502: components["responses"]["BadGateway"];
+        };
+    };
+    getContract: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The contract */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    updateContract: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContractUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    deleteContract: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    transferContractOwner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnerUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Transferred */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    exportContract: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The export */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractExportResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listContractEvents: {
+        parameters: {
+            query?: {
+                /** @description 1-based page index. Defaults to 1. */
+                page?: components["parameters"]["Page"];
+                /** @description Rows per page. Defaults to 20, maximum 100. */
+                pageSize?: components["parameters"]["PageSize"];
+                /**
+                 * @description Sort spec. Format: `field` (ascending) or `-field` (descending). Multiple fields are
+                 *     comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
+                 *     sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
+                 *     always appended as a deterministic tiebreaker.
+                 */
+                sort?: components["parameters"]["Sort"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of events */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractEventPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listContractVersions: {
+        parameters: {
+            query?: {
+                /** @description 1-based page index. Defaults to 1. */
+                page?: components["parameters"]["Page"];
+                /** @description Rows per page. Defaults to 20, maximum 100. */
+                pageSize?: components["parameters"]["PageSize"];
+                /**
+                 * @description Sort spec. Format: `field` (ascending) or `-field` (descending). Multiple fields are
+                 *     comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
+                 *     sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
+                 *     always appended as a deterministic tiebreaker.
+                 */
+                sort?: components["parameters"]["Sort"];
+                /** @description Repeatable — any-of over lifecycles (the LATEST version's on the contracts list/tree). */
+                lifecycle?: components["parameters"]["ContractLifecycle"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of versions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    createContractVersion: {
+        parameters: {
+            query?: {
+                /** @description Store despite SOFT `ERROR` findings (the Save-anyway waiver). HARD findings are never waivable. */
+                allowInvalid?: components["parameters"]["AllowInvalid"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Created; `Location` points at the new version */
+            201: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["PayloadTooLarge"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getContractVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    deleteContractVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getContractVersionContent: {
+        parameters: {
+            query?: {
+                download?: boolean;
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The document, byte-exact */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/yaml": string;
+                    "application/json": unknown;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    updateContractVersionContent: {
+        parameters: {
+            query?: {
+                /** @description Store despite SOFT `ERROR` findings (the Save-anyway waiver). HARD findings are never waivable. */
+                allowInvalid?: components["parameters"]["AllowInvalid"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionContentRequest"];
+            };
+        };
+        responses: {
+            /** @description The updated version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["PayloadTooLarge"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    transitionContractVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransitionRequest"];
+            };
+        };
+        responses: {
+            /** @description The version after the transition */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    recheckContractVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The version with the fresh report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];
         };
     };

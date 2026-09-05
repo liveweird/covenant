@@ -46,6 +46,13 @@ export default defineConfig({
               test: /node_modules[\\/](?:react|react-dom|scheduler)[\\/]/,
               priority: 10,
             },
+            // The editor and its grammar packages: one chunk, loaded only on a document screen
+            // (components/LazyCodeEditor.tsx).
+            {
+              name: 'codemirror',
+              test: /node_modules[\\/](?:@codemirror|@lezer|style-mod|w3c-keyname|crelt)[\\/]/,
+              priority: 9,
+            },
           ],
         },
       },
@@ -66,6 +73,10 @@ export default defineConfig({
         'src/test/**',
         'src/main.tsx',
         'src/vite-env.d.ts',
+        // CodeMirror cannot mount under happy-dom (no layout, no ranges); page tests stub the
+        // editor (src/test/codeEditorStub.tsx) and utils/findingDiagnostics.ts is tested exhaustively.
+        'src/components/CodeEditor.tsx',
+        'src/components/codeEditorTheme.ts',
         '**/*.d.ts',
       ],
       // Floors set just below current measured coverage so they gate regressions without

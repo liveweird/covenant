@@ -1,0 +1,113 @@
+{
+  "title": "Kontrakty",
+  "intro": "Każdy kontrakt w katalogu — API, strumienie zdarzeń i widoki danych — z właścicielem i najnowszą wersją.",
+  "newContract": "Nowy kontrakt",
+  "import": "Importuj",
+  "createTitle": "Nowy kontrakt",
+  "createIntro": "Gdzie kontrakt się znajduje, jak się nazywa i kto jest jego właścicielem. Dokument pierwszej wersji dodasz w następnym kroku.",
+  "editTitle": "Edytuj {{name}}",
+  "backToList": "Wróć do kontraktów",
+  "backToContract": "Wróć do kontraktu",
+  "openAria": "Otwórz kontrakt {{name}}",
+  "empty": "Brak kontraktów — utwórz pierwszy lub zaimportuj dokument",
+  "emptyFiltered": "Żaden kontrakt nie pasuje do filtrów",
+  "loadFailed": "Nie udało się wczytać kontraktów",
+  "notFound": "Ten kontrakt nie istnieje (lub został usunięty).",
+  "noVersions": "brak wersji",
+  "more": "Więcej",
+  "moreActions": "Więcej działań",
+  "export": "Eksportuj (JSON)",
+  "field": {
+    "type": "Typ",
+    "typeHint": "Standard, którego trzymają się dokumenty — stały po utworzeniu kontraktu",
+    "typeLocked": "Typu nie można zmienić: każda wersja jest walidowana względem niego",
+    "system": "System",
+    "systemHint": "Aplikacja lub usługa udostępniająca ten kontrakt",
+    "systemLocked": "Kontrakt pozostaje w systemie, w którym powstał",
+    "domain": "Domena",
+    "owner": "Właściciel",
+    "ownerHint": "Zespół, do którego należysz, albo Ty sam/sama; administratorzy mogą wskazać dowolnego",
+    "ownerLocked": "Tylko administrator może przenieść własność",
+    "ownerTransferHint": "Wybór innego właściciela przenosi kontrakt",
+    "nameHint": "Unikalna w obrębie systemu, bez rozróżniania wielkości liter"
+  },
+  "section": {
+    "placement": "Umiejscowienie",
+    "identity": "Tożsamość",
+    "ownership": "Własność"
+  },
+  "owner": {
+    "TEAM": "Zespół",
+    "USER": "Osoba",
+    "teams": "Zespoły",
+    "users": "Osoby",
+    "me": "{{name}} (Ty)",
+    "pick": "Wybierz właściciela…",
+    "nothingFound": "Brak pasującego właściciela",
+    "deleted": "usunięty/a"
+  },
+  "filter": {
+    "q": "Szukaj",
+    "clearQ": "Wyczyść wyszukiwanie",
+    "ownerTeam": "Zespół-właściciel",
+    "hasErrors": "Tylko z błędami"
+  },
+  "column": {
+    "latest": "Najnowsza wersja",
+    "updated": "Zmieniono"
+  },
+  "validation": {
+    "systemRequired": "Wybierz system",
+    "nameLength": "Nazwa musi mieć od 1 do 100 znaków",
+    "descriptionLength": "Opis może mieć najwyżej 2000 znaków",
+    "ownerRequired": "Wybierz właściciela"
+  },
+  "saveForbidden": "Nie możesz edytować tego kontraktu — mogą to tylko jego właściciele i administratorzy",
+  "saveConflict": "Kontrakt o tej nazwie już istnieje w tym systemie",
+  "saveInvalid": "Co najmniej jedno pole jest nieprawidłowe",
+  "saveGone": "Ten kontrakt już nie istnieje — odśwież stronę",
+  "deleteTitle": "Usunąć kontrakt?",
+  "deleteBody": "„{{name}}” i jego {{count}} wersji zostaną usunięte.",
+  "deleteFailed": "Nie udało się usunąć kontraktu",
+  "deleteHasPublished": "Ten kontrakt ma jeszcze aktywne lub przestarzałe wersje — najpierw je wycofaj.",
+  "importTitle": "Importuj dokument",
+  "importIntro": "Wklej, wgraj lub pobierz dokument kontraktu. Trafi on jako nowa wersja — kontraktu o tej nazwie w wybranym systemie albo nowego kontraktu.",
+  "importNameHint": "Uzupełniona z tytułu dokumentu",
+  "importVersionHint": "Uzupełniona z wersji zadeklarowanej w dokumencie",
+  "importOwnerHint": "Potrzebny tylko wtedy, gdy kontrakt jeszcze nie istnieje",
+  "importPlaceholder": "Wklej tutaj dokument OpenAPI, AsyncAPI lub ODCS…",
+  "importHint": "Sprawdź przewiduje wynik bez zapisywania; Importuj zapisuje dokument, akceptując miękkie uwagi.",
+  "importCheck": "Sprawdź",
+  "importRun": "Importuj",
+  "importFailed": "Import nie powiódł się",
+  "importInvalid": "Żądanie zostało odrzucone — sprawdź pola",
+  "importOpenVersion": "Otwórz wersję",
+  "importOpenContract": "Otwórz kontrakt",
+  "importStatus": {
+    "CREATED": "Utworzono kontrakt z pierwszą wersją",
+    "CREATED_WITH_FINDINGS": "Utworzono kontrakt — wersja ma uwagi",
+    "VERSION_ADDED": "Dodano wersję",
+    "VERSION_ADDED_WITH_FINDINGS": "Dodano wersję — ma uwagi",
+    "INVALID": "Nie zaimportowano — dokument lub wersja zostały odrzucone",
+    "CONFLICT": "Nie zaimportowano — ta wersja już istnieje",
+    "FORBIDDEN": "Nie zaimportowano — nie możesz zapisywać tego kontraktu",
+    "ERROR": "Nie zaimportowano — zapis nie powiódł się"
+  },
+  "importCheckStatus": {
+    "CREATED": "Utworzy kontrakt z tą wersją",
+    "CREATED_WITH_FINDINGS": "Utworzy kontrakt — wersja będzie mieć uwagi",
+    "VERSION_ADDED": "Doda tę wersję",
+    "VERSION_ADDED_WITH_FINDINGS": "Doda tę wersję — będzie mieć uwagi",
+    "INVALID": "Zostanie odrzucone — dokument lub wersja",
+    "CONFLICT": "Zostanie odrzucone — ta wersja już istnieje",
+    "FORBIDDEN": "Zostanie odmówione — nie możesz zapisywać tego kontraktu",
+    "ERROR": "Nie udało się przewidzieć"
+  },
+  "toast": {
+    "created": "Utworzono kontrakt",
+    "saved": "Zapisano kontrakt",
+    "deleted": "Usunięto kontrakt",
+    "exported": "Pobrano eksport",
+    "imported": "Zaimportowano dokument"
+  }
+}

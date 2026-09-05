@@ -1,0 +1,30 @@
+{
+  "title": "Findings",
+  "listAria": "Findings",
+  "count": {
+    "ERROR": "{{count}} errors",
+    "WARN": "{{count}} warnings",
+    "INFO": "{{count}} notes"
+  },
+  "severity": {
+    "ERROR": "Error",
+    "WARN": "Warning",
+    "INFO": "Note"
+  },
+  "source": {
+    "SYNTAX": "Syntax",
+    "SCHEMA": "Schema",
+    "SEMANTIC": "Semantic",
+    "LINT": "Lint",
+    "BREAKING": "Breaking change",
+    "SYSTEM": "System"
+  },
+  "waiting": "Checking the document…",
+  "checking": "Checking…",
+  "clean": "No findings — the document passes every check",
+  "cleanShort": "clean",
+  "noneMatch": "No findings match the chips",
+  "jumpTo": "Go to line {{line}}, column {{column}}",
+  "incompleteTitle": "Checks incomplete",
+  "incompleteBody": "The lint and semantic checker was unavailable — only the built-in syntax and schema checks ran. Re-run the checks later."
+}

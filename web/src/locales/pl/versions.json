@@ -1,0 +1,126 @@
+{
+  "newVersion": "Nowa wersja",
+  "newTitle": "Nowa wersja {{name}}",
+  "newIntroHighest": "Najwyższa dotychczasowa wersja to {{highest}} — nowa musi być wyższa.",
+  "newIntroFirst": "Kontrakt nie ma jeszcze wersji — ta będzie pierwsza.",
+  "newFromThis": "Nowa wersja na podstawie tej",
+  "compare": "Porównaj wersje",
+  "compareWithLatest": "Porównaj z najnowszą",
+  "download": "Pobierz",
+  "downloadFailed": "Nie udało się pobrać dokumentu",
+  "recheck": "Uruchom sprawdzenia ponownie",
+  "editDocument": "Edytuj dokument",
+  "saveDraft": "Zapisz szkic",
+  "openAria": "Otwórz wersję {{version}}",
+  "deleteAria": "Usuń wersję {{version}}",
+  "tableAria": "Wersje {{name}}",
+  "empty": "Brak wersji",
+  "emptyWriter": "Brak wersji — dodaj pierwszy dokument",
+  "loadFailed": "Nie udało się wczytać wersji",
+  "notFound": "Ta wersja nie istnieje (lub została usunięta).",
+  "gone": "Ta wersja już nie istnieje — odśwież stronę",
+  "editorAria": "Dokument kontraktu",
+  "blankTemplate": "Pusty szablon",
+  "clearStartFrom": "Wyczyść wersję początkową",
+  "blockedBySyntax": "Dokument nie parsuje się — popraw błąd składni przed zapisem.",
+  "readyHint": "Zapis tworzy SZKIC; miękkie uwagi można zaakceptować, błędów składni nie.",
+  "unsaved": "Niezapisane zmiany",
+  "noChanges": "Brak zmian",
+  "saveInvalid": "Wersja została odrzucona — zobacz szczegóły",
+  "saveConflict": "Ten numer wersji już istnieje",
+  "contentLocked": "Ta wersja jest opublikowana — jej dokument jest tylko do odczytu; utwórz nową wersję",
+  "transitionConflict": "To przejście nie jest dozwolone z obecnego stanu wersji",
+  "field": {
+    "version": "Wersja",
+    "versionHint": "Ścisły SemVer (np. 1.2.0 lub 2.0.0-rc.1)",
+    "lifecycle": "Cykl życia",
+    "title": "Tytuł dokumentu",
+    "specVersion": "Spec",
+    "startFrom": "Zacznij od",
+    "startFromHint": "Skopiuj dokument zapisanej wersji jako punkt wyjścia"
+  },
+  "bump": {
+    "major": "Główna",
+    "minor": "Poboczna",
+    "patch": "Poprawka"
+  },
+  "lifecycle": {
+    "DRAFT": "Szkic",
+    "PROPOSED": "Zaproponowana",
+    "ACTIVE": "Aktywna",
+    "DEPRECATED": "Przestarzała",
+    "RETIRED": "Wycofana"
+  },
+  "transition": {
+    "PROPOSED": "Zaproponuj",
+    "DRAFT": "Wróć do szkicu",
+    "ACTIVE": "Aktywuj",
+    "DEPRECATED": "Oznacz jako przestarzałą",
+    "RETIRED": "Wycofaj"
+  },
+  "transitionConfirm": {
+    "DEPRECATED": {
+      "title": "Oznaczyć tę wersję jako przestarzałą?",
+      "body": "Wersja {{version}} zostanie oznaczona jako przestarzała. Konsumenci powinni przejść na nowszą wersję; tego nie da się cofnąć."
+    },
+    "RETIRED": {
+      "title": "Wycofać tę wersję?",
+      "body": "Wersja {{version}} zostanie wycofana — pozostanie w historii, ale nie będzie już w obiegu. Tego nie da się cofnąć."
+    }
+  },
+  "validation": {
+    "versionRequired": "Podaj wersję",
+    "versionFormat": "Użyj ścisłego SemVer, np. 1.2.0 lub 2.0.0-rc.1",
+    "versionNotAbove": "Wersja musi być wyższa niż {{highest}}",
+    "contentRequired": "Dokument jest pusty",
+    "contentTooLarge": "Dokument jest większy niż 2 MiB"
+  },
+  "saveAnyway": {
+    "title": "Zapisać z uwagami?",
+    "intro": "Sprawdzenia znalazły {{count}} blokujących uwag. Możesz zapisać mimo to — uwagi pozostaną przy wersji do czasu poprawienia dokumentu.",
+    "more": "…i {{count}} więcej",
+    "confirm": "Zapisz mimo to"
+  },
+  "source": {
+    "urlLabel": "Pobierz z adresu URL",
+    "fetch": "Pobierz",
+    "pickFile": "Wgraj plik",
+    "fetchFailed": "Nie udało się pobrać adresu URL",
+    "fetchedFrom": "Pobrano z {{url}}",
+    "urlInvalid": "Można pobierać tylko publiczne adresy https://",
+    "urlFailedStatus": "Pobieranie nie powiodło się ({{status}})",
+    "urlFailedNetwork": "Pobieranie nie powiodło się. Sprawdź połączenie i spróbuj ponownie."
+  },
+  "meta": {
+    "format": "Format: {{format}}",
+    "specVersion": "Spec: {{specVersion}}",
+    "sha": "SHA-256",
+    "checked": "Sprawdzono {{when}}",
+    "updated": "Zmieniono {{when}}"
+  },
+  "diff": {
+    "title": "Porównaj wersje {{name}}",
+    "intro": "Porównanie dwóch zapisanych dokumentów linia po linii.",
+    "from": "Od",
+    "to": "Do",
+    "hideUnchanged": "Ukryj niezmienione linie",
+    "stats": "+{{added}} / −{{removed}} linii",
+    "skipped": "Ukryto {{count}} niezmienionych linii",
+    "identical": "Oba dokumenty są identyczne.",
+    "needTwo": "Do porównania potrzebne są dwie wersje.",
+    "viewAria": "Różnice od {{from}} do {{to}}"
+  },
+  "deleteTitle": "Usunąć wersję?",
+  "deleteBody": "Wersja {{version}} kontraktu „{{name}}” zostanie usunięta. Usuwać można tylko szkice.",
+  "deleteFailed": "Nie udało się usunąć wersji",
+  "deleteNotDraft": "Usunąć można tylko wersję w stanie SZKIC — ta jest częścią historii kontraktu.",
+  "toast": {
+    "created": "Utworzono wersję",
+    "createdWithFindings": "Utworzono wersję z uwagami",
+    "saved": "Zapisano dokument",
+    "savedWithFindings": "Zapisano dokument z uwagami",
+    "deleted": "Usunięto wersję",
+    "transitioned": "Zmieniono cykl życia",
+    "rechecked": "Ponownie uruchomiono sprawdzenia"
+  }
+}

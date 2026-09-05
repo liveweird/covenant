@@ -38,6 +38,13 @@ export function saveErrorMessage(err: unknown, t: TFunction, keys: SaveErrorKeys
   return t(keys.failed);
 }
 
+/** The server-side URL fetch (`POST /contracts/fetch`): 400 = refused URL (scheme/host), 502 = the upstream failed. */
+export const FETCH_URL_ERROR_KEYS: SaveErrorKeys = {
+  invalid: "versions.source.urlInvalid",
+  failedStatus: "versions.source.urlFailedStatus",
+  failed: "versions.source.urlFailedNetwork",
+};
+
 /** The user-save 409 disambiguator: last-admin demotion vs an email already in use. */
 export function isLastAdminConflict(err: unknown): boolean {
   return err instanceof ApiError && err.status === 409 &&

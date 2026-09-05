@@ -1,0 +1,13 @@
+{
+  "title": "Hierarchy",
+  "intro": "Domains, their systems, and the contracts each system exposes.",
+  "treeAria": "Contract hierarchy",
+  "toggleAria": "Toggle {{name}}",
+  "expandAll": "Expand all",
+  "collapseAll": "Collapse all",
+  "contractCount": "{{count}} contracts",
+  "noSystems": "No systems in this domain",
+  "noContracts": "No contracts",
+  "empty": "No domains yet — administrators create them on the Domains page",
+  "loadFailed": "Could not load the hierarchy"
+}
