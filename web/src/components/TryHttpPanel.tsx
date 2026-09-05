@@ -1,10 +1,11 @@
-import { Alert, Button, Select, Stack, Text, TextInput } from "@mantine/core";
+import { Button, Select, Stack, Text, TextInput } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
 import { IconSend } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import TryError from "./TryError";
 import { tryHttp, type HttpOperationSummary, type TryHttpResult } from "../api/tryIt";
-import { rowsToRecord, templateParams, tryErrorMessage, type KeyValueRow } from "../utils/tryIt";
+import { rowsToRecord, templateParams, type KeyValueRow } from "../utils/tryIt";
 import KeyValueEditor from "./KeyValueEditor";
 import LazyCodeEditor from "./LazyCodeEditor";
 import TryResponseView from "./TryResponseView";
@@ -105,11 +106,7 @@ export default function TryHttpPanel({
           </Button>
         </>
       )}
-      {send.isError && (
-        <Alert color="red" variant="light" role="alert">
-          {tryErrorMessage(send.error, t)}
-        </Alert>
-      )}
+      <TryError error={send.error} />
       {result && (
         <TryResponseView
           url={result.url}

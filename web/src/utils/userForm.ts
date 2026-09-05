@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next";
+import { nameRule } from "./formRules";
 import type { SupportedLanguage } from "../i18n";
 
 // Server limits (users/Validation.kt + auth/Passwords.kt) mirrored client-side.
@@ -26,10 +27,7 @@ export const EMPTY_USER_FORM: UserFormValues = { name: "", email: "", admin: fal
 /** Validation rules shared by the create and edit user pages (mirrors the server's checks). */
 export function userFormValidation(t: TFunction) {
   return {
-    name: (value: string) => {
-      const v = value.trim();
-      return v.length >= 1 && v.length <= MAX_USER_NAME_LENGTH ? null : t("users.validation.nameLength");
-    },
+    name: nameRule(t, "users.validation.nameLength", MAX_USER_NAME_LENGTH),
     email: (value: string) => {
       const v = value.trim();
       if (v.length > MAX_EMAIL_LENGTH) return t("users.validation.emailTooLong");

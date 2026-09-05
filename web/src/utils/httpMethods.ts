@@ -1,9 +1,13 @@
-/** The reader's method colours — text-first badges, the app's vocabulary: teal reads, the brand hue creates, yellow changes, red removes. */
+/**
+ * The reader's method colours — text-first badges (the word carries the meaning): teal reads, yellow changes, red
+ * removes, gray for the rest. POST is deliberately NOT the brand hue: purple marks the interactive accent and
+ * nothing else (theme.ts), and an operation list full of purple chips would drown the page's real CTAs.
+ */
 const METHOD_COLOR: Record<string, string> = {
   GET: "teal",
   HEAD: "teal",
   OPTIONS: "gray",
-  POST: "covenant",
+  POST: "gray",
   PUT: "yellow",
   PATCH: "yellow",
   DELETE: "red",

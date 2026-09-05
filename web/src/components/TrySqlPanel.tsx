@@ -1,10 +1,10 @@
-import { Alert, Box, Button, Code, Group, NumberInput, Select, Stack, Table, Text } from "@mantine/core";
+import { Box, Button, Code, Group, NumberInput, Select, Stack, Table, Text } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
 import { IconDatabaseSearch } from "@tabler/icons-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import TryError from "./TryError";
 import { trySql, type SqlDatasetSummary, type TrySqlResult } from "../api/tryIt";
-import { tryErrorMessage } from "../utils/tryIt";
 import FindingsPanel from "./FindingsPanel";
 
 const TABLE_LIKE = new Set(["table", "view"]);
@@ -48,11 +48,7 @@ export default function TrySqlPanel({
           {t("tryIt.sql.run")}
         </Button>
       </Group>
-      {run.isError && (
-        <Alert color="red" variant="light" role="alert">
-          {tryErrorMessage(run.error, t)}
-        </Alert>
-      )}
+      <TryError error={run.error} />
       {result && (
         <Stack gap="sm" role="region" aria-label={t("tryIt.sql.result")}>
           <Group gap="xs">

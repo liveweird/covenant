@@ -2,6 +2,7 @@ import type { TFunction } from "i18next";
 import type { EnvironmentBody, EnvironmentResponse, KafkaSaslMechanism, KafkaSecurityProtocol } from "../api/environments";
 import { ApiError } from "../api/http";
 import { saveErrorMessage } from "./saveError";
+import { descriptionRule, nameRule } from "./formRules";
 
 // The server's limits (environments/Environment.kt) — keep in step.
 export const MAX_ENVIRONMENT_NAME_LENGTH = 50;
@@ -82,8 +83,8 @@ export function environmentFormValidation(t: TFunction, existing: EnvironmentRes
   const passwordNeeded = (has: boolean | undefined) => !(existing && has);
   return {
     systemId: (v: string | null) => (v ? null : t("environments.validation.systemRequired")),
-    name: (v: string) => (v.trim().length >= 1 && v.trim().length <= MAX_ENVIRONMENT_NAME_LENGTH ? null : t("environments.validation.nameLength")),
-    description: (v: string) => (v.length <= MAX_ENVIRONMENT_DESCRIPTION_LENGTH ? null : t("environments.validation.descriptionLength")),
+    name: nameRule(t, "environments.validation.nameLength", MAX_ENVIRONMENT_NAME_LENGTH),
+    description: descriptionRule(t, "environments.validation.descriptionLength", MAX_ENVIRONMENT_DESCRIPTION_LENGTH),
     httpEnabled: (v: boolean, values: EnvironmentFormValues) => (v || values.kafkaEnabled || values.pgEnabled ? null : t("environments.validation.needsTarget")),
     httpBaseUrl: (v: string, values: EnvironmentFormValues) => (!values.httpEnabled || isHttpBaseUrl(v.trim()) ? null : t("environments.validation.httpBaseUrl")),
     bootstrapServers: (v: string, values: EnvironmentFormValues) => (!values.kafkaEnabled || isBootstrapServers(v) ? null : t("environments.validation.bootstrapServers")),

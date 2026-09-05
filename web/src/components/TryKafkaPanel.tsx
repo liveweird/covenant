@@ -3,8 +3,9 @@ import { useMutation } from "@tanstack/react-query";
 import { IconDownload, IconSend } from "@tabler/icons-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import TryError from "./TryError";
 import { tryKafkaPublish, tryKafkaRead, type KafkaChannelSummary, type KafkaRecordView, type TryKafkaPublishResult, type TryKafkaReadResult } from "../api/tryIt";
-import { rowsToRecord, tryErrorMessage, type KeyValueRow } from "../utils/tryIt";
+import { rowsToRecord, type KeyValueRow } from "../utils/tryIt";
 import FindingsPanel from "./FindingsPanel";
 import KeyValueEditor from "./KeyValueEditor";
 import LazyCodeEditor from "./LazyCodeEditor";
@@ -135,11 +136,7 @@ export default function TryKafkaPanel({
           </Group>
         </>
       )}
-      {error && (
-        <Alert color="red" variant="light" role="alert">
-          {tryErrorMessage(error, t)}
-        </Alert>
-      )}
+      <TryError error={error} />
       {published && (
         <Stack gap="sm" role="region" aria-label={t("tryIt.kafka.publishedAria")}>
           <Alert color="teal" variant="light">
