@@ -1,0 +1,40 @@
+asyncapi: 3.0.0
+info:
+  title: Streetlights
+  version: 1.0.0
+  description: Lighting measurements, as events.
+servers:
+  production:
+    host: broker.example.com:9092
+    protocol: kafka
+channels:
+  lightMeasured:
+    address: smartylighting.streetlights.1.0.event.lighting.measured
+    messages:
+      lightMeasured:
+        $ref: "#/components/messages/lightMeasured"
+operations:
+  receiveLightMeasurement:
+    action: receive
+    channel:
+      $ref: "#/channels/lightMeasured"
+    messages:
+      - $ref: "#/channels/lightMeasured/messages/lightMeasured"
+components:
+  messages:
+    lightMeasured:
+      name: lightMeasured
+      title: Light measured
+      contentType: application/json
+      payload:
+        $ref: "#/components/schemas/lightMeasuredPayload"
+  schemas:
+    lightMeasuredPayload:
+      type: object
+      properties:
+        lumens:
+          type: integer
+          minimum: 0
+        sentAt:
+          type: string
+          format: date-time

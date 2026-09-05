@@ -1,0 +1,50 @@
+apiVersion: v3.1.0
+kind: DataContract
+id: 53581432-6c55-4ba2-a65f-72344a91553a
+version: 1.0.0
+status: active
+name: customer_view
+domain: customers
+dataProduct: customer-360
+description:
+  purpose: A read-only view of active customers for downstream analytics.
+  usage: Query by customer_id; never join on email (PII, hashed downstream).
+  limitations: Refreshed nightly; not for real-time decisions.
+schema:
+  - name: customer_view
+    physicalName: v_customer
+    physicalType: view
+    logicalType: object
+    description: One row per active customer.
+    properties:
+      - name: customer_id
+        logicalType: string
+        physicalType: uuid
+        required: true
+        unique: true
+        primaryKey: true
+        primaryKeyPosition: 1
+      - name: email_hash
+        logicalType: string
+        physicalType: char(64)
+        required: true
+        classification: confidential
+      - name: created_at
+        logicalType: date
+        physicalType: timestamptz
+        required: true
+servers:
+  - server: analytics
+    type: postgres
+    host: analytics.example.internal
+    port: 5432
+    database: warehouse
+    schema: public
+    environment: prod
+team:
+  - username: data-platform
+    role: owner
+slaProperties:
+  - property: freshness
+    value: 24
+    unit: h
