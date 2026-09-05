@@ -1,6 +1,7 @@
 package ch.nokillswit.contracts.tryit
 
 import ch.nokillswit.contracts.ContractType
+import ch.nokillswit.contracts.checks.AsyncApiSites
 import ch.nokillswit.contracts.checks.AsyncApiValidator
 import com.fasterxml.jackson.databind.JsonNode
 
@@ -82,33 +83,26 @@ object TryCatalog {
                 val actions = fields(root.path("operations")).mapNotNull { (_, op) ->
                     op.path("action").textOrNull()?.takeIf { op.path("channel").path("\$ref").textOrNull() == "#$base" }
                 }.distinct()
-                val messages = fields(channel.path("messages")).map { (name, msg) ->
-                    val ref = msg.path("\$ref").textOrNull()
-                    val messagePointer = if (ref != null && ref.startsWith("#")) ref.drop(1) else "$base/messages/${esc(name)}"
-                    val resolved = deref(root, msg)
-                    message(name, resolved, payloadPointerFor(messagePointer))
+                val messages = AsyncApiSites.messagesOf(channel, base, v3 = true).map { site ->
+                    message(site.key, deref(root, site.node), payloadPointerFor(declaredPointer(site)))
                 }
                 KafkaChannelSummary(key, channel.path("address").textOrNull() ?: key, actions, messages)
             } else {
-                val actions = listOf("publish", "subscribe").filter { channel.path(it).isObject }
-                val messages = actions.flatMap { verb ->
-                    val msg = channel.path(verb).path("message")
-                    val alternatives = when {
-                        msg.has("oneOf") -> msg["oneOf"].mapIndexed { i, m -> "$base/$verb/message/oneOf/$i" to m }
-                        else -> listOf("$base/$verb/message" to msg)
-                    }
-                    alternatives.mapIndexed { i, (pointer, m) ->
-                        val resolved = deref(root, m)
-                        val ref = m.path("\$ref").textOrNull()
-                        val messagePointer = if (ref != null && ref.startsWith("#")) ref.drop(1) else pointer
-                        val name = resolved.path("name").textOrNull() ?: resolved.path("title").textOrNull()
-                            ?: ref?.substringAfterLast('/') ?: "$verb-$i"
-                        message(name, resolved, payloadPointerFor(messagePointer))
-                    }
+                val actions = AsyncApiSites.LEGACY_VERBS.filter { channel.path(it).isObject }
+                val messages = AsyncApiSites.messagesOf(channel, base, v3 = false).map { site ->
+                    val resolved = deref(root, site.node)
+                    val name = resolved.path("name").textOrNull() ?: resolved.path("title").textOrNull() ?: site.displayName()
+                    message(name, resolved, payloadPointerFor(declaredPointer(site)))
                 }.distinctBy { it.name }
                 KafkaChannelSummary(key, key, actions, messages)
             }
         }
+    }
+
+    /** The pointer the validator reports payload findings under: the `$ref` target when the site is a bare ref, else the site itself. */
+    private fun declaredPointer(site: ch.nokillswit.contracts.checks.MessageSite): String {
+        val ref = site.node.path("\$ref").textOrNull()
+        return if (ref != null && ref.startsWith("#")) ref.drop(1) else site.pointer
     }
 
     private fun message(name: String, resolved: JsonNode, payloadPointer: String?) =

@@ -1,5 +1,6 @@
 package ch.nokillswit.contracts.tryit
 
+import ch.nokillswit.contracts.checks.SchemaFormats
 import ch.nokillswit.contracts.ContractType
 import ch.nokillswit.contracts.checks.Finding
 import ch.nokillswit.contracts.checks.FindingSource
@@ -232,8 +233,8 @@ object PayloadConformance {
         }
         val format = schemaFormat?.lowercase()
         return when {
-            format != null && format.contains("avro") -> avro(root.at(payloadPointer), payload, prefix)
-            format == null || JSON_FORMATS.any { format.contains(it) } -> {
+            SchemaFormats.isAvro(format) -> avro(root.at(payloadPointer), payload, prefix)
+            SchemaFormats.isJsonLike(format) -> {
                 val instance = Conformance.parseJson(payload)
                     ?: return listOf(Conformance.error(Conformance.PAYLOAD_NOT_JSON, "The payload is not valid JSON", prefix))
                 val schema = schemas.schemaAt(payloadPointer) ?: return emptyList()
@@ -245,8 +246,6 @@ object PayloadConformance {
             }
         }
     }
-
-    private val JSON_FORMATS = listOf("json", "asyncapi", "openapi")
 
     private fun avro(schemaNode: JsonNode, payload: String, prefix: String): List<Finding> = try {
         val schema = AvroSchema.Parser().parse(schemaNode.toString())

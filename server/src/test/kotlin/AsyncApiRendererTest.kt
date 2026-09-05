@@ -29,8 +29,9 @@ class AsyncApiRendererTest {
         assertEquals("Measurements", channel.description)
         assertEquals("id", channel.parameters.single().name)
         assertEquals(listOf("string"), channel.parameters.single().schema?.types)
-        assertEquals(listOf("lightMeasured", "turnedOff", "subscribe"), channel.messages.map { it.name })
-        val targets = listOf("lightMeasured", "lights/{id}/measured/turnedOff", "lights/{id}/measured/subscribe")
+        // An unnamed 2.x message takes its title (the try catalog's rule, shared since the checkup), else the verb.
+        assertEquals(listOf("lightMeasured", "turnedOff", "Dim command"), channel.messages.map { it.name })
+        val targets = listOf("lightMeasured", "lights/{id}/measured/turnedOff", "lights/{id}/measured/Dim command")
         assertEquals(targets, channel.messages.map { it.target })
         val ops = m.operations
         assertEquals(listOf("receive" to "publish", "send" to "subscribe"), ops.map { it.action to it.legacyAction })
@@ -49,7 +50,7 @@ class AsyncApiRendererTest {
         val off = messages.getValue("lights/{id}/measured/turnedOff")
         assertTrue(off.inline)
         assertEquals("date-time", off.payload?.properties?.single()?.schema?.format)
-        assertEquals("Dim command", messages.getValue("lights/{id}/measured/subscribe").title)
+        assertEquals("Dim command", messages.getValue("lights/{id}/measured/Dim command").title)
         assertEquals(listOf("sasl"), m.securitySchemes.map { it.name })
         assertEquals("scramSha256", m.securitySchemes.single().type)
     }

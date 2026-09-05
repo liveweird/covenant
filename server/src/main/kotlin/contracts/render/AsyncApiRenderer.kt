@@ -1,5 +1,7 @@
 package ch.nokillswit.contracts.render
 
+import ch.nokillswit.contracts.checks.AsyncApiSites
+import ch.nokillswit.contracts.checks.SchemaFormats
 import com.fasterxml.jackson.databind.JsonNode
 
 /**
@@ -56,10 +58,8 @@ class AsyncApiRenderer(private val root: JsonNode, private val budget: RenderBud
     private fun channel(key: String, raw: JsonNode): ChannelView {
         val c = Shared.deref(root, raw)
         val pointer = Shared.pointerOf(raw, "/channels/${JsonPointers.escape(key)}")
-        val refs = if (v3) {
-            Nodes.fields(c.path("messages")).map { (name, m) -> messageRef(name, m, "$pointer/messages/${JsonPointers.escape(name)}", key) }
-        } else {
-            listOf("publish", "subscribe").flatMap { verb -> operationMessagesV2(c, key, pointer, verb) }
+        val refs = AsyncApiSites.messagesOf(c, pointer, v3).map { site ->
+            messageRef(if (v3) site.key else site.displayName(), site.node, site.pointer, key)
         }
         return ChannelView(
             pointer = pointer,
@@ -100,23 +100,6 @@ class AsyncApiRenderer(private val root: JsonNode, private val budget: RenderBud
         val key = "$channelKey/$name"
         messages.putIfAbsent(key, message(key, raw, pointer, inline = true))
         return MessageRefView(name, key)
-    }
-
-    private fun operationMessagesV2(channel: JsonNode, channelKey: String, pointer: String, verb: String): List<MessageRefView> {
-        val msg = channel.path(verb).path("message")
-        return when {
-            msg.isMissingNode -> emptyList()
-            msg.has("oneOf") -> msg["oneOf"].mapIndexed { i, m ->
-                messageRef(nameOf(m, "$verb-$i"), m, "$pointer/$verb/message/oneOf/$i", channelKey)
-            }
-            else -> listOf(messageRef(nameOf(msg, verb), msg, "$pointer/$verb/message", channelKey))
-        }
-    }
-
-    private fun nameOf(m: JsonNode, fallback: String): String {
-        val ref = Nodes.text(m, "\$ref")
-        if (ref != null) return JsonPointers.name(ref)
-        return Nodes.text(m, "name") ?: Nodes.text(m, "messageId") ?: fallback
     }
 
     private fun operationsV3(): List<AsyncOperationView> = Nodes.fields(root.path("operations")).map { (name, raw) ->
@@ -164,7 +147,9 @@ class AsyncApiRenderer(private val root: JsonNode, private val budget: RenderBud
                 action = action,
                 legacyAction = verb,
                 channel = key,
-                messages = operationMessagesV2(c, key, "/channels/${JsonPointers.escape(key)}", verb),
+                messages = AsyncApiSites.messagesOf(c, "/channels/${JsonPointers.escape(key)}", v3 = false)
+                    .filter { it.verb == verb }
+                    .map { site -> messageRef(site.displayName(), site.node, site.pointer, key) },
                 reply = null,
                 summary = Nodes.text(op, "summary"),
                 description = Nodes.text(op, "description"),
@@ -211,10 +196,9 @@ class AsyncApiRenderer(private val root: JsonNode, private val budget: RenderBud
     private fun headersSchema(h: JsonNode): JsonNode = if (h.has("schemaFormat") && h.has("schema")) h["schema"] else h
 
     private fun payloadNode(schema: JsonNode, pointer: String, format: String?): SchemaNode {
-        val f = format?.lowercase()
         return when {
-            f != null && f.contains("avro") -> AvroSchemaMapper(budget).node(Shared.deref(root, schema), pointer)
-            f == null || JSON_LIKE.any { f.contains(it) } -> walker.node(schema, pointer)
+            SchemaFormats.isAvro(format) -> AvroSchemaMapper(budget).node(Shared.deref(root, schema), pointer)
+            SchemaFormats.isJsonLike(format) -> walker.node(schema, pointer)
             else -> SchemaWalker.empty(pointer).copy(raw = Nodes.pretty(schema), format = format)
         }
     }
@@ -237,7 +221,6 @@ class AsyncApiRenderer(private val root: JsonNode, private val budget: RenderBud
         url.substringAfter("://", "").substringAfter('/', "").takeIf { it.isNotEmpty() }?.let { "/$it" }
 
     companion object {
-        private val JSON_LIKE = listOf("json", "asyncapi", "openapi")
         private const val COMPONENT_MESSAGES = "#/components/messages/"
     }
 }

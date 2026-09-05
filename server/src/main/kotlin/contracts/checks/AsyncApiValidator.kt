@@ -52,25 +52,10 @@ object AsyncApiValidator {
         root.path("components").path("messages").fields().forEach { (name, msg) -> message("/components/messages/${esc(name)}", msg) }
         root.path("channels").fields().forEach { (channelName, channel) ->
             val base = "/channels/${esc(channelName)}"
-            if (v3) {
-                channel.path("messages").fields().forEach { (name, msg) -> message("$base/messages/${esc(name)}", msg) }
-            } else {
-                operationMessages(channel, base).forEach { (pointer, msg) -> message(pointer, msg) }
-            }
+            AsyncApiSites.messagesOf(channel, base, v3).forEach { site -> message(site.pointer, site.node) }
         }
         return out
     }
-
-    /** 2.x: the message (or each `oneOf` alternative) under `publish`/`subscribe`. */
-    private fun operationMessages(channel: JsonNode, base: String): List<Pair<String, JsonNode>> =
-        listOf("publish", "subscribe").flatMap { op ->
-            val msg = channel.path(op).path("message")
-            when {
-                msg.isMissingNode -> emptyList()
-                msg.has("oneOf") -> msg["oneOf"].mapIndexed { i, m -> "$base/$op/message/oneOf/$i" to m }
-                else -> listOf("$base/$op/message" to msg)
-            }
-        }
 
     internal data class Payload(val pointer: String, val schema: JsonNode, val format: String?)
 
@@ -87,13 +72,13 @@ object AsyncApiValidator {
                 ),
             )
             ref.isTextual -> emptyList() // an internal ref: the target is checked where it is declared
-            p.format == null || p.format.contains("json", ignoreCase = true) || p.format.contains("asyncapi", ignoreCase = true) ->
+            SchemaFormats.isJsonLike(p.format) ->
                 VendoredSchemas.validate(
                     VendoredSchemas.jsonSchema202012,
                     p.schema,
                     CODE_PAYLOAD_SCHEMA,
                 ).map { it.copy(path = p.pointer + (it.path ?: "")) }
-            p.format.contains("avro", ignoreCase = true) -> avro(p)
+            SchemaFormats.isAvro(p.format) -> avro(p)
             else -> listOf(
                 Finding(
                     Severity.INFO,
