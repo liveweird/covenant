@@ -6,7 +6,11 @@
   teams (`e2e-team*`), contracts (`e2e-petstore-*`, `e2e-readonly-*`) and user — all deleted by the
   end of the file
 
-## Scenario: admin imports a contract, iterates a version through Save-anyway, compares, publishes, downloads and retires it
+The core loop is one journey told in three serial tests — Playwright's per-test budget is 60 s and the
+whole loop needs about 90 — each resuming on the contract page the first one recorded; a failing test
+skips the rest (the leftover `e2e-*` rows are cleaned up by hand or by the next run's own names).
+
+## Scenario: admin imports a contract and iterates a version through Save-anyway and compare
 
 1. The admin creates a domain, a system inside it and a team through the registry pages.
 2. On the Import page they paste an OpenAPI 3.1 document into the editor.
@@ -24,7 +28,10 @@
 6. They open Compare versions.
    - *Expected*: the diff names the two versions and shows the changed `$ref` as a `+` line, with
      "+2 / −2 lines".
-7. They open 1.0.0, click Propose then Activate.
+
+## Scenario: admin publishes the version, reads it in the reader, downloads it and sees the breaking-change gate
+
+7. The admin signs in again, opens the contract page, opens 1.0.0, clicks Propose then Activate.
    - *Expected*: Deprecate becomes the only move and the Edit document button is gone (the text is
      locked).
 8. They switch the version page to the Reader.
@@ -43,7 +50,10 @@
 12. Back on the contract page they read the History section.
     - *Expected*: it lists "Version 1.0.0: Proposed → Active", "Version 1.1.0 created" and
       "Version 1.0.0 imported" as localized lines.
-13. Teardown through the rules: the 1.1.0 draft deletes from its row; deleting the contract is
+
+## Scenario: admin retires the version and deletes the contract and its registries
+
+13. The admin signs in again, opens the contract page and tears down through the rules: the 1.1.0 draft deletes from its row; deleting the contract is
    refused while 1.0.0 is active ("still has active or deprecated versions"); they deprecate and
    retire 1.0.0 (each behind a confirm), delete the contract, then the system, domain and team.
    - *Expected*: each step lands where described; the contract delete returns to the list.

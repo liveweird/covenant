@@ -1,10 +1,12 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type APIRequestContext, type APIResponse, expect, type Page, request as playwrightRequest, test } from "@playwright/test";
+import { randomUUID } from "node:crypto";
+import { BASE_URL } from "../playwright.config";
 
 export { expect, test };
 
 /** The seeded bootstrap admin (V3) — the compose demo leaves its password unrotated. */
 export const ADMIN = "admin@covenant.local";
-export const PASSWORD = "changeme";
+const PASSWORD = "changeme";
 
 /**
  * Navigate to a usable sign-in form. Any leftover session has to go first: while one exists
@@ -88,7 +90,7 @@ export async function createUserViaUi(
 
 /** Collision-free text so specs never depend on absolute counts or clean state. */
 export function uniqueText(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  return `${prefix}-${randomUUID().slice(0, 8)}`;
 }
 
 /**
@@ -115,13 +117,75 @@ export async function rowOperation(
   operation: "Edit" | "Delete" | (string & {}),
 ): Promise<void> {
   const trigger = page.getByRole("button", { name: `Operations for ${name}` });
+  // A missing row fails HERE with its name, not as an anonymous click timeout at the end of the test budget.
+  await expect(trigger).toBeVisible();
   // Ensure THIS row's menu actually opened: a previous row's still-fading dropdown treats
   // the first click as its outside-click and swallows it, leaving the WRONG menu mounted —
-  // an unscoped menuitem click would then drive the other row's operation.
+  // an unscoped menuitem click would then drive the other row's operation. Bounded: an
+  // unbounded toPass() retries until the TEST budget is gone and reports the wrong step.
   await expect(async () => {
     if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click();
     expect(await trigger.getAttribute("aria-expanded")).toBe("true");
-  }).toPass();
+  }).toPass({ timeout: 10_000 });
   const dropdownId = await trigger.getAttribute("aria-controls");
   await page.locator(`[id="${dropdownId}"]`).getByRole("menuitem", { name: operation }).click();
+}
+
+/**
+ * API-side seeding for specs whose subject is a PAGE, not the journey that creates its data (the
+ * accessibility sweep): one admin-authenticated request context against the same stack. Every id
+ * it creates is the caller's to delete (`teardownSeededContract`) — the Owns rule applies unchanged.
+ */
+export async function apiAsAdmin(): Promise<{ api: APIRequestContext; userId: number }> {
+  const anonymous = await playwrightRequest.newContext({ baseURL: BASE_URL });
+  const login = await anonymous.post("/api/v1/login", { data: { email: ADMIN, password: PASSWORD } });
+  expect(login.ok(), await login.text()).toBeTruthy();
+  const { token, userId } = (await login.json()) as { token: string; userId: number };
+  await anonymous.dispose();
+  const api = await playwrightRequest.newContext({ baseURL: BASE_URL, extraHTTPHeaders: { Authorization: `Bearer ${token}` } });
+  return { api, userId };
+}
+
+export interface SeededContract {
+  domainId: number;
+  systemId: number;
+  teamId: number;
+  teamName: string;
+  contractId: number;
+  contractName: string;
+  versionId: number;
+}
+
+async function createdId(response: APIResponse): Promise<number> {
+  expect(response.status(), await response.text()).toBe(201);
+  return ((await response.json()) as { id: number }).id;
+}
+
+/** A domain → system → team-owned OPENAPI contract with one DRAFT version holding `document`, all uniquely named. */
+export async function seedContractViaApi(api: APIRequestContext, prefix: string, document: string): Promise<SeededContract> {
+  const domainId = await createdId(await api.post("/api/v1/domains", { data: { name: uniqueText(`${prefix}-dom`) } }));
+  const systemId = await createdId(await api.post("/api/v1/systems", { data: { domainId, name: uniqueText(`${prefix}-sys`) } }));
+  const teamName = uniqueText(`${prefix}-team`);
+  const teamId = await createdId(await api.post("/api/v1/teams", { data: { name: teamName } }));
+  const contractName = uniqueText(`${prefix}-api`);
+  const contractId = await createdId(
+    await api.post("/api/v1/contracts", { data: { systemId, type: "OPENAPI", name: contractName, ownerTeamId: teamId } }),
+  );
+  const versionId = await createdId(
+    await api.post(`/api/v1/contracts/${contractId}/versions`, { data: { version: "1.0.0", content: document } }),
+  );
+  return { domainId, systemId, teamId, teamName, contractId, contractName, versionId };
+}
+
+/** The reverse of `seedContractViaApi`, in dependency order; a row already gone (404) is fine. */
+export async function teardownSeededContract(api: APIRequestContext, seeded: SeededContract): Promise<void> {
+  for (const path of [
+    `/api/v1/contracts/${seeded.contractId}`,
+    `/api/v1/systems/${seeded.systemId}`,
+    `/api/v1/domains/${seeded.domainId}`,
+    `/api/v1/teams/${seeded.teamId}`,
+  ]) {
+    const response = await api.delete(path);
+    expect([204, 404], `${path} -> ${response.status()} ${await response.text()}`).toContain(response.status());
+  }
 }

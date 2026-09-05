@@ -3,7 +3,7 @@
 // contract in scenarios/README.md, previously verified by hand at every checkup).
 // accessibility.spec.ts is the ONE registered exception: its titles are a template literal
 // instantiated per page, so its scenario keeps a placeholder heading (see scenarios/README.md).
-import { readdirSync, readFileSync, existsSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -13,8 +13,9 @@ const scenariosDir = join(root, "scenarios");
 const SKIP = new Set(["accessibility.spec.ts"]);
 
 // Matches a top-level test declaration's double-quoted title (also when the title starts on
-// the next line); `.skip`/`.fixme` calls don't match — they are preceded by a dot.
-const TITLE_RE = /(?<![.\w])test\(\s*\n?\s*"((?:[^"\\]|\\.)*)"/g;
+// the next line); modifier calls (`test.skip(`, `test.only(`) don't match — they are preceded by a dot.
+// The quoted-string body is the unrolled `[^"\\]*(?:\\.[^"\\]*)*` form — linear, no alternation backtracking.
+const TITLE_RE = /(?<![.\w])test\(\s*"([^"\\]*(?:\\.[^"\\]*)*)"/g;
 
 let failures = 0;
 const fail = (msg) => {
@@ -40,7 +41,7 @@ for (const spec of specs) {
   const src = readFileSync(join(testsDir, spec), "utf8");
   const titles = [...src.matchAll(TITLE_RE)].map((m) => m[1]);
   const scenario = readFileSync(join(scenariosDir, scenarioName), "utf8");
-  const headings = [...scenario.matchAll(/^## Scenario: (.+?)\s*$/gm)].map((m) => m[1]);
+  const headings = [...scenario.matchAll(/^## Scenario: (.+)$/gm)].map((m) => m[1].trimEnd());
 
   for (const t of titles) {
     if (!headings.includes(t)) fail(`${spec}: title has no matching heading in ${scenarioName}:\n    "${t}"`);

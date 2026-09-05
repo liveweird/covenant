@@ -11,12 +11,20 @@
     "test:ui": "playwright test --ui",
     "install:browsers": "playwright install chromium",
     "typecheck": "tsc --noEmit",
-    "check:scenarios": "node scripts/check-scenarios.mjs"
+    "check:scenarios": "node scripts/check-scenarios.mjs",
+    "lint": "eslint . --max-warnings 0",
+    "knip": "knip"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.0",
     "@types/node": "^24.0.0",
-    "typescript": "^7.0.2"
+    "eslint": "^10.8.0",
+    "eslint-plugin-sonarjs": "^4.2.0",
+    "globals": "^17.8.0",
+    "knip": "^6.32.2",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.65.0"
   }
 }

@@ -44,8 +44,13 @@ tests may be order-dependent); different files run concurrently. That is only so
 from Lettuce, that any new or edited spec must satisfy:
 
 - Each spec's scenario file declares its **Owns** line (exclusive server-side state; "nothing —
-  read-only" when applicable). Today: `auth`, `accessibility`, and `changelog` (device-local
-  localStorage only) are read-only; `users` owns its throwaway accounts; `teams` owns its throwaway teams (unique `e2e-team-*` names) and users; `registries` owns its throwaway domains/systems (`e2e-dom-*`/`e2e-sys-*`) and user; `i18n` owns its
+  read-only" when applicable). Today: `auth` and `changelog` (device-local
+  localStorage only) are read-only; `accessibility` owns one API-seeded fixture contract with its
+  domain/system/team (`e2e-axe-*`); `contracts` owns its throwaway domain/system/team/contract/user
+  (`e2e-dom-*`/`e2e-sys-*`/`e2e-team-*`/`e2e-petstore-*`/`e2e-readonly-*`); `environments` owns its
+  throwaway domain/system/environment and user; `notifications` owns its throwaway
+  domain/system/team/contract and follower; `tryit` owns its throwaway domain/system/environment/
+  ODCS contract (`e2e-accounts-*`) and user; `users` owns its throwaway accounts; `teams` owns its throwaway teams (unique `e2e-team-*` names) and users; `registries` owns its throwaway domains/systems (`e2e-dom-*`/`e2e-sys-*`) and user; `i18n` owns its
   throwaway user (and ONLY that user's language — **seeded accounts must stay English**: every
   login applies the stored language to that session's UI, so a Polish seed admin would flip
   parallel specs mid-run); `password-reset` owns its throwaway account (its reset requests use
@@ -53,10 +58,12 @@ from Lettuce, that any new or edited spec must satisfy:
   under the per-IP 5/min reset bucket); `mfa` owns its throwaway accounts and toggles ONLY their
   MFA flags (the seed admin's MFA flag is never touched — enabling it would make every spec's
   login demand a code) — all deleted by their own spec.
-- **Admin-curated registries are single-writer state.** When the domain/system registries land,
-  a spec that writes them is that registry's ONLY in-run writer and only ever appends/removes
-  its own unique `e2e-*` rows; shared seeds are never edited or deleted (Toadie's dictionary
-  and registry rulebook applies verbatim — port it with the feature).
+- **Admin-curated registries are shared, append-only state.** Several specs create domains,
+  systems, teams and environments concurrently (`contracts`, `registries`, `environments`,
+  `notifications`, `tryit`, `accessibility`), so a spec only ever appends and removes its OWN
+  uniquely named `e2e-*` rows, never edits or deletes another's or a shared seed — and every list
+  assertion is anchored on a name filter, never on an unfiltered total or row count (Toadie's
+  dictionary and registry rulebook, applied verbatim).
 - Seeded accounts are never mutated. The seed admin (`admin@covenant.local`) is a shared
   read-mostly actor: specs sign in as it but must not change its password, roles, or state — a
   future spec that needs a mutated account creates a throwaway.
@@ -77,21 +84,24 @@ outcomes). **A new or behaviorally changed test lands with its scenario file and
 the same commit** — this list is the coverage map, the scenario file is the design.
 
 - [`accessibility.spec.ts`](scenarios/accessibility.md) — axe WCAG A/AA smoke: login + the
-  authenticated pages (`/`, `/contracts`, `/contracts/new`, `/contracts/import`, `/domains`, `/systems`,
-  `/teams`, `/users`, `/users/new`, `/feature-flags`, `/change-password`, `/changelog`), `color-contrast` included (the theme's tokens are AA-tested in
-  `web/src/theme.test.ts`).
+  authenticated list/form pages (`/`, `/contracts`, `/contracts/new`, `/contracts/import`, `/domains`, `/systems`,
+  `/environments`, `/teams`, `/users`, `/users/new`, `/feature-flags`, `/change-password`, `/changelog`),
+  the detail pages of an API-seeded fixture contract (contract, version in Source and Reader, edit,
+  new version, compare, team, edit-user, user-features), `/reset-password`, the not-found page, and
+  the overlays scoped to their dialog (the notifications drawer, the Try it drawer, a registry editor
+  modal); `color-contrast` included (the theme's tokens are AA-tested in `web/src/theme.test.ts`).
 - [`auth.spec.ts`](scenarios/auth.md) — login / logout / invalid credentials / guarded deep link.
 - [`changelog.spec.ts`](scenarios/changelog.md) — the what's-new dot on a fresh device
   leads to the changelog via the version stamp and clears once read (no language switching
   — it runs as the seed admin; see `i18n.spec.ts`).
-- [`contracts.spec.ts`](scenarios/contracts.md) — the core loop: import an OpenAPI document as a
-  contract's first version (name/version prefilled from the document) → a minor version with a
-  broken `$ref` stored through Save-anyway → the two compared → 1.0.0 proposed and activated (text
-  locked) → the Reader opened (the operation card, an axe scan, remembered across a reload) →
-  downloaded → a breaking change against it flagged by the live check until the Major
-  bump → the History section read → teardown through the delete rules (draft deletes, an active
-  version blocks the contract, deprecate → retire, then delete); a regular user's read-only tree,
-  page and list.
+- [`contracts.spec.ts`](scenarios/contracts.md) — the core loop, as three serial tests on one
+  contract: (1) import an OpenAPI document as a contract's first version (name/version prefilled
+  from the document) → a minor version with a broken `$ref` stored through Save-anyway → the two
+  compared; (2) 1.0.0 proposed and activated (text locked) → the Reader opened (the operation card,
+  an axe scan, remembered across a reload) → downloaded → a breaking change against it flagged by
+  the live check until the Major bump → the History section read; (3) teardown through the delete
+  rules (draft deletes, an active version blocks the contract, deprecate → retire, then delete);
+  plus a regular user's read-only tree, page and list.
 - [`environments.spec.ts`](scenarios/environments.md) — the try-it targets registry: an admin
   creates an environment on a throwaway system with HTTP + PostgreSQL targets (the stack's own
   services), edits it leaving the password blank (the stored secret is kept — the badge stays),

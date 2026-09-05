@@ -3,8 +3,9 @@
 // semantic error through Save-anyway, compares the two, publishes the first (DRAFT → PROPOSED →
 // ACTIVE — the text locks), sees a breaking change against it flagged until the MAJOR bump,
 // downloads it, reads the history, and tears everything down through the lifecycle's exit (deprecate → retire) and
-// the delete rules. A second test pins the read-only view of a
-// regular user. Owns: its throwaway domain/system/team/contract/user (unique `e2e-*` names).
+// the delete rules — as three serial tests sharing the contract (the per-test budget). A fourth
+// test pins the read-only view of a regular user. Owns: its throwaway domain/system/team/contract/user
+// (unique `e2e-*` names).
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { createUserViaUi, deleteUserRow, expect, login, openFilters, rowOperation, signOut, test, uniqueText } from "./helpers";
@@ -113,12 +114,18 @@ async function deleteRegistryRow(page: Page, path: string, name: string, urlPatt
   await confirmDelete(page, urlPattern);
 }
 
-test("admin imports a contract, iterates a version through Save-anyway, compares, publishes, downloads and retires it", async ({ page }) => {
-  await login(page);
+// One journey in three tests (Playwright's per-test budget is 60 s; the whole loop — three checker
+// round trips, an axe scan, a reload, a download and six lifecycle confirms — needed ~90). Serial:
+// each test resumes on the contract page the first one recorded; a failure skips the rest.
+test.describe.serial("the contract core loop", () => {
   const domainName = uniqueText("e2e-dom");
   const systemName = uniqueText("e2e-sys");
   const teamName = uniqueText("e2e-team");
   const contractName = uniqueText("e2e-petstore");
+  let contractPath = "";
+
+  test("admin imports a contract and iterates a version through Save-anyway and compare", async ({ page }) => {
+  await login(page);
   await createDomainAndSystem(page, domainName, systemName);
   await createTeam(page, teamName);
 
@@ -143,6 +150,7 @@ test("admin imports a contract, iterates a version through Save-anyway, compares
   // A minor version from the first, with a broken $ref: the strict save asks for the waiver.
   await page.getByRole("link", { name: "Back to the contract" }).click();
   await expect(page.getByRole("heading", { name: contractName })).toBeVisible();
+  contractPath = new URL(page.url()).pathname;
   await page.getByRole("link", { name: "New version" }).click();
   await expect(page.getByLabel("Version", { exact: true })).toHaveValue("1.0.1");
   await page.getByRole("button", { name: "Minor" }).click();
@@ -158,7 +166,8 @@ test("admin imports a contract, iterates a version through Save-anyway, compares
   ]);
   await expect(page.getByRole("heading", { name: `${contractName} 1.1.0` })).toBeVisible();
   // swagger-parser and Spectral both flag the missing schema — the stored report carries their errors.
-  await expect(page.getByRole("region", { name: "Findings" })).toContainText(/[1-9]\d* errors/);
+  await expect(page.getByRole("region", { name: "Findings" })).toContainText(" errors");
+  await expect(page.getByRole("region", { name: "Findings" })).not.toContainText("0 errors");
 
   // The diff between the two: the changed $ref shows as a −/+ pair.
   await page.getByRole("link", { name: "Back to the contract" }).click();
@@ -167,9 +176,14 @@ test("admin imports a contract, iterates a version through Save-anyway, compares
   await expect(diff).toBeVisible();
   await expect(diff).toContainText('+                   $ref: "#/components/schemas/Missing"');
   await expect(page.getByText("+2 / −2 lines")).toBeVisible();
+  });
+
+  test("admin publishes the version, reads it in the reader, downloads it and sees the breaking-change gate", async ({ page }) => {
+  await login(page);
+  await page.goto(contractPath);
+  await expect(page.getByRole("heading", { name: contractName })).toBeVisible();
 
   // Publish 1.0.0: DRAFT → PROPOSED → ACTIVE locks the text; the download carries the server's file name.
-  await page.getByRole("link", { name: "Back to the contract" }).click();
   await page.getByRole("link", { name: "Open version 1.0.0" }).click();
   await expect(page.getByRole("button", { name: "Edit document" })).toBeVisible();
   await page.getByRole("button", { name: "Propose" }).click();
@@ -194,7 +208,7 @@ test("admin imports a contract, iterates a version through Save-anyway, compares
   await expect(page.getByRole("textbox", { name: "Contract document" })).toBeVisible();
   await page.getByRole("button", { name: "More actions" }).click();
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("menuitem", { name: "Download" }).click()]);
-  expect(download.suggestedFilename()).toMatch(new RegExp(`__${contractName}__1\\.0\\.0\\.yaml$`));
+  expect(download.suggestedFilename().endsWith(`__${contractName}__1.0.0.yaml`)).toBe(true);
 
   // A breaking change against the ACTIVE 1.0.0: the live check compares against it and blocks
   // the minor bump with BREAKING_WITHOUT_MAJOR_BUMP; the Major bump turns the facts into notes.
@@ -218,9 +232,14 @@ test("admin imports a contract, iterates a version through Save-anyway, compares
   await expect(history).toContainText("Version 1.0.0: Proposed → Active");
   await expect(history).toContainText("Version 1.1.0 created");
   await expect(history).toContainText("Version 1.0.0 imported");
+  });
 
-  // Teardown through the rules (already on the contract page): the draft deletes; the contract
-  // refuses while 1.0.0 is active.
+  test("admin retires the version and deletes the contract and its registries", async ({ page }) => {
+  await login(page);
+  await page.goto(contractPath);
+  await expect(page.getByRole("heading", { name: contractName })).toBeVisible();
+
+  // Teardown through the rules: the draft deletes; the contract refuses while 1.0.0 is active.
   await rowOperation(page, "1.1.0", "Delete version 1.1.0");
   await confirmDelete(page, /\/versions\/\d+$/);
   await expect(page.getByRole("link", { name: "Open version 1.1.0" })).toHaveCount(0);
@@ -244,6 +263,7 @@ test("admin imports a contract, iterates a version through Save-anyway, compares
   await deleteRegistryRow(page, "/systems", systemName, /\/api\/v1\/systems\/\d+$/);
   await deleteRegistryRow(page, "/domains", domainName, /\/api\/v1\/domains\/\d+$/);
   await deleteRegistryRow(page, "/teams", teamName, /\/api\/v1\/teams\/\d+$/);
+  });
 });
 
 test("a regular user reads a contract in the hierarchy and the list but gets no write actions", async ({ page }) => {
