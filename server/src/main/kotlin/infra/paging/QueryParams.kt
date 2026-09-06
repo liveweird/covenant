@@ -53,3 +53,16 @@ inline fun <reified E : Enum<E>> Parameters.optionalEnum(name: String): E? =
             "Unknown $name: $raw (allowed: ${enumValues<E>().joinToString { it.name }})",
         )
     }
+
+/**
+ * Every non-blank value of [name] parsed as an enum constant (case-insensitive, `distinct()`) —
+ * the repeated-key any-of idiom (API-LIST-004) for an enum-typed filter; 400 (listing the allowed
+ * values) on an unknown one. Empty when absent. Lifted out of the contracts list's `contractFilter`
+ * (its first two consumers, `type` and `lifecycle`) so a third repeated-enum filter never re-rolls it.
+ */
+inline fun <reified E : Enum<E>> Parameters.repeatedEnum(name: String): List<E> =
+    repeatedValues(name).map { raw ->
+        enumValues<E>().firstOrNull { it.name.equals(raw, ignoreCase = true) } ?: throw BadRequestException(
+            "Unknown $name: $raw (allowed: ${enumValues<E>().joinToString { it.name }})",
+        )
+    }.distinct()

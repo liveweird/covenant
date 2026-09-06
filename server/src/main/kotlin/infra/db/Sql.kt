@@ -6,6 +6,7 @@ import org.jetbrains.exposed.v1.core.LikeEscapeOp
 import org.jetbrains.exposed.v1.core.LikePattern
 import org.jetbrains.exposed.v1.core.LowerCase
 import org.jetbrains.exposed.v1.core.Op
+import org.jetbrains.exposed.v1.core.QueryBuilder
 import org.jetbrains.exposed.v1.core.TextColumnType
 import org.jetbrains.exposed.v1.core.stringParam
 
@@ -48,6 +49,45 @@ internal fun containsPattern(raw: String): LikePattern {
         .replace("%", "\\%")
         .replace("_", "\\_")
     return LikePattern("%$escaped%", escapeChar = '\\')
+}
+
+/**
+ * Existence test over a JSON ARRAY of small objects nested inside a TEXT column holding a JSON
+ * document — the errors report's read over `contract_versions.findings` (`Finding[]`): renders
+ * `EXISTS (SELECT 1 FROM jsonb_array_elements(CAST(col AS jsonb)) e WHERE TRUE AND (e->>'field')
+ * IN (?, …) …)`, one `IN` clause per non-empty [clauses] pair, every value bound via
+ * [stringParam]. An EMPTY value list LIFTS its own clause (matches on every element for that
+ * field) rather than matching nothing — the "no filter selected on this dimension" case a caller
+ * with `severities = emptyList()` needs; passing NO clauses at all answers "the array has at
+ * least one element". Field names are compile-time constants by contract (`require`d — they land
+ * inside a SQL literal, never a bound parameter, exactly like the removed `jsonArrayContains`'s path
+ * segments before it). The per-row `CAST` is a seq-scan cost accepted at this scale — the day a
+ * filter here needs an index is the day `findings` gets a denormalized column instead.
+ */
+fun Expression<String>.jsonArrayHasElementWhere(vararg clauses: Pair<String, List<String>>): Op<Boolean> {
+    clauses.forEach { (field, _) ->
+        require(field.matches(Regex("[A-Za-z0-9_]+"))) { "jsonArrayHasElementWhere field must be a simple identifier" }
+    }
+    return object : Op<Boolean>() {
+        // Chained single-arg appends on purpose — the vararg overload is absent from the
+        // QueryBuilder this resolves against in a cold (Docker) build (the idiom the checkup's
+        // four JSON helpers established; see git show 26a9a3d^:server/.../infra/db/Sql.kt).
+        override fun toQueryBuilder(queryBuilder: QueryBuilder) {
+            queryBuilder.append("EXISTS (SELECT 1 FROM jsonb_array_elements(CAST(")
+            queryBuilder.append(this@jsonArrayHasElementWhere)
+            queryBuilder.append(" AS jsonb)) e WHERE TRUE")
+            clauses.forEach { (field, values) ->
+                if (values.isEmpty()) return@forEach
+                queryBuilder.append(" AND (e->>'$field') IN (")
+                values.forEachIndexed { index, value ->
+                    if (index > 0) queryBuilder.append(", ")
+                    queryBuilder.append(stringParam(value))
+                }
+                queryBuilder.append(")")
+            }
+            queryBuilder.append(")")
+        }
+    }
 }
 
 /**

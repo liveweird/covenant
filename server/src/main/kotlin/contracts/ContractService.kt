@@ -4,8 +4,8 @@ import ch.nokillswit.authz.CallerPrincipal
 import ch.nokillswit.authz.ConflictException
 import ch.nokillswit.authz.NotFoundException
 import ch.nokillswit.authz.isAdmin
+import ch.nokillswit.contracts.ContractJoins.ownerRef
 import ch.nokillswit.domains.DomainService
-import ch.nokillswit.infra.db.containsNormalized
 import ch.nokillswit.infra.paging.PageRequest
 import ch.nokillswit.infra.paging.applyPaging
 import ch.nokillswit.systems.SystemService
@@ -56,16 +56,11 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
         val latestVersionId = uinteger("latest_version_id").nullable()
     }
 
-    // Owner display names: two OUTER joins (a contract has one owner side or the other).
-    private val ownerTeams = TeamService.Teams.alias("owner_teams")
-    private val ownerUsers = UserService.Users.alias("owner_users")
+    // The highest active version's alias — the contract list/tree/facets read THIS notion of
+    // "the" version; ContractErrorService joins every ACTIVE version instead (see ContractJoins).
     private val latest = ContractVersionService.ContractVersions.alias("latest_versions")
 
-    private fun joined() = Contracts
-        .innerJoin(SystemService.Systems)
-        .innerJoin(DomainService.Domains)
-        .join(ownerTeams, JoinType.LEFT, onColumn = Contracts.ownerTeamId, otherColumn = ownerTeams[TeamService.Teams.id])
-        .join(ownerUsers, JoinType.LEFT, onColumn = Contracts.ownerUserId, otherColumn = ownerUsers[UserService.Users.id])
+    private fun joined() = ContractJoins.spine()
         .join(latest, JoinType.LEFT, onColumn = Contracts.latestVersionId, otherColumn = latest[ContractVersionService.ContractVersions.id])
 
     /** The caller's active team set — read once per request, then handed to every `canWrite`. */
@@ -226,8 +221,8 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
         val systems = SystemService.Systems
         val system = rows(FacetDimension.SYSTEM, systems.id, systems.name)
             .map { NamedFacetCount(it[systems.id].value, it[systems.name], it[n]) }.toList()
-        val teamId = ownerTeams[TeamService.Teams.id]
-        val teamName = ownerTeams[TeamService.Teams.name]
+        val teamId = ContractJoins.ownerTeams[TeamService.Teams.id]
+        val teamName = ContractJoins.ownerTeams[TeamService.Teams.name]
         val ownerTeam = joined().select(teamId, teamName, n)
             .where {
                 buildPredicate(filter.lifting(FacetDimension.OWNER_TEAM)) and Contracts.active() and Contracts.ownerTeamId.isNotNull()
@@ -316,17 +311,9 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
     }
 
     private fun buildPredicate(filter: ContractListFilter): Op<Boolean> {
-        var op: Op<Boolean> = Op.TRUE
-        filter.domainId?.let { op = op and (SystemService.Systems.domainId eq it) }
-        filter.systemId?.let { op = op and (Contracts.systemId eq it) }
-        if (filter.types.isNotEmpty()) op = op and (Contracts.type inList filter.types.map { it.name })
-        filter.ownerTeamId?.let { op = op and (Contracts.ownerTeamId eq it) }
-        filter.ownerUserId?.let { op = op and (Contracts.ownerUserId eq it) }
+        var op = ContractJoins.contractScope(filter)
         if (filter.lifecycles.isNotEmpty()) {
             op = op and (latest[ContractVersionService.ContractVersions.lifecycle] inList filter.lifecycles.map { it.name })
-        }
-        filter.q?.takeIf { it.isNotBlank() }?.let { q ->
-            op = op and (Contracts.name.containsNormalized(q) or Contracts.description.containsNormalized(q))
         }
         filter.hasErrors?.let { wanted ->
             val errors = latest[ContractVersionService.ContractVersions.checkErrors]
@@ -336,20 +323,6 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
     }
 
     private fun ResultRow.ownership() = Ownership(this[Contracts.ownerTeamId]?.value, this[Contracts.ownerUserId]?.value)
-
-    private fun ResultRow.owner(): OwnerRef {
-        val teamId = this[Contracts.ownerTeamId]?.value
-        return if (teamId != null) {
-            OwnerRef(OwnerKind.TEAM, teamId, this[ownerTeams[TeamService.Teams.name]], this[ownerTeams[TeamService.Teams.markedAsDeleted]])
-        } else {
-            OwnerRef(
-                OwnerKind.USER,
-                this[Contracts.ownerUserId]!!.value,
-                this[ownerUsers[UserService.Users.name]],
-                this[ownerUsers[UserService.Users.markedAsDeleted]],
-            )
-        }
-    }
 
     private fun ResultRow.latestVersion(): LatestVersionSummary? {
         val v = ContractVersionService.ContractVersions
@@ -373,7 +346,7 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
             type = ContractType.valueOf(this[Contracts.type]),
             name = this[Contracts.name],
             description = this[Contracts.description],
-            owner = owner(),
+            owner = ownerRef(),
             latestVersion = latestVersion(),
             versionCount = facts.versionCounts[id] ?: 0,
             canWrite = canWriteContract(viewer.caller, ownership(), viewer.teamIds),
@@ -391,7 +364,7 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
             id = id,
             name = this[Contracts.name],
             type = ContractType.valueOf(this[Contracts.type]),
-            owner = owner(),
+            owner = ownerRef(),
             latestVersion = latestVersion(),
             versionCount = facts.versionCounts[id] ?: 0,
             canWrite = canWriteContract(viewer.caller, ownership(), viewer.teamIds),

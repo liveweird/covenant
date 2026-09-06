@@ -111,11 +111,21 @@ ch.nokillswit
 │                       (DTOs, sanitizers, validateContractCreate, Ownership), ContractType.kt,
 │                       Lifecycle.kt (the transition matrix + contentEditable/deletable/published),
 │                       SemVer.kt (full 2.0 precedence), ContractAccess.kt (the owner-team/owner-user/
-│                       ADMIN writer guard + requireOwnerAssignable), ContractService.kt (Contracts table;
-│                       the list/tree joins, facets (six group-bys over the shared predicate, each dimension lifted), authorizeWrite reading team_members inside the tx, the
+│                       ADMIN writer guard + requireOwnerAssignable), ContractJoins.kt (the contracts
+│                       spine — contracts ⋈ systems ⋈ domains ⋈ the two owner OUTER joins — plus
+│                       contractScope/ownerRef, factored out of ContractService so ContractErrorService
+│                       shares one join and one filter instead of a second copy), ContractService.kt
+│                       (Contracts table; the list/tree joins, facets (six group-bys over the shared
+│                       predicate, each dimension lifted), authorizeWrite reading team_members inside the tx, the
 │                       published-versions 409 on delete, export), ContractVersionService.kt
 │                       (ContractVersions table; SemVer > highest, the HARD/SOFT gate, transitions,
-│                       recomputeLatest), ContractEvents.kt (the EventLog clone), ContractSubscriptionService.kt
+│                       recomputeLatest, applySemverPaging shared with the errors report), ContractErrors.kt
+│                       (the Errors report's DTOs + ErrorListFilter + the pure foldErrorFacets/Finding.matches
+│                       fold — Toadie's `/errors` ported onto Covenant's stored findings) and
+│                       ContractErrorService.kt (ContractErrorService — every ACTIVE version carrying a
+│                       matching finding, paged; facets counted in memory over one select, jsonb parse
+│                       guarded by the denormalized check counts), ContractEvents.kt (the EventLog clone),
+│                       ContractSubscriptionService.kt
 │                       (V13 followers), ContractNotifications.kt (the pure event → notification mapping),
 │                       ContractActivity.kt (THE post-commit chokepoint: followers' notifications, then the
 │                       history event), Links.kt (the SPA paths notifications carry), Import.kt (report &

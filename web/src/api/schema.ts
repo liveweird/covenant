@@ -689,6 +689,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contracts/errors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Errors report — versions carrying findings
+         * @description Any authenticated user. Rows are VERSIONS carrying at least one finding matching the
+         *     filter (a version without one is never a row), findings trimmed to those; the SPA groups
+         *     consecutive rows of one contract visually. `lifecycle` here is the VERSION's own state —
+         *     not the "latest version" reading the contracts list/tree/facets use. `severity`/`source`
+         *     are repeatable any-of filters that accept every enum value (SYNTAX and CONFORMANCE simply
+         *     match nothing, since neither is ever stored on a version).
+         *
+         *     - Sortable fields: `id`, `name`, `version`, `lifecycle`, `checkedAt`, `errors`. Default
+         *       `name` ascending then `version` descending (SemVer precedence) — a contract split
+         *       across a page boundary is accepted.
+         *     - Filters: the contracts list's own (`domainId`, `systemId`, `type`, `ownerTeamId`,
+         *       `ownerUserId`, `q`) plus the version's own `lifecycle`, `severity` and `source`
+         *       (all repeatable any-of; empty = any).
+         */
+        get: operations["listContractErrors"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/errors/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Facet counts for the Errors report
+         * @description Any authenticated user. The SAME filter parameters as the errors list, minus paging.
+         *     `severity`/`source` count FINDINGS across the matching versions, each lifted for its own
+         *     dimension; `lifecycle` counts VERSIONS carrying at least one matching finding, lifted for
+         *     its own dimension; `contracts`/`versions`/`findings` are the totals with every filter
+         *     applied. Counted in memory over one select — see `.claude/docs/list-endpoints.md`
+         *     "Facets".
+         */
+        get: operations["getContractErrorFacets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contracts/versions/check": {
         parameters: {
             query?: never;
@@ -1833,6 +1890,63 @@ export interface components {
             ownerTeam: components["schemas"]["NamedFacetCount"][];
             hasErrors: components["schemas"]["ErrorFacets"];
         };
+        ErrorContractRef: {
+            /** Format: int32 */
+            id: number;
+            name: string;
+            type: components["schemas"]["ContractType"];
+            system: components["schemas"]["RefSummary"];
+            domain: components["schemas"]["RefSummary"];
+            owner: components["schemas"]["OwnerRef"];
+        };
+        ErrorVersionRef: {
+            /** Format: int32 */
+            id: number;
+            version: string;
+            lifecycle: components["schemas"]["Lifecycle"];
+            checkErrors: number;
+            checkWarnings: number;
+            checkInfos: number;
+            checkComplete: boolean;
+            /** Format: int64 */
+            checkedAt: number;
+        };
+        ErrorRow: {
+            contract: components["schemas"]["ErrorContractRef"];
+            version: components["schemas"]["ErrorVersionRef"];
+            /** @description Trimmed to the findings matching the caller's severity/source filter, in stored order. */
+            findings: components["schemas"]["Finding"][];
+        };
+        ErrorPage: {
+            items: components["schemas"]["ErrorRow"][];
+            page: number;
+            pageSize: number;
+            /** Format: int64 */
+            total: number;
+        };
+        ErrorFacetsResponse: {
+            /**
+             * Format: int64
+             * @description Distinct contracts with a matching row.
+             */
+            contracts: number;
+            /**
+             * Format: int64
+             * @description Versions carrying at least one matching finding.
+             */
+            versions: number;
+            /**
+             * Format: int64
+             * @description Matching findings across those versions.
+             */
+            findings: number;
+            /** @description Findings by severity (severity itself lifted). */
+            severity: components["schemas"]["FacetCount"][];
+            /** @description Findings by source (source itself lifted). */
+            source: components["schemas"]["FacetCount"][];
+            /** @description Versions by lifecycle (lifecycle itself lifted). */
+            lifecycle: components["schemas"]["FacetCount"][];
+        };
         TreeContract: {
             /** @description Whether the CALLER follows the contract — every event on it then reaches their bell. */
             subscribed: boolean;
@@ -2849,6 +2963,12 @@ export interface components {
         /** @description Case- and accent-insensitive substring over name OR description. */
         ContractQuery: string;
         ContractHasErrors: boolean;
+        /** @description Repeatable — any-of over lifecycles, of the VERSION itself (the Errors report's rows — not a contract's latest version, which ContractLifecycle reads instead). */
+        VersionLifecycle: components["schemas"]["Lifecycle"][];
+        /** @description Repeatable — any-of over finding severities; every enum value is accepted (empty = any). */
+        ErrorSeverity: components["schemas"]["Severity"][];
+        /** @description Repeatable — any-of over finding sources; every enum value is accepted, though SYNTAX and CONFORMANCE never match a stored finding (empty = any). */
+        ErrorSource: components["schemas"]["FindingSource"][];
     };
     requestBodies: never;
     headers: never;
@@ -4136,6 +4256,93 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TreeResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listContractErrors: {
+        parameters: {
+            query?: {
+                /** @description 1-based page index. Defaults to 1. */
+                page?: components["parameters"]["Page"];
+                /** @description Rows per page. Defaults to 20, maximum 100. */
+                pageSize?: components["parameters"]["PageSize"];
+                /**
+                 * @description Sort spec. Format: `field` (ascending) or `-field` (descending). Multiple fields are
+                 *     comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
+                 *     sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
+                 *     always appended as a deterministic tiebreaker.
+                 */
+                sort?: components["parameters"]["Sort"];
+                domainId?: components["parameters"]["ContractDomainId"];
+                systemId?: components["parameters"]["ContractSystemId"];
+                /** @description Repeatable — any-of over the contract types. */
+                type?: components["parameters"]["ContractType"];
+                ownerTeamId?: components["parameters"]["ContractOwnerTeamId"];
+                ownerUserId?: components["parameters"]["ContractOwnerUserId"];
+                /** @description Repeatable — any-of over lifecycles, of the VERSION itself (the Errors report's rows — not a contract's latest version, which ContractLifecycle reads instead). */
+                lifecycle?: components["parameters"]["VersionLifecycle"];
+                /** @description Repeatable — any-of over finding severities; every enum value is accepted (empty = any). */
+                severity?: components["parameters"]["ErrorSeverity"];
+                /** @description Repeatable — any-of over finding sources; every enum value is accepted, though SYNTAX and CONFORMANCE never match a stored finding (empty = any). */
+                source?: components["parameters"]["ErrorSource"];
+                /** @description Case- and accent-insensitive substring over name OR description. */
+                q?: components["parameters"]["ContractQuery"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of version rows carrying findings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getContractErrorFacets: {
+        parameters: {
+            query?: {
+                domainId?: components["parameters"]["ContractDomainId"];
+                systemId?: components["parameters"]["ContractSystemId"];
+                /** @description Repeatable — any-of over the contract types. */
+                type?: components["parameters"]["ContractType"];
+                ownerTeamId?: components["parameters"]["ContractOwnerTeamId"];
+                ownerUserId?: components["parameters"]["ContractOwnerUserId"];
+                /** @description Repeatable — any-of over lifecycles, of the VERSION itself (the Errors report's rows — not a contract's latest version, which ContractLifecycle reads instead). */
+                lifecycle?: components["parameters"]["VersionLifecycle"];
+                /** @description Repeatable — any-of over finding severities; every enum value is accepted (empty = any). */
+                severity?: components["parameters"]["ErrorSeverity"];
+                /** @description Repeatable — any-of over finding sources; every enum value is accepted, though SYNTAX and CONFORMANCE never match a stored finding (empty = any). */
+                source?: components["parameters"]["ErrorSource"];
+                /** @description Case- and accent-insensitive substring over name OR description. */
+                q?: components["parameters"]["ContractQuery"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The facet counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorFacetsResponse"];
                 };
             };
             400: components["responses"]["BadRequest"];

@@ -1118,6 +1118,80 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/errors:
+    get:
+      tags: [contracts]
+      operationId: listContractErrors
+      summary: The Errors report — versions carrying findings
+      description: |
+        Any authenticated user. Rows are VERSIONS carrying at least one finding matching the
+        filter (a version without one is never a row), findings trimmed to those; the SPA groups
+        consecutive rows of one contract visually. `lifecycle` here is the VERSION's own state —
+        not the "latest version" reading the contracts list/tree/facets use. `severity`/`source`
+        are repeatable any-of filters that accept every enum value (SYNTAX and CONFORMANCE simply
+        match nothing, since neither is ever stored on a version).
+
+        - Sortable fields: `id`, `name`, `version`, `lifecycle`, `checkedAt`, `errors`. Default
+          `name` ascending then `version` descending (SemVer precedence) — a contract split
+          across a page boundary is accepted.
+        - Filters: the contracts list's own (`domainId`, `systemId`, `type`, `ownerTeamId`,
+          `ownerUserId`, `q`) plus the version's own `lifecycle`, `severity` and `source`
+          (all repeatable any-of; empty = any).
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/ContractDomainId'
+        - $ref: '#/components/parameters/ContractSystemId'
+        - $ref: '#/components/parameters/ContractType'
+        - $ref: '#/components/parameters/ContractOwnerTeamId'
+        - $ref: '#/components/parameters/ContractOwnerUserId'
+        - $ref: '#/components/parameters/VersionLifecycle'
+        - $ref: '#/components/parameters/ErrorSeverity'
+        - $ref: '#/components/parameters/ErrorSource'
+        - $ref: '#/components/parameters/ContractQuery'
+      responses:
+        '200':
+          description: A page of version rows carrying findings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorPage'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/errors/facets:
+    get:
+      tags: [contracts]
+      operationId: getContractErrorFacets
+      summary: Facet counts for the Errors report
+      description: |
+        Any authenticated user. The SAME filter parameters as the errors list, minus paging.
+        `severity`/`source` count FINDINGS across the matching versions, each lifted for its own
+        dimension; `lifecycle` counts VERSIONS carrying at least one matching finding, lifted for
+        its own dimension; `contracts`/`versions`/`findings` are the totals with every filter
+        applied. Counted in memory over one select — see `.claude/docs/list-endpoints.md`
+        "Facets".
+      parameters:
+        - $ref: '#/components/parameters/ContractDomainId'
+        - $ref: '#/components/parameters/ContractSystemId'
+        - $ref: '#/components/parameters/ContractType'
+        - $ref: '#/components/parameters/ContractOwnerTeamId'
+        - $ref: '#/components/parameters/ContractOwnerUserId'
+        - $ref: '#/components/parameters/VersionLifecycle'
+        - $ref: '#/components/parameters/ErrorSeverity'
+        - $ref: '#/components/parameters/ErrorSource'
+        - $ref: '#/components/parameters/ContractQuery'
+      responses:
+        '200':
+          description: The facet counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorFacetsResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
   /api/v1/contracts/versions/check:
     post:
       tags: [contract-versions]
@@ -2088,6 +2162,40 @@ components:
       in: query
       required: false
       schema: { type: boolean }
+    VersionLifecycle:
+      name: lifecycle
+      in: query
+      required: false
+      description: >-
+        Repeatable — any-of over lifecycles, of the VERSION itself (the Errors report's rows —
+        not a contract's latest version, which ContractLifecycle reads instead).
+      schema:
+        type: array
+        items: { $ref: '#/components/schemas/Lifecycle' }
+      style: form
+      explode: true
+    ErrorSeverity:
+      name: severity
+      in: query
+      required: false
+      description: Repeatable — any-of over finding severities; every enum value is accepted (empty = any).
+      schema:
+        type: array
+        items: { $ref: '#/components/schemas/Severity' }
+      style: form
+      explode: true
+    ErrorSource:
+      name: source
+      in: query
+      required: false
+      description: >-
+        Repeatable — any-of over finding sources; every enum value is accepted, though SYNTAX and
+        CONFORMANCE never match a stored finding (empty = any).
+      schema:
+        type: array
+        items: { $ref: '#/components/schemas/FindingSource' }
+      style: form
+      explode: true
   responses:
     BadRequest:
       description: Malformed request
@@ -2688,6 +2796,68 @@ components:
         system: { type: array, items: { $ref: '#/components/schemas/NamedFacetCount' } }
         ownerTeam: { type: array, items: { $ref: '#/components/schemas/NamedFacetCount' } }
         hasErrors: { $ref: '#/components/schemas/ErrorFacets' }
+    ErrorContractRef:
+      type: object
+      required: [id, name, type, system, domain, owner]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        name: { type: string }
+        type: { $ref: '#/components/schemas/ContractType' }
+        system: { $ref: '#/components/schemas/RefSummary' }
+        domain: { $ref: '#/components/schemas/RefSummary' }
+        owner: { $ref: '#/components/schemas/OwnerRef' }
+    ErrorVersionRef:
+      type: object
+      required: [id, version, lifecycle, checkErrors, checkWarnings, checkInfos, checkComplete, checkedAt]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        version: { type: string }
+        lifecycle: { $ref: '#/components/schemas/Lifecycle' }
+        checkErrors: { type: integer, minimum: 0 }
+        checkWarnings: { type: integer, minimum: 0 }
+        checkInfos: { type: integer, minimum: 0 }
+        checkComplete: { type: boolean }
+        checkedAt: { type: integer, format: int64, minimum: 0 }
+    ErrorRow:
+      type: object
+      required: [contract, version, findings]
+      properties:
+        contract: { $ref: '#/components/schemas/ErrorContractRef' }
+        version: { $ref: '#/components/schemas/ErrorVersionRef' }
+        findings:
+          type: array
+          items: { $ref: '#/components/schemas/Finding' }
+          description: Trimmed to the findings matching the caller's severity/source filter, in stored order.
+    ErrorPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrorRow'
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, format: int64, minimum: 0 }
+    ErrorFacetsResponse:
+      type: object
+      required: [contracts, versions, findings, severity, source, lifecycle]
+      properties:
+        contracts: { type: integer, format: int64, minimum: 0, description: "Distinct contracts with a matching row." }
+        versions: { type: integer, format: int64, minimum: 0, description: "Versions carrying at least one matching finding." }
+        findings: { type: integer, format: int64, minimum: 0, description: "Matching findings across those versions." }
+        severity:
+          type: array
+          items: { $ref: '#/components/schemas/FacetCount' }
+          description: Findings by severity (severity itself lifted).
+        source:
+          type: array
+          items: { $ref: '#/components/schemas/FacetCount' }
+          description: Findings by source (source itself lifted).
+        lifecycle:
+          type: array
+          items: { $ref: '#/components/schemas/FacetCount' }
+          description: Versions by lifecycle (lifecycle itself lifted).
     TreeContract:
       type: object
       required: [id, name, type, owner, versionCount, canWrite, subscribed, subscriberCount]

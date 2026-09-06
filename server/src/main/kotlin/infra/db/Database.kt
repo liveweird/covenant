@@ -1,6 +1,8 @@
 package ch.nokillswit.infra.db
 
 import ch.nokillswit.auth.TokenBlocklistService
+import ch.nokillswit.contracts.ContractErrorService
+import ch.nokillswit.contracts.ContractErrorServiceKey
 import ch.nokillswit.contracts.ContractEventService
 import ch.nokillswit.contracts.ContractEventServiceKey
 import ch.nokillswit.contracts.ContractService
@@ -72,6 +74,8 @@ suspend fun Application.configureDatabase() {
     attributes.put(ContractUrlFetcherKey, ContractUrlFetcher())
     val eventService = ContractEventService(database)
     attributes.put(ContractEventServiceKey, eventService)
+    // The Errors report — a read-only join over the same tables; no writer, no dependency on ChecksService.
+    attributes.put(ContractErrorServiceKey, ContractErrorService(database))
     // Followers + their notifications: the routes record every contract mutation through
     // ContractActivity (notifications, then the history event — see persistence.md).
     val subscriptionService = ContractSubscriptionService(database)

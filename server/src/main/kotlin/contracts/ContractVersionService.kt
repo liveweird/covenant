@@ -39,6 +39,31 @@ val VERSION_SORT_FIELDS: Set<String> = SORTABLE_COLUMNS.keys
 /** Highest SemVer first — the versions list's default (`-version`). */
 val VERSION_DEFAULT_SORT: List<SortField> = listOf(SortField("version", descending = true))
 
+/** Shared with `ContractErrorService` — decoding the same stored `findings` column twice must never drift. */
+internal val findingsSerializer = ListSerializer(Finding.serializer())
+
+/**
+ * `"version"` expands to the four SemVer columns (prerelease NULL sorts as a release, ranked
+ * above — the same rule for every caller); every other field maps through [columns]. Lifted out
+ * of [ContractVersionService] (it was `applySemverSort`, a private member reading its own
+ * `SORTABLE_COLUMNS`) so `ContractErrorService`'s errors-report query — which paginates the same
+ * `contract_versions` rows under a different column whitelist — shares one implementation.
+ */
+internal fun Query.applySemverPaging(req: PageRequest, columns: Map<String, Column<*>>): Query {
+    val v = ContractVersionService.ContractVersions
+    val expanded = req.sort.flatMap { sf ->
+        if (sf.name == "version") {
+            val order = if (sf.descending) SortOrder.DESC else SortOrder.ASC
+            val nulls = if (sf.descending) SortOrder.DESC_NULLS_FIRST else SortOrder.ASC_NULLS_LAST
+            listOf(v.semverMajor to order, v.semverMinor to order, v.semverPatch to order, v.semverPrerelease to nulls)
+        } else {
+            val column = columns[sf.name] ?: error("unsortable field ${sf.name}")
+            listOf(column to if (sf.descending) SortOrder.DESC else SortOrder.ASC)
+        }
+    }
+    return orderBy(*expanded.toTypedArray()).limit(req.pageSize).offset(((req.page - 1).toLong()) * req.pageSize)
+}
+
 /** What a store path produced: the row's fresh response plus what it waived (for the audit). */
 data class VersionSaveResult(val response: VersionResponse, val waived: List<Finding>)
 
@@ -74,13 +99,12 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
     }
 
     private val json = Json
-    private val findingsSerializer = ListSerializer(Finding.serializer())
 
     suspend fun list(contractId: UInt, filter: VersionListFilter, paging: PageRequest): VersionListResult = suspendTransaction(database) {
         var predicate: Op<Boolean> = (ContractVersions.contractId eq contractId) and ContractVersions.active()
         if (filter.lifecycles.isNotEmpty()) predicate = predicate and (ContractVersions.lifecycle inList filter.lifecycles.map { it.name })
         val total = ContractVersions.selectAll().where { predicate }.count()
-        val rows = ContractVersions.selectAll().where { predicate }.applySemverSort(paging).toList()
+        val rows = ContractVersions.selectAll().where { predicate }.applySemverPaging(paging, SORTABLE_COLUMNS).toList()
         VersionListResult(items = rows.map { it.toListItem() }, total = total)
     }
 
@@ -376,22 +400,6 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
         ContractVersions.selectAll()
             .where { (ContractVersions.id eq versionId) and (ContractVersions.contractId eq contractId) and ContractVersions.active() }
             .toList().singleOrNull()
-
-    /** `version` sorts by the parsed triple (prerelease NULL = release, ranked above); other fields as usual. */
-    private fun Query.applySemverSort(paging: PageRequest): Query {
-        val v = ContractVersions
-        val expanded = paging.sort.flatMap { sf ->
-            if (sf.name == "version") {
-                val order = if (sf.descending) SortOrder.DESC else SortOrder.ASC
-                val nulls = if (sf.descending) SortOrder.DESC_NULLS_FIRST else SortOrder.ASC_NULLS_LAST
-                listOf(v.semverMajor to order, v.semverMinor to order, v.semverPatch to order, v.semverPrerelease to nulls)
-            } else {
-                val column = SORTABLE_COLUMNS[sf.name] ?: error("unsortable field ${sf.name}")
-                listOf(column to if (sf.descending) SortOrder.DESC else SortOrder.ASC)
-            }
-        }
-        return orderBy(*expanded.toTypedArray()).limit(paging.pageSize).offset(((paging.page - 1) * paging.pageSize).toLong())
-    }
 
     private fun ResultRow.toResponse() = VersionResponse(
         id = this[ContractVersions.id].value,

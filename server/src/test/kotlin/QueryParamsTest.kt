@@ -2,6 +2,7 @@ package ch.nokillswit
 
 import ch.nokillswit.infra.paging.optionalEnum
 import ch.nokillswit.infra.paging.optionalString
+import ch.nokillswit.infra.paging.repeatedEnum
 import ch.nokillswit.infra.paging.repeatedValues
 import ch.nokillswit.infra.paging.singleValue
 import io.ktor.http.parametersOf
@@ -51,6 +52,15 @@ class QueryParamsTest {
         assertEquals(Fruit.PEAR, params.optionalEnum<Fruit>("ok"))
         assertNull(params.optionalEnum<Fruit>("missing"))
         val failure = assertFailsWith<BadRequestException> { params.optionalEnum<Fruit>("junk") }
+        assertTrue(failure.message!!.contains("APPLE, PEAR"))
+    }
+
+    @Test
+    fun `repeatedEnum is case-insensitive, distinct, empty when absent, and 400s an unknown value`() {
+        val params = parametersOf("v" to listOf("pear", "PEAR", "Apple"), "junk" to listOf("kiwi"))
+        assertEquals(listOf(Fruit.PEAR, Fruit.APPLE), params.repeatedEnum<Fruit>("v"))
+        assertEquals(emptyList(), params.repeatedEnum<Fruit>("missing"))
+        val failure = assertFailsWith<BadRequestException> { params.repeatedEnum<Fruit>("junk") }
         assertTrue(failure.message!!.contains("APPLE, PEAR"))
     }
 }

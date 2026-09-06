@@ -5,6 +5,8 @@ import ch.nokillswit.authz.NotFoundException
 import ch.nokillswit.authz.caller
 import ch.nokillswit.authz.orNotFound
 import ch.nokillswit.authz.requireAdmin
+import ch.nokillswit.contracts.checks.FindingSource
+import ch.nokillswit.contracts.checks.Severity
 import ch.nokillswit.infra.db.EVENT_LOG_DEFAULT_SORT
 import ch.nokillswit.infra.db.EVENT_LOG_SORT_FIELDS
 import ch.nokillswit.infra.db.orVanished
@@ -12,14 +14,13 @@ import ch.nokillswit.infra.paging.optionalBoolean
 import ch.nokillswit.infra.paging.optionalString
 import ch.nokillswit.infra.paging.optionalUInt
 import ch.nokillswit.infra.paging.parsePaging
-import ch.nokillswit.infra.paging.repeatedValues
+import ch.nokillswit.infra.paging.repeatedEnum
 import ch.nokillswit.infra.paging.toPage
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.resources.Resource
 import io.ktor.server.application.*
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.request.receive
 import io.ktor.server.resources.delete
 import io.ktor.server.resources.get
@@ -43,6 +44,15 @@ class ContractsRoute {
     @Serializable
     @Resource("facets")
     class Facets(val parent: ContractsRoute = ContractsRoute())
+
+    /** The Errors report: versions carrying findings, across the whole catalog. */
+    @Serializable
+    @Resource("errors")
+    class Errors(val parent: ContractsRoute = ContractsRoute()) {
+        @Serializable
+        @Resource("facets")
+        class Facets(val parent: Errors = Errors())
+    }
 
     @Serializable
     @Resource("import")
@@ -146,20 +156,32 @@ class ContractsRoute {
 /** The list/tree filter parser — one function, so the two endpoints declare the same set. */
 internal fun ApplicationCall.contractFilter(): ContractListFilter {
     val params = request.queryParameters
-    fun <T : Enum<T>> parseAll(name: String, values: Array<T>): List<T> =
-        params.repeatedValues(name).map { raw ->
-            values.firstOrNull { it.name.equals(raw, ignoreCase = true) }
-                ?: throw BadRequestException("Unknown $name: $raw (allowed: ${values.joinToString { it.name }})")
-        }.distinct()
     return ContractListFilter(
         domainId = params.optionalUInt("domainId"),
         systemId = params.optionalUInt("systemId"),
-        types = parseAll("type", ContractType.entries.toTypedArray()),
+        types = params.repeatedEnum<ContractType>("type"),
         ownerTeamId = params.optionalUInt("ownerTeamId"),
         ownerUserId = params.optionalUInt("ownerUserId"),
-        lifecycles = parseAll("lifecycle", Lifecycle.entries.toTypedArray()),
+        lifecycles = params.repeatedEnum<Lifecycle>("lifecycle"),
         q = params.optionalString("q"),
         hasErrors = params.optionalBoolean("hasErrors"),
+    )
+}
+
+/**
+ * Beside [contractFilter]: the same contract-scoped params (domain/system/type/owner/q), minus
+ * the contract list's OWN lifecycle/hasErrors (which read the LATEST version — meaningless here,
+ * where every row already IS one specific version), plus that version's own `lifecycle` and the
+ * finding `severity`/`source` filters.
+ */
+internal fun ApplicationCall.errorFilter(): ErrorListFilter {
+    val base = contractFilter()
+    val params = request.queryParameters
+    return ErrorListFilter(
+        contracts = base.copy(lifecycles = emptyList(), hasErrors = null),
+        lifecycles = base.lifecycles,
+        severities = params.repeatedEnum<Severity>("severity"),
+        sources = params.repeatedEnum<FindingSource>("source"),
     )
 }
 
@@ -169,11 +191,27 @@ fun Application.configureContractRoutes() {
     val activity = attributes[ContractActivityKey]
     val eventService = attributes[ContractEventServiceKey]
     val subscriptions = attributes[ContractSubscriptionServiceKey]
+    val errorService = attributes[ContractErrorServiceKey]
     routing {
         authenticate {
             contractCollection(contractService, activity)
             contractItem(contractService, activity, eventService, subscriptions)
+            contractErrors(errorService)
         }
+    }
+}
+
+/** The Errors report: reads only — no audit, no `canWrite` (a finding is not a contract's writable state). */
+private fun Route.contractErrors(errors: ContractErrorService) {
+    get<ContractsRoute.Errors> {
+        call.caller()
+        val paging = call.parsePaging(sortable = ERROR_SORT_FIELDS, defaultSort = ERROR_DEFAULT_SORT)
+        val result = errors.list(call.errorFilter(), paging)
+        call.respond(HttpStatusCode.OK, paging.toPage(result.items, result.total))
+    }
+    get<ContractsRoute.Errors.Facets> {
+        call.caller()
+        call.respond(HttpStatusCode.OK, errors.facets(call.errorFilter()))
     }
 }
 
