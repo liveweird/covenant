@@ -1,0 +1,72 @@
+[
+  {
+    "key": "openapi-orders-clean",
+    "name": "Sample - Orders HTTP API",
+    "type": "OPENAPI",
+    "version": "1.0.0",
+    "file": "specs/openapi-orders-clean.yaml",
+    "expectation": "clean",
+    "description": "A lint-clean OpenAPI 3.0.3 contract with order creation and retrieval operations, reusable schemas, examples, and RFC 7807 errors.",
+    "system": "Orders"
+  },
+  {
+    "key": "asyncapi-orders-clean",
+    "name": "Sample - Orders Events",
+    "type": "ASYNCAPI",
+    "version": "1.0.0",
+    "file": "specs/asyncapi-orders-clean.yaml",
+    "expectation": "clean",
+    "description": "An AsyncAPI 3.1.0 contract for CloudEvents-compatible order status events with channel, operation, message, schema, and example details.",
+    "system": "Orders"
+  },
+  {
+    "key": "odcs-order-analytics-clean",
+    "name": "Sample - Order Analytics",
+    "type": "ODCS",
+    "version": "1.0.0",
+    "file": "specs/odcs-order-analytics-clean.yaml",
+    "expectation": "clean",
+    "description": "An ODCS 3.1.0 data contract for an analytics-ready order facts table with governance, warehouse, ownership, and support metadata.",
+    "system": "Analytics"
+  },
+  {
+    "key": "openapi-orders-soft-error",
+    "name": "Sample - Orders HTTP API (soft error)",
+    "type": "OPENAPI",
+    "version": "1.0.0",
+    "file": "specs/openapi-orders-soft-error.yaml",
+    "expectation": "error",
+    "description": "A parseable OpenAPI document with one intentional soft semantic error: the 200 response references the undefined MissingOrder schema.",
+    "system": "Orders"
+  },
+  {
+    "key": "asyncapi-orders-soft-error",
+    "name": "Sample - Orders Events (soft error)",
+    "type": "ASYNCAPI",
+    "version": "1.0.0",
+    "file": "specs/asyncapi-orders-soft-error.yaml",
+    "expectation": "error",
+    "description": "A parseable AsyncAPI document with one intentional soft schema error: the payload schema uses numeric type 42 instead of a JSON Schema type name.",
+    "system": "Orders"
+  },
+  {
+    "key": "odcs-order-analytics-soft-error",
+    "name": "Sample - Order Analytics (soft error)",
+    "type": "ODCS",
+    "version": "1.0.0",
+    "file": "specs/odcs-order-analytics-soft-error.yaml",
+    "expectation": "error",
+    "description": "A valid YAML ODCS document with one intentional soft schema error: the required stable contract id is omitted.",
+    "system": "Analytics"
+  },
+  {
+    "key": "openapi-orders-lint-warning",
+    "name": "Sample - Orders HTTP API (lint warning)",
+    "type": "OPENAPI",
+    "version": "1.0.0",
+    "file": "specs/openapi-orders-lint-warning.yaml",
+    "expectation": "warning",
+    "description": "A structurally valid OpenAPI document with one intentional Spectral info-contact warning; all operations remain fully described and tagged.",
+    "system": "Orders"
+  }
+]

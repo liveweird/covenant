@@ -90,6 +90,21 @@ Ports are chosen to coexist with [Lettuce](https://github.com/liveweird/lettuce)
 same machine: the app is on **8082**, Postgres is host-mapped to **5434**, the Vite dev server uses
 **5175**, Mailpit **8027**. All host ports bind to 127.0.0.1. The checker has no host port at all.
 
+## Sample contracts
+
+[`samples/contracts/`](samples/contracts/README.md) contains reusable OpenAPI, AsyncAPI, and
+ODCS documents: clean examples, intentional validation errors, and an OpenAPI lint-warning
+example. Load them into a running local instance with Python 3 (standard library only):
+
+```bash
+python3 samples/contracts/load.py --base-url http://localhost:8082
+```
+
+The loader prompts for the local administrator password, checks every document before
+creating catalog data, and skips unchanged samples on repeat runs. Use `--check-only` to
+validate the files without creating catalog records. See the sample README for expected
+findings and how to reload after editing or deleting samples.
+
 ## Running on Kubernetes (local)
 
 With a local cluster that shares the Docker image store (e.g. OrbStack):

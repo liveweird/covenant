@@ -41,6 +41,12 @@ The playbooks in `.claude/skills/` are useful repository-local references even o
 `api-review` covers the two-pass OpenAPI review, `run-stack` covers packaging/deployment, and
 `verify` covers browser verification and cleanup.
 
+Reusable manual-test documents live in `samples/contracts/` (OpenAPI, AsyncAPI, and ODCS;
+clean, warning-only, and intentionally invalid examples). Its README describes the expected
+findings and the Python API loader. Keep sample expectations synchronized with validator changes;
+load them with `python3 samples/contracts/load.py` or validate without catalog writes using
+`--check-only`. Preserve sample records explicitly requested by the user as persistent demo data.
+
 ## Project Structure & Architecture
 
 This is a Kotlin/Gradle backend plus three standalone npm workspaces:

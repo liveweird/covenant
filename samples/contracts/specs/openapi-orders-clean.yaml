@@ -1,0 +1,144 @@
+openapi: 3.0.3
+info:
+  title: Sample - Orders HTTP API
+  version: 1.0.0
+  description: Create orders and inspect their current fulfilment state.
+  contact:
+    name: Commerce Platform Team
+    email: commerce-platform@example.com
+servers:
+  - url: https://orders.example.com/v1
+    description: Example production endpoint
+tags:
+  - name: orders
+    description: Order creation and retrieval
+paths:
+  /orders:
+    post:
+      operationId: createOrder
+      summary: Create an order
+      description: Accepts a priced basket and creates an order awaiting fulfilment.
+      tags: [orders]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrder"
+            example:
+              customerId: cus_72JQ
+              currency: EUR
+              lines:
+                - sku: mug-graphite
+                  quantity: 2
+                  unitPrice: 18.50
+      responses:
+        "201":
+          description: The order was created.
+          headers:
+            Location:
+              description: Canonical URL of the created order.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /orders/{orderId}:
+    get:
+      operationId: getOrder
+      summary: Retrieve an order
+      description: Returns the order and its latest fulfilment status.
+      tags: [orders]
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: The requested order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "404":
+          $ref: "#/components/responses/Problem"
+components:
+  parameters:
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      description: Stable order identifier.
+      schema:
+        type: string
+        pattern: "^ord_[A-Za-z0-9]+$"
+      example: ord_01J8Y7D6
+  responses:
+    Problem:
+      description: The request could not be completed.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  schemas:
+    CreateOrder:
+      type: object
+      required: [customerId, currency, lines]
+      properties:
+        customerId:
+          type: string
+          description: Customer placing the order.
+        currency:
+          type: string
+          enum: [EUR, USD]
+        lines:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/OrderLine"
+    OrderLine:
+      type: object
+      required: [sku, quantity, unitPrice]
+      properties:
+        sku:
+          type: string
+          minLength: 1
+        quantity:
+          type: integer
+          minimum: 1
+        unitPrice:
+          type: number
+          format: double
+          minimum: 0
+    Order:
+      allOf:
+        - $ref: "#/components/schemas/CreateOrder"
+        - type: object
+          required: [id, status, createdAt]
+          properties:
+            id:
+              type: string
+              example: ord_01J8Y7D6
+            status:
+              type: string
+              enum: [pending, confirmed, shipped, cancelled]
+            createdAt:
+              type: string
+              format: date-time
+              example: "2026-09-06T10:15:00Z"
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string

@@ -1,0 +1,55 @@
+asyncapi: 3.1.0
+info:
+  title: Sample - Orders Events (soft error)
+  version: 1.0.0
+  description: Order lifecycle events with one intentionally invalid payload schema keyword.
+  contact:
+    name: Commerce Platform Team
+    url: https://teams.example.com/commerce-platform
+    email: commerce-platform@example.com
+  license:
+    name: Sample use license
+    url: https://legal.example.com/licenses/sample-use
+  tags:
+    - name: orders
+      description: Order lifecycle events
+defaultContentType: application/json
+servers:
+  production:
+    host: broker.example.com:9092
+    protocol: kafka
+    description: Example commerce event broker
+channels:
+  orderLifecycle:
+    address: commerce.orders.lifecycle.v1
+    description: Ordered stream of lifecycle changes for all orders.
+    messages:
+      orderStatusChanged:
+        $ref: "#/components/messages/orderStatusChanged"
+operations:
+  receiveOrderStatusChanged:
+    action: receive
+    summary: Consume order status changes
+    description: Updates fulfilment projections whenever an order changes status.
+    channel:
+      $ref: "#/channels/orderLifecycle"
+    messages:
+      - $ref: "#/channels/orderLifecycle/messages/orderStatusChanged"
+components:
+  messages:
+    orderStatusChanged:
+      name: orderStatusChanged
+      title: Order status changed
+      contentType: application/json
+      payload:
+        $ref: "#/components/schemas/OrderStatusChanged"
+  schemas:
+    OrderStatusChanged:
+      type: 42
+      required: [orderId, status]
+      properties:
+        orderId:
+          type: string
+        status:
+          type: string
+          enum: [pending, confirmed, shipped, cancelled]

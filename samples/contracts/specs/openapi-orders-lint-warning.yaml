@@ -1,0 +1,85 @@
+openapi: 3.0.3
+info:
+  title: Sample - Orders HTTP API (lint warning)
+  version: 1.0.0
+  description: Create orders and inspect their current fulfilment state. This specimen intentionally omits info.contact.
+servers:
+  - url: https://orders.example.com/v1
+    description: Example production endpoint
+tags:
+  - name: orders
+    description: Order creation and retrieval
+paths:
+  /orders:
+    post:
+      operationId: createOrder
+      summary: Create an order
+      description: Accepts a priced basket and creates an order awaiting fulfilment.
+      tags: [orders]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrder"
+      responses:
+        "201":
+          description: The order was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+  /orders/{orderId}:
+    get:
+      operationId: getOrder
+      summary: Retrieve an order
+      description: Returns the order and its latest fulfilment status.
+      tags: [orders]
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          description: Stable order identifier.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The requested order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+components:
+  schemas:
+    CreateOrder:
+      type: object
+      required: [customerId, lines]
+      properties:
+        customerId:
+          type: string
+        lines:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/OrderLine"
+    OrderLine:
+      type: object
+      required: [sku, quantity]
+      properties:
+        sku:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+    Order:
+      allOf:
+        - $ref: "#/components/schemas/CreateOrder"
+        - type: object
+          required: [id, status]
+          properties:
+            id:
+              type: string
+              example: ord_01J8Y7D6
+            status:
+              type: string
+              enum: [pending, confirmed, shipped, cancelled]

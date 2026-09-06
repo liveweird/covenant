@@ -1,0 +1,100 @@
+apiVersion: v3.1.0
+kind: DataContract
+id: 6d227514-b514-4a7e-8a8a-7925a6ef74d3
+version: 1.0.0
+status: draft
+name: Sample - Order Analytics
+domain: commerce
+dataProduct: order-insights
+tenant: example
+tags: [orders, analytics]
+contractCreatedTs: "2026-09-06T10:00:00Z"
+description:
+  purpose: Provide trusted order facts for revenue and fulfilment analysis.
+  usage: Join daily order facts to product and customer dimensions for internal reporting.
+  limitations: Cancelled orders remain present and must be filtered explicitly when measuring revenue.
+schema:
+  - name: order_facts
+    physicalName: analytics.order_facts
+    physicalType: table
+    logicalType: object
+    businessName: Order facts
+    description: One row per commerce order at its latest known lifecycle state.
+    dataGranularityDescription: One record per order identifier.
+    tags: [orders, certified]
+    properties:
+      - name: order_id
+        logicalType: string
+        physicalType: varchar
+        physicalName: order_id
+        description: Stable identifier assigned by the Orders system.
+        required: true
+        unique: true
+        primaryKey: true
+        primaryKeyPosition: 1
+        classification: internal
+        criticalDataElement: true
+        examples: [ord_01J8Y7D6]
+      - name: customer_id
+        logicalType: string
+        physicalType: varchar
+        physicalName: customer_id
+        description: Pseudonymous customer identifier used for cohort analysis.
+        required: true
+        classification: confidential
+        examples: [cus_72JQ]
+      - name: status
+        logicalType: string
+        physicalType: varchar
+        physicalName: status
+        description: Latest observed order lifecycle status.
+        required: true
+        examples: [confirmed]
+      - name: total_amount
+        logicalType: number
+        physicalType: numeric(12,2)
+        physicalName: total_amount
+        description: Gross order amount in the currency recorded on the order.
+        required: true
+        criticalDataElement: true
+        transformSourceObjects: [commerce.orders]
+        transformLogic: SUM(order_lines.quantity * order_lines.unit_price)
+        examples: [37.00]
+      - name: currency
+        logicalType: string
+        physicalType: char(3)
+        physicalName: currency
+        description: ISO 4217 currency code for total_amount.
+        required: true
+        examples: [EUR]
+      - name: created_at
+        logicalType: date
+        logicalTypeOptions:
+          format: date-time
+        physicalType: timestamptz
+        physicalName: created_at
+        description: Time at which the order was accepted by the Orders API.
+        required: true
+servers:
+  - server: analytics-warehouse
+    type: postgres
+    environment: production
+    host: warehouse.example.com
+    port: 5432
+    database: commerce_analytics
+    schema: analytics
+    roles:
+      - role: analyst
+        access: read
+support:
+  - channel: commerce-data@example.com
+    tool: email
+    scope: interactive
+    description: Questions about definitions, access, and data quality.
+team:
+  - username: commerce-data@example.com
+    role: owner
+    dateIn: "2026-01-01"
+customProperties:
+  - property: refreshCadence
+    value: hourly

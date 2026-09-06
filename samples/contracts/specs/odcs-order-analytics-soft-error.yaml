@@ -1,0 +1,46 @@
+apiVersion: v3.1.0
+kind: DataContract
+version: 1.0.0
+status: draft
+name: Sample - Order Analytics (soft error)
+domain: commerce
+dataProduct: order-insights
+tenant: example
+tags: [orders, analytics]
+description:
+  purpose: Provide trusted order facts for revenue analysis. This specimen intentionally omits the required id.
+  usage: Use the table for internal order reporting.
+schema:
+  - name: order_facts
+    physicalName: analytics.order_facts
+    physicalType: table
+    logicalType: object
+    businessName: Order facts
+    description: One row per commerce order.
+    dataGranularityDescription: One record per order identifier.
+    properties:
+      - name: order_id
+        logicalType: string
+        physicalType: varchar
+        physicalName: order_id
+        description: Stable identifier assigned by the Orders system.
+        required: true
+        unique: true
+        primaryKey: true
+        primaryKeyPosition: 1
+        examples: [ord_01J8Y7D6]
+      - name: total_amount
+        logicalType: number
+        physicalType: numeric(12,2)
+        physicalName: total_amount
+        description: Gross order amount.
+        required: true
+        examples: [37.00]
+servers:
+  - server: analytics-warehouse
+    type: postgres
+    environment: production
+    host: warehouse.example.com
+    port: 5432
+    database: commerce_analytics
+    schema: analytics

@@ -1,0 +1,110 @@
+asyncapi: 3.1.0
+info:
+  title: Sample - Orders Events
+  version: 1.0.0
+  description: Events emitted as orders move through the commerce fulfilment workflow.
+  contact:
+    name: Commerce Platform Team
+    url: https://teams.example.com/commerce-platform
+    email: commerce-platform@example.com
+  license:
+    name: Sample use license
+    url: https://legal.example.com/licenses/sample-use
+  tags:
+    - name: orders
+      description: Order lifecycle events
+defaultContentType: application/json
+servers:
+  production:
+    host: broker.example.com:9092
+    pathname: /commerce
+    protocol: kafka
+    description: Example commerce event broker
+channels:
+  orderLifecycle:
+    address: commerce.orders.lifecycle.v1
+    description: Ordered stream of lifecycle changes for all orders.
+    servers:
+      - $ref: "#/servers/production"
+    messages:
+      orderStatusChanged:
+        $ref: "#/components/messages/orderStatusChanged"
+operations:
+  receiveOrderStatusChanged:
+    action: receive
+    summary: Consume order status changes
+    description: Updates fulfilment projections whenever an order changes status.
+    channel:
+      $ref: "#/channels/orderLifecycle"
+    messages:
+      - $ref: "#/channels/orderLifecycle/messages/orderStatusChanged"
+    tags:
+      - name: orders
+components:
+  messages:
+    orderStatusChanged:
+      name: orderStatusChanged
+      title: Order status changed
+      summary: A CloudEvents-compatible envelope containing the new order status.
+      contentType: application/json
+      payload:
+        $ref: "#/components/schemas/OrderStatusChangedEvent"
+      examples:
+        - name: orderConfirmed
+          summary: An order passed payment checks.
+          payload:
+            id: evt_01J8Y80R
+            source: https://orders.example.com
+            specversion: "1.0"
+            type: com.example.commerce.order.status-changed.v1
+            time: "2026-09-06T10:16:00Z"
+            data:
+              orderId: ord_01J8Y7D6
+              customerId: cus_72JQ
+              previousStatus: pending
+              status: confirmed
+              totalAmount: 37.00
+              currency: EUR
+  schemas:
+    OrderStatusChangedEvent:
+      type: object
+      additionalProperties: false
+      required: [id, source, specversion, type, time, data]
+      properties:
+        id:
+          type: string
+        source:
+          type: string
+          format: uri
+        specversion:
+          type: string
+          const: "1.0"
+        type:
+          type: string
+          const: com.example.commerce.order.status-changed.v1
+        time:
+          type: string
+          format: date-time
+        data:
+          $ref: "#/components/schemas/OrderStatusChanged"
+    OrderStatusChanged:
+      type: object
+      additionalProperties: false
+      required: [orderId, customerId, status, totalAmount, currency]
+      properties:
+        orderId:
+          type: string
+        customerId:
+          type: string
+        previousStatus:
+          type: [string, "null"]
+          enum: [pending, confirmed, shipped, cancelled, null]
+        status:
+          type: string
+          enum: [pending, confirmed, shipped, cancelled]
+        totalAmount:
+          type: number
+          minimum: 0
+        currency:
+          type: string
+          enum: [EUR, USD]

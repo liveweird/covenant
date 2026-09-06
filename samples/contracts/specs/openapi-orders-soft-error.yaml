@@ -1,0 +1,35 @@
+openapi: 3.0.3
+info:
+  title: Sample - Orders HTTP API (soft error)
+  version: 1.0.0
+  description: Retrieve orders. The response intentionally references an undefined schema.
+  contact:
+    name: Commerce Platform Team
+    email: commerce-platform@example.com
+servers:
+  - url: https://orders.example.com/v1
+    description: Example production endpoint
+tags:
+  - name: orders
+    description: Order retrieval
+paths:
+  /orders/{orderId}:
+    get:
+      operationId: getOrder
+      summary: Retrieve an order
+      description: Returns the order and its latest fulfilment status.
+      tags: [orders]
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          description: Stable order identifier.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The requested order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MissingOrder"
