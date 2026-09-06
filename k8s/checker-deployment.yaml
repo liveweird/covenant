@@ -15,8 +15,13 @@ spec:
       labels:
         io.kompose.service: checker
     spec:
+      # The image runs as the node image's `node` user (checker/Dockerfile). The uid must be
+      # spelled out here: with only runAsNonRoot the kubelet refuses a by-name USER it cannot
+      # verify ("image has non-numeric user") — the app pod pins its 10001 the same way.
       securityContext:
         runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
       containers:
         - name: covenant-checker
           # Built locally with `docker build -t covenant-checker:latest -f checker/Dockerfile .`;
