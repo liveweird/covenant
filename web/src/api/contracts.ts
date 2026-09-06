@@ -38,15 +38,24 @@ export type ContractFilters = {
 
 type ContractListQuery = ContractFilters & { page: number; pageSize: number; sort?: string };
 
-function filterParams(f: ContractFilters) {
+/** The scope every filter set shares (the Errors report's own params reuse it): free text, domain/system/type/owner. */
+export type ContractScope = Pick<ContractFilters, "q" | "domainId" | "systemId" | "types" | "ownerTeamId" | "ownerUserId">;
+
+export function contractScopeParams(f: ContractScope) {
   return {
     q: f.q,
     domainId: f.domainId,
     systemId: f.systemId,
     type: f.types,
-    lifecycle: f.lifecycles,
     ownerTeamId: f.ownerTeamId,
     ownerUserId: f.ownerUserId,
+  };
+}
+
+function filterParams(f: ContractFilters) {
+  return {
+    ...contractScopeParams(f),
+    lifecycle: f.lifecycles,
     // An omit-when-false param: the list means "only flawed" with true and "everything" without.
     hasErrors: f.hasErrors || undefined,
   };

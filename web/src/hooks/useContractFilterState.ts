@@ -11,8 +11,15 @@ const isStringArray = (v: unknown): v is string[] => Array.isArray(v) && v.every
  * endpoints declare the same params): persisted per view under `<viewKey>.filter.*`, the free
  * text debounced. `values` is what the API takes; `deps` resets paging; `activeCount` feeds the
  * FilterPanel badge. Extend here + in ContractFilterControls, never on one page.
+ *
+ * `latestVersion` (default `true`) gates the two fields that read a CONTRACT's LATEST version
+ * (lifecycle, hasErrors) out of `values`/`deps`/`activeCount` — the Errors report reuses this
+ * hook for its scope filters only (`useErrorFilterState`, `{ latestVersion: false }`) and owns
+ * the VERSION's own lifecycle itself, so those two slots' storage-backed state still runs
+ * (rules of hooks: the option never changes at a call site) but is simply never read.
  */
-export function useContractFilterState(viewKey: string) {
+export function useContractFilterState(viewKey: string, options: { latestVersion?: boolean } = {}) {
+  const { latestVersion = true } = options;
   const [q, setQ] = useStoredState(`${viewKey}.filter.q`, "", isString);
   const [domainId, setDomainId] = useStoredState(`${viewKey}.filter.domain`, "", isString);
   const [systemId, setSystemId] = useStoredState(`${viewKey}.filter.system`, "", isString);
@@ -31,18 +38,21 @@ export function useContractFilterState(viewKey: string) {
     domainId: domainId ? Number(domainId) : undefined,
     systemId: systemId ? Number(systemId) : undefined,
     types: validTypes,
-    lifecycles: validLifecycles,
+    lifecycles: latestVersion ? validLifecycles : [],
     ownerTeamId: ownerTeamId ? Number(ownerTeamId) : undefined,
-    hasErrors: hasErrors || undefined,
+    hasErrors: latestVersion ? hasErrors || undefined : undefined,
   };
   const activeCount =
     (debouncedQ ? 1 : 0) + (domainId ? 1 : 0) + (systemId ? 1 : 0) + (validTypes.length > 0 ? 1 : 0) +
-    (validLifecycles.length > 0 ? 1 : 0) + (ownerTeamId ? 1 : 0) + (hasErrors ? 1 : 0);
+    (latestVersion && validLifecycles.length > 0 ? 1 : 0) + (ownerTeamId ? 1 : 0) + (latestVersion && hasErrors ? 1 : 0);
 
   return {
     values,
-    deps: [debouncedQ, domainId, systemId, validTypes.join(","), validLifecycles.join(","), ownerTeamId, hasErrors],
+    deps: latestVersion
+      ? [debouncedQ, domainId, systemId, validTypes.join(","), validLifecycles.join(","), ownerTeamId, hasErrors]
+      : [debouncedQ, domainId, systemId, validTypes.join(","), ownerTeamId],
     activeCount,
+    latestVersion,
     slots: {
       q, setQ,
       domainId, setDomainId,

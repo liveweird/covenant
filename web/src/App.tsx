@@ -18,6 +18,7 @@ import classes from "./theme.module.css";
 const Login = lazy(() => import("./pages/Login"));
 const Hierarchy = lazy(() => import("./pages/Hierarchy"));
 const Contracts = lazy(() => import("./pages/Contracts"));
+const Errors = lazy(() => import("./pages/Errors"));
 const CreateContract = lazy(() => import("./pages/CreateContract"));
 const EditContract = lazy(() => import("./pages/EditContract"));
 const ContractDetails = lazy(() => import("./pages/ContractDetails"));
@@ -160,6 +161,7 @@ export default function App() {
           <Route element={<Shell />}>
             <Route index element={<Hierarchy />} />
             <Route path="contracts" element={<Contracts />} />
+            <Route path="errors" element={<Errors />} />
             <Route path="contracts/new" element={<CreateContract />} />
             <Route path="contracts/import" element={<ImportContract />} />
             <Route path="contracts/:id" element={<ContractDetails />} />

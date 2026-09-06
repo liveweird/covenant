@@ -1,0 +1,26 @@
+{
+  "title": "Errors",
+  "intro": "Every version in the catalog still carrying a finding — narrowed by the shared filters and the severity/source chips below.",
+  "loadFailed": "Could not load the errors report",
+  "field": {
+    "contract": "Contract",
+    "version": "Version",
+    "findings": "Findings",
+    "checked": "Checked"
+  },
+  "filter": {
+    "lifecycle": "Version lifecycle"
+  },
+  "summary": {
+    "contracts": "Contracts",
+    "versions": "Versions",
+    "findings": "Findings"
+  },
+  "severityLabel": "Severity",
+  "sourceLabel": "Source",
+  "noFindings": "No findings — every version in the catalog is clean",
+  "emptyFiltered": "No versions match the filters",
+  "noSelection": "Pick at least one severity and one source to show rows",
+  "openVersionAria": "Open version {{version}} of {{contract}}",
+  "times": "×{{count}}"
+}

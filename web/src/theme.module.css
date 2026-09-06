@@ -132,16 +132,14 @@
   border-left: 1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-5));
 }
 
-/* A count riding a filter chip (the Errors class chips): tabular, dimmed, and NOT part of
-   the chip's accessible name (aria-hidden at the call site). */
+/* A count riding a filter chip (the Errors severity/source chips): tabular, lighter in weight
+   and NOT part of the chip's accessible name (aria-hidden at the call site). Never dimmed by
+   opacity — the chip's ink is AA-tested at full strength only, and the axe sweep over /errors
+   pins that a faded count fails 4.5:1 (Toadie's 0.7/0.4 opacities were the first casualty). */
 .chipCount {
   margin-inline-start: 6px;
   font-variant-numeric: tabular-nums;
-  opacity: 0.7;
-}
-
-.chipCount[data-zero] {
-  opacity: 0.4;
+  font-weight: 400;
 }
 
 /* Form sections: a flat block under a small-caps legend on a hairline (v1.20.0) —

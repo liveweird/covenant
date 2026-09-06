@@ -34,6 +34,9 @@ export default function ContractFilterControls({ filters, facets = null }: { fil
   const systemOptions = (systems.data?.items ?? [])
     .filter((s) => !slots.domainId || String(s.domainId) === slots.domainId)
     .map((s) => ({ value: String(s.id), label: named(s.id, s.name, systemCounts) }));
+  // The Errors report reuses this control set for its scope filters only — it owns the
+  // VERSION's own lifecycle itself and has no "latest version" reading to gate on errors.
+  const showLatestVersionFilters = filters.latestVersion !== false;
   return (
     <>
       <ClearableTextInput label={t("contracts.filter.q")} value={slots.q} onChange={slots.setQ} clearLabel={t("contracts.filter.clearQ")} />
@@ -71,16 +74,18 @@ export default function ContractFilterControls({ filters, facets = null }: { fil
         clearButtonProps={{ "aria-label": t("common.filter.clearType") }}
         w={220}
       />
-      <MultiSelect
-        label={t("versions.field.lifecycle")}
-        placeholder={slots.lifecycles.length === 0 ? t("common.state.any") : undefined}
-        data={LIFECYCLES.map((l) => ({ value: l, label: lifecycleCounts ? `${t(`versions.lifecycle.${l}`)} (${lifecycleCounts.get(l) ?? 0})` : t(`versions.lifecycle.${l}`) }))}
-        value={slots.lifecycles}
-        onChange={slots.setLifecycles}
-        clearable
-        clearButtonProps={{ "aria-label": t("common.filter.clearLifecycle") }}
-        w={240}
-      />
+      {showLatestVersionFilters && (
+        <MultiSelect
+          label={t("versions.field.lifecycle")}
+          placeholder={slots.lifecycles.length === 0 ? t("common.state.any") : undefined}
+          data={LIFECYCLES.map((l) => ({ value: l, label: lifecycleCounts ? `${t(`versions.lifecycle.${l}`)} (${lifecycleCounts.get(l) ?? 0})` : t(`versions.lifecycle.${l}`) }))}
+          value={slots.lifecycles}
+          onChange={slots.setLifecycles}
+          clearable
+          clearButtonProps={{ "aria-label": t("common.filter.clearLifecycle") }}
+          w={240}
+        />
+      )}
       <Select
         label={t("contracts.filter.ownerTeam")}
         placeholder={t("common.state.any")}
@@ -91,7 +96,9 @@ export default function ContractFilterControls({ filters, facets = null }: { fil
         clearButtonProps={{ "aria-label": t("common.filter.clearOwner") }}
         searchable
       />
-      <Switch label={t("contracts.filter.hasErrors")} checked={slots.hasErrors} onChange={(e) => slots.setHasErrors(e.currentTarget.checked)} pb={6} />
+      {showLatestVersionFilters && (
+        <Switch label={t("contracts.filter.hasErrors")} checked={slots.hasErrors} onChange={(e) => slots.setHasErrors(e.currentTarget.checked)} pb={6} />
+      )}
     </>
   );
 }

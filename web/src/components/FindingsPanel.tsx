@@ -4,16 +4,9 @@ import { ActionIcon, Alert, Badge, Chip, Code, Group, Stack, Text, Tooltip } fro
 import { IconCircleCheck, IconCrosshair } from "@tabler/icons-react";
 import type { Finding, FindingSource, Severity } from "../api/versions";
 import { isHardFinding } from "../api/versions";
+import { SEVERITIES, SEVERITY_COLOR } from "../utils/findings";
 
-const SEVERITIES = ["ERROR", "WARN", "INFO"] as const satisfies readonly Severity[];
 const SOURCES = ["SYNTAX", "SCHEMA", "SEMANTIC", "LINT", "BREAKING", "CONFORMANCE", "SYSTEM"] as const satisfies readonly FindingSource[];
-
-/**
- * The colour vocabulary: red = blocks the save (a HARD syntax finding, or a soft ERROR that
- * needs the Save-anyway waiver — both stop a strict save), orange = a warning that saves
- * through, gray = informational.
- */
-const SEVERITY_COLOR: Record<Severity, string> = { ERROR: "red", WARN: "orange", INFO: "gray" };
 
 /**
  * The check report beside the editor (and under a stored version): the findings with

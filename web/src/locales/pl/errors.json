@@ -1,0 +1,26 @@
+{
+  "title": "Błędy",
+  "intro": "Każda wersja w katalogu, która wciąż ma uwagę — zawężona przez wspólne filtry i poniższe chipy istotności/źródła.",
+  "loadFailed": "Nie udało się wczytać raportu błędów",
+  "field": {
+    "contract": "Kontrakt",
+    "version": "Wersja",
+    "findings": "Uwagi",
+    "checked": "Sprawdzono"
+  },
+  "filter": {
+    "lifecycle": "Cykl życia wersji"
+  },
+  "summary": {
+    "contracts": "Kontrakty",
+    "versions": "Wersje",
+    "findings": "Uwagi"
+  },
+  "severityLabel": "Istotność",
+  "sourceLabel": "Źródło",
+  "noFindings": "Brak uwag — każda wersja w katalogu jest czysta",
+  "emptyFiltered": "Żadna wersja nie pasuje do filtrów",
+  "noSelection": "Wybierz co najmniej jedną istotność i jedno źródło, aby zobaczyć wiersze",
+  "openVersionAria": "Otwórz wersję {{version}} kontraktu {{contract}}",
+  "times": "×{{count}}"
+}

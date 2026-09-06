@@ -15,8 +15,8 @@ const FACETS: ContractFacets = {
   hasErrors: { withErrors: 2, clean: 11 },
 };
 
-function Harness({ facets }: { facets: ContractFacets | null }) {
-  const filters = useContractFilterState("test");
+function Harness({ facets, latestVersion }: { facets: ContractFacets | null; latestVersion?: boolean }) {
+  const filters = useContractFilterState("test", { latestVersion });
   return <ContractFilterControls filters={filters} facets={facets} />;
 }
 
@@ -58,5 +58,12 @@ describe("ContractFilterControls", () => {
     renderWithProviders(<Harness facets={null} />);
     await user.click(screen.getByLabelText("Type", { selector: "input" }));
     expect(await screen.findByRole("option", { name: "OpenAPI" })).toBeInTheDocument();
+  });
+
+  test("with latestVersion: false the Lifecycle filter and the only-with-errors switch are hidden (the Errors report owns its own lifecycle filter)", async () => {
+    renderWithProviders(<Harness facets={null} latestVersion={false} />);
+    expect(await screen.findByLabelText("Type", { selector: "input" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Lifecycle", { selector: "input" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Only with errors" })).not.toBeInTheDocument();
   });
 });

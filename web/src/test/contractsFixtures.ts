@@ -53,6 +53,25 @@ export const TREE = {
     { id: 2, name: "Identity", systems: [] },
   ],
 };
+const ERROR_ROW = {
+  contract: { id: 5, name: "orders-api", type: "OPENAPI" as const, system: { id: 7, name: "gateway" }, domain: { id: 1, name: "Payments" }, owner: OWNER_TEAM },
+  version: { id: 11, version: "1.1.0", lifecycle: "DRAFT" as const, checkErrors: 1, checkWarnings: 1, checkInfos: 0, checkComplete: true, checkedAt: 1_700_000_000_000 },
+  findings: [SOFT_ERROR, SOFT_ERROR, FINDING],
+};
+const ERROR_ROW_OLD = {
+  contract: ERROR_ROW.contract,
+  version: { id: 10, version: "1.0.0", lifecycle: "ACTIVE" as const, checkErrors: 0, checkWarnings: 1, checkInfos: 0, checkComplete: true, checkedAt: 1_700_000_000_000 },
+  findings: [FINDING],
+};
+export const ERROR_PAGE = { items: [ERROR_ROW, ERROR_ROW_OLD], page: 1, pageSize: 20, total: 2 };
+export const ERROR_FACETS = {
+  contracts: 1,
+  versions: 2,
+  findings: 4,
+  severity: [{ value: "ERROR", count: 2 }, { value: "WARN", count: 2 }, { value: "INFO", count: 0 }],
+  source: [{ value: "SCHEMA", count: 2 }, { value: "LINT", count: 2 }],
+  lifecycle: [{ value: "DRAFT", count: 1 }, { value: "ACTIVE", count: 1 }],
+};
 export const SYSTEMS_PAGE = { items: [{ id: 7, domainId: 1, domainName: "Payments", name: "gateway", description: null, contractCount: 1, createdAt: 1, updatedAt: 2 }], page: 1, pageSize: 100, total: 1 };
 const DOMAINS_PAGE = { items: [{ id: 1, name: "Payments", description: null, systemCount: 1, createdAt: 1, updatedAt: 2 }], page: 1, pageSize: 100, total: 1 };
 const TEAMS_PAGE = { items: [{ id: 3, name: "Payments Team", description: null, memberCount: 1, createdAt: 1, updatedAt: 2 }], page: 1, pageSize: 100, total: 1 };
