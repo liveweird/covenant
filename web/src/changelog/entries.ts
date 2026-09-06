@@ -17,6 +17,20 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.6.0",
+    date: "2026-09-06",
+    en: `**The Errors report: every finding in the catalog, on one page.**
+
+- A new Errors view sits beside Hierarchy and Contracts: every version still carrying a finding, grouped under its contract, with the findings shown as badges and a link straight into the version. The same filters as the Contracts list narrow it — plus the version's own lifecycle, with retired versions hidden until you ask for them.
+- Three tiles say how many contracts, versions and findings match; the Error, Warning and Note chips and the source chips (Schema, Semantic, Lint, Breaking change, System) filter the report and show what turning each one on would yield. The report opens on errors and warnings; notes are one click away.
+- Sample contracts for trying it out: clean, warning-only and deliberately invalid OpenAPI, AsyncAPI and ODCS documents, with a loader that fills a local instance.`,
+    pl: `**Raport błędów: każda uwaga w katalogu na jednej stronie.**
+
+- Nowy widok Błędy stoi obok Hierarchii i Kontraktów: każda wersja, która nadal ma uwagi, pogrupowana pod swoim kontraktem, z uwagami pokazanymi jako odznaki i linkiem prosto do wersji. Zawężają go te same filtry co listę Kontraktów — plus własny cykl życia wersji, z wycofanymi wersjami ukrytymi, dopóki o nie nie poprosisz.
+- Trzy kafelki mówią, ile kontraktów, wersji i uwag pasuje; przełączniki Błąd, Ostrzeżenie i Informacja oraz przełączniki źródeł (Schemat, Semantyka, Lint, Zmiana łamiąca, System) filtrują raport i pokazują, co dałoby włączenie każdego z nich. Raport otwiera się na błędach i ostrzeżeniach; informacje są jedno kliknięcie dalej.
+- Przykładowe kontrakty do wypróbowania: czyste, tylko z ostrzeżeniami i celowo niepoprawne dokumenty OpenAPI, AsyncAPI i ODCS, z programem ładującym, który wypełnia lokalną instancję.`,
+  },
+  {
     version: "0.5.1",
     date: "2026-09-06",
     en: `**The checkup release: guardrails, hardening and a few gaps closed.**
