@@ -47,7 +47,8 @@ from Lettuce, that any new or edited spec must satisfy:
   read-only" when applicable). Today: `auth` and `changelog` (device-local
   localStorage only) are read-only; `accessibility` owns one API-seeded fixture contract with its
   domain/system/team (`e2e-axe-*`); `contracts` owns its throwaway domain/system/team/contract/user
-  (`e2e-dom-*`/`e2e-sys-*`/`e2e-team-*`/`e2e-petstore-*`/`e2e-readonly-*`); `environments` owns its
+  (`e2e-dom-*`/`e2e-sys-*`/`e2e-team-*`/`e2e-petstore-*`/`e2e-readonly-*`); `errors` owns its
+  throwaway API-seeded domain/system/team/contract (`e2e-errors-*`); `environments` owns its
   throwaway domain/system/environment and user; `notifications` owns its throwaway
   domain/system/team/contract and follower; `tryit` owns its throwaway domain/system/environment/
   ODCS contract (`e2e-accounts-*`) and user; `users` owns its throwaway accounts; `teams` owns its throwaway teams (unique `e2e-team-*` names) and users; `registries` owns its throwaway domains/systems (`e2e-dom-*`/`e2e-sys-*`) and user; `i18n` owns its
@@ -60,7 +61,7 @@ from Lettuce, that any new or edited spec must satisfy:
   login demand a code) — all deleted by their own spec.
 - **Admin-curated registries are shared, append-only state.** Several specs create domains,
   systems, teams and environments concurrently (`contracts`, `registries`, `environments`,
-  `notifications`, `tryit`, `accessibility`), so a spec only ever appends and removes its OWN
+  `notifications`, `tryit`, `accessibility`, `errors`), so a spec only ever appends and removes its OWN
   uniquely named `e2e-*` rows, never edits or deletes another's or a shared seed — and every list
   assertion is anchored on a name filter, never on an unfiltered total or row count (Toadie's
   dictionary and registry rulebook, applied verbatim).
@@ -85,7 +86,7 @@ the same commit** — this list is the coverage map, the scenario file is the de
 
 - [`accessibility.spec.ts`](scenarios/accessibility.md) — axe WCAG A/AA smoke: login + the
   authenticated list/form pages (`/`, `/contracts`, `/contracts/new`, `/contracts/import`, `/domains`, `/systems`,
-  `/environments`, `/teams`, `/users`, `/users/new`, `/feature-flags`, `/change-password`, `/changelog`),
+  `/environments`, `/teams`, `/users`, `/users/new`, `/feature-flags`, `/change-password`, `/changelog`, `/errors`),
   the detail pages of an API-seeded fixture contract (contract, version in Source and Reader, edit,
   new version, compare, team, edit-user, user-features), `/reset-password`, the not-found page, and
   the overlays scoped to their dialog (the notifications drawer, the Try it drawer, a registry editor
@@ -102,6 +103,10 @@ the same commit** — this list is the coverage map, the scenario file is the de
   the live check until the Major bump → the History section read; (3) teardown through the delete
   rules (draft deletes, an active version blocks the contract, deprecate → retire, then delete);
   plus a regular user's read-only tree, page and list.
+- [`errors.spec.ts`](scenarios/errors.md) — the catalog-wide Errors report: a soft-error version
+  stored via the `allowInvalid` waiver shows up with its `OAS_PARSE` finding badge, the "Error"
+  severity chip narrows it away and back, and its version link opens the version page; teardown of
+  the contract and its registries.
 - [`environments.spec.ts`](scenarios/environments.md) — the try-it targets registry: an admin
   creates an environment on a throwaway system with HTTP + PostgreSQL targets (the stack's own
   services), edits it leaving the password blank (the stored secret is kept — the badge stays),

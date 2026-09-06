@@ -93,6 +93,49 @@ export function uniqueText(prefix: string): string {
   return `${prefix}-${randomUUID().slice(0, 8)}`;
 }
 
+/** A minimal OpenAPI 3.1 document — the fixture every spec that needs a valid contract document shares. */
+export const PETSTORE = (title: string, version: string) => `openapi: 3.1.0
+info:
+  title: ${title}
+  version: ${version}
+  description: Playwright's petstore.
+  contact:
+    name: Platform team
+servers:
+  - url: https://api.example.com/v1
+tags:
+  - name: pets
+paths:
+  /pets:
+    get:
+      operationId: listPets
+      summary: List pets
+      description: Returns every pet.
+      tags: [pets]
+      responses:
+        "200":
+          description: The pets.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Pet"
+components:
+  schemas:
+    Pet:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+`;
+
+/** A broken internal $ref — swagger-parser reports it as a SEMANTIC error, the soft kind Save-anyway waives. */
+export const BROKEN_REF = (title: string, version: string) => PETSTORE(title, version).replace("#/components/schemas/Pet", "#/components/schemas/Missing");
+
 /**
  * Ensure a list view's filter panel is expanded. Idempotent on purpose: the open/collapsed
  * state persists per view in localStorage (covenant.viewSettings.*), so within one test a

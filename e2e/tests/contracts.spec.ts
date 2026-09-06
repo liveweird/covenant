@@ -8,52 +8,10 @@
 // (unique `e2e-*` names).
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
-import { createUserViaUi, deleteUserRow, expect, login, openFilters, rowOperation, signOut, test, uniqueText } from "./helpers";
-
-const PETSTORE = (title: string, version: string) => `openapi: 3.1.0
-info:
-  title: ${title}
-  version: ${version}
-  description: Playwright's petstore.
-  contact:
-    name: Platform team
-servers:
-  - url: https://api.example.com/v1
-tags:
-  - name: pets
-paths:
-  /pets:
-    get:
-      operationId: listPets
-      summary: List pets
-      description: Returns every pet.
-      tags: [pets]
-      responses:
-        "200":
-          description: The pets.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Pet"
-components:
-  schemas:
-    Pet:
-      type: object
-      required: [id, name]
-      properties:
-        id:
-          type: integer
-        name:
-          type: string
-`;
+import { BROKEN_REF, createUserViaUi, deleteUserRow, expect, login, openFilters, PETSTORE, rowOperation, signOut, test, uniqueText } from "./helpers";
 
 /** The required `Pet.name` gone from the response schema — a breaking change against an ACTIVE version. */
 const NARROWED = (title: string, version: string) => PETSTORE(title, version).replace("        name:\n          type: string\n", "");
-
-/** A broken internal $ref — swagger-parser reports it as a SEMANTIC error, the soft kind Save-anyway waives. */
-const BROKEN_REF = (title: string, version: string) => PETSTORE(title, version).replace("#/components/schemas/Pet", "#/components/schemas/Missing");
 
 /** CodeMirror's content is a contenteditable textbox named by the editor's aria-label. */
 async function fillEditor(page: Page, text: string) {
