@@ -2,8 +2,8 @@
 
 ## Sources of Truth
 
-This file is the Codex entry point. Before changing code, also read the relevant sections of
-`CLAUDE.md`; when working under `web/`, read `web/CLAUDE.md` as well; when working under
+This file is the Codex entry point. Before changing or reviewing code, also read the relevant
+sections of `CLAUDE.md`; when working under `web/`, read `web/CLAUDE.md` as well; when working under
 `checker/`, read `.claude/docs/checker.md`. `CLAUDE.md` uses Claude's `@...` import syntax to
 reference the cross-cutting conventions in `.claude/docs/` (persistence, list endpoints,
 security, authorization, observability, testing, contract standards, the checker); Codex must
@@ -11,18 +11,25 @@ open the applicable files directly. Together those files contain the detailed, a
 maintained domain, security, persistence, UI, and testing conventions shared by the project. For
 API work, `api-guidelines/API-GUIDELINES.md` is authoritative and its stable rule IDs should be
 cited in reviews. If documentation and executable configuration disagree, the configuration and
-code win; update the affected guidance in the same change.
+code win; update the affected guidance in the same change. Keep this entry point's feature,
+package, and command summaries synchronized when those surfaces change; detailed conventions
+remain in the shared references rather than being copied here.
 
 Covenant deliberately mirrors [Toadie](https://github.com/liveweird/toadie) and
-[Lettuce](https://github.com/liveweird/lettuce). The implemented surface today is the scaffold:
+[Lettuce](https://github.com/liveweird/lettuce). The implemented surface includes
 authentication/session handling (JWT pair, revocation blocklist, lockout, rate limits), email MFA
 and password reset, admin-managed users and per-user feature flags, the synced user language,
-shared paging, the React shell (nav model, command palette, theme, changelog), the checker
-sidecar's HTTP contract, and every quality gate. The contract catalog — flat teams, the Domain →
-System registries, contracts and their SemVer/lifecycle versions, validation and lint, import,
-diff, export — lands feature by feature. When adding a capability one of the two siblings already
-has, **port its implementation rather than inventing a new one**; `CLAUDE.md` lists where each
-one lives.
+shared paging, and the React shell (nav model, command palette, theme, changelog). The catalog
+and its SPA are implemented: flat teams with rosters; the Domain → System → Contract → Version
+hierarchy; team/user ownership; SemVer and lifecycle rules; validation, lint, and breaking-change
+detection; import with dry run, guarded URL fetch, source references and sync, diff, download,
+and export; history, followers and in-app notifications; and catalog facets. ADMIN-curated
+Environments hold HTTP, Kafka, and PostgreSQL targets with passwords encrypted at rest. Try-it
+executes requests against those targets and reports live conformance findings. The contract
+reader renders a server-produced model alongside the source/editor views. The checker sidecar
+and quality gates cover the implemented stack. When adding a capability one of the two siblings
+already has, **port its implementation rather than inventing a new one**; `CLAUDE.md` lists
+where each one lives.
 
 `.claude/docs/contract-standards.md` is the local domain reference for the formats Covenant
 stores and validates (OpenAPI, AsyncAPI, ODCS, JSON Schema, Avro, SemVer). Consult it before
@@ -42,11 +49,15 @@ This is a Kotlin/Gradle backend plus three standalone npm workspaces:
   bootstrap.
 - `server/` is the Kotlin/JVM Ktor application. Feature packages live directly under
   `server/src/main/kotlin/`: `auth`, `users`, `teams` (the flat-teams registry with rosters —
-  the feature template), `domains` and `systems` (the Domain → System registries), and
+  the small-registry template), `domains` and `systems` (the Domain → System registries),
+  `environments` (per-system connection targets), `notifications` (recipient-scoped inbox), and
   `contracts` (the contract catalog — contracts, SemVer/lifecycle versions, the checks pipeline
-  under `contracts/checks`, import, export, events, the tree; see `CLAUDE.md` "Package layout"). Cross-cutting wiring and policy live
-  in `plugins/`, `audit/`, and `authz/`; database, mail, paging, and shared validation
-  infrastructure live in `infra/`.
+  under `contracts/checks`, import/export/sync, events/followers, facets, and the tree).
+  `contracts/tryit` owns live HTTP/Kafka/SQL conformance and `contracts/render` owns the reader's
+  normalized view models. Copy `contracts/` for a full feature with ownership and sub-collections;
+  see `CLAUDE.md` "Package layout" for the detailed map. Cross-cutting wiring and policy live
+  in `plugins/`, `audit/`, and `authz/`; database, mail, encryption at rest (`infra/crypto`),
+  paging, and shared validation infrastructure live in `infra/`.
 - `server/src/main/resources/application.yaml` declaratively registers application modules.
   `main.kt` only starts `EngineMain`; do not wire features from it. Module order matters because
   modules publish and consume Ktor application attributes.
@@ -59,8 +70,9 @@ This is a Kotlin/Gradle backend plus three standalone npm workspaces:
 - `web/` is a standalone Vite + React 19 + TypeScript SPA. Gradle does not build it. Source is
   organized into `pages/`, `components/`, `hooks/`, `utils/`, `api/`, `changelog/`, and bilingual
   resources under `locales/{en,pl}/`.
-- `checker/` is a standalone Node 24 + TypeScript service: Spectral and `@asyncapi/parser`
-  behind `POST /check`, reached by the server only, on an internal network with no route out.
+- `checker/` is a standalone Node 24 + TypeScript service: Spectral, `@asyncapi/parser`, and
+  `@asyncapi/diff` behind `POST /check`, reached by the server only, on an internal network
+  with no route out. Its HTTP contract is `checker/openapi.yaml`.
 - Backend tests are in `server/src/test/kotlin/`, colocated frontend tests use `*.test.ts(x)`,
   checker tests are in `checker/test/`, and Playwright journeys are in `e2e/tests/*.spec.ts` with
   their design artifacts in `e2e/scenarios/*.md`.
@@ -83,6 +95,8 @@ registered in `application.yaml`. `plugins/Routing.kt` is only the final SPA/sta
   `DOCKER_HOST=unix://$HOME/.orbstack/run/docker.sock`).
 - `./gradlew :server:test --tests "<fully-qualified test name>"`: run one backend test.
 - `./gradlew detekt`: static analysis over `core` + `server` — zero-findings gate, no baseline.
+  Tune rules in `config/detekt/detekt.yml` with a documented rationale; never add an
+  uncommented `@Suppress`.
 - `./gradlew :server:checkDependencyAlignment`: one version per aligned dependency family.
 - `cd web && npm run dev`: start Vite on port 5175, proxying `/api` to Ktor on :8082.
 - `cd web && npm run build && npm run lint && npm test`: type-check, bundle, lint, and run Vitest.
@@ -90,10 +104,13 @@ registered in `application.yaml`. `plugins/Routing.kt` is only the final SPA/sta
 - `cd web && npm run gen:api`: regenerate `web/src/api/schema.ts` from the OpenAPI contract.
 - `cd checker && npm ci && npm run lint && npm run knip && npm run typecheck && npm run test:coverage && npm run build`:
   the checker's gates; `npm run dev` runs it on :9090.
-- `cd e2e && npm test`: run Playwright against the full stack on port 8082;
-  `npm run typecheck` and `npm run check:scenarios` are the Docker-free static gates.
-- `.github/workflows/ci.yml` runs the server, web, checker, and e2e-static gates on every push/PR
-  (and builds both images on `main`); `e2e.yml` is the manual blackbox suite.
+- `cd e2e && npm ci && npx playwright install chromium && npm test`: install and run Playwright
+  against the full stack on port 8082. `npm run lint`, `npm run knip`, `npm run typecheck`, and
+  `npm run check:scenarios` are the Docker-free static gates.
+- `.github/workflows/ci.yml` runs the server, web, checker, and e2e-static gates on pushes to
+  `main` and on pull requests
+  (including server OpenAPI coverage and frontend spec → `schema.ts` drift, and builds both
+  images on `main`); `e2e.yml` runs the blackbox suite nightly against `main` and on demand.
 
 For a clean frontend install, use `cd web && npm install --legacy-peer-deps`;
 `openapi-typescript` declares a TypeScript 5 peer while the project uses TypeScript 6. Keep the
@@ -121,23 +138,43 @@ When an API changes, update all of the following in the same change:
 4. API guideline conformance, using the Spectral ruleset and review checklist described in
    `.claude/skills/api-review/SKILL.md`.
 
+The server's OpenAPI document declares 3.1.0 but uses only 3.0-compatible constructs for the
+conformance harness; `OpenApiSpecTest` guards this restriction. It applies to Covenant's own
+API contract, not the contract documents stored in the catalog.
+
 Use `V<number>__description.sql` for migrations. Business entities follow the established
 soft-delete convention (`marked_as_deleted`, active-row filtering on every read/count/mutation,
 and partial unique indexes where deleted values may be reused); follow the detailed pattern in
 `.claude/docs/persistence.md` rather than inventing a variant. Emit structured `audit(...)`
 events for security-relevant mutations and denials, and never log passwords or tokens. Contract
-product history (the structural event log) is separate from the security audit trail; contract
-mutations extend both where applicable.
+product history and followers' in-app notifications are separate from the security audit trail.
+History-bearing contract mutations use `ContractActivity.record` after the mutation commits:
+it creates follower notifications (excluding the actor), then appends the history event.
+Extend these trails through that shared entry point; see `.claude/docs/observability.md` and
+`.claude/docs/persistence.md` for event conventions and the separate-transaction failure model.
 
 Contract content is readable by every authenticated user; writes are scoped to the owning team's
-members, the owning user, or ADMIN. Validation has two classes. Unparseable documents and
-type mismatches are hard `400`s that cannot be waived. Schema, semantic, and lint findings are
+members, the owning user, or ADMIN; ownership transfer is ADMIN-only. Versions must be unique
+per contract and a new version must exceed the highest existing one. Content is editable only
+in DRAFT/PROPOSED, and only DRAFT versions can be deleted; published versions follow the
+lifecycle transition matrix in `contracts/Lifecycle.kt`.
+
+Validation has two classes. Unparseable documents and type mismatches are hard `400`s that
+cannot be waived. Schema, semantic, and lint findings are
 soft: an `ERROR` blocks a strict save, `WARN`/`INFO` never block, and create/replace may
 explicitly use `allowInvalid=true`. The editor exposes that waiver as Save anyway; import always
 waives soft findings, while the `/check` endpoints perform the same classification without
-storing anything. Findings are the JVM's own syntax/schema/semantic verdicts merged with the
-checker sidecar's lint/semantic ones; an unreachable checker degrades to a report-only
+storing anything. Findings merge the JVM's verdicts with the checker sidecar's schema, semantic,
+lint, and breaking-change verdicts; an unreachable checker degrades to a report-only
 `CHECKER_UNAVAILABLE` finding. The document text is stored byte-exact and never rewritten.
+
+Breaking changes are compared against the highest ACTIVE version strictly below the candidate.
+A break without a major version bump adds the soft, waivable `BREAKING_WITHOUT_MAJOR_BUMP`
+error. Try-it findings use `CONFORMANCE`: they describe a live observation and are never stored
+on the version. HTTP requests, Kafka publish/tail, and read-only SQL sampling run on the server
+against an ADMIN-curated Environment; Kafka publishing additionally requires contract write
+access. Consult `.claude/docs/security.md` for the distinct URL-fetch and Environment trust
+boundaries, and `.claude/docs/contract-standards.md` for conformance and reader-model rules.
 
 Use four-space indentation, preserve existing package boundaries, PascalCase for Kotlin types,
 and camelCase for functions and variables. Name backend test classes `*Test`.
@@ -198,5 +235,8 @@ development keys are burned demo credentials; production mode deliberately refus
 fail-closed check in `plugins/Security.kt` and the seed-password check in `infra/db/Bootstrap.kt`).
 Mail transport is also fail-closed: production refuses the `log` transport, and SMTP with a blank
 host fails in every mode. The compose demo uses SMTP through Mailpit; the image defaults to
-disabled mail, where reset and MFA-dependent flows return 503. The checker is reachable only from
-the app (compose internal network / k8s NetworkPolicy) and never fetches anything itself.
+disabled mail, where reset and MFA-dependent flows return 503. Environment passwords use the
+shared `infra/crypto/FieldCipher` encryption-at-rest machinery and are write-only in API DTOs
+(`hasPassword` is exposed instead); production refuses burned encryption keys. The checker is
+reachable only from the app (compose internal network / k8s NetworkPolicy) and never fetches
+anything itself.
