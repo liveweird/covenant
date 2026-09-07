@@ -7,6 +7,7 @@ import ch.nokillswit.contracts.checks.Finding
 import ch.nokillswit.contracts.checks.FindingSource
 import ch.nokillswit.contracts.checks.Severity
 import ch.nokillswit.contracts.render.RenderBudget
+import ch.nokillswit.contracts.tryit.KafkaTry
 import ch.nokillswit.contracts.tryit.TryCatalog
 import ch.nokillswit.infra.validation.sanitizeSingleLine
 import com.fasterxml.jackson.core.JsonProcessingException
@@ -86,6 +87,49 @@ data class InferResponse(
     val warnings: Int,
     val infos: Int,
 )
+
+// ---- Observe: one live sample pulled through an Environment, in the pure endpoint's own shapes --------------------
+
+/** `POST /contracts/infer/observe/http`: one request against a literal path through an environment's HTTP base URL. */
+@Serializable
+data class ObserveHttpRequest(
+    val environmentId: UInt,
+    val method: String,
+    /** A concrete path, e.g. `/orders/42` — never a template. */
+    val path: String,
+    val query: Map<String, String> = emptyMap(),
+    /** Per-call headers — the caller MAY type credentials here; never stored, logged or audited. */
+    val headers: Map<String, String> = emptyMap(),
+    val contentType: String? = null,
+    val body: String? = null,
+)
+
+@Serializable
+data class ObserveHttpResponse(val sample: HttpExchangeSample, val notes: List<Finding>)
+
+/** `POST /contracts/infer/observe/kafka`: a bounded tail read reduced to the payloads worth learning a schema from. */
+@Serializable
+data class ObserveKafkaRequest(val environmentId: UInt, val topic: String, val limit: Int = KafkaTry.DEFAULT_READ_LIMIT)
+
+@Serializable
+data class ObserveKafkaResponse(val sample: MessageBatchSample, val notes: List<Finding>, val reachedEnd: Boolean)
+
+/** `POST /contracts/infer/observe/sql`: one relation described from PostgreSQL's own catalog — never `SELECT *`. */
+@Serializable
+data class ObserveSqlRequest(val environmentId: UInt, val relation: String)
+
+@Serializable
+data class ObserveSqlResponse(val sample: RelationSample, val notes: List<Finding>)
+
+/** `POST /contracts/infer/observe/sql/relations`: what the environment's database offers to describe. */
+@Serializable
+data class ObserveRelationsRequest(val environmentId: UInt)
+
+@Serializable
+data class RelationSummary(val schema: String?, val name: String, val kind: String)
+
+@Serializable
+data class RelationListResponse(val relations: List<RelationSummary>)
 
 private const val MAX_SAMPLES = 50
 internal const val MAX_SAMPLE_BODY_BYTES = 1024 * 1024

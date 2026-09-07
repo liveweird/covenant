@@ -69,7 +69,28 @@ class ContractsRoute {
     /** The inference engine (`contracts/infer/`): samples in, a draft document out — pure, nothing stored. */
     @Serializable
     @Resource("infer")
-    class Infer(val parent: ContractsRoute = ContractsRoute())
+    class Infer(val parent: ContractsRoute = ContractsRoute()) {
+        /** The observe legs: one live sample pulled through an Environment — the try-it trust boundary and code, reused. */
+        @Serializable
+        @Resource("observe")
+        class Observe(val parent: Infer = Infer()) {
+            @Serializable
+            @Resource("http")
+            class Http(val parent: Observe = Observe())
+
+            @Serializable
+            @Resource("kafka")
+            class Kafka(val parent: Observe = Observe())
+
+            @Serializable
+            @Resource("sql")
+            class Sql(val parent: Observe = Observe()) {
+                @Serializable
+                @Resource("relations")
+                class Relations(val parent: Sql = Sql())
+            }
+        }
+    }
 
     @Serializable
     @Resource("versions")

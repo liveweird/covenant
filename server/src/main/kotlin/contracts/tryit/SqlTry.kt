@@ -5,16 +5,12 @@ import ch.nokillswit.contracts.checks.Finding
 import ch.nokillswit.environments.PostgresTarget
 import com.fasterxml.jackson.databind.JsonNode
 import io.ktor.server.plugins.BadRequestException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.sql.Connection
-import java.sql.DriverManager
 import java.sql.ResultSet
 import java.sql.ResultSetMetaData
 import java.sql.SQLException
 import java.sql.Types
 import java.util.Base64
-import java.util.Properties
 
 /**
  * The SQL leg of try-it: `SELECT * FROM <dataset> LIMIT n` over a read-only JDBC connection to
@@ -29,9 +25,8 @@ object SqlTry {
     const val MAX_LIMIT = 200
     private const val MAX_CELL_CHARS = 4096
     private const val MAX_SAMPLE_BYTES = 1024 * 1024
-    private const val CONNECT_TIMEOUT_SECONDS = "5"
-    private const val SOCKET_TIMEOUT_SECONDS = "20"
-    private val IDENTIFIER = Regex("[A-Za-z_][A-Za-z0-9_$]{0,62}")
+    /** Reused by the observe SQL leg (`contracts/infer/ObserveSql.kt`) — the same grammar, the same identifier. */
+    internal val IDENTIFIER = Regex("[A-Za-z_][A-Za-z0-9_$]{0,62}")
     private val TABLE_LIKE = setOf("table", "view")
 
     class Prepared(
@@ -91,15 +86,15 @@ object SqlTry {
     }
 
     /** Runs the sample; a missing relation is an observation (`datasetMissing`), everything else that fails is a 502. */
-    suspend fun execute(prepared: Prepared, target: PostgresTarget): Sample = withContext(Dispatchers.IO) {
+    suspend fun execute(prepared: Prepared, target: PostgresTarget): Sample {
         val started = System.nanoTime()
-        try {
-            connect(target).use { connection -> sample(connection, prepared, started) }
+        return try {
+            PostgresRead.readOnly(target) { connection -> sample(connection, prepared, started) }
         } catch (e: SQLException) {
             when {
                 e.sqlState == UNDEFINED_TABLE ->
                     Sample(emptyList(), emptyList(), false, emptySet(), elapsedMs(started), datasetMissing = true)
-                else -> throw BadGatewayException(classify(e))
+                else -> throw BadGatewayException(PostgresRead.classify(e))
             }
         }
     }
@@ -122,33 +117,11 @@ object SqlTry {
         return sample.columns.map { c -> SqlColumn(c.name, c.dbType, c.nullable, byPhysical[c.name.lowercase()]?.logicalType) }
     }
 
-    private fun connect(target: PostgresTarget): Connection {
-        val props = Properties().apply {
-            setProperty("user", target.username)
-            target.password?.let { setProperty("password", it) }
-            setProperty("readOnly", "true")
-            setProperty("readOnlyMode", "always")
-            setProperty("connectTimeout", CONNECT_TIMEOUT_SECONDS)
-            setProperty("socketTimeout", SOCKET_TIMEOUT_SECONDS)
-            setProperty("loginTimeout", CONNECT_TIMEOUT_SECONDS)
-            setProperty("ApplicationName", "covenant-try")
+    private fun sample(connection: Connection, prepared: Prepared, started: Long): Sample =
+        connection.prepareStatement("SELECT * FROM ${prepared.quoted()} LIMIT ?").use { statement ->
+            statement.setInt(1, prepared.limit)
+            statement.executeQuery().use { rs -> read(rs, started) }
         }
-        return DriverManager.getConnection(target.jdbcUrl, props)
-    }
-
-    private fun sample(connection: Connection, prepared: Prepared, started: Long): Sample {
-        connection.autoCommit = false
-        try {
-            connection.createStatement().use { it.execute("SET TRANSACTION READ ONLY") }
-            connection.createStatement().use { it.execute("SET LOCAL statement_timeout = '15s'") }
-            return connection.prepareStatement("SELECT * FROM ${prepared.quoted()} LIMIT ?").use { statement ->
-                statement.setInt(1, prepared.limit)
-                statement.executeQuery().use { rs -> read(rs, started) }
-            }
-        } finally {
-            connection.rollback()
-        }
-    }
 
     private fun read(rs: ResultSet, started: Long): Sample {
         val meta = rs.metaData
@@ -179,17 +152,7 @@ object SqlTry {
         return if (text.length > MAX_CELL_CHARS) text.take(MAX_CELL_CHARS) + "…" else text
     }
 
-    private fun classify(e: SQLException): String = when {
-        e.sqlState == INSUFFICIENT_PRIVILEGE -> "The environment's database role may not read this dataset"
-        e.sqlState == QUERY_CANCELED -> "The read timed out in the environment's database"
-        e.sqlState?.startsWith(INVALID_AUTHORIZATION_CLASS) == true -> "The environment's database refused the credentials"
-        else -> "The environment's database could not be reached"
-    }
-
     private const val UNDEFINED_TABLE = "42P01"
-    private const val INSUFFICIENT_PRIVILEGE = "42501"
-    private const val QUERY_CANCELED = "57014"
-    private const val INVALID_AUTHORIZATION_CLASS = "28"
 
     private fun JsonNode.textOrNull(): String? = takeIf { it.isTextual }?.asText()
 }

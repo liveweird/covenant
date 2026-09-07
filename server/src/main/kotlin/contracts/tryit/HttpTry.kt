@@ -127,6 +127,39 @@ object HttpTry {
         return ConformanceReport.of(before + after.findings + truncatedNote, after.validatedAgainst)
     }
 
+    /**
+     * The observe leg's version of [prepare] (`contracts/infer/ObserveHttp.kt`): no document to
+     * check an operation against — a literal method and a concrete path are the whole shape rule.
+     */
+    internal fun prepareRaw(
+        method: String,
+        path: String,
+        query: Map<String, String>,
+        headers: Map<String, String>,
+        contentType: String?,
+        body: String?,
+        baseUrl: String,
+    ): Prepared {
+        val upperMethod = method.uppercase()
+        if (method.lowercase() !in TryCatalog.METHODS) throw BadRequestException("Unknown HTTP method")
+        if (!path.startsWith("/") || path.contains('{')) {
+            throw BadRequestException("The path must be concrete — a literal path, no template")
+        }
+        val builtQuery = buildQuery(query)
+        val validHeaders = validateHeaders(headers)
+        val nonEmptyBody = body?.takeIf { it.isNotEmpty() }
+        if (nonEmptyBody != null && nonEmptyBody.toByteArray().size > MAX_BODY_BYTES) {
+            throw PayloadTooLargeException(MAX_BODY_BYTES.toLong())
+        }
+        // A caller-typed path is raw text: an unencoded space or any other RFC 3986-illegal character
+        // must be the documented 400, not URI.create's IllegalArgumentException surfacing as a 500.
+        val uri = runCatching { URI(baseUrl + path + builtQuery) }.getOrElse {
+            throw BadRequestException("The path must be concrete — a literal path, no template")
+        }
+        val resolvedContentType = contentType?.takeIf { it.isNotBlank() } ?: nonEmptyBody?.let { "application/json" }
+        return Prepared(upperMethod, uri, validHeaders, resolvedContentType, nonEmptyBody)
+    }
+
     private fun bindTemplate(template: String, params: Map<String, String>): String {
         val names = TEMPLATE_PARAM.findAll(template).map { it.groupValues[1] }.toSet()
         val missing = names - params.keys
@@ -136,7 +169,7 @@ object HttpTry {
         return TEMPLATE_PARAM.replace(template) { m -> encode(params.getValue(m.groupValues[1])) }
     }
 
-    private fun buildQuery(query: Map<String, String>): String {
+    internal fun buildQuery(query: Map<String, String>): String {
         if (query.isEmpty()) return ""
         if (query.size > MAX_QUERY_PARAMS) throw BadRequestException("At most $MAX_QUERY_PARAMS query parameters")
         query.forEach { (k, v) ->
@@ -147,7 +180,7 @@ object HttpTry {
         return "?" + query.entries.joinToString("&") { (k, v) -> "${encode(k)}=${encode(v)}" }
     }
 
-    private fun validateHeaders(headers: Map<String, String>): Map<String, String> {
+    internal fun validateHeaders(headers: Map<String, String>): Map<String, String> {
         if (headers.size > MAX_HEADERS) throw BadRequestException("At most $MAX_HEADERS headers")
         headers.forEach { (name, value) ->
             if (!HEADER_TOKEN.matches(name)) throw BadRequestException("Header name '$name' is not a valid token")
@@ -167,7 +200,7 @@ object HttpTry {
             .take(MAX_RESPONSE_HEADERS)
             .associate { (name, values) -> name.lowercase() to values.joinToString(", ") }
 
-    private fun encode(value: String) = URLEncoder.encode(value, Charsets.UTF_8).replace("+", "%20")
+    internal fun encode(value: String) = URLEncoder.encode(value, Charsets.UTF_8).replace("+", "%20")
 
     const val UNREACHABLE = "The environment could not be reached"
 }

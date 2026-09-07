@@ -34,8 +34,11 @@ import io.ktor.server.routing.routing
 import ch.nokillswit.plugins.RateLimits
 import java.net.URI
 
-/** The host of a `jdbc:postgresql://host:port/db` URL — the one thing about the target the audit records. */
-private fun jdbcHost(jdbcUrl: String): String? = runCatching { URI.create(jdbcUrl.removePrefix("jdbc:")).host }.getOrNull()
+/**
+ * The host of a `jdbc:postgresql://host:port/db` URL — the one thing about the target the audit
+ * records. Reused by the observe SQL leg (`contracts/infer/InferRoutes.kt`).
+ */
+internal fun jdbcHost(jdbcUrl: String): String? = runCatching { URI.create(jdbcUrl.removePrefix("jdbc:")).host }.getOrNull()
 
 /** The per-IP bucket the try POSTs share — registered with the others in `configureAuthRoutes`. */
 
@@ -110,8 +113,9 @@ private fun Route.tryCatalog(contractService: ContractService, versionService: C
 /**
  * Every try leaves ONE audit line: [event] with the leg's [trail] plus `outcome` — [failure] when the
  * target could not be reached (the 502 keeps propagating), [success]'s fields when it answered.
+ * Reused by the observe legs (`contracts/infer/InferRoutes.kt`) — the same failure/success shape.
  */
-private inline fun <T> audited(
+internal inline fun <T> audited(
     event: String,
     trail: Array<out Pair<String, Any?>>,
     failure: String,

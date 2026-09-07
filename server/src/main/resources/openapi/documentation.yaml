@@ -2131,6 +2131,138 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/infer/observe/http:
+    post:
+      tags: [inference]
+      operationId: observeHttp
+      summary: Pull one live HTTP sample through an environment for inference
+      description: |
+        Any authenticated user. The same trust boundary and code as `POST …/try/http` — the
+        environment's HTTP base URL, `HttpTry.send`, the same header/body/redirect rules — minus a
+        document to check the operation against: `path` must be a literal path (no `{param}`
+        template) and `method` one of the seven try-it allows. The response becomes one
+        `HttpExchangeSample` for `POST /contracts/infer`: header NAMES only (values never travel),
+        the `Authorization` value reduced to its scheme word, the response body dropped (with an
+        `INFER_BODY_SKIPPED` note) once it is truncated past 1 MiB. Rate-limited on the shared
+        `tryIt` bucket (`429`). Audited as `contract.observed_http` with the host, method, status
+        and duration only — never the path, query, headers or bodies.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObserveHttpRequest'
+      responses:
+        '200':
+          description: The sample and the notes its capture produced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObserveHttpResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+  /api/v1/contracts/infer/observe/kafka:
+    post:
+      tags: [inference]
+      operationId: observeKafka
+      summary: Pull one live Kafka sample through an environment for inference
+      description: |
+        Any authenticated user. `KafkaTry.read` unchanged — a bounded tail read (`limit` 1–50,
+        newest first, no consumer group, nothing committed) over the topic named directly, never a
+        document's channel. The records reduce to one `MessageBatchSample`: a tombstone, a binary
+        payload or one cut at 64 KiB carries nothing an inferencer can use, so each is dropped and
+        the drop counted in a single `INFER_RECORDS_SKIPPED` note rather than silently. Rate-limited
+        on the shared `tryIt` bucket (`429`). Audited as `contract.observed_kafka` with the
+        bootstrap, topic, record count and outcome only — never a payload.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObserveKafkaRequest'
+      responses:
+        '200':
+          description: The sample, its notes and whether the read reached the topic's end
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObserveKafkaResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+  /api/v1/contracts/infer/observe/sql:
+    post:
+      tags: [inference]
+      operationId: observeSql
+      summary: Describe one relation through an environment's PostgreSQL catalog for inference
+      description: |
+        Any authenticated user. **No `SELECT *`** — the relation's columns, types and primary key
+        come straight from PostgreSQL's own catalog (`to_regclass`, `pg_attribute`, `pg_index`)
+        over the same read-only connection try-it's SQL leg uses (`PostgresRead`); the identifier
+        follows the same grammar as `POST …/try/sql`'s dataset, optionally schema-qualified. A
+        relation `to_regclass` cannot resolve is a `404`; a view's columns come back with one
+        `INFER_VIEW_NULLABILITY` note (PostgreSQL's catalog carries no NOT NULL for a view's
+        columns). Rate-limited on the shared `tryIt` bucket (`429`). Audited as
+        `contract.observed_sql` with the host, the quoted relation, its column count and outcome
+        only — never a cell.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObserveSqlRequest'
+      responses:
+        '200':
+          description: The relation's columns and the notes its description produced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObserveSqlResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+  /api/v1/contracts/infer/observe/sql/relations:
+    post:
+      tags: [inference]
+      operationId: listObservableRelations
+      summary: List what an environment's PostgreSQL database offers to describe
+      description: |
+        Any authenticated user. Every table, partitioned table, foreign table, view and
+        materialized view in the database, `pg_catalog`/`information_schema`/`pg_toast*` excluded —
+        up to 500, alphabetically — the picker `POST …/observe/sql` reads from. Rate-limited on the
+        shared `tryIt` bucket (`429`). Audited as `contract.observed_sql` with the host, the
+        relation count and `outcome=listed` — the `relation` field stays null (nothing was
+        described).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObserveRelationsRequest'
+      responses:
+        '200':
+          description: The relations the environment's database offers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationListResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+        '502': { $ref: '#/components/responses/BadGateway' }
 components:
   securitySchemes:
     bearerAuth:
@@ -4112,6 +4244,69 @@ components:
         errors: { type: integer, minimum: 0 }
         warnings: { type: integer, minimum: 0 }
         infos: { type: integer, minimum: 0 }
+
+    ObserveHttpRequest:
+      type: object
+      required: [environmentId, method, path]
+      properties:
+        environmentId: { type: integer, format: int32, minimum: 0 }
+        method: { type: string, description: "GET, PUT, POST, DELETE, OPTIONS, HEAD or PATCH." }
+        path: { type: string, description: "A concrete path, e.g. /orders/42 — never a template." }
+        query: { $ref: '#/components/schemas/StringMap' }
+        headers:
+          allOf: [{ $ref: '#/components/schemas/StringMap' }]
+          description: "Per-call headers — the caller MAY type credentials here; never stored, logged or audited."
+        contentType: { type: string, nullable: true }
+        body: { type: string, nullable: true, maxLength: 1048576 }
+    ObserveHttpResponse:
+      type: object
+      required: [sample, notes]
+      properties:
+        sample: { $ref: '#/components/schemas/HttpExchangeSample' }
+        notes: { type: array, items: { $ref: '#/components/schemas/Finding' } }
+    ObserveKafkaRequest:
+      type: object
+      required: [environmentId, topic]
+      properties:
+        environmentId: { type: integer, format: int32, minimum: 0 }
+        topic: { type: string, description: "The topic named directly — never a document's channel." }
+        limit: { type: integer, format: int32, minimum: 1, maximum: 50, default: 10 }
+    ObserveKafkaResponse:
+      type: object
+      required: [sample, notes, reachedEnd]
+      properties:
+        sample: { $ref: '#/components/schemas/MessageBatchSample' }
+        notes: { type: array, items: { $ref: '#/components/schemas/Finding' } }
+        reachedEnd: { type: boolean }
+    ObserveSqlRequest:
+      type: object
+      required: [environmentId, relation]
+      properties:
+        environmentId: { type: integer, format: int32, minimum: 0 }
+        relation: { type: string, maxLength: 127, description: "An identifier, optionally schema-qualified (public.users)." }
+    ObserveSqlResponse:
+      type: object
+      required: [sample, notes]
+      properties:
+        sample: { $ref: '#/components/schemas/RelationSample' }
+        notes: { type: array, items: { $ref: '#/components/schemas/Finding' } }
+    ObserveRelationsRequest:
+      type: object
+      required: [environmentId]
+      properties:
+        environmentId: { type: integer, format: int32, minimum: 0 }
+    RelationSummary:
+      type: object
+      required: [name, kind]
+      properties:
+        schema: { type: string, nullable: true }
+        name: { type: string }
+        kind: { type: string, enum: [table, view] }
+    RelationListResponse:
+      type: object
+      required: [relations]
+      properties:
+        relations: { type: array, items: { $ref: '#/components/schemas/RelationSummary' } }
 
     ProblemDetail:
       type: object
