@@ -175,6 +175,33 @@ export async function rowOperation(
 }
 
 /**
+ * Register a PostgreSQL environment (the stack's own database, `covenant`/`covenant`) on an
+ * existing system through the Environments page — the "New environment" modal, HTTP unchecked,
+ * PostgreSQL checked (`tryit.spec.ts`'s original journey, lifted here once `infer.spec.ts` needed
+ * the same fixture). Returns the created environment's id for callers that tear it down by id.
+ */
+export async function createPostgresEnvironment(page: Page, domainName: string, systemName: string, envName: string): Promise<number> {
+  await page.goto("/environments");
+  await page.getByRole("button", { name: "New environment" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("combobox", { name: "System" }).click();
+  await dialog.getByRole("combobox", { name: "System" }).fill(systemName);
+  await page.getByRole("option", { name: `${domainName} / ${systemName}` }).click();
+  await dialog.getByLabel("Name", { exact: true }).fill(envName);
+  await dialog.getByLabel("HTTP target (OpenAPI)").uncheck();
+  await dialog.getByLabel("PostgreSQL target (ODCS)").check();
+  await dialog.getByLabel("JDBC URL").fill("jdbc:postgresql://postgres:5432/covenant");
+  await dialog.getByLabel("Username").fill("covenant");
+  await dialog.getByRole("textbox", { name: "Password" }).fill("covenant");
+  const [created] = await Promise.all([
+    page.waitForResponse((r) => r.request().method() === "POST" && r.url().endsWith("/api/v1/environments") && r.ok()),
+    dialog.getByRole("button", { name: "Create", exact: true }).click(),
+  ]);
+  await expect(page.getByRole("row", { name: new RegExp(envName) })).toContainText("PostgreSQL");
+  return ((await created.json()) as { id: number }).id;
+}
+
+/**
  * API-side seeding for specs whose subject is a PAGE, not the journey that creates its data (the
  * accessibility sweep): one admin-authenticated request context against the same stack. Every id
  * it creates is the caller's to delete (`teardownSeededContract`) — the Owns rule applies unchanged.

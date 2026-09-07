@@ -51,7 +51,8 @@ from Lettuce, that any new or edited spec must satisfy:
   throwaway API-seeded domain/system/team/contract (`e2e-errors-*`); `environments` owns its
   throwaway domain/system/environment and user; `notifications` owns its throwaway
   domain/system/team/contract and follower; `tryit` owns its throwaway domain/system/environment/
-  ODCS contract (`e2e-accounts-*`) and user; `users` owns its throwaway accounts; `teams` owns its throwaway teams (unique `e2e-team-*` names) and users; `registries` owns its throwaway domains/systems (`e2e-dom-*`/`e2e-sys-*`) and user; `i18n` owns its
+  ODCS contract (`e2e-accounts-*`) and user; `infer` owns its throwaway domains/systems/teams, a
+  PostgreSQL environment and the contracts each journey creates (`e2e-infer-*`); `users` owns its throwaway accounts; `teams` owns its throwaway teams (unique `e2e-team-*` names) and users; `registries` owns its throwaway domains/systems (`e2e-dom-*`/`e2e-sys-*`) and user; `i18n` owns its
   throwaway user (and ONLY that user's language — **seeded accounts must stay English**: every
   login applies the stored language to that session's UI, so a Polish seed admin would flip
   parallel specs mid-run); `password-reset` owns its throwaway account (its reset requests use
@@ -85,7 +86,7 @@ outcomes). **A new or behaviorally changed test lands with its scenario file and
 the same commit** — this list is the coverage map, the scenario file is the design.
 
 - [`accessibility.spec.ts`](scenarios/accessibility.md) — axe WCAG A/AA smoke: login + the
-  authenticated list/form pages (`/`, `/contracts`, `/contracts/new`, `/contracts/import`, `/domains`, `/systems`,
+  authenticated list/form pages (`/`, `/contracts`, `/contracts/new`, `/contracts/import`, `/contracts/infer`, `/domains`, `/systems`,
   `/environments`, `/teams`, `/users`, `/users/new`, `/feature-flags`, `/change-password`, `/changelog`, `/errors`),
   the detail pages of an API-seeded fixture contract (contract, version in Source and Reader, edit,
   new version, compare, team, edit-user, user-features), `/reset-password`, the not-found page, and
@@ -114,6 +115,11 @@ the same commit** — this list is the coverage map, the scenario file is the de
 - [`tryit.spec.ts`](scenarios/tryit.md) — live conformance: an environment pointing at the stack's
   own Postgres, an imported ODCS contract declaring the `users` table with one bogus column, Try it →
   Run → the sample table and the `COLUMN_MISSING`/`COLUMN_EXTRA` findings; teardown of everything.
+- [`infer.spec.ts`](scenarios/infer.md) — contract inference: a pasted HTTP exchange becomes an
+  OpenAPI draft (the templated path and the `INFER_PATH_TEMPLATED` note reviewed before saving),
+  and a PostgreSQL table described live through an environment becomes an ODCS draft (`physicalType`,
+  a property and its primary key checked in the preview) — both opened in the ordinary editor and
+  saved as DRAFT through the ordinary Import flow; teardown of everything.
 - [`i18n.spec.ts`](scenarios/i18n.md) — the synced per-user language: a throwaway user
   switches to Polish, the choice survives a reload AND a wiped-device re-login (served from
   the stored value), and the admin's English flips it back; seeded accounts stay English.

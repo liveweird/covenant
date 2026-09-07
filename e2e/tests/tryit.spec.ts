@@ -3,7 +3,7 @@
 // a declared column the table lacks is a COLUMN_MISSING finding. Owns: its throwaway domain,
 // system, team, environment and contract (unique `e2e-*` names), all deleted by the end.
 import type { Page } from "@playwright/test";
-import { expect, login, openFilters, rowOperation, test, uniqueText } from "./helpers";
+import { createPostgresEnvironment, expect, login, openFilters, rowOperation, test, uniqueText } from "./helpers";
 
 const USERS_CONTRACT = (name: string) => `apiVersion: v3.1.0
 kind: DataContract
@@ -78,26 +78,6 @@ async function createTeam(page: Page, teamName: string) {
   await page.getByRole("dialog").getByLabel("Name").fill(teamName);
   await page.getByRole("dialog").getByRole("button", { name: "Create", exact: true }).click();
   await expect(page).toHaveURL(/\/teams\/\d+$/);
-}
-
-async function createPostgresEnvironment(page: Page, domainName: string, systemName: string, envName: string) {
-  await page.goto("/environments");
-  await page.getByRole("button", { name: "New environment" }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByRole("combobox", { name: "System" }).click();
-  await dialog.getByRole("combobox", { name: "System" }).fill(systemName);
-  await page.getByRole("option", { name: `${domainName} / ${systemName}` }).click();
-  await dialog.getByLabel("Name", { exact: true }).fill(envName);
-  await dialog.getByLabel("HTTP target (OpenAPI)").uncheck();
-  await dialog.getByLabel("PostgreSQL target (ODCS)").check();
-  await dialog.getByLabel("JDBC URL").fill("jdbc:postgresql://postgres:5432/covenant");
-  await dialog.getByLabel("Username").fill("covenant");
-  await dialog.getByRole("textbox", { name: "Password" }).fill("covenant");
-  await Promise.all([
-    page.waitForResponse((r) => r.request().method() === "POST" && r.url().endsWith("/api/v1/environments") && r.ok()),
-    dialog.getByRole("button", { name: "Create", exact: true }).click(),
-  ]);
-  await expect(page.getByRole("row", { name: new RegExp(envName) })).toContainText("PostgreSQL");
 }
 
 async function deleteRegistryRow(page: Page, path: string, name: string, urlPattern: RegExp) {
