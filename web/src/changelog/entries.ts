@@ -17,6 +17,20 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.6.1",
+    date: "2026-09-07",
+    en: `**Three fixes for reading comfort.**
+
+- The sidebar collapses to an icon rail from a button in the header and remembers your choice; the labels return in a tooltip.
+- The Hierarchy can hide domains and systems with no matching contract — a switch beside Expand all and Collapse all.
+- The version page has one side panel: Contents above Findings, on the right, for every contract type. Hide it for a full-width document; wide dataset tables now scroll inside their own frame instead of pushing the page.`,
+    pl: `**Trzy poprawki dla wygody czytania.**
+
+- Pasek boczny zwija się do paska ikon przyciskiem w nagłówku i pamięta Twój wybór; etykiety wracają w podpowiedzi.
+- Hierarchia może ukryć domeny i systemy bez pasujących kontraktów — przełącznik obok Rozwiń wszystko i Zwiń wszystko.
+- Strona wersji ma jeden panel boczny: Spis treści nad Uwagami, po prawej, dla każdego typu kontraktu. Ukryj go, aby czytać dokument na całej szerokości; szerokie tabele zbiorów danych przewijają się teraz w swojej ramce, zamiast rozpychać stronę.`,
+  },
+  {
     version: "0.6.0",
     date: "2026-09-06",
     en: `**The Errors report: every finding in the catalog, on one page.**
