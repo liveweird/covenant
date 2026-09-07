@@ -3,6 +3,7 @@
   "intro": "Every contract in the catalog — APIs, event streams and data views — with its owner and its latest version.",
   "newContract": "New contract",
   "import": "Import",
+  "infer": "Infer…",
   "createTitle": "New contract",
   "createIntro": "Where the contract lives, what it is called and who owns it. The first version's document comes next.",
   "editTitle": "Edit {{name}}",

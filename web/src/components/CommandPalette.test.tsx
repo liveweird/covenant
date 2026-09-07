@@ -73,6 +73,9 @@ describe("CommandPalette", () => {
     await user.click(await screen.findByRole("button", { name: /Import a document/ }));
     expect(await screen.findByText("at /contracts/import")).toBeInTheDocument();
     palette.open();
+    await user.click(await screen.findByRole("button", { name: /Infer a contract/ }));
+    expect(await screen.findByText("at /contracts/infer")).toBeInTheDocument();
+    palette.open();
     await user.type(await screen.findByRole("textbox"), "ord");
     expect(await screen.findByRole("button", { name: /orders-api/ })).toBeInTheDocument();
     expect(mockFetch.mock.calls.some(([u]) => typeof u === "string" && u.startsWith("/api/v1/contracts?") && u.includes("q=ord"))).toBe(true);

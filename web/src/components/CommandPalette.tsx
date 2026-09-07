@@ -8,10 +8,10 @@ import { Spotlight, type SpotlightActionData, type SpotlightActionGroupData, typ
 
 type SpotlightActions = SpotlightActionData | SpotlightActionGroupData;
 import { useQuery } from "@tanstack/react-query";
-import { IconFileImport, IconFileText, IconPlus, IconSearch } from "@tabler/icons-react";
+import { IconFileImport, IconFileText, IconPlus, IconSearch, IconWand } from "@tabler/icons-react";
 import { listContracts } from "../api/contracts";
 import { isAdmin } from "../api/session";
-import { contractPath, importContractPath, newContractPath } from "../utils/contractLinks";
+import { contractPath, importContractPath, inferContractPath, newContractPath } from "../utils/contractLinks";
 import { ACCOUNT_NAV, visibleSections } from "../utils/navigation";
 import { palette, paletteStore } from "../utils/commandPalette";
 import { foldDiacritics } from "../utils/text";
@@ -57,6 +57,7 @@ export default function CommandPalette() {
     actions: [
       { id: "action:new-contract", label: t("appShell.palette.newContract"), leftSection: <IconPlus size={18} stroke={1.5} />, onClick: () => go(newContractPath) },
       { id: "action:import", label: t("appShell.palette.importContract"), leftSection: <IconFileImport size={18} stroke={1.5} />, onClick: () => go(importContractPath) },
+      { id: "action:infer", label: t("appShell.palette.inferContract"), leftSection: <IconWand size={18} stroke={1.5} />, onClick: () => go(inferContractPath) },
     ],
   };
   const [debounced] = useDebouncedValue(query.trim(), 300);

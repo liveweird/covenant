@@ -87,6 +87,13 @@ describe("ImportContract page", () => {
     expect(await screen.findByText("The request was refused — check the fields")).toBeInTheDocument();
   });
 
+  test("a seeded document (Infer's hand-off) prefills the text and the type; a plain visit still starts blank", async () => {
+    serve(mockFetch, base);
+    renderWithProviders(<ImportContract />, { route: "/contracts/import", state: { content: CONTENT, sourceUrl: null, type: "ASYNCAPI" } });
+    expect(await screen.findByRole("textbox", { name: "Contract document" })).toHaveValue(CONTENT);
+    expect(screen.getByRole("combobox", { name: "Type" })).toHaveValue("AsyncAPI");
+  });
+
   test("validation stops a submit without a system", async () => {
     serve(mockFetch, base);
     const user = userEvent.setup();

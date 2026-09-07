@@ -8,16 +8,13 @@ import { fetchContractUrl } from "../api/contracts";
 import { checkDocument, getSyncState, isHardFinding, syncVersion, type VersionResponse } from "../api/versions";
 import TextDiffView from "./TextDiffView";
 import { newVersionPath } from "../utils/contractLinks";
-import { normalizeSourceUrl } from "../utils/document";
+import { normalizeSourceUrl, type SeededDocument } from "../utils/document";
 import { isContentEditable } from "../utils/lifecycle";
 import { collapseUnchanged } from "../utils/lineDiff";
 import { relativeTimeAgo } from "../utils/relativeTime";
 import { FETCH_URL_ERROR_KEYS, loadErrorMessage, saveErrorMessage } from "../utils/saveError";
 import { compareSyncSides } from "../utils/syncComparison";
 import { showSuccessToast } from "../utils/toast";
-
-/** What the New-version page reads from `location.state` when the sync modal seeds it with the repo copy. */
-export type SeededDocument = { content: string; sourceUrl: string | null };
 
 const SYNC_ERROR_KEYS = {
   forbidden: "contracts.saveForbidden",

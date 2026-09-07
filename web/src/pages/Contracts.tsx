@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
 import { Alert, Button, Group, Menu, Stack, Table, Text, Tooltip } from "@mantine/core";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconFileImport, IconFileText, IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconFileImport, IconFileText, IconPencil, IconPlus, IconTrash, IconWand } from "@tabler/icons-react";
 import { deleteContract, getContractFacets, listContracts, type ContractResponse } from "../api/contracts";
 import CheckSummaryBadges from "../components/CheckSummaryBadges";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
@@ -21,7 +21,7 @@ import TypeBadge from "../components/TypeBadge";
 import { useContractFilterState } from "../hooks/useContractFilterState";
 import { useDeleteConfirm } from "../hooks/useDeleteConfirm";
 import { usePagedSort } from "../hooks/usePagedSort";
-import { editContractPath, importContractPath, newContractPath } from "../utils/contractLinks";
+import { editContractPath, importContractPath, inferContractPath, newContractPath } from "../utils/contractLinks";
 import { formatDateTime, relativeTimeAgo } from "../utils/relativeTime";
 import { loadErrorMessage, saveErrorMessage } from "../utils/saveError";
 
@@ -69,6 +69,9 @@ export default function Contracts() {
           <>
             <Button component={RouterLink} to={importContractPath} variant="default" leftSection={<IconFileImport size={16} />}>
               {t("contracts.import")}
+            </Button>
+            <Button component={RouterLink} to={inferContractPath} variant="default" leftSection={<IconWand size={16} />}>
+              {t("contracts.infer")}
             </Button>
             <Button component={RouterLink} to={newContractPath} leftSection={<IconPlus size={16} />}>
               {t("contracts.newContract")}

@@ -7,7 +7,6 @@ import { getContract } from "../api/contracts";
 import { ApiError } from "../api/http";
 import { createVersion, getVersion, listVersions } from "../api/versions";
 import DocumentSourcePicker from "../components/DocumentSourcePicker";
-import type { SeededDocument } from "../components/SyncVersionModal";
 import EditPageLoadState from "../components/EditPageLoadState";
 import FindingsPanel from "../components/FindingsPanel";
 import LazyCodeEditor, { type JumpRequest } from "../components/LazyCodeEditor";
@@ -17,7 +16,7 @@ import TypeBadge from "../components/TypeBadge";
 import { useDocumentCheck } from "../hooks/useDocumentCheck";
 import { useVersionSave } from "../hooks/useVersionSave";
 import { contractPath, contractsPath, versionPath } from "../utils/contractLinks";
-import { blankTemplate, detectFormat, MAX_DOCUMENT_BYTES, utf8Length } from "../utils/document";
+import { blankTemplate, detectFormat, MAX_DOCUMENT_BYTES, type SeededDocument, utf8Length } from "../utils/document";
 import { toDiagnostics } from "../utils/findingDiagnostics";
 import { loadErrorMessage } from "../utils/saveError";
 import { bumpSemver, compareSemver, isValidSemver, MAX_VERSION_LENGTH, parseSemver, type BumpKind } from "../utils/semver";
@@ -216,7 +215,7 @@ export default function NewVersion() {
           {save.error.detail}
         </Alert>
       )}
-      <Paper withBorder p="md" radius="md" className={classes.stickyActions}>
+      <Paper withBorder p="md" radius="md" className={`${classes.stickyActions} ${classes.stickyActionsPage}`}>
         <Group justify="space-between">
           <Text size="sm" c="dimmed">
             {hasHard ? t("versions.blockedBySyntax") : check.checking ? t("findings.checking") : t("versions.readyHint")}

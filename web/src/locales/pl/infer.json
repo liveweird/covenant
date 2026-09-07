@@ -1,0 +1,91 @@
+{
+  "title": "Wywnioskuj kontrakt",
+  "intro": "Podaj Covenant próbkę tego, co naprawdę płynie — wymianę HTTP, ładunek zdarzenia, tabelę bazy danych — i otrzymaj szkic dokumentu do przejrzenia i zapisania. Nic nie zapisujemy, dopóki nie zapiszesz go przez zwykły edytor.",
+  "tab": {
+    "paste": "Wklej",
+    "har": "Plik HAR",
+    "observe": "Obserwuj"
+  },
+  "samples": {
+    "count_one": "{{count}} próbka",
+    "count_few": "{{count}} próbki",
+    "count_many": "{{count}} próbek",
+    "count_other": "{{count}} próbki",
+    "payloadCount_one": "{{count}} ładunek",
+    "payloadCount_few": "{{count}} ładunki",
+    "payloadCount_many": "{{count}} ładunków",
+    "payloadCount_other": "{{count}} ładunku",
+    "columnCount_one": "{{count}} kolumna",
+    "columnCount_few": "{{count}} kolumny",
+    "columnCount_many": "{{count}} kolumn",
+    "columnCount_other": "{{count}} kolumny",
+    "rowCount_one": "{{count}} wiersz",
+    "rowCount_few": "{{count}} wiersze",
+    "rowCount_many": "{{count}} wierszy",
+    "rowCount_other": "{{count}} wiersza",
+    "none": "Brak próbek — wklej jedną, wczytaj plik HAR albo obserwuj żywe wywołanie poniżej."
+  },
+  "removeAria": "Usuń {{name}}",
+  "generate": "Wygeneruj szkic",
+  "generateFailed": "Nie udało się wygenerować szkicu",
+  "error": {
+    "invalid": "Sprawdź próbki poniżej — jedna z nich została odrzucona."
+  },
+  "openInEditor": "Otwórz w edytorze",
+  "preview": {
+    "title": "Szkic",
+    "editorAria": "Wywnioskowany dokument",
+    "placeholder": "Wygeneruj szkic, aby zobaczyć go tutaj."
+  },
+  "paste": {
+    "method": "Metoda",
+    "url": "URL",
+    "status": "Status",
+    "requestContentType": "Typ treści żądania",
+    "requestBody": "Treść żądania",
+    "responseContentType": "Typ treści odpowiedzi",
+    "responseBody": "Treść odpowiedzi",
+    "add": "Dodaj próbkę",
+    "channel": "Kanał",
+    "payloads": "Ładunki",
+    "payloadsHint": "Jeden obiekt JSON w wierszu albo tablica JSON obiektów.",
+    "payloadsRequired": "Dodaj co najmniej jeden ładunek.",
+    "payloadsInvalid": "Każdy ładunek musi być poprawnym JSON-em.",
+    "relation": "Relacja",
+    "rows": "Wiersze",
+    "rowsHint": "Tablica JSON obiektów-wierszy.",
+    "rowsRequired": "Dodaj co najmniej jeden wiersz.",
+    "rowsInvalid": "Wiersze muszą być tablicą JSON obiektów."
+  },
+  "har": {
+    "pick": "Wybierz plik HAR",
+    "origin": "Źródło",
+    "add": "Dodaj",
+    "kept": "Zachowano {{kept}} z {{total}} wpisów",
+    "tooLarge": "Plik jest za duży (ponad 30 MiB).",
+    "notHar": "To nie jest eksport HAR."
+  },
+  "observe": {
+    "method": "Metoda",
+    "run": "Wyślij",
+    "describe": "Opisz",
+    "addToSamples": "Dodaj do próbek",
+    "credentialsHint": "Dane uwierzytelniające wpisane tutaj są wysyłane jednorazowo i nigdy nie są zapisywane.",
+    "http": {
+      "path": "Ścieżka",
+      "result": "Odpowiedź ze statusem {{status}}"
+    },
+    "kafka": {
+      "result_one": "Odczytano {{count}} rekord",
+      "result_few": "Odczytano {{count}} rekordy",
+      "result_many": "Odczytano {{count}} rekordów",
+      "result_other": "Odczytano {{count}} rekordu"
+    },
+    "sql": {
+      "result_one": "Opisano {{count}} kolumnę",
+      "result_few": "Opisano {{count}} kolumny",
+      "result_many": "Opisano {{count}} kolumn",
+      "result_other": "Opisano {{count}} kolumny"
+    }
+  }
+}

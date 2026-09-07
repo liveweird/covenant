@@ -1,4 +1,14 @@
+import type { ContractType } from "../api/contracts";
 import type { DocumentFormat } from "../api/versions";
+
+/**
+ * What a document hand-off via `location.state` carries into an editor screen: the sync modal's
+ * repo copy (`SyncVersionModal.tsx`) and the Infer page's generated draft (`InferContract.tsx`)
+ * both seed a document screen this way. `type` rides along only when the destination does not
+ * already know it (a new contract via `ImportContract`) — `NewVersion` ignores it, since the
+ * contract's type is fixed.
+ */
+export type SeededDocument = { content: string; sourceUrl: string | null; type?: ContractType };
 
 /** The server's rule (DocumentParser.detectFormat): a `{`/`[` first significant character is JSON. */
 export function detectFormat(text: string): DocumentFormat {

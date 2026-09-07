@@ -7,6 +7,9 @@ import { saveErrorMessage } from "./saveError";
 /** The leg each contract type tries through, and the environment target it needs. */
 export type TryTarget = "http" | "kafka" | "postgres";
 
+/** The HTTP methods offered by the try-it and infer method pickers. */
+export const HTTP_METHODS = ["GET", "PUT", "POST", "DELETE", "OPTIONS", "HEAD", "PATCH"];
+
 export function tryTargetOf(type: ContractType): TryTarget {
   if (type === "OPENAPI") return "http";
   if (type === "ASYNCAPI") return "kafka";
