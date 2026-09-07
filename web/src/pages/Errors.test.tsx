@@ -82,10 +82,12 @@ describe("Errors page", () => {
       const call = calledUrl(mockFetch, "GET", (u) => u.startsWith("/api/v1/contracts/errors?") && !u.includes("source=LINT") && u.includes("source=SCHEMA"));
       expect(call).toBeDefined();
     });
-    mockFetch.mockClear();
     for (const name of ["Schema", "Semantic", "Breaking change", "System"]) await user.click(sourceGroup.getByRole("checkbox", { name }));
     expect(await screen.findByText("Pick at least one severity and one source to show rows")).toBeInTheDocument();
-    expect(calledUrl(mockFetch, "GET", (u) => u.startsWith("/api/v1/contracts/errors?"))).toBeUndefined();
+    // Each intermediate click legitimately fires a narrower request; the one shape that must
+    // never leave is the match-nothing request — an errors/facets URL with NO source at all
+    // (the server reads an empty list as "any").
+    expect(calledUrl(mockFetch, "GET", (u) => u.startsWith("/api/v1/contracts/errors") && !u.includes("source="))).toBeUndefined();
   });
 
   test("turning off every severity chip shows the no-selection state and fires no request", async () => {
