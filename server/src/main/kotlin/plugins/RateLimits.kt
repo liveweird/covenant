@@ -16,7 +16,11 @@ object RateLimits {
     const val REFRESH = "refresh"
     const val PASSWORD_RESET = "password-reset"
     const val MFA = "mfa"
-    /** The four try-it POSTs (contracts/tryit/) — the server calling an environment on user command. */
+    /**
+     * The four try-it POSTs (contracts/tryit/) plus the four inference observe legs
+     * (contracts/infer/) — the server calling an environment on user command, either to try a
+     * declared operation or to pull ONE sample for the inference engine to build a draft from.
+     */
     const val TRY = "tryIt"
 
     const val DEFAULT_REFRESH_PER_MINUTE = 30

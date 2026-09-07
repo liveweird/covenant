@@ -149,8 +149,10 @@ ch.nokillswit
 │                       networknt registry with the OpenAPI dialects — HttpConformance, PayloadConformance),
 │                       OdcsTypes.kt (logicalType ↔ PostgreSQL type families), HttpTry.kt / SqlTry.kt /
 │                       KafkaTry.kt + KafkaClients.kt (the three legs — the server calls the environment,
-│                       never the SPA), TryRoutes.kt (GET …/{vid}/try + the four try POSTs behind the
-│                       shared TryPreamble and the tryIt RateLimit bucket); and render/ (milestone 4, the
+│                       never the SPA), PostgresRead.kt (the read-only connection prologue + SQLException
+│                       classify — shared by SqlTry and the inference engine's SQL observe leg), TryRoutes.kt
+│                       (GET …/{vid}/try + the four try POSTs behind the shared TryPreamble and the tryIt
+│                       RateLimit bucket); and render/ (milestone 4, the
 │                       reader's model behind GET …/{vid}/model) — RenderModel.kt (the @Serializable view
 │                       DTOs: SchemaNode + the OpenApi/AsyncApi/Odcs family models), JsonPointers.kt,
 │                       RenderBudget.kt (maxDepth 32 / maxNodes 20k → TRUNCATED markers), Nodes.kt (total
@@ -175,8 +177,15 @@ ch.nokillswit
 │                       schema-qualified caveats), DocumentWriter.kt ("the ONE place Covenant writes a
 │                       document — into a response body only, never stored; its custom
 │                       StringQuotingChecker closes the YAML-1.1-ambiguity gaps Jackson's default leaves"),
-│                       InferRoutes.kt (the pure POST /contracts/infer; the observe legs land in a later
-│                       commit). Every heuristic applied rides back as a FindingSource.INFERENCE note.
+│                       Observe.kt (ObserveHttp — HttpTry.prepareRaw + HttpTry.send reduced to one
+│                       HttpExchangeSample, header NAMES + the Authorization scheme word only; ObserveKafka —
+│                       KafkaTry.read reduced to the UTF-8 JSON payloads worth learning a schema from, the
+│                       rest counted in one INFER_RECORDS_SKIPPED note), ObserveSql.kt (the SQL observe leg:
+│                       to_regclass/pg_attribute/pg_index over PostgresRead — never SELECT *; describe one
+│                       relation or list what the database offers), InferRoutes.kt (the pure POST
+│                       /contracts/infer plus the four observe legs — POST …/infer/observe/http|kafka|sql|
+│                       sql/relations — behind the shared tryIt RateLimit bucket, reusing TryRoutes.audited/
+│                       jdbcHost). Every heuristic applied rides back as a FindingSource.INFERENCE note.
 ├── notifications/      in-app notifications (V14, Lettuce's, ported minus flags/email): Notification.kt (the
 │                       NotificationType whitelist + DTOs), NotificationService.kt (createAll/read/seen/unseen/
 │                       seenAll/soft delete/paged list on ONE predicate), NotificationRoutes.kt — /api/v1/notifications,

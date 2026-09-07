@@ -1526,6 +1526,113 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contracts/infer/observe/http": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pull one live HTTP sample through an environment for inference
+         * @description Any authenticated user. The same trust boundary and code as `POST …/try/http` — the
+         *     environment's HTTP base URL, `HttpTry.send`, the same header/body/redirect rules — minus a
+         *     document to check the operation against: `path` must be a literal path (no `{param}`
+         *     template) and `method` one of the seven try-it allows. The response becomes one
+         *     `HttpExchangeSample` for `POST /contracts/infer`: header NAMES only (values never travel),
+         *     the `Authorization` value reduced to its scheme word, the response body dropped (with an
+         *     `INFER_BODY_SKIPPED` note) once it is truncated past 1 MiB. Rate-limited on the shared
+         *     `tryIt` bucket (`429`). Audited as `contract.observed_http` with the host, method, status
+         *     and duration only — never the path, query, headers or bodies.
+         */
+        post: operations["observeHttp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/infer/observe/kafka": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pull one live Kafka sample through an environment for inference
+         * @description Any authenticated user. `KafkaTry.read` unchanged — a bounded tail read (`limit` 1–50,
+         *     newest first, no consumer group, nothing committed) over the topic named directly, never a
+         *     document's channel. The records reduce to one `MessageBatchSample`: a tombstone, a binary
+         *     payload or one cut at 64 KiB carries nothing an inferencer can use, so each is dropped and
+         *     the drop counted in a single `INFER_RECORDS_SKIPPED` note rather than silently. Rate-limited
+         *     on the shared `tryIt` bucket (`429`). Audited as `contract.observed_kafka` with the
+         *     bootstrap, topic, record count and outcome only — never a payload.
+         */
+        post: operations["observeKafka"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/infer/observe/sql": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Describe one relation through an environment's PostgreSQL catalog for inference
+         * @description Any authenticated user. **No `SELECT *`** — the relation's columns, types and primary key
+         *     come straight from PostgreSQL's own catalog (`to_regclass`, `pg_attribute`, `pg_index`)
+         *     over the same read-only connection try-it's SQL leg uses (`PostgresRead`); the identifier
+         *     follows the same grammar as `POST …/try/sql`'s dataset, optionally schema-qualified. A
+         *     relation `to_regclass` cannot resolve is a `404`; a view's columns come back with one
+         *     `INFER_VIEW_NULLABILITY` note (PostgreSQL's catalog carries no NOT NULL for a view's
+         *     columns). Rate-limited on the shared `tryIt` bucket (`429`). Audited as
+         *     `contract.observed_sql` with the host, the quoted relation, its column count and outcome
+         *     only — never a cell.
+         */
+        post: operations["observeSql"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/infer/observe/sql/relations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * List what an environment's PostgreSQL database offers to describe
+         * @description Any authenticated user. Every table, partitioned table, foreign table, view and
+         *     materialized view in the database, `pg_catalog`/`information_schema`/`pg_toast*` excluded —
+         *     up to 500, alphabetically — the picker `POST …/observe/sql` reads from. Rate-limited on the
+         *     shared `tryIt` bucket (`429`). Audited as `contract.observed_sql` with the host, the
+         *     relation count and `outcome=listed` — the `relation` field stays null (nothing was
+         *     described).
+         */
+        post: operations["listObservableRelations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2997,6 +3104,62 @@ export interface components {
             errors: number;
             warnings: number;
             infos: number;
+        };
+        ObserveHttpRequest: {
+            /** Format: int32 */
+            environmentId: number;
+            /** @description GET, PUT, POST, DELETE, OPTIONS, HEAD or PATCH. */
+            method: string;
+            /** @description A concrete path, e.g. /orders/42 — never a template. */
+            path: string;
+            query?: components["schemas"]["StringMap"];
+            /** @description Per-call headers — the caller MAY type credentials here; never stored, logged or audited. */
+            headers?: components["schemas"]["StringMap"];
+            contentType?: string | null;
+            body?: string | null;
+        };
+        ObserveHttpResponse: {
+            sample: components["schemas"]["HttpExchangeSample"];
+            notes: components["schemas"]["Finding"][];
+        };
+        ObserveKafkaRequest: {
+            /** Format: int32 */
+            environmentId: number;
+            /** @description The topic named directly — never a document's channel. */
+            topic: string;
+            /**
+             * Format: int32
+             * @default 10
+             */
+            limit: number;
+        };
+        ObserveKafkaResponse: {
+            sample: components["schemas"]["MessageBatchSample"];
+            notes: components["schemas"]["Finding"][];
+            reachedEnd: boolean;
+        };
+        ObserveSqlRequest: {
+            /** Format: int32 */
+            environmentId: number;
+            /** @description An identifier, optionally schema-qualified (public.users). */
+            relation: string;
+        };
+        ObserveSqlResponse: {
+            sample: components["schemas"]["RelationSample"];
+            notes: components["schemas"]["Finding"][];
+        };
+        ObserveRelationsRequest: {
+            /** Format: int32 */
+            environmentId: number;
+        };
+        RelationSummary: {
+            schema?: string | null;
+            name: string;
+            /** @enum {string} */
+            kind: "table" | "view";
+        };
+        RelationListResponse: {
+            relations: components["schemas"]["RelationSummary"][];
         };
         /** @description RFC 7807 problem detail. Served as `application/problem+json`. */
         ProblemDetail: {
@@ -5637,6 +5800,127 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             413: components["responses"]["PayloadTooLarge"];
             500: components["responses"]["InternalServerError"];
+        };
+    };
+    observeHttp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ObserveHttpRequest"];
+            };
+        };
+        responses: {
+            /** @description The sample and the notes its capture produced */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ObserveHttpResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            413: components["responses"]["PayloadTooLarge"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            502: components["responses"]["BadGateway"];
+        };
+    };
+    observeKafka: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ObserveKafkaRequest"];
+            };
+        };
+        responses: {
+            /** @description The sample, its notes and whether the read reached the topic's end */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ObserveKafkaResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            502: components["responses"]["BadGateway"];
+        };
+    };
+    observeSql: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ObserveSqlRequest"];
+            };
+        };
+        responses: {
+            /** @description The relation's columns and the notes its description produced */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ObserveSqlResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            502: components["responses"]["BadGateway"];
+        };
+    };
+    listObservableRelations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ObserveRelationsRequest"];
+            };
+        };
+        responses: {
+            /** @description The relations the environment's database offers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelationListResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            502: components["responses"]["BadGateway"];
         };
     };
 }
