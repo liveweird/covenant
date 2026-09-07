@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
-import { AppShell, Box, Burger, Group, NavLink, ScrollArea, Text } from "@mantine/core";
+import { ActionIcon, AppShell, Box, Burger, Divider, Group, NavLink, ScrollArea, Text, Tooltip } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
+import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand } from "@tabler/icons-react";
 import { Link as RouterLink, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { isAdmin } from "./api/session";
@@ -13,6 +14,7 @@ import UserMenu from "./components/UserMenu";
 import VersionStamp from "./components/VersionStamp";
 import { RouteErrorBoundary } from "./components/ErrorBoundary";
 import { activeNavPath, visibleSections, type NavLeaf } from "./utils/navigation";
+import { isBoolean, useStoredState } from "./hooks/useStoredState";
 import classes from "./theme.module.css";
 
 const Login = lazy(() => import("./pages/Login"));
@@ -51,6 +53,10 @@ function Shell() {
   const { t } = useTranslation();
   const [opened, { toggle, close }] = useDisclosure();
   const { pathname } = useLocation();
+  // Desktop navbar collapse — device-level, persisted like the other view settings; the
+  // mobile overlay keeps its own `opened` disclosure above and always shows full labels.
+  const [navCollapsed, setNavCollapsed] = useStoredState("appShell.navCollapsed", false, isBoolean);
+  const rail = navCollapsed && !opened;
 
   // The nav model lives in utils/navigation.ts (shared with the command palette): sections
   // of always-present leaves, admin-only ones filtered per session (the routes are guarded
@@ -64,6 +70,25 @@ function Shell() {
   const renderLeaf = (leaf: NavLeaf) => {
     const active = leaf.to === activeTo;
     const Icon = leaf.icon;
+    const label = t(leaf.label);
+    if (rail) {
+      // Icon-only: the accessible NAME stays the label (aria-label), so every locator that
+      // finds the link by name works in both modes.
+      return (
+        <Tooltip key={leaf.to} label={label} position="right" withinPortal>
+          <NavLink
+            component={RouterLink}
+            to={leaf.to}
+            active={active}
+            aria-current={active ? "page" : undefined}
+            aria-label={label}
+            leftSection={<Icon size={20} stroke={1.5} />}
+            className={classes.railLink}
+            onClick={close}
+          />
+        </Tooltip>
+      );
+    }
     return (
       <NavLink
         key={leaf.to}
@@ -71,7 +96,7 @@ function Shell() {
         to={leaf.to}
         active={active}
         aria-current={active ? "page" : undefined}
-        label={t(leaf.label)}
+        label={label}
         leftSection={<Icon size={18} stroke={1.5} />}
         onClick={close}
       />
@@ -81,7 +106,7 @@ function Shell() {
   return (
     <AppShell
       header={{ height: 48 }}
-      navbar={{ width: 240, breakpoint: "sm", collapsed: { mobile: !opened } }}
+      navbar={{ width: { base: 240, sm: rail ? 64 : 240 }, breakpoint: "sm", collapsed: { mobile: !opened } }}
       padding="md"
     >
       <AppShell.Header>
@@ -91,6 +116,22 @@ function Shell() {
         <Group h={48} px="md" justify="space-between" wrap="nowrap">
           <Group gap="sm" wrap="nowrap">
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+            {/* Sits beside the Burger, where the nav it toggles lives. */}
+            <Tooltip label={t("appShell.toggleNav")} position="right" withinPortal>
+              <ActionIcon
+                variant="subtle"
+                visibleFrom="sm"
+                onClick={() => setNavCollapsed(!navCollapsed)}
+                aria-label={t("appShell.toggleNav")}
+                data-expanded={!navCollapsed || undefined}
+              >
+                {navCollapsed ? (
+                  <IconLayoutSidebarLeftExpand size={18} />
+                ) : (
+                  <IconLayoutSidebarLeftCollapse size={18} />
+                )}
+              </ActionIcon>
+            </Tooltip>
             <BrandLogo />
             <Text fw={600} size="md" className={classes.brandText}>
               {t("appShell.brand")}
@@ -107,19 +148,23 @@ function Shell() {
       <AppShell.Navbar p="xs">
         {/* The link list scrolls when it outgrows the viewport; the version stamp stays pinned. */}
         <AppShell.Section grow component={ScrollArea} type="hover" scrollbarSize={6} offsetScrollbars>
-          {sections.map((section) => (
+          {sections.map((section, index) => (
             // A labelled, always-open block — never a toggle, so every leaf stays in the DOM
             // for tests and deep links.
             <Box key={section.label} role="group" aria-label={t(section.label)}>
-              <Text component="div" className={classes.navSectionLabel}>
-                {t(section.label)}
-              </Text>
+              {rail ? (
+                index > 0 && <Divider my={4} mx={8} />
+              ) : (
+                <Text component="div" className={classes.navSectionLabel}>
+                  {t(section.label)}
+                </Text>
+              )}
               {section.items.map(renderLeaf)}
             </Box>
           ))}
         </AppShell.Section>
         <AppShell.Section pt="xs" style={{ borderTop: "1px solid var(--mantine-color-default-border)" }}>
-          <VersionStamp to="/changelog" ta="center" pt={4} />
+          <VersionStamp to="/changelog" ta="center" pt={4} compact={rail} />
         </AppShell.Section>
       </AppShell.Navbar>
 

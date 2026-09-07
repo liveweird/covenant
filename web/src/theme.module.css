@@ -83,6 +83,21 @@
   color: var(--mantine-color-dimmed);
 }
 
+/* The collapsed sidebar's icon rail (.navLink above still applies via the NavLink.extend
+   classNames, so the active accent bar carries over): icon-only, label hidden. */
+.railLink {
+  justify-content: center;
+  padding: 8px;
+}
+
+.railLink :global(.mantine-NavLink-section) {
+  margin: 0;
+}
+
+.railLink :global(.mantine-NavLink-body) {
+  display: none;
+}
+
 /* Links are text, not accent: dark by default, the brand colour only as the hover
    underline. Every Anchor in the app inherits this through the theme. */
 .anchor {

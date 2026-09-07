@@ -8,16 +8,19 @@ import { APP_VERSION } from "../changelog/version";
 // avoids timezone re-interpretation. APP_VERSION is the newest changelog entry.
 // With `to` set, the stamp renders as a router link (the navbar instance points
 // at /changelog); without it, plain text (the login screen, where /changelog is
-// behind auth).
-export default function VersionStamp({ to, ...props }: TextProps & { to?: string }) {
+// behind auth). `compact` (the icon-rail navbar, 64px wide) shows just the version
+// number and moves the full `v… · sha · time` line into the `title` tooltip, so the
+// build detail stays one hover away.
+export default function VersionStamp({
+  to,
+  compact,
+  ...props
+}: TextProps & { to?: string; compact?: boolean }) {
   const { t } = useTranslation();
   const time = __APP_COMMIT_TIME__.slice(0, 16).replace("T", " ");
-  const stamp = (
-    <>
-      {`v${APP_VERSION} · ${__APP_COMMIT__}`}
-      {time && ` · ${time}`}
-    </>
-  );
+  const full = `v${APP_VERSION} · ${__APP_COMMIT__}${time ? ` · ${time}` : ""}`;
+  const stamp = compact ? `v${APP_VERSION}` : full;
+  const title = compact ? full : t("common.buildInfo");
   if (to) {
     return (
       <Text
@@ -26,7 +29,7 @@ export default function VersionStamp({ to, ...props }: TextProps & { to?: string
         td="none"
         size="xs"
         c="dimmed"
-        title={t("common.buildInfo")}
+        title={title}
         {...props}
       >
         {stamp}
@@ -34,7 +37,7 @@ export default function VersionStamp({ to, ...props }: TextProps & { to?: string
     );
   }
   return (
-    <Text size="xs" c="dimmed" title={t("common.buildInfo")} {...props}>
+    <Text size="xs" c="dimmed" title={title} {...props}>
       {stamp}
     </Text>
   );

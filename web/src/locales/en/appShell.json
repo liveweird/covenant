@@ -1,6 +1,7 @@
 {
   "brand": "Covenant",
   "skipToContent": "Skip to main content",
+  "toggleNav": "Show or hide the navigation",
   "nav": {
     "users": "Users",
     "changePassword": "Change password",

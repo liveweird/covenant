@@ -67,6 +67,32 @@ describe("App shell", () => {
       expect(screen.queryByRole("group", { name: "Administration" })).not.toBeInTheDocument();
     });
 
+    test("the nav toggle collapses the sidebar to an icon rail and persists the choice", async () => {
+      const user = userEvent.setup();
+      renderApp("/");
+      const catalog = await screen.findByRole("group", { name: "Catalog" });
+      expect(within(catalog).getByText("Catalog")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Show or hide the navigation" }));
+
+      // The section label text is gone, but every leaf is still addressable by name and href.
+      expect(screen.queryByText("Catalog")).not.toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Hierarchy" })).toHaveAttribute("href", "/");
+      expect(screen.getByRole("link", { name: "Contracts" })).toHaveAttribute("href", "/contracts");
+      expect(screen.getByRole("link", { name: "Errors" })).toHaveAttribute("href", "/errors");
+      expect(localStorage.getItem("covenant.viewSettings.appShell.navCollapsed")).toBe("true");
+    });
+
+    test("a fresh render starts collapsed once the choice was persisted", async () => {
+      localStorage.setItem("covenant.viewSettings.appShell.navCollapsed", "true");
+      renderApp("/");
+      await screen.findByRole("heading", { level: 2, name: "Hierarchy" });
+      expect(screen.queryByText("Catalog")).not.toBeInTheDocument();
+      const toggle = screen.getByRole("button", { name: "Show or hide the navigation" });
+      expect(toggle).not.toHaveAttribute("data-expanded");
+      expect(screen.getByRole("link", { name: "Hierarchy" })).toHaveAttribute("href", "/");
+    });
+
     test("an admin session sees the Administration section", async () => {
       localStorage.setItem("covenant.auth.roles", JSON.stringify(["ADMIN"]));
       renderApp("/");
