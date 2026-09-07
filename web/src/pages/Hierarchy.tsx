@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
-import { ActionIcon, Alert, Anchor, Box, Button, Group, Stack, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Alert, Anchor, Box, Button, Group, Stack, Switch, Text, Tooltip } from "@mantine/core";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { IconChevronDown, IconChevronRight, IconChevronsDown, IconChevronsUp, IconFileImport, IconFolders, IconPlus, IconServer2, IconSitemap } from "@tabler/icons-react";
 import { getContractFacets, getContractTree, type TreeContract, type TreeDomain, type TreeSystem } from "../api/contracts";
@@ -15,6 +15,7 @@ import LoadingBlock from "../components/LoadingBlock";
 import PageHeader from "../components/PageHeader";
 import TypeBadge from "../components/TypeBadge";
 import { useContractFilterState } from "../hooks/useContractFilterState";
+import { isBoolean, useStoredState } from "../hooks/useStoredState";
 import { importContractPath, newContractPath, versionPath } from "../utils/contractLinks";
 import { loadErrorMessage } from "../utils/saveError";
 import classes from "../theme.module.css";
@@ -102,15 +103,25 @@ const systemKey = (s: TreeSystem) => `s${s.id}`;
 const domainKey = (d: TreeDomain) => `d${d.id}`;
 const contractsIn = (d: TreeDomain) => d.systems.reduce((n, s) => n + s.contracts.length, 0);
 
+/** Drops systems with no contracts, then domains left with no systems — pure, display-only. */
+function pruneEmpty(domains: readonly TreeDomain[]): TreeDomain[] {
+  return domains
+    .map((domain) => ({ ...domain, systems: domain.systems.filter((system) => system.contracts.length > 0) }))
+    .filter((domain) => domain.systems.length > 0);
+}
+
 /**
  * The catalog's home (`/`): Domain → System → Contract as a collapsible tree, the same filter
- * set as the list (a filter narrows the contracts; the domain/system spine stays so an empty
- * branch reads as "nothing here", not "nothing exists"). Registry-scale, unpaged by design.
+ * set as the list (a filter narrows the contracts; by DEFAULT the domain/system spine stays so
+ * an empty branch reads as "nothing here", not "nothing exists" — the "Hide empty" switch is a
+ * display-only opt-in that prunes systems with no contracts and domains left with no systems).
+ * Registry-scale, unpaged by design.
  */
 export default function Hierarchy() {
   const { t } = useTranslation();
   const filters = useContractFilterState(SETTINGS_KEY);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  const [hideEmpty, setHideEmpty] = useStoredState(`${SETTINGS_KEY}.hideEmpty`, false, isBoolean);
   // The facet counts ride the same filters; a stale count while the next one loads beats a flicker.
   const facets = useQuery({
     queryKey: ["contracts", "facets", filters.values],
@@ -131,7 +142,8 @@ export default function Hierarchy() {
       return next;
     });
   }
-  const allKeys = (data?.domains ?? []).flatMap((d) => [domainKey(d), ...d.systems.map(systemKey)]);
+  const shown = hideEmpty ? pruneEmpty(data?.domains ?? []) : (data?.domains ?? []);
+  const allKeys = shown.flatMap((d) => [domainKey(d), ...d.systems.map(systemKey)]);
 
   return (
     <Stack gap="md">
@@ -154,6 +166,12 @@ export default function Hierarchy() {
         storageKey={SETTINGS_KEY}
         aside={
           <Group gap={4}>
+            <Switch
+              size="xs"
+              label={t("hierarchy.hideEmpty")}
+              checked={hideEmpty}
+              onChange={(e) => setHideEmpty(e.currentTarget.checked)}
+            />
             <Tooltip label={t("hierarchy.expandAll")}>
               <ActionIcon variant="default" size="md" aria-label={t("hierarchy.expandAll")} onClick={() => setCollapsed(new Set())}>
                 <IconChevronsDown size={16} />
@@ -177,29 +195,33 @@ export default function Hierarchy() {
       {isPending && !data ? (
         <LoadingBlock />
       ) : data && data.domains.length > 0 ? (
-        <Box role="tree" aria-label={t("hierarchy.treeAria")}>
-          {data.domains.map((domain) => (
-            <Branch key={domain.id} id={domainKey(domain)} label={domain.name} icon={IconFolders} count={contractsIn(domain)} level={1} collapsed={collapsed} onToggle={toggle}>
-              {domain.systems.length === 0 && (
-                <Text size="xs" c="dimmed" fs="italic" py={3} px={4}>
-                  {t("hierarchy.noSystems")}
-                </Text>
-              )}
-              {domain.systems.map((system) => (
-                <Branch key={system.id} id={systemKey(system)} label={system.name} icon={IconServer2} count={system.contracts.length} level={2} collapsed={collapsed} onToggle={toggle}>
-                  {system.contracts.length === 0 && (
-                    <Text size="xs" c="dimmed" fs="italic" py={3} px={4}>
-                      {t("hierarchy.noContracts")}
-                    </Text>
-                  )}
-                  {system.contracts.map((contract) => (
-                    <ContractRow key={contract.id} contract={contract} />
-                  ))}
-                </Branch>
-              ))}
-            </Branch>
-          ))}
-        </Box>
+        shown.length > 0 ? (
+          <Box role="tree" aria-label={t("hierarchy.treeAria")}>
+            {shown.map((domain) => (
+              <Branch key={domain.id} id={domainKey(domain)} label={domain.name} icon={IconFolders} count={contractsIn(domain)} level={1} collapsed={collapsed} onToggle={toggle}>
+                {domain.systems.length === 0 && (
+                  <Text size="xs" c="dimmed" fs="italic" py={3} px={4}>
+                    {t("hierarchy.noSystems")}
+                  </Text>
+                )}
+                {domain.systems.map((system) => (
+                  <Branch key={system.id} id={systemKey(system)} label={system.name} icon={IconServer2} count={system.contracts.length} level={2} collapsed={collapsed} onToggle={toggle}>
+                    {system.contracts.length === 0 && (
+                      <Text size="xs" c="dimmed" fs="italic" py={3} px={4}>
+                        {t("hierarchy.noContracts")}
+                      </Text>
+                    )}
+                    {system.contracts.map((contract) => (
+                      <ContractRow key={contract.id} contract={contract} />
+                    ))}
+                  </Branch>
+                ))}
+              </Branch>
+            ))}
+          </Box>
+        ) : (
+          <EmptyState icon={IconSitemap} label={t("hierarchy.allEmpty")} />
+        )
       ) : !isError ? (
         <EmptyState icon={IconSitemap} label={t("hierarchy.empty")} />
       ) : null}

@@ -50,4 +50,37 @@ describe("Hierarchy page", () => {
     renderWithProviders(<Hierarchy />);
     expect(await screen.findByText("Could not load the hierarchy")).toBeInTheDocument();
   });
+
+  test("Hide empty prunes empty systems/domains and persists, toggling back restores them", async () => {
+    serve(mockFetch, { "GET /api/v1/contracts/tree": { status: 200, body: TREE }, "GET /api/v1/contracts/tree?": { status: 200, body: TREE } });
+    const user = userEvent.setup();
+    renderWithProviders(<Hierarchy />);
+    expect(await screen.findByText("Identity")).toBeInTheDocument();
+    expect(screen.getByText("No systems in this domain")).toBeInTheDocument();
+    expect(screen.getByText("gateway")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open contract orders-api" })).toBeInTheDocument();
+
+    const toggle = screen.getByRole("switch", { name: "Hide empty" });
+    await user.click(toggle);
+    expect(screen.queryByText("Identity")).not.toBeInTheDocument();
+    expect(screen.queryByText("No systems in this domain")).not.toBeInTheDocument();
+    expect(screen.getByText("gateway")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open contract orders-api" })).toBeInTheDocument();
+    expect(localStorage.getItem("covenant.viewSettings.hierarchy.hideEmpty")).toBe("true");
+
+    await user.click(toggle);
+    expect(screen.getByText("Identity")).toBeInTheDocument();
+    expect(screen.getByText("No systems in this domain")).toBeInTheDocument();
+  });
+
+  test("Hide empty shows the all-empty state when every branch is pruned away", async () => {
+    const allEmptyTree = { domains: [{ id: 1, name: "Payments", systems: [{ id: 7, name: "gateway", contracts: [] }] }] };
+    serve(mockFetch, { "GET /api/v1/contracts/tree": { status: 200, body: allEmptyTree }, "GET /api/v1/contracts/tree?": { status: 200, body: allEmptyTree } });
+    const user = userEvent.setup();
+    renderWithProviders(<Hierarchy />);
+    expect(await screen.findByText("Payments")).toBeInTheDocument();
+    await user.click(screen.getByRole("switch", { name: "Hide empty" }));
+    expect(screen.queryByText("Payments")).not.toBeInTheDocument();
+    expect(screen.getByText(/Every domain and system is empty for these filters/)).toBeInTheDocument();
+  });
 });

@@ -9,5 +9,7 @@
   "noSystems": "No systems in this domain",
   "noContracts": "No contracts",
   "empty": "No domains yet — administrators create them on the Domains page",
+  "hideEmpty": "Hide empty",
+  "allEmpty": "Every domain and system is empty for these filters — turn off “Hide empty” to see them",
   "loadFailed": "Could not load the hierarchy"
 }
