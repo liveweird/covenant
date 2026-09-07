@@ -21,6 +21,10 @@ generated from a list, so a single scenario section stands in for each list.
 1. The admin signs in, opens `<path>`, and waits for its heading.
    - *Expected*: an axe scan (same tags) reports zero violations.
 
+The list today includes `/contracts/infer` (the Infer page's type picker, sample list and Paste
+tab) alongside the catalog and registry pages — see `tests/accessibility.spec.ts`'s `AUTHED_PAGES`
+list for the current set.
+
 ## Scenario: `<detail page>` has no WCAG A/AA violations
 
 1. Before the block, the admin's API session seeds a domain, a system, a team and a team-owned

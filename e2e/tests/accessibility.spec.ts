@@ -36,6 +36,7 @@ const AUTHED_PAGES: { path: string; heading: string }[] = [
   { path: "/contracts", heading: "Contracts" },
   { path: "/contracts/new", heading: "New contract" },
   { path: "/contracts/import", heading: "Import a document" },
+  { path: "/contracts/infer", heading: "Infer a contract" },
   { path: "/domains", heading: "Domains" },
   { path: "/systems", heading: "Systems" },
   { path: "/environments", heading: "Environments" },
