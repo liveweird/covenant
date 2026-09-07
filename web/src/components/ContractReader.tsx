@@ -1,9 +1,9 @@
 import { Alert, Box, Text } from "@mantine/core";
-import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { ContractResponse } from "../api/contracts";
-import { getVersionModel, type VersionResponse } from "../api/versions";
+import type { VersionResponse } from "../api/versions";
+import { useVersionModel } from "../hooks/useVersionModel";
 import { findPointerElement } from "../utils/readerPointer";
 import { loadErrorMessage } from "../utils/saveError";
 import LoadingBlock from "./LoadingBlock";
@@ -30,10 +30,7 @@ export default function ContractReader({
 }) {
   const { t } = useTranslation();
   const root = useRef<HTMLDivElement>(null);
-  const model = useQuery({
-    queryKey: ["contracts", "version", contract.id, version.id, "model", version.contentSha256],
-    queryFn: () => getVersionModel(contract.id, version.id),
-  });
+  const model = useVersionModel(contract, version);
   const ready = model.data != null;
   useEffect(() => {
     if (!highlight || !ready || !root.current) return;

@@ -195,17 +195,20 @@
   border-bottom-right-radius: var(--mantine-radius-md);
 }
 
-/* The editor's preview column: sticks under the header, offset from the shell's own vars. */
+/* The editor's preview column, and the version page's single side panel (Contents above
+   Findings): sticks under the header, offset from the shell's own vars, and caps its own
+   height so a tall panel scrolls as one instead of running past the viewport. */
 .stickyAside {
   position: sticky;
   top: calc(var(--app-shell-header-height, 0px) + var(--mantine-spacing-md));
+  max-height: calc(100vh - var(--app-shell-header-height, 0px) - 2 * var(--mantine-spacing-md));
+  overflow-y: auto;
 }
 
-/* The reader's table of contents: sticky beside the content, scrolling on its own when long. */
-.readerToc {
-  position: sticky;
-  top: calc(var(--app-shell-header-height, 0px) + var(--mantine-spacing-md));
-  max-height: calc(100vh - var(--app-shell-header-height, 0px) - 2 * var(--mantine-spacing-md));
+/* The reader's table of contents inside the version page's side panel, capped so Findings stay
+   reachable below it even when the document declares a long table of contents. */
+.asideToc {
+  max-height: 40vh;
   overflow-y: auto;
 }
 

@@ -158,5 +158,6 @@
     "invalid": "Only https:// URLs without credentials can be linked",
     "save": "Save link"
   },
-  "readAria": "Read version {{version}} of {{name}}"
+  "readAria": "Read version {{version}} of {{name}}",
+  "toggleAside": "Show or hide the side panel"
 }

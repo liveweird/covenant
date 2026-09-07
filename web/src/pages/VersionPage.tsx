@@ -1,29 +1,32 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
-import { Alert, Box, Button, Grid, Group, Paper, Stack, Text } from "@mantine/core";
+import { Alert, Button, Grid, Group, Paper, Stack, Text } from "@mantine/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getContract } from "../api/contracts";
 import { ApiError } from "../api/http";
 import { deleteVersion, getVersion, updateVersionContent } from "../api/versions";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import EditPageLoadState from "../components/EditPageLoadState";
-import FindingsPanel from "../components/FindingsPanel";
 import LazyCodeEditor, { type JumpRequest } from "../components/LazyCodeEditor";
 import LazyContractReader from "../components/LazyContractReader";
 import LifecyclePill from "../components/LifecyclePill";
 import PageHeader from "../components/PageHeader";
 import SaveAnywayModal from "../components/SaveAnywayModal";
 import TypeBadge from "../components/TypeBadge";
+import VersionAsidePanel from "../components/VersionAsidePanel";
+import VersionAsideToggle from "../components/VersionAsideToggle";
 import VersionHeaderActions from "../components/VersionHeaderActions";
 import VersionMetaStrip from "../components/VersionMetaStrip";
 import VersionViewToggle from "../components/VersionViewToggle";
 import { useDeleteConfirm } from "../hooks/useDeleteConfirm";
 import { useDocumentCheck } from "../hooks/useDocumentCheck";
+import { isBoolean, useStoredState } from "../hooks/useStoredState";
 import { useVersionActions } from "../hooks/useVersionActions";
 import { useVersionDownload } from "../hooks/useVersionDownload";
+import { useVersionModel } from "../hooks/useVersionModel";
 import { useVersionSave } from "../hooks/useVersionSave";
-import { useVersionView } from "../hooks/useVersionView";
+import { useVersionView, type VersionView } from "../hooks/useVersionView";
 import { contractPath, contractsPath } from "../utils/contractLinks";
 import { detectFormat, MAX_DOCUMENT_BYTES, utf8Length } from "../utils/document";
 import { toDiagnostics } from "../utils/findingDiagnostics";
@@ -32,10 +35,17 @@ import { loadErrorMessage, saveErrorMessage } from "../utils/saveError";
 import { showSuccessToast } from "../utils/toast";
 import classes from "../theme.module.css";
 
-/** The two-column split per view: the reader gets more room, its findings aside less. */
+/** The two-column split per view when the side panel is open: the reader gets more room, its
+ * panel less; with the panel hidden the main column always takes the full width. */
 const MAIN_SPAN = { reader: 9, source: 8 } as const;
 const ASIDE_SPAN = { reader: 3, source: 4 } as const;
 const JUMP_BY = { reader: "path", source: "line" } as const;
+
+/** The main column's span: its per-view share of the grid when the side panel is open, or the
+ * full width once it's hidden. */
+function mainSpanFor(view: VersionView, asideOpen: boolean): number {
+  return asideOpen ? MAIN_SPAN[view] : 12;
+}
 
 function editingHintKey(hasHard: boolean, tooLarge: boolean, dirty: boolean) {
   if (hasHard) return "versions.blockedBySyntax" as const;
@@ -65,8 +75,12 @@ export default function VersionPage() {
   const [jump, setJump] = useState<JumpRequest | null>(null);
   const [highlight, setHighlight] = useState<{ path: string; nonce: number } | null>(null);
   const { view, setView } = useVersionView(version.data?.lifecycle, editing);
+  const [asideOpen, setAsideOpen] = useStoredState("version.aside", true, isBoolean);
   const downloads = useVersionDownload();
   const actions = useVersionActions(id, vid);
+  // The side panel's table of contents; fetched only while the Reader shows (the Source view
+  // never needs the render model, and ContractReader shares this very query when it mounts).
+  const model = useVersionModel(contract.data, version.data, { enabled: view === "reader" });
 
   const stored = version.data;
   const text = editing ? (draft ?? stored?.content ?? "") : (stored?.content ?? "");
@@ -121,6 +135,7 @@ export default function VersionPage() {
   const canEdit = data.canWrite && isContentEditable(stored.lifecycle);
   const editingHint = t(editingHintKey(hasHard, tooLarge, dirty));
   const latestId = data.latestVersion?.id ?? null;
+  const errorCount = findings.filter((f) => f.severity === "ERROR").length;
 
   return (
     <Stack gap="md">
@@ -134,7 +149,12 @@ export default function VersionPage() {
           </Group>
         }
         backTo={{ to: contractPath(id), label: t("contracts.backToContract") }}
-        toolbar={<VersionViewToggle view={view} onChange={setView} disabled={editing} />}
+        toolbar={
+          <Group gap="sm">
+            <VersionViewToggle view={view} onChange={setView} disabled={editing} />
+            <VersionAsideToggle open={asideOpen} errorCount={errorCount} onToggle={() => setAsideOpen(!asideOpen)} />
+          </Group>
+        }
         actions={
           <VersionHeaderActions
             contract={data}
@@ -164,7 +184,7 @@ export default function VersionPage() {
         </Alert>
       )}
       <Grid gap="md">
-        <Grid.Col span={{ base: 12, lg: MAIN_SPAN[view] }}>
+        <Grid.Col span={{ base: 12, lg: mainSpanFor(view, asideOpen) }}>
           <Stack gap="xs">
             {view === "reader" ? (
               <LazyContractReader contract={data} version={stored} highlight={highlight} />
@@ -182,27 +202,27 @@ export default function VersionPage() {
             <VersionMetaStrip version={stored} />
           </Stack>
         </Grid.Col>
-        <Grid.Col span={{ base: 12, lg: ASIDE_SPAN[view] }}>
-          <Box className={classes.stickyAside}>
-            <Paper withBorder p="md" radius="md">
-              <FindingsPanel
-                findings={findings}
-                mode={editing ? "live" : "stored"}
-                checked={!editing || check.checked}
-                checkComplete={editing ? (check.report?.checkerAvailable ?? true) : stored.checkComplete}
-                baselineVersion={check.report?.baselineVersion}
-                jumpBy={JUMP_BY[view]}
-                onJump={(f) => {
-                  if (view === "reader") {
-                    if (f.path) setHighlight({ path: f.path, nonce: Date.now() });
-                  } else if (f.line != null) {
-                    setJump({ line: f.line, column: f.column, nonce: Date.now() });
-                  }
-                }}
-              />
-            </Paper>
-          </Box>
-        </Grid.Col>
+        {asideOpen && (
+          <Grid.Col span={{ base: 12, lg: ASIDE_SPAN[view] }}>
+            <VersionAsidePanel
+              view={view}
+              model={model.data}
+              findings={findings}
+              mode={editing ? "live" : "stored"}
+              checked={!editing || check.checked}
+              checkComplete={editing ? (check.report?.checkerAvailable ?? true) : stored.checkComplete}
+              baselineVersion={check.report?.baselineVersion}
+              jumpBy={JUMP_BY[view]}
+              onJump={(f) => {
+                if (view === "reader") {
+                  if (f.path) setHighlight({ path: f.path, nonce: Date.now() });
+                } else if (f.line != null) {
+                  setJump({ line: f.line, column: f.column, nonce: Date.now() });
+                }
+              }}
+            />
+          </Grid.Col>
+        )}
       </Grid>
       {editing && (
         <>

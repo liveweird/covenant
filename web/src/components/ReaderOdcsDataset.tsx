@@ -88,86 +88,91 @@ export default function DatasetSection({ dataset, id }: { dataset: DatasetView; 
           {t("reader.odcs.granularity")}: {dataset.dataGranularityDescription}
         </Text>
       )}
+      {/* Nine columns: below ~1100px the description column collapses to a few characters per
+          line and rows balloon, so the frame scrolls sideways instead (the side panel open at
+          1440px leaves ~880px). Hidden panel or a wider screen: it simply fits. */}
       {rows.length > 0 && (
-        <Table fz="sm" aria-label={t("reader.odcs.propertiesAria", { dataset: dataset.name })} style={{ overflowX: "auto" }}>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>{t("reader.odcs.col.name")}</Table.Th>
-              <Table.Th>{t("reader.odcs.col.logicalType")}</Table.Th>
-              <Table.Th>{t("reader.odcs.col.physicalType")}</Table.Th>
-              <Table.Th>{t("reader.odcs.col.required")}</Table.Th>
-              <Table.Th>{t("reader.odcs.col.unique")}</Table.Th>
-              <Table.Th>{t("reader.odcs.col.primaryKey")}</Table.Th>
-              <Table.Th>{t("reader.odcs.col.partition")}</Table.Th>
-              <Table.Th>{t("reader.odcs.col.classification")}</Table.Th>
-              <Table.Th>{t("reader.odcs.col.description")}</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {rows.map(({ p, level, label }) => (
-              <Table.Tr key={p.pointer} data-pointer={p.pointer} aria-level={level}>
-                <Table.Td ff="monospace" fw={500} style={{ paddingLeft: `calc(var(--mantine-spacing-sm) + ${(level - 1) * 16}px)`, whiteSpace: "nowrap" }}>
-                  {label}
-                  {p.physicalName && p.physicalName !== p.name && (
-                    <Text span size="xs" c="dimmed">
-                      {" "}
-                      ({p.physicalName})
-                    </Text>
-                  )}
-                  {p.marker === "TRUNCATED" && (
-                    <PlainBadge ml={4}>
-                      {t("reader.schema.truncated")}
-                    </PlainBadge>
-                  )}
-                </Table.Td>
-                <Table.Td>
-                  {p.logicalType}
-                  {p.options.length > 0 && (
-                    <Text size="xs" c="dimmed">
-                      {p.options.map((o) => `${o.key}: ${o.value}`).join(", ")}
-                    </Text>
-                  )}
-                </Table.Td>
-                <Table.Td c="dimmed">{p.physicalType}</Table.Td>
-                <Table.Td ta="center">
-                  <Yes on={p.required} label={t("reader.odcs.col.required")} />
-                </Table.Td>
-                <Table.Td ta="center">
-                  <Yes on={p.unique} label={t("reader.odcs.col.unique")} />
-                </Table.Td>
-                <Table.Td ta="center">
-                  {p.primaryKey && <Text span>{p.primaryKeyPosition != null ? `PK ${p.primaryKeyPosition}` : "PK"}</Text>}
-                </Table.Td>
-                <Table.Td ta="center">
-                  {p.partitioned && <Text span>{p.partitionKeyPosition != null ? `P ${p.partitionKeyPosition}` : "P"}</Text>}
-                </Table.Td>
-                <Table.Td c="dimmed">
-                  {p.classification}
-                  {p.criticalDataElement && (
-                    <PlainBadge color="orange" ml={4}>
-                      {t("reader.odcs.critical")}
-                    </PlainBadge>
-                  )}
-                </Table.Td>
-                <Table.Td>
-                  {p.description}
-                  {p.examples.length > 0 && (
-                    <Text size="xs" c="dimmed">
-                      {t("reader.schema.examples")}: {p.examples.join(", ")}
-                    </Text>
-                  )}
-                  {p.transformLogic && (
-                    <Text size="xs" c="dimmed">
-                      {t("reader.odcs.transform")}: <Code fz="xs">{p.transformLogic}</Code>
-                      {p.transformSourceObjects.length > 0 && ` ← ${p.transformSourceObjects.join(", ")}`}
-                    </Text>
-                  )}
-                  {p.quality.length > 0 && <QualityList quality={p.quality} />}
-                </Table.Td>
+        <Table.ScrollContainer minWidth={1100}>
+          <Table fz="sm" aria-label={t("reader.odcs.propertiesAria", { dataset: dataset.name })}>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>{t("reader.odcs.col.name")}</Table.Th>
+                <Table.Th>{t("reader.odcs.col.logicalType")}</Table.Th>
+                <Table.Th>{t("reader.odcs.col.physicalType")}</Table.Th>
+                <Table.Th>{t("reader.odcs.col.required")}</Table.Th>
+                <Table.Th>{t("reader.odcs.col.unique")}</Table.Th>
+                <Table.Th>{t("reader.odcs.col.primaryKey")}</Table.Th>
+                <Table.Th>{t("reader.odcs.col.partition")}</Table.Th>
+                <Table.Th>{t("reader.odcs.col.classification")}</Table.Th>
+                <Table.Th>{t("reader.odcs.col.description")}</Table.Th>
               </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
+            </Table.Thead>
+            <Table.Tbody>
+              {rows.map(({ p, level, label }) => (
+                <Table.Tr key={p.pointer} data-pointer={p.pointer} aria-level={level}>
+                  <Table.Td ff="monospace" fw={500} style={{ paddingLeft: `calc(var(--mantine-spacing-sm) + ${(level - 1) * 16}px)`, whiteSpace: "nowrap" }}>
+                    {label}
+                    {p.physicalName && p.physicalName !== p.name && (
+                      <Text span size="xs" c="dimmed">
+                        {" "}
+                        ({p.physicalName})
+                      </Text>
+                    )}
+                    {p.marker === "TRUNCATED" && (
+                      <PlainBadge ml={4}>
+                        {t("reader.schema.truncated")}
+                      </PlainBadge>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    {p.logicalType}
+                    {p.options.length > 0 && (
+                      <Text size="xs" c="dimmed">
+                        {p.options.map((o) => `${o.key}: ${o.value}`).join(", ")}
+                      </Text>
+                    )}
+                  </Table.Td>
+                  <Table.Td c="dimmed">{p.physicalType}</Table.Td>
+                  <Table.Td ta="center">
+                    <Yes on={p.required} label={t("reader.odcs.col.required")} />
+                  </Table.Td>
+                  <Table.Td ta="center">
+                    <Yes on={p.unique} label={t("reader.odcs.col.unique")} />
+                  </Table.Td>
+                  <Table.Td ta="center">
+                    {p.primaryKey && <Text span>{p.primaryKeyPosition != null ? `PK ${p.primaryKeyPosition}` : "PK"}</Text>}
+                  </Table.Td>
+                  <Table.Td ta="center">
+                    {p.partitioned && <Text span>{p.partitionKeyPosition != null ? `P ${p.partitionKeyPosition}` : "P"}</Text>}
+                  </Table.Td>
+                  <Table.Td c="dimmed">
+                    {p.classification}
+                    {p.criticalDataElement && (
+                      <PlainBadge color="orange" ml={4}>
+                        {t("reader.odcs.critical")}
+                      </PlainBadge>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    {p.description}
+                    {p.examples.length > 0 && (
+                      <Text size="xs" c="dimmed">
+                        {t("reader.schema.examples")}: {p.examples.join(", ")}
+                      </Text>
+                    )}
+                    {p.transformLogic && (
+                      <Text size="xs" c="dimmed">
+                        {t("reader.odcs.transform")}: <Code fz="xs">{p.transformLogic}</Code>
+                        {p.transformSourceObjects.length > 0 && ` ← ${p.transformSourceObjects.join(", ")}`}
+                      </Text>
+                    )}
+                    {p.quality.length > 0 && <QualityList quality={p.quality} />}
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
       )}
       <QualityList quality={dataset.quality} />
       <KeyValueTable rows={dataset.customProperties} ariaLabel={t("reader.odcs.customPropertiesAria", { name: dataset.name })} />

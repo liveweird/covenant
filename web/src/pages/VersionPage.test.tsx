@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { renderWithProviders, screen, waitFor, within } from "../test/render";
 import { Route, Routes } from "react-router-dom";
 import VersionPage from "./VersionPage";
-import { bodyOf, CLEAN_REPORT, CONTENT, CONTRACT, findCall, OLD_VERSION, serve, signIn, VERSION, type FetchMock } from "../test/contractsFixtures";
+import { bodyOf, CLEAN_REPORT, CONTENT, CONTRACT, findCall, FINDING, OLD_VERSION, serve, signIn, SOFT_ERROR, VERSION, type FetchMock } from "../test/contractsFixtures";
 import { MODEL_OPENAPI } from "../test/readerFixtures";
 
 vi.mock("../components/LazyCodeEditor", async () => (await import("../test/codeEditorStub")).codeEditorMock());
@@ -186,6 +186,39 @@ describe("VersionPage", () => {
     expect(await screen.findByRole("textbox", { name: "Contract document" })).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem("covenant.viewSettings.version.view") ?? "null")).toBe("source");
     expect(screen.getByRole("button", { name: "Try it" })).toBeEnabled();
+  });
+
+  test("the side panel lists Contents above Findings in Reader view, inside the same panel", async () => {
+    serve(mockFetch, base);
+    renderPage("/contracts/5/versions/11?view=reader");
+    await screen.findByRole("heading", { level: 2, name: "orders-api 1.1.0" });
+    const nav = await screen.findByRole("navigation", { name: "Contents", hidden: true });
+    expect(within(nav).getByRole("link", { name: "pets", hidden: true })).toHaveAttribute("href", "#tag-pets");
+    const region = screen.getByRole("region", { name: "Findings" });
+    expect(nav.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  test("the toggle hides the side panel and persists the choice; a fresh render honours it and keeps the ERROR count visible", async () => {
+    const withError = { ...VERSION, findings: [FINDING, SOFT_ERROR] };
+    serve(mockFetch, { ...base, "GET /api/v1/contracts/5/versions/11": { status: 200, body: withError } });
+    const user = userEvent.setup();
+    const first = renderPage("/contracts/5/versions/11?view=reader");
+    await screen.findByRole("heading", { level: 2, name: "orders-api 1.1.0" });
+    const toggle = screen.getByRole("button", { name: "Show or hide the side panel" });
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await user.click(toggle);
+    expect(screen.queryByRole("region", { name: "Findings" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Contents", hidden: true })).not.toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem("covenant.viewSettings.version.aside") ?? "null")).toBe(false);
+    first.unmount();
+
+    renderPage("/contracts/5/versions/11?view=reader");
+    await screen.findByRole("heading", { level: 2, name: "orders-api 1.1.0" });
+    const reopened = screen.getByRole("button", { name: "Show or hide the side panel" });
+    expect(reopened).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByRole("region", { name: "Findings" })).not.toBeInTheDocument();
+    // The one ERROR among the stored findings stays visible on the toggle's indicator while the panel is hidden.
+    expect(screen.getByText("1")).toBeInTheDocument();
   });
 
   test("a draft opens on Source; ?view=reader deep-links into the Reader without persisting; Edit forces Source", async () => {

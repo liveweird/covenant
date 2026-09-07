@@ -1,4 +1,4 @@
-import { Anchor, Badge, Code, Grid, Group, Paper, Stack, Table, Text, Title } from "@mantine/core";
+import { Anchor, Badge, Code, Group, Paper, Stack, Table, Text, Title } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import type { AsyncApiModel, AsyncOperationView, ChannelView, MessageView } from "../api/versions";
 import MarkdownView from "./MarkdownView";
@@ -7,7 +7,6 @@ import { schemaAnchors } from "../utils/readerAnchors";
 import ReaderSchemas from "./ReaderSchemas";
 import ReaderSection from "./ReaderSection";
 import ReaderSecuritySchemes from "./ReaderSecuritySchemes";
-import ReaderToc, { type TocEntry } from "./ReaderToc";
 import SchemaTree from "./SchemaTree";
 
 const messageAnchor = (model: AsyncApiModel, key: string | null | undefined) => {
@@ -251,92 +250,77 @@ function MessageCard({ message, id, anchors }: { message: MessageView; id: strin
 export default function ReaderAsyncApi({ model, specVersion }: { model: AsyncApiModel; specVersion: string | null | undefined }) {
   const { t } = useTranslation();
   const anchors = schemaAnchors(model.schemas);
-  const toc: TocEntry[] = [
-    ...(model.servers.length > 0 ? [{ id: "reader-servers", label: t("reader.section.servers") }] : []),
-    { id: "reader-channels", label: t("reader.section.channels"), children: model.channels.map((c, i) => ({ id: `channel-${i}`, label: c.name })) },
-    { id: "reader-operations", label: t("reader.section.operations"), children: model.operations.map((o, i) => ({ id: `operation-${i}`, label: o.name })) },
-    { id: "reader-messages", label: t("reader.section.messages"), children: model.messages.map((m, i) => ({ id: `message-${i}`, label: m.name ?? m.key })) },
-    ...(model.schemas.length > 0 ? [{ id: "reader-schemas", label: t("reader.section.schemas") }] : []),
-    ...(model.securitySchemes.length > 0 ? [{ id: "reader-security", label: t("reader.section.security") }] : []),
-  ];
   return (
-    <Grid gap="md">
-      <Grid.Col span={{ base: 12, lg: 3 }} visibleFrom="lg">
-        <ReaderToc entries={toc} />
-      </Grid.Col>
-      <Grid.Col span={{ base: 12, lg: 9 }}>
-        <Stack gap="md">
-          <ReaderInfoHeader info={model.info} externalDocs={model.externalDocs} tags={model.tags} specLabel={t("reader.spec.asyncapi", { version: specVersion ?? "" })} />
-          {model.defaultContentType && (
-            <Text size="xs" c="dimmed">
-              {t("reader.async.defaultContentType")}: {model.defaultContentType}
-            </Text>
-          )}
-          {model.servers.length > 0 && (
-            <ReaderSection id="reader-servers" title={t("reader.section.servers")} pointer="/servers">
-              <Table fz="sm" withRowBorders={false} aria-label={t("reader.section.servers")}>
-                <Table.Tbody>
-                  {model.servers.map((s) => (
-                    <Table.Tr key={s.name}>
-                      <Table.Td fw={500} ff="monospace">
-                        {s.name}
-                      </Table.Td>
-                      <Table.Td ff="monospace">
-                        {s.protocol ? `${s.protocol}://` : ""}
-                        {s.host}
-                        {s.pathname}
-                      </Table.Td>
-                      <Table.Td c="dimmed">
-                        {s.description}
-                        {s.protocolVersion && ` · ${s.protocolVersion}`}
-                        {s.security.length > 0 && ` · ${t("reader.security.title")}: ${s.security.join(", ")}`}
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
-            </ReaderSection>
-          )}
-          <ReaderSection id="reader-channels" title={t("reader.section.channels")} pointer="/channels">
-            {model.channels.length === 0 && (
-              <Text size="sm" c="dimmed">
-                {t("reader.async.noChannels")}
-              </Text>
-            )}
-            <Stack gap="sm">
-              {model.channels.map((c, i) => (
-                <ChannelCard key={c.pointer} channel={c} id={`channel-${i}`} model={model} />
+    <Stack gap="md">
+      <ReaderInfoHeader info={model.info} externalDocs={model.externalDocs} tags={model.tags} specLabel={t("reader.spec.asyncapi", { version: specVersion ?? "" })} />
+      {model.defaultContentType && (
+        <Text size="xs" c="dimmed">
+          {t("reader.async.defaultContentType")}: {model.defaultContentType}
+        </Text>
+      )}
+      {model.servers.length > 0 && (
+        <ReaderSection id="reader-servers" title={t("reader.section.servers")} pointer="/servers">
+          <Table fz="sm" withRowBorders={false} aria-label={t("reader.section.servers")}>
+            <Table.Tbody>
+              {model.servers.map((s) => (
+                <Table.Tr key={s.name}>
+                  <Table.Td fw={500} ff="monospace">
+                    {s.name}
+                  </Table.Td>
+                  <Table.Td ff="monospace">
+                    {s.protocol ? `${s.protocol}://` : ""}
+                    {s.host}
+                    {s.pathname}
+                  </Table.Td>
+                  <Table.Td c="dimmed">
+                    {s.description}
+                    {s.protocolVersion && ` · ${s.protocolVersion}`}
+                    {s.security.length > 0 && ` · ${t("reader.security.title")}: ${s.security.join(", ")}`}
+                  </Table.Td>
+                </Table.Tr>
               ))}
-            </Stack>
-          </ReaderSection>
-          <ReaderSection id="reader-operations" title={t("reader.section.operations")} pointer="/operations">
-            {model.operations.length === 0 && (
-              <Text size="sm" c="dimmed">
-                {t("reader.async.noOperations")}
-              </Text>
-            )}
-            <Stack gap="sm">
-              {model.operations.map((o, i) => (
-                <OperationRow key={o.pointer} operation={o} id={`operation-${i}`} model={model} />
-              ))}
-            </Stack>
-          </ReaderSection>
-          <ReaderSection id="reader-messages" title={t("reader.section.messages")} pointer="/components/messages">
-            {model.messages.length === 0 && (
-              <Text size="sm" c="dimmed">
-                {t("reader.async.noMessages")}
-              </Text>
-            )}
-            <Stack gap="sm">
-              {model.messages.map((m, i) => (
-                <MessageCard key={m.key} message={m} id={`message-${i}`} anchors={anchors} />
-              ))}
-            </Stack>
-          </ReaderSection>
-          <ReaderSchemas schemas={model.schemas} />
-          <ReaderSecuritySchemes schemes={model.securitySchemes} />
+            </Table.Tbody>
+          </Table>
+        </ReaderSection>
+      )}
+      <ReaderSection id="reader-channels" title={t("reader.section.channels")} pointer="/channels">
+        {model.channels.length === 0 && (
+          <Text size="sm" c="dimmed">
+            {t("reader.async.noChannels")}
+          </Text>
+        )}
+        <Stack gap="sm">
+          {model.channels.map((c, i) => (
+            <ChannelCard key={c.pointer} channel={c} id={`channel-${i}`} model={model} />
+          ))}
         </Stack>
-      </Grid.Col>
-    </Grid>
+      </ReaderSection>
+      <ReaderSection id="reader-operations" title={t("reader.section.operations")} pointer="/operations">
+        {model.operations.length === 0 && (
+          <Text size="sm" c="dimmed">
+            {t("reader.async.noOperations")}
+          </Text>
+        )}
+        <Stack gap="sm">
+          {model.operations.map((o, i) => (
+            <OperationRow key={o.pointer} operation={o} id={`operation-${i}`} model={model} />
+          ))}
+        </Stack>
+      </ReaderSection>
+      <ReaderSection id="reader-messages" title={t("reader.section.messages")} pointer="/components/messages">
+        {model.messages.length === 0 && (
+          <Text size="sm" c="dimmed">
+            {t("reader.async.noMessages")}
+          </Text>
+        )}
+        <Stack gap="sm">
+          {model.messages.map((m, i) => (
+            <MessageCard key={m.key} message={m} id={`message-${i}`} anchors={anchors} />
+          ))}
+        </Stack>
+      </ReaderSection>
+      <ReaderSchemas schemas={model.schemas} />
+      <ReaderSecuritySchemes schemes={model.securitySchemes} />
+    </Stack>
   );
 }

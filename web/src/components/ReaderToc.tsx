@@ -1,14 +1,13 @@
 import { Anchor, Box, Stack, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
+import type { TocEntry } from "../utils/readerToc";
 import classes from "../theme.module.css";
 
-export type TocEntry = { id: string; label: string; children?: TocEntry[] };
-
-/** The reader's sticky table of contents — plain in-page anchors, so the browser owns the scroll. */
+/** The reader's table of contents, inside the version page's side panel — plain in-page anchors, so the browser owns the scroll; the panel itself is the sticky element. */
 export default function ReaderToc({ entries }: { entries: readonly TocEntry[] }) {
   const { t } = useTranslation();
   return (
-    <Box component="nav" aria-label={t("reader.tocAria")} className={classes.readerToc}>
+    <Box component="nav" aria-label={t("reader.tocAria")} className={classes.asideToc}>
       <Stack gap={2}>
         {entries.map((e) => (
           <Box key={e.id}>

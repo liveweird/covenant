@@ -160,5 +160,6 @@
     "invalid": "Można powiązać tylko adresy https:// bez danych logowania",
     "save": "Zapisz powiązanie"
   },
-  "readAria": "Czytaj wersję {{version}} kontraktu {{name}}"
+  "readAria": "Czytaj wersję {{version}} kontraktu {{name}}",
+  "toggleAside": "Pokaż lub ukryj panel boczny"
 }

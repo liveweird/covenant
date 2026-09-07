@@ -1,8 +1,11 @@
 import { describe, expect, test } from "vitest";
 import { renderWithProviders, screen } from "../test/render";
+import i18n from "../i18n";
 import { MODEL_ODCS } from "../test/readerFixtures";
+import { odcsToc } from "../utils/readerToc";
 import ReaderOdcs from "./ReaderOdcs";
 
+const t = i18n.t;
 const FULL = MODEL_ODCS.odcs!;
 
 /** The optional sections: present in the rich fixture (asserted through ContractReader.test), absent here when the model lacks them. */
@@ -14,10 +17,11 @@ describe("ReaderOdcs", () => {
     for (const title of ["Team", "Roles", "Service levels", "Support", "Price", "Custom properties", "Servers"]) {
       expect(screen.queryByRole("heading", { name: title })).not.toBeInTheDocument();
     }
-    // The description card still renders, and the TOC lists only what exists.
+    // The description card still renders, and the TOC (now the version page's side panel content) lists only what exists.
     expect(screen.getByRole("heading", { name: "Description" })).toBeInTheDocument();
-    const nav = screen.getByRole("navigation", { name: "Contents", hidden: true });
-    expect(nav).not.toHaveTextContent("Team");
+    const labels = odcsToc(bare, t).map((e) => e.label);
+    expect(labels).not.toContain("Team");
+    expect(labels).toEqual(["Description", "Datasets"]);
   });
 
   test("a contract without datasets or a description says so and shows the raw status when it maps to no lifecycle", () => {
@@ -26,6 +30,7 @@ describe("ReaderOdcs", () => {
     expect(screen.getByText("This contract declares no datasets.")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Description" })).not.toBeInTheDocument();
     expect(screen.getByText("experimental")).toBeInTheDocument();
+    expect(odcsToc(empty, t).map((e) => e.label)).not.toContain("Description");
   });
 
   test("the table sections lay their rows out one cell per column", () => {

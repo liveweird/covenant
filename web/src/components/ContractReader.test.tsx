@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders, screen, waitFor, within } from "../test/render";
+import i18n from "../i18n";
+import { readerToc } from "../utils/readerToc";
 import ContractReader from "./ContractReader";
 import { CONTRACT, serve, signIn, VERSION, type FetchMock } from "../test/contractsFixtures";
 import { MODEL_ASYNCAPI, MODEL_EMPTY, MODEL_ERROR, MODEL_ODCS, MODEL_OPENAPI } from "../test/readerFixtures";
 
+const t = i18n.t;
 const MODEL_URL = "GET /api/v1/contracts/5/versions/11/model";
 
 describe("ContractReader", () => {
@@ -33,12 +36,14 @@ describe("ContractReader", () => {
     expect(screen.getByText("pet", { selector: "strong" })).toBeInTheDocument();
     expect(screen.getByText("https://{env}.example.com/v2")).toBeInTheDocument();
     expect(screen.getByText("env = api (api, staging)")).toBeInTheDocument();
-    // The TOC hides below the lg breakpoint (a media query happy-dom evaluates as matching) — query it as hidden.
-    const nav = screen.getByRole("navigation", { name: "Contents", hidden: true });
-    expect(within(nav).getByRole("link", { name: "pets", hidden: true })).toHaveAttribute("href", "#tag-pets");
-    expect(within(nav).getByRole("link", { name: "GET /pets/{id}", hidden: true })).toHaveAttribute("href", "#op-0");
-    expect(within(nav).getByRole("link", { name: "Other operations", hidden: true })).toBeInTheDocument();
-    expect(within(nav).getByRole("link", { name: "Webhooks", hidden: true })).toBeInTheDocument();
+    // The TOC now lives in the version page's side panel, not the reader itself — assert the
+    // dispatcher VersionPage renders it from instead of a `nav` element inside ContractReader.
+    const toc = readerToc(MODEL_OPENAPI, t);
+    const petsEntry = toc.find((e) => e.id === "tag-pets");
+    expect(petsEntry?.label).toBe("pets");
+    expect(petsEntry?.children).toContainEqual({ id: "op-0", label: "GET /pets/{id}" });
+    expect(toc.map((e) => e.label)).toContain("Other operations");
+    expect(toc.map((e) => e.id)).toContain("reader-webhooks");
     expect(screen.getByRole("heading", { level: 3, name: "pets" })).toBeInTheDocument();
     expect(screen.getByText("Everything about pets")).toBeInTheDocument();
     const get = screen.getByRole("article", { name: "/pets/{id}" });
@@ -146,8 +151,9 @@ describe("ContractReader", () => {
     expect(screen.getByRole("table", { name: "Support" })).toHaveTextContent("slack");
     expect(screen.getByText("9.95 USD / megabyte")).toBeInTheDocument();
     expect(screen.getByText("refreshCadence")).toBeInTheDocument();
-    const nav = screen.getByRole("navigation", { name: "Contents", hidden: true });
-    expect(within(nav).getByRole("link", { name: "customers", hidden: true })).toHaveAttribute("href", "#dataset-0");
+    const toc = readerToc(MODEL_ODCS, t);
+    const datasetsEntry = toc.find((e) => e.id === "reader-datasets");
+    expect(datasetsEntry?.children).toContainEqual({ id: "dataset-0", label: "customers" });
   });
 
   test("an unparseable stored document, an empty model, and a failed load each say so", async () => {
