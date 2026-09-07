@@ -150,7 +150,9 @@ export default function VersionPage() {
         }
         backTo={{ to: contractPath(id), label: t("contracts.backToContract") }}
         toolbar={
-          <Group gap="sm">
+          // The panel toggle sits at the edge it controls (the navbar toggle's rule): far right,
+          // above the side column, and it stays there once the panel is hidden.
+          <Group gap="sm" justify="space-between" wrap="wrap">
             <VersionViewToggle view={view} onChange={setView} disabled={editing} />
             <VersionAsideToggle open={asideOpen} errorCount={errorCount} onToggle={() => setAsideOpen(!asideOpen)} />
           </Group>
