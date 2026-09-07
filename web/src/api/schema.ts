@@ -1498,6 +1498,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contracts/infer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Infer a draft document from real samples
+         * @description Any authenticated user. Pure and computed per call — nothing is stored, no audit (the
+         *     try-it posture). Exactly the sample list matching `type` must carry entries; the other two
+         *     stay empty (`400`). HTTP exchanges become OpenAPI 3.1 (paths templated from literal
+         *     examples, request/response schemas, detected security schemes); AsyncAPI channel batches
+         *     become AsyncAPI 3.0 (one channel and one `send` operation per batch, CloudEvents envelopes
+         *     recognised); a relation's columns and/or rows become an ODCS 3.0.2 dataset. Every heuristic
+         *     applied rides back as an `INFERENCE` note beside the draft — never blocking. The response
+         *     is opened straight into the ordinary version-create/import screens; nothing is checked
+         *     against a contract's writer rule here.
+         */
+        post: operations["inferDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2687,7 +2715,7 @@ export interface components {
         /** @enum {string} */
         Severity: "ERROR" | "WARN" | "INFO";
         /** @enum {string} */
-        FindingSource: "SYNTAX" | "SCHEMA" | "SEMANTIC" | "LINT" | "BREAKING" | "CONFORMANCE" | "SYSTEM";
+        FindingSource: "SYNTAX" | "SCHEMA" | "SEMANTIC" | "LINT" | "BREAKING" | "CONFORMANCE" | "SYSTEM" | "INFERENCE";
         Finding: {
             severity: components["schemas"]["Severity"];
             source: components["schemas"]["FindingSource"];
@@ -2909,6 +2937,67 @@ export interface components {
         FetchUrlResponse: {
             content: string;
         };
+        /** @description Exactly the sample list matching `type` is read; the other two must stay empty (`400`). Pure — nothing is stored, no audit. */
+        InferRequest: {
+            type: components["schemas"]["ContractType"];
+            /** @description The document's title/name. */
+            name?: string | null;
+            /** @description The document's own version — SemVer 2.0 when given. */
+            version?: string | null;
+            http?: components["schemas"]["HttpExchangeSample"][];
+            messages?: components["schemas"]["MessageBatchSample"][];
+            relations?: components["schemas"]["RelationSample"][];
+        };
+        HttpExchangeSample: {
+            /** @description GET, PUT, POST, DELETE, OPTIONS, HEAD or PATCH. */
+            method: string;
+            /** @description An absolute http(s) URL (its origin becomes a servers[] entry) or a bare '/path'. */
+            url: string;
+            /** @description Values feed type inference only — never written into the document. */
+            query?: components["schemas"]["StringMap"];
+            /** @description Header NAMES only, lower-case — values never travel. */
+            requestHeaders?: string[];
+            /** @description bearer, basic, digest or other — the Authorization value's scheme word only. */
+            authorizationScheme?: string | null;
+            requestContentType?: string | null;
+            requestBody?: string | null;
+            /** Format: int32 */
+            status: number;
+            /** @description Header NAMES only, lower-case — values never travel. */
+            responseHeaders?: string[];
+            responseContentType?: string | null;
+            responseBody?: string | null;
+        };
+        MessageBatchSample: {
+            /** @description The AsyncAPI channel's topic/address. */
+            channel: string;
+            payloads?: string[];
+        };
+        RelationColumn: {
+            name: string;
+            /** @description The database's own type name (e.g. int4, varchar, _text). */
+            dbType: string;
+            nullable: boolean;
+            /** Format: int32 */
+            primaryKeyPosition?: number | null;
+        };
+        RelationSample: {
+            /** @description Optionally schema-qualified (public.users) — ODCS keeps only the bare name. */
+            name: string;
+            /** @description table or view; unset when unknown. */
+            physicalType?: string | null;
+            columns?: components["schemas"]["RelationColumn"][];
+            rows?: string[];
+        };
+        InferResponse: {
+            content: string;
+            format: components["schemas"]["DocumentFormat"];
+            /** @description Every heuristic the builder applied — FindingSource INFERENCE, never blocking. */
+            notes: components["schemas"]["Finding"][];
+            errors: number;
+            warnings: number;
+            infos: number;
+        };
         /** @description RFC 7807 problem detail. Served as `application/problem+json`. */
         ProblemDetail: {
             /**
@@ -3040,7 +3129,7 @@ export interface components {
         VersionLifecycle: components["schemas"]["Lifecycle"][];
         /** @description Repeatable — any-of over finding severities; every enum value is accepted (empty = any). */
         ErrorSeverity: components["schemas"]["Severity"][];
-        /** @description Repeatable — any-of over finding sources; every enum value is accepted, though SYNTAX and CONFORMANCE never match a stored finding (empty = any). */
+        /** @description Repeatable — any-of over finding sources; every enum value is accepted, though SYNTAX, CONFORMANCE and INFERENCE never match a stored finding (empty = any). */
         ErrorSource: components["schemas"]["FindingSource"][];
     };
     requestBodies: never;
@@ -4360,7 +4449,7 @@ export interface operations {
                 lifecycle?: components["parameters"]["VersionLifecycle"];
                 /** @description Repeatable — any-of over finding severities; every enum value is accepted (empty = any). */
                 severity?: components["parameters"]["ErrorSeverity"];
-                /** @description Repeatable — any-of over finding sources; every enum value is accepted, though SYNTAX and CONFORMANCE never match a stored finding (empty = any). */
+                /** @description Repeatable — any-of over finding sources; every enum value is accepted, though SYNTAX, CONFORMANCE and INFERENCE never match a stored finding (empty = any). */
                 source?: components["parameters"]["ErrorSource"];
                 /** @description Case- and accent-insensitive substring over name OR description. */
                 q?: components["parameters"]["ContractQuery"];
@@ -4398,7 +4487,7 @@ export interface operations {
                 lifecycle?: components["parameters"]["VersionLifecycle"];
                 /** @description Repeatable — any-of over finding severities; every enum value is accepted (empty = any). */
                 severity?: components["parameters"]["ErrorSeverity"];
-                /** @description Repeatable — any-of over finding sources; every enum value is accepted, though SYNTAX and CONFORMANCE never match a stored finding (empty = any). */
+                /** @description Repeatable — any-of over finding sources; every enum value is accepted, though SYNTAX, CONFORMANCE and INFERENCE never match a stored finding (empty = any). */
                 source?: components["parameters"]["ErrorSource"];
                 /** @description Case- and accent-insensitive substring over name OR description. */
                 q?: components["parameters"]["ContractQuery"];
@@ -5520,6 +5609,34 @@ export interface operations {
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
             502: components["responses"]["BadGateway"];
+        };
+    };
+    inferDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InferRequest"];
+            };
+        };
+        responses: {
+            /** @description The draft document and its inference notes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InferResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            413: components["responses"]["PayloadTooLarge"];
+            500: components["responses"]["InternalServerError"];
         };
     };
 }

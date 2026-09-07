@@ -112,3 +112,6 @@ typealias VersionPageResponse = PageResponse<VersionListItem>
 data class VersionListFilter(val lifecycles: List<Lifecycle> = emptyList())
 
 data class VersionListResult(val items: List<VersionListItem>, val total: Long)
+
+/** The `contracts.maxDocumentBytes` fallback — read by both the version routes and the inference routes. */
+internal const val DEFAULT_MAX_DOCUMENT_BYTES = 2L * 1024 * 1024

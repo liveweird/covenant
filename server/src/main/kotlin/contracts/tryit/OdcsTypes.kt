@@ -22,7 +22,7 @@ object OdcsTypes {
     const val COLUMN_NULLABLE_MISMATCH = "COLUMN_NULLABLE_MISMATCH"
     const val REQUIRED_VALUE_NULL = "REQUIRED_VALUE_NULL"
 
-    private val FAMILIES: Map<String, Set<String>> = mapOf(
+    internal val FAMILIES: Map<String, Set<String>> = mapOf(
         "string" to setOf(
             "varchar", "text", "bpchar", "char", "name", "uuid", "citext", "inet", "cidr", "macaddr", "xml", "interval",
             "character varying", "character",
@@ -47,6 +47,17 @@ object OdcsTypes {
         if (array) return false
         if (t !in KNOWN_TYPES) return null
         return FAMILIES[logicalType]?.contains(t) ?: false
+    }
+
+    /**
+     * The reverse of [matches] — the inference engine's lookup (`contracts/infer/OdcsInference.kt`):
+     * a database type name to the ODCS `logicalType` family it belongs to, `_`-prefix/`[]`-suffix
+     * meaning `array` first; null when the type name is unknown to the table (never a guess).
+     */
+    fun logicalTypeOf(dbType: String): String? {
+        val t = dbType.lowercase().trim()
+        if (t.startsWith("_") || t.endsWith("[]") || t == "array") return "array"
+        return FAMILIES.entries.firstOrNull { (_, types) -> t in types }?.key
     }
 
     /**

@@ -8,14 +8,16 @@ import kotlinx.serialization.Serializable
  * path, never waivable); a SOFT `ERROR` blocks a strict save unless `allowInvalid=true`;
  * `WARN`/`INFO` never block. `SYSTEM` carries operational notes (`CHECKER_UNAVAILABLE`,
  * `FINDINGS_TRUNCATED`); `CONFORMANCE` is a LIVE observation — a try-it response, message or table
- * measured against the document (never stored on a version). Codes are stable machine ids: the JVM's own SCREAMING_SNAKE codes,
+ * measured against the document (never stored on a version); `INFERENCE` is the inference
+ * engine's voice (`contracts/infer/`) — a heuristic applied while building a draft, never stored
+ * either. Codes are stable machine ids: the JVM's own SCREAMING_SNAKE codes,
  * Spectral's kebab rule ids, the AsyncAPI parser's codes.
  */
 @Serializable
 enum class Severity { ERROR, WARN, INFO }
 
 @Serializable
-enum class FindingSource { SYNTAX, SCHEMA, SEMANTIC, LINT, BREAKING, CONFORMANCE, SYSTEM }
+enum class FindingSource { SYNTAX, SCHEMA, SEMANTIC, LINT, BREAKING, CONFORMANCE, SYSTEM, INFERENCE }
 
 @Serializable
 data class Finding(

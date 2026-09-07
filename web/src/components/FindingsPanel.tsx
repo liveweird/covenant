@@ -6,7 +6,16 @@ import type { Finding, FindingSource, Severity } from "../api/versions";
 import { isHardFinding } from "../api/versions";
 import { SEVERITIES, SEVERITY_COLOR } from "../utils/findings";
 
-const SOURCES = ["SYNTAX", "SCHEMA", "SEMANTIC", "LINT", "BREAKING", "CONFORMANCE", "SYSTEM"] as const satisfies readonly FindingSource[];
+const SOURCES = [
+  "SYNTAX",
+  "SCHEMA",
+  "SEMANTIC",
+  "LINT",
+  "BREAKING",
+  "CONFORMANCE",
+  "SYSTEM",
+  "INFERENCE",
+] as const satisfies readonly FindingSource[];
 
 /**
  * The check report beside the editor (and under a stored version): the findings with
