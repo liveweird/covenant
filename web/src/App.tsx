@@ -25,6 +25,7 @@ const CreateContract = lazy(() => import("./pages/CreateContract"));
 const EditContract = lazy(() => import("./pages/EditContract"));
 const ContractDetails = lazy(() => import("./pages/ContractDetails"));
 const ImportContract = lazy(() => import("./pages/ImportContract"));
+const InferContract = lazy(() => import("./pages/InferContract"));
 const NewVersion = lazy(() => import("./pages/NewVersion"));
 const VersionPage = lazy(() => import("./pages/VersionPage"));
 const VersionDiff = lazy(() => import("./pages/VersionDiff"));
@@ -209,9 +210,12 @@ export default function App() {
             <Route path="errors" element={<Errors />} />
             <Route path="contracts/new" element={<CreateContract />} />
             <Route path="contracts/import" element={<ImportContract />} />
+            {/* Literal segments — registered above the "contracts/:id" family so they win the match. */}
+            <Route path="contracts/infer" element={<InferContract />} />
             <Route path="contracts/:id" element={<ContractDetails />} />
             <Route path="contracts/:id/edit" element={<EditContract />} />
             <Route path="contracts/:id/diff" element={<VersionDiff />} />
+            <Route path="contracts/:id/infer" element={<InferContract />} />
             <Route path="contracts/:id/versions/new" element={<NewVersion />} />
             <Route path="contracts/:id/versions/:vid" element={<VersionPage />} />
             <Route path="domains" element={<Domains />} />

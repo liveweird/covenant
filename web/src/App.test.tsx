@@ -56,6 +56,7 @@ describe("App shell", () => {
       const catalog = await screen.findByRole("group", { name: "Catalog" });
       expect(within(catalog).getByRole("link", { name: "Hierarchy" })).toHaveAttribute("href", "/");
       expect(within(catalog).getByRole("link", { name: "Contracts" })).toHaveAttribute("href", "/contracts");
+      expect(within(catalog).getByRole("link", { name: "Infer" })).toHaveAttribute("href", "/contracts/infer");
       expect(within(catalog).getByRole("link", { name: "Errors" })).toHaveAttribute("href", "/errors");
       const registries = screen.getByRole("group", { name: "Registries" });
       expect(within(registries).getByRole("link", { name: "Domains" })).toHaveAttribute("href", "/domains");

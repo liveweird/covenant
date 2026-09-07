@@ -3,6 +3,7 @@
   "intro": "Każdy kontrakt w katalogu — API, strumienie zdarzeń i widoki danych — z właścicielem i najnowszą wersją.",
   "newContract": "Nowy kontrakt",
   "import": "Importuj",
+  "infer": "Wywnioskuj…",
   "createTitle": "Nowy kontrakt",
   "createIntro": "Gdzie kontrakt się znajduje, jak się nazywa i kto jest jego właścicielem. Dokument pierwszej wersji dodasz w następnym kroku.",
   "editTitle": "Edytuj {{name}}",

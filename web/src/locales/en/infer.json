@@ -1,0 +1,79 @@
+{
+  "title": "Infer a contract",
+  "intro": "Hand Covenant a sample of what actually flows — an HTTP exchange, an event payload, a database table — and get a draft document to review and save. Nothing is stored until you save it through the ordinary editor.",
+  "tab": {
+    "paste": "Paste",
+    "har": "HAR file",
+    "observe": "Observe"
+  },
+  "samples": {
+    "count_one": "{{count}} sample",
+    "count_other": "{{count}} samples",
+    "payloadCount_one": "{{count}} payload",
+    "payloadCount_other": "{{count}} payloads",
+    "columnCount_one": "{{count}} column",
+    "columnCount_other": "{{count}} columns",
+    "rowCount_one": "{{count}} row",
+    "rowCount_other": "{{count}} rows",
+    "none": "No samples yet — paste one, upload a HAR file, or observe a live call below."
+  },
+  "removeAria": "Remove {{name}}",
+  "generate": "Generate draft",
+  "generateFailed": "Could not generate the draft",
+  "error": {
+    "invalid": "Check the samples below — one of them was refused."
+  },
+  "openInEditor": "Open in editor",
+  "preview": {
+    "title": "Draft",
+    "editorAria": "Inferred document",
+    "placeholder": "Generate a draft to preview it here."
+  },
+  "paste": {
+    "method": "Method",
+    "url": "URL",
+    "status": "Status",
+    "requestContentType": "Request content type",
+    "requestBody": "Request body",
+    "responseContentType": "Response content type",
+    "responseBody": "Response body",
+    "add": "Add sample",
+    "channel": "Channel",
+    "payloads": "Payloads",
+    "payloadsHint": "One JSON object per line, or a JSON array of objects.",
+    "payloadsRequired": "Add at least one payload.",
+    "payloadsInvalid": "Each payload must be valid JSON.",
+    "relation": "Relation",
+    "rows": "Rows",
+    "rowsHint": "A JSON array of row objects.",
+    "rowsRequired": "Add at least one row.",
+    "rowsInvalid": "The rows must be a JSON array of objects."
+  },
+  "har": {
+    "pick": "Choose a HAR file",
+    "origin": "Origin",
+    "add": "Add",
+    "kept": "Kept {{kept}} of {{total}} entries",
+    "tooLarge": "The file is too large (over 30 MiB).",
+    "notHar": "That file is not a HAR export."
+  },
+  "observe": {
+    "method": "Method",
+    "run": "Send",
+    "describe": "Describe",
+    "addToSamples": "Add to samples",
+    "credentialsHint": "Credentials typed here are sent once and never stored.",
+    "http": {
+      "path": "Path",
+      "result": "Answered with status {{status}}"
+    },
+    "kafka": {
+      "result_one": "{{count}} record read",
+      "result_other": "{{count}} records read"
+    },
+    "sql": {
+      "result_one": "{{count}} column described",
+      "result_other": "{{count}} columns described"
+    }
+  }
+}

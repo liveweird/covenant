@@ -195,6 +195,13 @@
   border-bottom-right-radius: var(--mantine-radius-md);
 }
 
+/* The same bar sitting directly on the page (the new-version, import and infer screens):
+   the shell pads by `md`, not `lg`, so the edge-to-edge margins must match it — the `lg`
+   pair overflows the viewport by four pixels and gives the page a horizontal scrollbar. */
+.stickyActionsPage {
+  margin: 0 calc(-1 * var(--mantine-spacing-md)) calc(-1 * var(--mantine-spacing-md));
+}
+
 /* The editor's preview column, and the version page's single side panel (Contents above
    Findings): sticks under the header, offset from the shell's own vars, and caps its own
    height so a tall panel scrolls as one instead of running past the viewport. */

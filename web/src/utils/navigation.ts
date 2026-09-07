@@ -1,6 +1,6 @@
 import type { ParseKeys } from "i18next";
-import { IconAlertTriangle, IconFileText, IconFolders, IconHistory, IconKey, IconPlugConnected, IconServer2, IconSitemap, IconToggleLeft, IconUsers, IconUsersGroup, type Icon } from "@tabler/icons-react";
-import { contractsPath, errorsPath, hierarchyPath } from "./contractLinks";
+import { IconAlertTriangle, IconFileText, IconFolders, IconHistory, IconKey, IconPlugConnected, IconServer2, IconSitemap, IconToggleLeft, IconUsers, IconUsersGroup, IconWand, type Icon } from "@tabler/icons-react";
+import { contractsPath, errorsPath, hierarchyPath, inferContractPath } from "./contractLinks";
 import { teamsPath } from "./teamLinks";
 import { environmentsPath } from "./environmentLinks";
 
@@ -32,6 +32,7 @@ const NAV_SECTIONS: ReadonlyArray<NavSection> = [
     items: [
       { to: hierarchyPath, label: "appShell.nav.hierarchy", icon: IconSitemap },
       { to: contractsPath, label: "appShell.nav.contracts", icon: IconFileText },
+      { to: inferContractPath, label: "appShell.nav.infer", icon: IconWand },
       { to: errorsPath, label: "appShell.nav.errors", icon: IconAlertTriangle },
     ],
   },

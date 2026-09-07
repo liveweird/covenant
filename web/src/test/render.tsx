@@ -9,10 +9,12 @@ import { theme } from "../theme";
 
 interface Options extends Omit<RenderOptions, "wrapper"> {
   route?: string;
+  /** `location.state` for the initial entry — the sync modal's / Infer page's hand-off. */
+  state?: unknown;
 }
 
 export function renderWithProviders(ui: ReactElement, options: Options = {}) {
-  const { route = "/", ...rest } = options;
+  const { route = "/", state, ...rest } = options;
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -20,7 +22,7 @@ export function renderWithProviders(ui: ReactElement, options: Options = {}) {
     wrapper: ({ children }) => (
       <MantineProvider env="test" theme={theme}>
         <QueryClientProvider client={queryClient}>
-          <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+          <MemoryRouter initialEntries={[state === undefined ? route : { pathname: route, state }]}>{children}</MemoryRouter>
         </QueryClientProvider>
       </MantineProvider>
     ),

@@ -12,6 +12,7 @@
     "systems": "Systems",
     "hierarchy": "Hierarchy",
     "contracts": "Contracts",
+    "infer": "Infer",
     "errors": "Errors",
     "environments": "Environments"
   },
@@ -38,6 +39,7 @@
     "groupContracts": "Contracts",
     "newContract": "New contract",
     "importContract": "Import a document",
+    "inferContract": "Infer a contract",
     "searchHint": "Type two or more characters to search contracts"
   }
 }

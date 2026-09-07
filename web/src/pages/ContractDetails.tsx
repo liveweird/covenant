@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import { Alert, Button, Group, Menu, Paper, Stack, Table, Text, Tooltip } from "@mantine/core";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconArrowsDiff, IconDots, IconDownload, IconFileText, IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconArrowsDiff, IconDots, IconDownload, IconFileText, IconPencil, IconPlus, IconTrash, IconWand } from "@tabler/icons-react";
 import { deleteContract, exportContract, getContract } from "../api/contracts";
 import { ApiError } from "../api/http";
 import { deleteVersion, listVersions, type VersionListItem } from "../api/versions";
@@ -23,7 +23,7 @@ import TypeBadge from "../components/TypeBadge";
 import { useDeleteConfirm } from "../hooks/useDeleteConfirm";
 import { usePagedSort } from "../hooks/usePagedSort";
 import { useVersionDownload } from "../hooks/useVersionDownload";
-import { contractsPath, editContractPath, newVersionPath, versionDiffPath, versionPath } from "../utils/contractLinks";
+import { contractsPath, editContractPath, inferVersionPath, newVersionPath, versionDiffPath, versionPath } from "../utils/contractLinks";
 import { downloadText } from "../utils/document";
 import { isDeletable } from "../utils/lifecycle";
 import { formatDateTime, relativeTimeAgo } from "../utils/relativeTime";
@@ -110,6 +110,11 @@ export default function ContractDetails() {
             {data.versionCount >= 2 && (
               <Button component={RouterLink} to={versionDiffPath(id)} variant="default" leftSection={<IconArrowsDiff size={16} />}>
                 {t("versions.compare")}
+              </Button>
+            )}
+            {data.canWrite && (
+              <Button component={RouterLink} to={inferVersionPath(id)} variant="default" leftSection={<IconWand size={16} />}>
+                {t("contracts.infer")}
               </Button>
             )}
             {data.canWrite && (

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
 import { Alert, Badge, Box, Button, Grid, Group, Paper, Select, Stack, Text, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -23,7 +23,7 @@ import {
   type ContractFormValues,
 } from "../utils/contractForm";
 import { contractPath, contractsPath, versionPath } from "../utils/contractLinks";
-import { detectFormat, MAX_DOCUMENT_BYTES, utf8Length } from "../utils/document";
+import { detectFormat, MAX_DOCUMENT_BYTES, type SeededDocument, utf8Length } from "../utils/document";
 import { toDiagnostics } from "../utils/findingDiagnostics";
 import { saveErrorMessage } from "../utils/saveError";
 import { isValidSemver, MAX_VERSION_LENGTH } from "../utils/semver";
@@ -58,13 +58,16 @@ export default function ImportContract() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const systems = useQuery({ queryKey: ["systems", "all"], queryFn: () => listSystems({ page: 1, pageSize: 100, sort: "name" }) });
-  const [content, setContent] = useState("");
+  // The Infer page hands over its generated draft this way (a new contract knows no type yet, so
+  // it rides along); a plain visit (no state) starts from a blank paste exactly as before.
+  const seeded = useLocation().state as SeededDocument | null;
+  const [content, setContent] = useState(seeded?.content ?? "");
   const [jump, setJump] = useState<JumpRequest | null>(null);
   const [busy, setBusy] = useState<"import" | "check" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ mode: "import" | "check"; row: ImportItemResult } | null>(null);
   const form = useForm<ImportFormValues>({
-    initialValues: { systemId: null, type: "OPENAPI", name: "", description: "", owner: null, version: "" },
+    initialValues: { systemId: null, type: seeded?.type ?? "OPENAPI", name: "", description: "", owner: null, version: "" },
     validate: {
       ...contractFormValidation(t, { withOwner: false }),
       version: (v) => (v.trim() && v.length <= MAX_VERSION_LENGTH && isValidSemver(v.trim()) ? null : t("versions.validation.versionFormat")),
@@ -216,7 +219,7 @@ export default function ImportContract() {
           </Stack>
         </Alert>
       )}
-      <Paper withBorder p="md" radius="md" className={classes.stickyActions}>
+      <Paper withBorder p="md" radius="md" className={`${classes.stickyActions} ${classes.stickyActionsPage}`}>
         <Group justify="space-between">
           <Text size="sm" c="dimmed">
             {hasHard ? t("versions.blockedBySyntax") : tooLarge ? t("versions.validation.contentTooLarge") : check.checking ? t("findings.checking") : t("contracts.importHint")}
