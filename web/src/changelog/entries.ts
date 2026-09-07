@@ -17,6 +17,22 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.8.0",
+    date: "2026-09-08",
+    en: `**Contracts from what actually flows.**
+
+- Infer a contract — a fourth way in, beside paste, import and sync: hand Covenant a sample of what really flows and get a draft to review. An HTTP exchange becomes an OpenAPI 3.1 draft (templated paths, query parameters, request and response schemas, security schemes from the header names). Event payloads become an AsyncAPI 3.0 draft (one channel, one message, a CloudEvents envelope recognised). A database table becomes an ODCS draft (columns, types, NOT NULL, the primary key).
+- Three ways to bring a sample: paste it, upload a HAR file from your browser's DevTools (parsed in the browser — header values and credentials never leave it), or observe it live through an environment: an HTTP call, a tail of a Kafka topic, a PostgreSQL table described from its catalog.
+- Every heuristic is named: an Inference note beside the draft says what was guessed — a templated path segment, a merged sample set, a column type it did not recognise, a view whose nullability cannot be read.
+- Nothing is stored until you save: the draft opens in the editor you already know, with its live findings, and goes through the ordinary save.`,
+    pl: `**Kontrakty z tego, co naprawdę płynie.**
+
+- Wnioskowanie kontraktu — czwarta droga obok wklejenia, importu i synchronizacji: podaj Covenantowi próbkę tego, co naprawdę płynie, i dostań szkic do przeglądu. Wymiana HTTP staje się szkicem OpenAPI 3.1 (ścieżki z parametrami, parametry zapytania, schematy żądania i odpowiedzi, schematy bezpieczeństwa z nazw nagłówków). Ładunki zdarzeń stają się szkicem AsyncAPI 3.0 (jeden kanał, jedna wiadomość, rozpoznana koperta CloudEvents). Tabela bazy danych staje się szkicem ODCS (kolumny, typy, NOT NULL, klucz główny).
+- Trzy sposoby na próbkę: wklej ją, wczytaj plik HAR z DevTools przeglądarki (parsowany w przeglądarce — wartości nagłówków i dane uwierzytelniające nigdy jej nie opuszczają) albo zaobserwuj na żywo przez środowisko: wywołanie HTTP, ogon tematu Kafki, tabelę PostgreSQL opisaną z jej katalogu.
+- Każda heurystyka ma nazwę: notatka wnioskowania obok szkicu mówi, co zostało zgadnięte — segment ścieżki zamieniony na parametr, połączony zestaw próbek, nierozpoznany typ kolumny, widok, którego nullowalności nie da się odczytać.
+- Nic nie jest zapisywane, dopóki nie zapiszesz: szkic otwiera się w znanym edytorze, z bieżącymi ustaleniami, i przechodzi przez zwykły zapis.`,
+  },
+  {
     version: "0.7.0",
     date: "2026-09-07",
     en: `**Compatibility, named.**
