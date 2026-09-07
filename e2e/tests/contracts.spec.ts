@@ -134,6 +134,10 @@ test.describe.serial("the contract core loop", () => {
   await expect(diff).toBeVisible();
   await expect(diff).toContainText('+                   $ref: "#/components/schemas/Missing"');
   await expect(page.getByText("+2 / −2 lines")).toBeVisible();
+  // The compatibility card names the verdict between the two — whichever it settled on.
+  const compatibility = page.getByRole("region", { name: "Compatibility" });
+  await expect(compatibility).toBeVisible();
+  await expect(compatibility.getByText(/Fully compatible|Backward compatible|Forward compatible|Not compatible|^Unknown$/)).toBeVisible();
   });
 
   test("admin publishes the version, reads it in the reader, downloads it and sees the breaking-change gate", async ({ page }) => {

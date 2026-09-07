@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
-import { renderWithProviders, screen, waitFor } from "../test/render";
+import { renderWithProviders, screen, waitFor, within } from "../test/render";
 import { Route, Routes } from "react-router-dom";
 import VersionDiff from "./VersionDiff";
-import { CONTRACT, findCall, OLD_VERSION, serve, signIn, VERSION, VERSION_PAGE, type FetchMock } from "../test/contractsFixtures";
+import { COMPATIBILITY, COMPATIBILITY_NO_BASELINE, CONTRACT, findCall, OLD_VERSION, serve, signIn, VERSION, VERSION_PAGE, type FetchMock } from "../test/contractsFixtures";
 
 function renderPage(route = "/contracts/5/diff") {
   return renderWithProviders(
@@ -31,6 +31,8 @@ describe("VersionDiff page", () => {
     "GET /api/v1/contracts/5/versions?": { status: 200, body: VERSION_PAGE },
     "GET /api/v1/contracts/5/versions/11": { status: 200, body: VERSION },
     "GET /api/v1/contracts/5/versions/10": { status: 200, body: OLD_VERSION },
+    "GET /api/v1/contracts/5/versions/11/compatibility?against=10": { status: 200, body: COMPATIBILITY },
+    "GET /api/v1/contracts/5/versions/10/compatibility?against=10": { status: 200, body: COMPATIBILITY_NO_BASELINE },
   };
 
   test("defaults to the two highest versions and renders the line diff with the −/+ rows and stats", async () => {
@@ -75,5 +77,21 @@ describe("VersionDiff page", () => {
     serve(mockFetch, { ...base, "GET /api/v1/contracts/5/versions?": { status: 200, body: { ...VERSION_PAGE, items: [VERSION_PAGE.items[0]], total: 1 } } });
     renderPage();
     expect(await screen.findByText("Two versions are needed for a comparison.")).toBeInTheDocument();
+  });
+
+  test("shows the compatibility card for the picked pair", async () => {
+    serve(mockFetch, base);
+    renderPage();
+    const card = await screen.findByRole("region", { name: "Compatibility" });
+    expect(within(card).getByText("Backward compatible")).toBeInTheDocument();
+    expect(within(card).getByText(/is backward compatible with/)).toBeInTheDocument();
+    expect(within(card).getByText(/minor bump/)).toBeInTheDocument();
+  });
+
+  test("a compatibility load failure renders inline; the diff still shows", async () => {
+    serve(mockFetch, { ...base, "GET /api/v1/contracts/5/versions/11/compatibility?against=10": { status: 500, body: { title: "Internal Server Error", status: 500 } } });
+    renderPage();
+    expect(await screen.findByText("Load failed (500)")).toBeInTheDocument();
+    expect(await screen.findByText("- version: 1.0.0")).toBeInTheDocument();
   });
 });

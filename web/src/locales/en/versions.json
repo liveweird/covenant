@@ -113,6 +113,47 @@
     "needTwo": "Two versions are needed for a comparison.",
     "viewAria": "Differences from {{from}} to {{to}}"
   },
+  "compatibility": {
+    "title": "Compatibility",
+    "verdictBadge": {
+      "FULL": "Fully compatible",
+      "BACKWARD": "Backward compatible",
+      "FORWARD": "Forward compatible",
+      "NONE": "Not compatible",
+      "UNKNOWN": "Unknown"
+    },
+    "verdict": {
+      "FULL": "{{to}} is fully compatible with {{from}} — consumers of either version keep working against the other.",
+      "BACKWARD": "{{to}} is backward compatible with {{from}}: consumers built for {{from}} keep working, but consumers built for {{to}} would break against {{from}}.",
+      "FORWARD": "{{to}} is forward compatible with {{from}}: consumers built for {{to}} already work against {{from}}, but consumers built for {{from}} would break against {{to}}.",
+      "NONE": "{{to}} is not compatible with {{from}} in either direction.",
+      "UNKNOWN": "Compatibility between {{to}} and {{from}} could not be fully determined."
+    },
+    "bump": {
+      "MAJOR": "{{to}} is a major bump over {{from}}, which permits breaking changes.",
+      "MINOR": {
+        "holds": "{{to}} is a minor bump over {{from}}, which promises backward compatibility — and it holds.",
+        "broken_one": "{{to}} is a minor bump over {{from}}, which promises backward compatibility — but {{count}} change breaks consumers of {{from}}.",
+        "broken_other": "{{to}} is a minor bump over {{from}}, which promises backward compatibility — but {{count}} changes break consumers of {{from}}.",
+        "unknown": "{{to}} is a minor bump over {{from}}, which promises backward compatibility — whether it holds could not be verified."
+      },
+      "PATCH": {
+        "holds": "{{to}} is a patch bump over {{from}}, which promises backward compatibility — and it holds.",
+        "broken_one": "{{to}} is a patch bump over {{from}}, which promises backward compatibility — but {{count}} change breaks consumers of {{from}}.",
+        "broken_other": "{{to}} is a patch bump over {{from}}, which promises backward compatibility — but {{count}} changes break consumers of {{from}}.",
+        "unknown": "{{to}} is a patch bump over {{from}}, which promises backward compatibility — whether it holds could not be verified."
+      },
+      "PRERELEASE": "{{to}} is a prerelease of {{from}} — compatibility is not guaranteed.",
+      "NONE": "{{to}} is the same version as {{from}}.",
+      "DOWNGRADE": "{{to}} is older than {{from}} — the directions read the other way round."
+    },
+    "breaksTitle": "What breaks consumers of {{version}}",
+    "nothing": "Nothing.",
+    "noBaseline": "No active version to compare with",
+    "compact": "Compatibility with {{from}} (active):",
+    "details": "Details",
+    "checkerUnavailable": "The AsyncAPI checker could not be reached — this direction could not be verified."
+  },
   "toast": {
     "created": "Version created",
     "createdWithFindings": "Version created with findings",

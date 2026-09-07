@@ -5,7 +5,8 @@ import { Alert, Group, Select, Stack, Switch, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { getContract } from "../api/contracts";
 import { ApiError } from "../api/http";
-import { getVersion, listVersions } from "../api/versions";
+import { getVersion, getVersionCompatibility, listVersions } from "../api/versions";
+import CompatibilityCard from "../components/CompatibilityCard";
 import EditPageLoadState from "../components/EditPageLoadState";
 import LoadingBlock from "../components/LoadingBlock";
 import PageHeader from "../components/PageHeader";
@@ -38,6 +39,11 @@ export default function VersionDiff() {
   const fromId = Number(params.get("from")) || (items.find((v) => v.id !== toId)?.id ?? null);
   const from = useQuery({ queryKey: ["contracts", "version", id, fromId], queryFn: () => getVersion(id, fromId as number), enabled: fromId != null });
   const to = useQuery({ queryKey: ["contracts", "version", id, toId], queryFn: () => getVersion(id, toId as number), enabled: toId != null });
+  const compatibility = useQuery({
+    queryKey: ["contracts", "version", id, toId, "compatibility", fromId ?? "baseline"],
+    queryFn: () => getVersionCompatibility(id, toId as number, fromId as number),
+    enabled: fromId != null && toId != null,
+  });
 
   const diff = useMemo(() => (from.data && to.data ? diffLines(from.data.content, to.data.content) : null), [from.data, to.data]);
   const rows = useMemo(() => (diff ? (hideUnchanged ? collapseUnchanged(diff) : diff) : []), [diff, hideUnchanged]);
@@ -91,6 +97,17 @@ export default function VersionDiff() {
           {loadErrorMessage(from.error ?? to.error, t)}
         </Alert>
       )}
+      {fromId != null &&
+        toId != null &&
+        (compatibility.isLoading ? (
+          <LoadingBlock mih={80} />
+        ) : compatibility.isError ? (
+          <Alert color="red" variant="light">
+            {loadErrorMessage(compatibility.error, t)}
+          </Alert>
+        ) : compatibility.data ? (
+          <CompatibilityCard variant="full" report={compatibility.data} />
+        ) : null)}
       {diff ? (
         stats && stats.added === 0 && stats.removed === 0 ? (
           <Alert color="teal" variant="light">

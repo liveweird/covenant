@@ -27,7 +27,7 @@ skips the rest (the leftover `e2e-*` rows are cleaned up by hand or by the next 
      with `allowInvalid=true` and the version page shows "1 errors".
 6. They open Compare versions.
    - *Expected*: the diff names the two versions and shows the changed `$ref` as a `+` line, with
-     "+2 / −2 lines".
+     "+2 / −2 lines"; a Compatibility card names the two-way verdict between them with a badge.
 
 ## Scenario: admin publishes the version, reads it in the reader, downloads it and sees the breaking-change gate
 

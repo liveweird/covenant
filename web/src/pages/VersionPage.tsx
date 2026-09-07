@@ -209,6 +209,9 @@ export default function VersionPage() {
             <VersionAsidePanel
               view={view}
               model={model.data}
+              contract={data}
+              version={stored}
+              editing={editing}
               findings={findings}
               mode={editing ? "live" : "stored"}
               checked={!editing || check.checked}

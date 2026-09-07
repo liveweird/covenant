@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { renderWithProviders, screen, waitFor, within } from "../test/render";
 import { Route, Routes } from "react-router-dom";
 import VersionPage from "./VersionPage";
-import { bodyOf, CLEAN_REPORT, CONTENT, CONTRACT, findCall, FINDING, OLD_VERSION, serve, signIn, SOFT_ERROR, VERSION, type FetchMock } from "../test/contractsFixtures";
+import { bodyOf, CLEAN_REPORT, COMPATIBILITY, COMPATIBILITY_NO_BASELINE, CONTENT, CONTRACT, findCall, FINDING, OLD_VERSION, serve, signIn, SOFT_ERROR, VERSION, type FetchMock } from "../test/contractsFixtures";
 import { MODEL_OPENAPI } from "../test/readerFixtures";
 
 vi.mock("../components/LazyCodeEditor", async () => (await import("../test/codeEditorStub")).codeEditorMock());
@@ -37,6 +37,8 @@ describe("VersionPage", () => {
     "POST /api/v1/contracts/versions/check": { status: 200, body: CLEAN_REPORT },
     "GET /api/v1/contracts/5/versions/10/model": { status: 200, body: MODEL_OPENAPI },
     "GET /api/v1/contracts/5/versions/11/model": { status: 200, body: MODEL_OPENAPI },
+    "GET /api/v1/contracts/5/versions/11/compatibility?": { status: 200, body: COMPATIBILITY },
+    "GET /api/v1/contracts/5/versions/10/compatibility?": { status: 200, body: COMPATIBILITY_NO_BASELINE },
   };
 
   test("shows the document read-only with its stored findings, meta and the writer's lifecycle moves", async () => {
@@ -55,6 +57,25 @@ describe("VersionPage", () => {
     await user.click(screen.getByRole("button", { name: "Go to line 2, column 1" }));
     expect(screen.getByTestId("code-editor-stub")).toHaveAttribute("data-jump", "2:1");
     expect(screen.getByTestId("code-editor-stub")).toHaveAttribute("data-diagnostics", "1");
+  });
+
+  test("the compact compatibility line shows above Findings in stored view and disappears while editing", async () => {
+    serve(mockFetch, base);
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("heading", { level: 2, name: "orders-api 1.1.0" });
+    expect(await screen.findByText("Compatibility with 1.0.0 (active):")).toBeInTheDocument();
+    expect(screen.getByText("Backward compatible")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Details" })).toHaveAttribute("href", "/contracts/5/diff?from=10&to=11");
+    await user.click(screen.getByRole("button", { name: "Edit document" }));
+    expect(screen.queryByText("Compatibility with 1.0.0 (active):")).not.toBeInTheDocument();
+  });
+
+  test("no active predecessor shows a dimmed line instead of the badge", async () => {
+    serve(mockFetch, base);
+    renderPage("/contracts/5/versions/10");
+    await screen.findByRole("heading", { level: 2, name: "orders-api 1.0.0" });
+    expect(await screen.findByText("No active version to compare with")).toBeInTheDocument();
   });
 
   test("a reader sees no moves, no Edit, and a More menu with Download and Compare only", async () => {

@@ -14,6 +14,11 @@ export type CheckReport = components["schemas"]["CheckReport"];
 export type DocumentCheckBody = components["schemas"]["DocumentCheckRequest"];
 export type DocumentFormat = components["schemas"]["DocumentFormat"];
 export type SyncState = components["schemas"]["SyncStateResponse"];
+// The two-way compatibility report between an arbitrary version pair (never stored, never audited).
+export type CompatibilityReport = components["schemas"]["CompatibilityReport"];
+export type CompatibilityVerdict = components["schemas"]["CompatibilityVerdict"];
+export type CompatibilityDirection = components["schemas"]["CompatibilityDirection"];
+export type VersionBump = components["schemas"]["VersionBump"];
 // The reader's render model (milestone 4) — computed server-side, typed here from the spec.
 export type RenderModel = components["schemas"]["RenderModelResponse"];
 export type SchemaNode = components["schemas"]["SchemaNode"];
@@ -60,6 +65,16 @@ export async function getVersion(contractId: number, versionId: number): Promise
 /** The reader's render model — keyed by the version's content hash upstream, so a stored edit refetches it. */
 export async function getVersionModel(contractId: number, versionId: number): Promise<RenderModel> {
   return jsonRequest<RenderModel>(`/api/v1/contracts/${contractId}/versions/${versionId}/model`);
+}
+
+/**
+ * The two-way compatibility report between this version (`to`) and another (`against`, the
+ * older/reference side) — omitted `against` means the contract's highest ACTIVE version below
+ * `to` (and, with none, `from: null`/`verdict: UNKNOWN`). Pure and unstored, like `getVersionModel`.
+ */
+export async function getVersionCompatibility(contractId: number, versionId: number, against?: number): Promise<CompatibilityReport> {
+  const params = buildQuery({ against });
+  return jsonRequest<CompatibilityReport>(`/api/v1/contracts/${contractId}/versions/${versionId}/compatibility?${params}`);
 }
 
 export async function getVersionContent(contractId: number, versionId: number): Promise<string> {

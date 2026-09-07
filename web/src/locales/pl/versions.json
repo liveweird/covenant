@@ -113,6 +113,51 @@
     "needTwo": "Do porównania potrzebne są dwie wersje.",
     "viewAria": "Różnice od {{from}} do {{to}}"
   },
+  "compatibility": {
+    "title": "Zgodność",
+    "verdictBadge": {
+      "FULL": "W pełni zgodne",
+      "BACKWARD": "Zgodne wstecznie",
+      "FORWARD": "Zgodne w przód",
+      "NONE": "Niezgodne",
+      "UNKNOWN": "Nieznana"
+    },
+    "verdict": {
+      "FULL": "{{to}} jest w pełni zgodna z {{from}} — integracje korzystające z jednej wersji działają też z drugą.",
+      "BACKWARD": "{{to}} jest zgodna wstecznie z {{from}}: integracje korzystające z {{from}} nadal działają, ale integracje korzystające z {{to}} przestałyby działać wobec {{from}}.",
+      "FORWARD": "{{to}} jest zgodna w przód z {{from}}: integracje korzystające z {{to}} już działają wobec {{from}}, ale integracje korzystające z {{from}} przestałyby działać wobec {{to}}.",
+      "NONE": "{{to}} nie jest zgodna z {{from}} w żadnym kierunku.",
+      "UNKNOWN": "Nie udało się w pełni ustalić zgodności między {{to}} a {{from}}."
+    },
+    "bump": {
+      "MAJOR": "{{to}} to główna zmiana wersji względem {{from}}, która dopuszcza zmiany łamiące zgodność.",
+      "MINOR": {
+        "holds": "{{to}} to poboczna zmiana wersji względem {{from}}, która obiecuje zgodność wsteczną — i dotrzymuje obietnicy.",
+        "broken_one": "{{to}} to poboczna zmiana wersji względem {{from}}, która obiecuje zgodność wsteczną — ale {{count}} zmiana łamie integracje korzystające z {{from}}.",
+        "broken_few": "{{to}} to poboczna zmiana wersji względem {{from}}, która obiecuje zgodność wsteczną — ale {{count}} zmiany łamią integracje korzystające z {{from}}.",
+        "broken_many": "{{to}} to poboczna zmiana wersji względem {{from}}, która obiecuje zgodność wsteczną — ale {{count}} zmian łamie integracje korzystające z {{from}}.",
+        "broken_other": "{{to}} to poboczna zmiana wersji względem {{from}}, która obiecuje zgodność wsteczną — ale {{count}} zmian łamie integracje korzystające z {{from}}.",
+        "unknown": "{{to}} to poboczna zmiana wersji względem {{from}}, która obiecuje zgodność wsteczną — nie udało się zweryfikować, czy dotrzymuje obietnicy."
+      },
+      "PATCH": {
+        "holds": "{{to}} to poprawka względem {{from}}, która obiecuje zgodność wsteczną — i dotrzymuje obietnicy.",
+        "broken_one": "{{to}} to poprawka względem {{from}}, która obiecuje zgodność wsteczną — ale {{count}} zmiana łamie integracje korzystające z {{from}}.",
+        "broken_few": "{{to}} to poprawka względem {{from}}, która obiecuje zgodność wsteczną — ale {{count}} zmiany łamią integracje korzystające z {{from}}.",
+        "broken_many": "{{to}} to poprawka względem {{from}}, która obiecuje zgodność wsteczną — ale {{count}} zmian łamie integracje korzystające z {{from}}.",
+        "broken_other": "{{to}} to poprawka względem {{from}}, która obiecuje zgodność wsteczną — ale {{count}} zmian łamie integracje korzystające z {{from}}.",
+        "unknown": "{{to}} to poprawka względem {{from}}, która obiecuje zgodność wsteczną — nie udało się zweryfikować, czy dotrzymuje obietnicy."
+      },
+      "PRERELEASE": "{{to}} to wersja przedpremierowa {{from}} — zgodność nie jest gwarantowana.",
+      "NONE": "{{to}} to ta sama wersja co {{from}}.",
+      "DOWNGRADE": "{{to}} jest starsza niż {{from}} — kierunki czytamy odwrotnie."
+    },
+    "breaksTitle": "Co psuje integracje korzystające z {{version}}",
+    "nothing": "Nic.",
+    "noBaseline": "Brak aktywnej wersji do porównania",
+    "compact": "Zgodność z {{from}} (aktywna):",
+    "details": "Szczegóły",
+    "checkerUnavailable": "Nie udało się połączyć z mechanizmem sprawdzającym AsyncAPI — nie można zweryfikować tego kierunku."
+  },
   "deleteTitle": "Usunąć wersję?",
   "deleteBody": "Wersja {{version}} kontraktu „{{name}}” zostanie usunięta. Usuwać można tylko szkice.",
   "deleteFailed": "Nie udało się usunąć wersji",
