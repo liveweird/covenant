@@ -2,7 +2,7 @@ import type { IRuleResult } from "@stoplight/spectral-core";
 
 /** The wire vocabulary shared with the JVM (`contracts/checks/Finding.kt`) — never re-mapped there. */
 export type Severity = "ERROR" | "WARN" | "INFO";
-export type Source = "SYNTAX" | "SCHEMA" | "SEMANTIC" | "LINT" | "BREAKING" | "CONFORMANCE" | "SYSTEM";
+export type Source = "SYNTAX" | "SCHEMA" | "SEMANTIC" | "LINT" | "BREAKING" | "CONFORMANCE" | "SYSTEM" | "INFERENCE";
 
 export interface Finding {
   severity: Severity;

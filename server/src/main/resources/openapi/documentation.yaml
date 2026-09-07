@@ -34,6 +34,7 @@ tags:
   - name: contracts
   - name: contract-versions
   - name: try-it
+  - name: inference
   - name: notifications
 
 paths:
@@ -2098,6 +2099,38 @@ paths:
         '429': { $ref: '#/components/responses/TooManyRequests' }
         '500': { $ref: '#/components/responses/InternalServerError' }
         '502': { $ref: '#/components/responses/BadGateway' }
+  /api/v1/contracts/infer:
+    post:
+      tags: [inference]
+      operationId: inferDocument
+      summary: Infer a draft document from real samples
+      description: |
+        Any authenticated user. Pure and computed per call — nothing is stored, no audit (the
+        try-it posture). Exactly the sample list matching `type` must carry entries; the other two
+        stay empty (`400`). HTTP exchanges become OpenAPI 3.1 (paths templated from literal
+        examples, request/response schemas, detected security schemes); AsyncAPI channel batches
+        become AsyncAPI 3.0 (one channel and one `send` operation per batch, CloudEvents envelopes
+        recognised); a relation's columns and/or rows become an ODCS 3.0.2 dataset. Every heuristic
+        applied rides back as an `INFERENCE` note beside the draft — never blocking. The response
+        is opened straight into the ordinary version-create/import screens; nothing is checked
+        against a contract's writer rule here.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InferRequest'
+      responses:
+        '200':
+          description: The draft document and its inference notes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InferResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
 components:
   securitySchemes:
     bearerAuth:
@@ -2223,8 +2256,8 @@ components:
       in: query
       required: false
       description: >-
-        Repeatable — any-of over finding sources; every enum value is accepted, though SYNTAX and
-        CONFORMANCE never match a stored finding (empty = any).
+        Repeatable — any-of over finding sources; every enum value is accepted, though SYNTAX,
+        CONFORMANCE and INFERENCE never match a stored finding (empty = any).
       schema:
         type: array
         items: { $ref: '#/components/schemas/FindingSource' }
@@ -3707,7 +3740,7 @@ components:
       enum: [ERROR, WARN, INFO]
     FindingSource:
       type: string
-      enum: [SYNTAX, SCHEMA, SEMANTIC, LINT, BREAKING, CONFORMANCE, SYSTEM]
+      enum: [SYNTAX, SCHEMA, SEMANTIC, LINT, BREAKING, CONFORMANCE, SYSTEM, INFERENCE]
     Finding:
       type: object
       required: [severity, source, code, message]
@@ -3983,6 +4016,102 @@ components:
       required: [content]
       properties:
         content: { type: string }
+
+    InferRequest:
+      type: object
+      required: [type]
+      description: >-
+        Exactly the sample list matching `type` is read; the other two must stay empty (`400`).
+        Pure — nothing is stored, no audit.
+      properties:
+        type: { $ref: '#/components/schemas/ContractType' }
+        name: { type: string, nullable: true, description: "The document's title/name." }
+        version:
+          type: string
+          nullable: true
+          description: "The document's own version — SemVer 2.0 when given."
+        http:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/HttpExchangeSample' }
+        messages:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/MessageBatchSample' }
+        relations:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/RelationSample' }
+    HttpExchangeSample:
+      type: object
+      required: [method, url, status]
+      properties:
+        method: { type: string, description: "GET, PUT, POST, DELETE, OPTIONS, HEAD or PATCH." }
+        url: { type: string, description: "An absolute http(s) URL (its origin becomes a servers[] entry) or a bare '/path'." }
+        query:
+          allOf: [{ $ref: '#/components/schemas/StringMap' }]
+          description: "Values feed type inference only — never written into the document."
+        requestHeaders:
+          type: array
+          description: "Header NAMES only, lower-case — values never travel."
+          items: { type: string }
+        authorizationScheme:
+          type: string
+          nullable: true
+          description: "bearer, basic, digest or other — the Authorization value's scheme word only."
+        requestContentType: { type: string, nullable: true }
+        requestBody: { type: string, nullable: true, maxLength: 1048576 }
+        status: { type: integer, format: int32, minimum: 100, maximum: 599 }
+        responseHeaders:
+          type: array
+          description: "Header NAMES only, lower-case — values never travel."
+          items: { type: string }
+        responseContentType: { type: string, nullable: true }
+        responseBody: { type: string, nullable: true, maxLength: 1048576 }
+    MessageBatchSample:
+      type: object
+      required: [channel]
+      properties:
+        channel: { type: string, description: "The AsyncAPI channel's topic/address." }
+        payloads:
+          type: array
+          maxItems: 50
+          items: { type: string, maxLength: 1048576 }
+    RelationColumn:
+      type: object
+      required: [name, dbType, nullable]
+      properties:
+        name: { type: string }
+        dbType: { type: string, description: "The database's own type name (e.g. int4, varchar, _text)." }
+        nullable: { type: boolean }
+        primaryKeyPosition: { type: integer, format: int32, minimum: 1, nullable: true }
+    RelationSample:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, description: "Optionally schema-qualified (public.users) — ODCS keeps only the bare name." }
+        physicalType: { type: string, nullable: true, description: "table or view; unset when unknown." }
+        columns:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/RelationColumn' }
+        rows:
+          type: array
+          maxItems: 50
+          items: { type: string, maxLength: 1048576, description: "One JSON object per observed row." }
+    InferResponse:
+      type: object
+      required: [content, format, notes, errors, warnings, infos]
+      properties:
+        content: { type: string }
+        format: { $ref: '#/components/schemas/DocumentFormat' }
+        notes:
+          type: array
+          description: "Every heuristic the builder applied — FindingSource INFERENCE, never blocking."
+          items: { $ref: '#/components/schemas/Finding' }
+        errors: { type: integer, minimum: 0 }
+        warnings: { type: integer, minimum: 0 }
+        infos: { type: integer, minimum: 0 }
 
     ProblemDetail:
       type: object

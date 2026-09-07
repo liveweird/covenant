@@ -18,7 +18,8 @@
     "LINT": "Lint",
     "BREAKING": "Breaking change",
     "SYSTEM": "System",
-    "CONFORMANCE": "Conformance"
+    "CONFORMANCE": "Conformance",
+    "INFERENCE": "Inference"
   },
   "waiting": "Checking the document…",
   "checking": "Checking…",

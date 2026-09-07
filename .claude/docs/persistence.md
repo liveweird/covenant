@@ -49,6 +49,8 @@ The contract tables follow Toadie's dialect (`SERIAL`/`INTEGER` ids, epoch-milli
 
 **The try-it feature stores nothing** (`contracts/tryit/`, milestone 3c): a try's observation and its conformance report are computed per call and answered, never written — not to `contract_versions`, not to `contract_events` (an observation is not a change to the contract), only to the security audit log. The one persistence it touches is a READ of the environment's decrypted targets (`EnvironmentService.resolveTarget`); the SQL leg opens its own short-lived JDBC connection to the ENVIRONMENT's database (read-only, `statement_timeout`, rolled back) — never the app's own pool or R2DBC.
 
+**Inference stores nothing either** (`contracts/infer/`, release 0.8.0): `POST /api/v1/contracts/infer` derives a draft document from samples and answers it in the response body — never `contract_versions`, never `contract_events`, no audit (the pure POST touches no contract at all). The draft only reaches the database once the caller pastes it into the ordinary version-create/import path, which runs every rule (the writer guard, the SemVer/lifecycle checks, the two-tier validation) exactly as for a typed document.
+
 ### Not yet ported from Lettuce / Toadie
 
 Nothing remains on the persistence list — notifications arrived with milestone 3 in Lettuce's exact shape (see the consistency model above); new subsystems arrive with their own paragraph here.

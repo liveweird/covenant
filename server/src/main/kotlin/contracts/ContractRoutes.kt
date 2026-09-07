@@ -66,6 +66,11 @@ class ContractsRoute {
     @Resource("fetch")
     class Fetch(val parent: ContractsRoute = ContractsRoute())
 
+    /** The inference engine (`contracts/infer/`): samples in, a draft document out — pure, nothing stored. */
+    @Serializable
+    @Resource("infer")
+    class Infer(val parent: ContractsRoute = ContractsRoute())
+
     @Serializable
     @Resource("versions")
     class Versions(val parent: ContractsRoute = ContractsRoute()) {
