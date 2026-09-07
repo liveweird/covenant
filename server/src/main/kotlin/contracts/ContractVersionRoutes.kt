@@ -1,9 +1,13 @@
 package ch.nokillswit.contracts
 
 import ch.nokillswit.audit.audit
+import ch.nokillswit.authz.NotFoundException
 import ch.nokillswit.authz.caller
 import ch.nokillswit.authz.orNotFound
+import ch.nokillswit.contracts.checks.Baseline
 import ch.nokillswit.contracts.checks.BreakingChanges
+import ch.nokillswit.contracts.checks.CompatibilityReport
+import ch.nokillswit.contracts.checks.VersionRef
 import ch.nokillswit.contracts.render.ContractRenderer
 import ch.nokillswit.contracts.checks.ChecksServiceKey
 import ch.nokillswit.contracts.checks.DocumentFormat
@@ -125,10 +129,11 @@ private fun Route.versionCollection(deps: VersionRouteDeps) {
     }
 }
 
-/** One version read three ways: the row, the reader's render model, the raw document (optionally as a download). */
+/** One version read three ways — the row, the render model, the raw document (or its download) — plus the compatibility report. */
 private fun Route.versionReads(deps: VersionRouteDeps) {
     val contractService = deps.contractService
     val versionService = deps.versionService
+    val checks = deps.checks
     get<ContractsRoute.Id.Versions.Vid> { route ->
         call.caller()
         call.respond(HttpStatusCode.OK, versionService.read(route.parent.parent.id, route.vid).orNotFound("Version"))
@@ -140,6 +145,27 @@ private fun Route.versionReads(deps: VersionRouteDeps) {
         val type = contractService.typeOf(contractId).orNotFound("Contract")
         val model = ContractRenderer.render(type, version.content)
         call.respondText(ContractRenderer.json.encodeToString(model), ContentType.Application.Json, HttpStatusCode.OK)
+    }
+    get<ContractsRoute.Id.Versions.Vid.Compatibility> { route ->
+        call.caller()
+        val contractId = route.parent.parent.parent.id
+        val type = contractService.typeOf(contractId).orNotFound("Contract")
+        val to = versionService.read(contractId, route.parent.vid).orNotFound("Version")
+        val toSemVer = SemVer.parse(to.version)
+        val fromSide = resolveCompatibilityFrom(versionService, contractId, route.against, toSemVer)
+        val outcome = checks.compatibility(type, fromSide.baseline, toSemVer, to.content)
+        call.respond(
+            HttpStatusCode.OK,
+            CompatibilityReport(
+                from = fromSide.ref,
+                to = VersionRef(to.id, to.version, to.lifecycle),
+                verdict = outcome.verdict,
+                bump = outcome.bump,
+                backward = outcome.backward,
+                forward = outcome.forward,
+                checkerAvailable = outcome.checkerAvailable,
+            ),
+        )
     }
     get<ContractsRoute.Id.Versions.Vid.Content> { route ->
         val viewer = contractService.viewer(call.caller())
@@ -389,6 +415,30 @@ private fun ApplicationCall.auditCheckerUnavailableFor(version: VersionResponse)
 
 /** A filename-safe slug: letters, digits, dot, dash, underscore; everything else collapses to `-`. */
 internal fun slug(raw: String): String = raw.replace(Regex("[^A-Za-z0-9._-]+"), "-").trim('-').ifEmpty { "document" }
+
+/** The compatibility report's `from` side: its [VersionRef] (when resolvable) beside the [Baseline] the engines compare against. */
+private data class CompatibilityFrom(val ref: VersionRef?, val baseline: Baseline?)
+
+/**
+ * `against` given → the full row (id, version, lifecycle all known — malformed/foreign/missing is
+ * a 404); omitted → the contract's ACTIVE baseline below `to`, read WITH its row id in ONE
+ * transaction (`ContractVersionService.baselineRowFor` — a second lookup could see a version that
+ * transitioned in between and answer `from` null beside a `bump`; lifecycle is ACTIVE by
+ * construction). No baseline at all → both sides null, `ChecksService.compatibility` answers UNKNOWN.
+ */
+private suspend fun resolveCompatibilityFrom(
+    versionService: ContractVersionService,
+    contractId: UInt,
+    against: UInt?,
+    toVersion: SemVer,
+): CompatibilityFrom {
+    if (against != null) {
+        val row = versionService.read(contractId, against) ?: throw NotFoundException("Version not found")
+        return CompatibilityFrom(VersionRef(row.id, row.version, row.lifecycle), Baseline(SemVer.parse(row.version), row.content))
+    }
+    val row = versionService.baselineRowFor(contractId, toVersion) ?: return CompatibilityFrom(null, null)
+    return CompatibilityFrom(VersionRef(row.id, row.baseline.version.toString(), Lifecycle.ACTIVE), row.baseline)
+}
 
 /** Whether the stored report carries the waived breaking gate — the one verdict followers are told about. */
 private fun VersionResponse.storedBreaking(): Boolean = findings.any { it.code == BreakingChanges.CODE_WITHOUT_MAJOR_BUMP }

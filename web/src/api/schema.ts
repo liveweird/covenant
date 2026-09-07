@@ -1304,6 +1304,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contracts/{id}/versions/{vid}/compatibility": {
+        parameters: {
+            query?: {
+                /**
+                 * @description The OLDER/reference version's id (`vid` is the newer/candidate side); omitted, the
+                 *     contract's highest ACTIVE version below `vid` is used. `against == vid` is legal (→
+                 *     `FULL`, identical). Must be a version of the SAME contract.
+                 */
+                against?: number;
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The two-way compatibility report between this version and another
+         * @description Any authenticated user. Never stored, never audited — a pure read like `GET …/model`.
+         *     Computes BOTH directions between the pair: backward (do `from`'s consumers still work
+         *     against `to`?) and forward (do `to`'s consumers already work against `from`?), the same raw
+         *     breaking-change facts the check pipeline draws on, and names the two-way `verdict` plus the
+         *     SemVer `bump` between them. With no ACTIVE predecessor and no `against`, the report answers
+         *     `200` with `from: null` and `verdict: UNKNOWN`.
+         */
+        get: operations["getVersionCompatibility"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contracts/{id}/versions/{vid}/try": {
         parameters: {
             query?: never;
@@ -2678,6 +2713,44 @@ export interface components {
             checkerAvailable: boolean;
             /** @description The ACTIVE version the document was compared against for breaking changes; null when none applied. */
             baselineVersion?: string | null;
+        };
+        /**
+         * @description `FULL` (both directions compatible), `BACKWARD` (consumers of `from` still work against
+         *     `to`), `FORWARD` (consumers of `to` already worked against `from`), `NONE` (neither), or
+         *     `UNKNOWN` (a direction could not be computed — no ACTIVE predecessor, an unparseable side,
+         *     a differ skip, the checker down for AsyncAPI).
+         * @enum {string}
+         */
+        CompatibilityVerdict: "FULL" | "BACKWARD" | "FORWARD" | "NONE" | "UNKNOWN";
+        /**
+         * @description The SemVer bump of `to` relative to `from` — the "why" sentence: a MINOR/PATCH bump
+         *     promises backward compatibility, MAJOR permits a break. `DOWNGRADE` when `from` is actually
+         *     the newer of the pair (the Compare page lets you pick either order).
+         * @enum {string}
+         */
+        VersionBump: "MAJOR" | "MINOR" | "PATCH" | "PRERELEASE" | "NONE" | "DOWNGRADE";
+        VersionRef: {
+            /** Format: int32 */
+            id: number;
+            version: string;
+            lifecycle: components["schemas"]["Lifecycle"];
+        };
+        CompatibilityDirection: {
+            /** @description Null when not computable — `findings` then holds the SKIPPED / CHECKER_UNAVAILABLE note, never facts. */
+            compatible?: boolean | null;
+            findings: components["schemas"]["Finding"][];
+        };
+        CompatibilityReport: {
+            /** @description The older/reference side; null when no ACTIVE predecessor exists and `against` was omitted. */
+            from?: components["schemas"]["VersionRef"] | null;
+            to: components["schemas"]["VersionRef"];
+            verdict: components["schemas"]["CompatibilityVerdict"];
+            /** @description Absent exactly when `from` is null (a nullable enum has no clean 3.0 spelling, so the wire omits it). */
+            bump?: components["schemas"]["VersionBump"];
+            backward: components["schemas"]["CompatibilityDirection"];
+            forward: components["schemas"]["CompatibilityDirection"];
+            /** @description False when the checker sidecar could not be reached for an AsyncAPI direction. */
+            checkerAvailable: boolean;
         };
         DocumentCheckRequest: {
             type: components["schemas"]["ContractType"];
@@ -5245,6 +5318,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RenderModelResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getVersionCompatibility: {
+        parameters: {
+            query?: {
+                /**
+                 * @description The OLDER/reference version's id (`vid` is the newer/candidate side); omitted, the
+                 *     contract's highest ACTIVE version below `vid` is used. `against == vid` is legal (→
+                 *     `FULL`, identical). Must be a version of the SAME contract.
+                 */
+                against?: number;
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The compatibility report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompatibilityReport"];
                 };
             };
             400: components["responses"]["BadRequest"];

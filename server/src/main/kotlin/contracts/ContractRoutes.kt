@@ -124,6 +124,11 @@ class ContractsRoute {
                 @Resource("model")
                 class Model(val parent: Vid)
 
+                /** The two-way compatibility report against `against` (default: the ACTIVE baseline below this version). */
+                @Serializable
+                @Resource("compatibility")
+                class Compatibility(val parent: Vid, val against: UInt? = null)
+
                 /** The try-it family (contracts/tryit/): the catalog GET, then the HTTP / Kafka / SQL legs. */
                 @Serializable
                 @Resource("try")

@@ -79,6 +79,72 @@ class ChecksService(private val checkerProvider: () -> CheckerClient) {
         return CheckReport.of(parsed.format, metadata, settled, checkerAvailable, baseline?.version?.toString())
     }
 
+    /**
+     * The two-way compatibility report between an arbitrary pair (`contracts/checks/Compatibility.kt`):
+     * `backward` = the facts of comparing old=`from` → new=`to`, `forward` = old=`to` → new=`from` —
+     * the same raw facts `BreakingChanges`/`settle` draw on, kept at their WARN severity (no
+     * MAJOR-bump flip here; that sentence is the SPA's). `from == null` (no ACTIVE predecessor)
+     * answers UNKNOWN without touching any engine; identical text on both sides short-circuits to
+     * `compatible = true` twice, likewise without an engine call.
+     */
+    suspend fun compatibility(type: ContractType, from: Baseline?, toVersion: SemVer, toContent: String): CompatibilityOutcome {
+        if (from == null) {
+            val note = CompatibilityDirection(null, listOf(skippedFinding("no active version to compare against")))
+            return CompatibilityOutcome(CompatibilityVerdict.UNKNOWN, null, note, note, checkerAvailable = true)
+        }
+        if (from.content == toContent) {
+            val same = CompatibilityDirection(true, emptyList())
+            val bump = Compatibility.bump(from.version, toVersion)
+            return CompatibilityOutcome(CompatibilityVerdict.FULL, bump, same, same, checkerAvailable = true)
+        }
+        val backward = breakingFacts(type, from.version, from.content, toContent)
+        val forward = breakingFacts(type, toVersion, toContent, from.content)
+        return CompatibilityOutcome(
+            Compatibility.verdict(backward.direction.compatible, forward.direction.compatible),
+            Compatibility.bump(from.version, toVersion),
+            backward.direction,
+            forward.direction,
+            backward.checkerAvailable && forward.checkerAvailable,
+        )
+    }
+
+    /** One direction: the facts of comparing `old` (`oldVersion`/`oldContent`) against `newContent`. */
+    private suspend fun breakingFacts(type: ContractType, oldVersion: SemVer, oldContent: String, newContent: String): DirectionResult {
+        val parsedNew = when (val outcome = DocumentParser.parse(newContent)) {
+            is ParseOutcome.Failed ->
+                return DirectionResult(CompatibilityDirection(null, listOf(skippedFinding("the document does not parse"))), true)
+            is ParseOutcome.Parsed -> outcome
+        }
+        if (DocumentParser.typeGate(type, parsedNew.root) != null) {
+            return DirectionResult(
+                CompatibilityDirection(null, listOf(skippedFinding("the document does not match the contract's type"))),
+                true,
+            )
+        }
+        return when (type) {
+            ContractType.OPENAPI, ContractType.ODCS -> {
+                val facts = BreakingChanges.facts(type, Baseline(oldVersion, oldContent), newContent, parsedNew.root)
+                val isSkipped = facts.any { it.code == BreakingChanges.CODE_SKIPPED }
+                DirectionResult(CompatibilityDirection(if (isSkipped) null else facts.isEmpty(), facts), true)
+            }
+            ContractType.ASYNCAPI -> try {
+                val breaking = checkerProvider().check(type, newContent, previousContent = oldContent).findings
+                    .filter { it.source == FindingSource.BREAKING }
+                val isSkipped = breaking.any { it.code == CODE_ASYNCAPI_DIFF_SKIPPED }
+                DirectionResult(CompatibilityDirection(if (isSkipped) null else breaking.isEmpty(), breaking), true)
+            } catch (e: CheckerUnavailableException) {
+                log.warn("checker unavailable: {}", e.message)
+                val note = Finding(Severity.WARN, FindingSource.SYSTEM, CODE_CHECKER_UNAVAILABLE, CHECKER_UNAVAILABLE_DIRECTION_MESSAGE)
+                DirectionResult(CompatibilityDirection(null, listOf(note)), false)
+            }
+        }
+    }
+
+    private fun skippedFinding(reason: String) = Finding(
+        Severity.INFO, FindingSource.BREAKING, BreakingChanges.CODE_SKIPPED,
+        "Breaking changes could not be computed — $reason",
+    )
+
     private fun crossChecks(
         type: ContractType,
         parsed: ParseOutcome.Parsed,
@@ -115,8 +181,16 @@ class ChecksService(private val checkerProvider: () -> CheckerClient) {
         const val CODE_CHECKER_UNAVAILABLE = "CHECKER_UNAVAILABLE"
         const val CODE_VERSION_MISMATCH = "VERSION_MISMATCH"
         const val CODE_STATUS_MISMATCH = "STATUS_MISMATCH"
+
+        /** The checker's `@asyncapi/diff` skip code (`checker/src/engines/asyncapi.ts`) — an uncomparable AsyncAPI pair. */
+        private const val CODE_ASYNCAPI_DIFF_SKIPPED = "asyncapi-diff-skipped"
+        private const val CHECKER_UNAVAILABLE_DIRECTION_MESSAGE =
+            "The lint/semantic checker was unavailable — this direction's breaking changes could not be computed"
     }
 }
+
+/** [ChecksService.breakingFacts]'s answer: the direction plus whether the checker was reachable for it. */
+private data class DirectionResult(val direction: CompatibilityDirection, val checkerAvailable: Boolean)
 
 /** Audit the operational fact once per failed sidecar call: who was checking what (byUserId + the request path), never the document. */
 fun io.ktor.server.application.ApplicationCall.auditCheckerUnavailable(report: CheckReport) {

@@ -411,6 +411,21 @@ object TestChecker {
     )
 
     fun down() = Stub(emptyList(), fail = true)
+
+    /**
+     * A checker whose `check` answer depends on `previousContent` (the compatibility endpoint
+     * calls it twice per request, sides swapped) — [Stub] cannot express that.
+     */
+    class ByPrevious(private val findingsFor: (previousContent: String?) -> List<ch.nokillswit.contracts.checks.Finding>) :
+        ch.nokillswit.contracts.checks.CheckerClient {
+        override suspend fun check(
+            type: ch.nokillswit.contracts.ContractType,
+            content: String,
+            previousContent: String?,
+        ): ch.nokillswit.contracts.checks.CheckerResponse = ch.nokillswit.contracts.checks.CheckerResponse(findingsFor(previousContent))
+    }
+
+    fun byPrevious(findingsFor: (previousContent: String?) -> List<ch.nokillswit.contracts.checks.Finding>) = ByPrevious(findingsFor)
 }
 
 /** Direct contract fixtures: a system to hang contracts on, and contract/version seeding past the routes. */

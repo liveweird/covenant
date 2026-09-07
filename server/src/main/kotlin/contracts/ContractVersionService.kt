@@ -337,15 +337,22 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
      * BELOW it (a recheck of an older version compares against ITS predecessor, never a successor);
      * no `below` = the highest ACTIVE version. Null when nothing is published yet.
      */
-    suspend fun baselineFor(contractId: UInt, below: SemVer?): Baseline? = suspendTransaction(database) {
+    suspend fun baselineFor(contractId: UInt, below: SemVer?): Baseline? = baselineRowFor(contractId, below)?.baseline
+
+    /**
+     * [baselineFor] with the row id beside it, read in the SAME transaction — the compatibility
+     * route names the baseline as a `VersionRef`, and a second lookup could see a version that
+     * transitioned in between (`from` null with a `bump` present, contradicting the spec).
+     */
+    suspend fun baselineRowFor(contractId: UInt, below: SemVer?): BaselineRow? = suspendTransaction(database) {
         val v = ContractVersions
-        v.select(v.version, v.content)
+        v.select(v.id, v.version, v.content)
             .where { (v.contractId eq contractId) and (v.lifecycle eq Lifecycle.ACTIVE.name) and ContractVersions.active() }
-            .map { SemVer.parse(it[v.version]) to it[v.content] }
+            .map { Triple(it[v.id].value, SemVer.parse(it[v.version]), it[v.content]) }
             .toList()
-            .filter { (semver, _) -> below == null || semver < below }
-            .maxByOrNull { it.first }
-            ?.let { (semver, content) -> Baseline(semver, content) }
+            .filter { (_, semver, _) -> below == null || semver < below }
+            .maxByOrNull { it.second }
+            ?.let { (id, semver, content) -> BaselineRow(id, Baseline(semver, content)) }
     }
 
     // ---- internals -----------------------------------------------------------------------
@@ -456,3 +463,6 @@ data class SourceChange(val version: String, val previous: String?, val next: St
 
 internal fun sha256(text: String): String =
     MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") { "%02x".format(it) }
+
+/** [ContractVersionService.baselineRowFor]'s answer: the baseline plus the row it came from, read together. */
+data class BaselineRow(val id: UInt, val baseline: Baseline)
