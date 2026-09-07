@@ -17,6 +17,20 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.7.0",
+    date: "2026-09-07",
+    en: `**Compatibility, named.**
+
+- The Compare page now says whether the two versions you picked are fully, backward, forward or not compatible — and why: the breaking changes in each direction, and whether the version bump promised what it delivered (a minor or patch bump promises backward compatibility; a major bump permits a break).
+- Every version page shows its verdict against the active version before it, with a Details link into the comparison.
+- The verdict is computed on demand from the stored documents for OpenAPI, AsyncAPI and ODCS alike; nothing is stored, and a side that cannot be compared is reported as unknown rather than guessed.`,
+    pl: `**Zgodność nazwana po imieniu.**
+
+- Strona Porównaj mówi teraz, czy dwie wybrane wersje są w pełni zgodne, zgodne wstecz, zgodne w przód czy niezgodne — i dlaczego: zmiany łamiące w każdym kierunku oraz to, czy podbicie wersji dotrzymało obietnicy (podbicie minor lub patch obiecuje zgodność wstecz; podbicie major dopuszcza zmianę łamiącą).
+- Każda strona wersji pokazuje swój werdykt względem poprzedzającej ją aktywnej wersji, z linkiem Szczegóły do porównania.
+- Werdykt jest liczony na żądanie z zapisanych dokumentów — tak samo dla OpenAPI, AsyncAPI i ODCS; nic nie jest zapisywane, a strona, której nie da się porównać, jest zgłaszana jako nieznana, a nie zgadywana.`,
+  },
+  {
     version: "0.6.1",
     date: "2026-09-07",
     en: `**Three fixes for reading comfort.**
