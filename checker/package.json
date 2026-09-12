@@ -36,10 +36,10 @@
     "eslint": "^10.8.0",
     "eslint-plugin-sonarjs": "^4.2.0",
     "globals": "^17.8.0",
-    "knip": "^6.32.2",
+    "knip": "^6.35.1",
     "tsx": "^4.23.13",
     "typescript": "~6.0.3",
-    "typescript-eslint": "^8.65.0",
+    "typescript-eslint": "^8.70.0",
     "vitest": "^4.1.10"
   }
 }
