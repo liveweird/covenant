@@ -65,6 +65,7 @@ fun ApplicationTestBuilder.configureApp(vararg overrides: Pair<String, String>) 
                 "postgres.user" to PostgresTestSupport.user,
                 "postgres.password" to PostgresTestSupport.password,
                 "security.csrf.enabled" to "false",
+                "lifecycle.reminders.enabled" to "false",
                 *overrides,
             )
         )

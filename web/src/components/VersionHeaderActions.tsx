@@ -60,7 +60,7 @@ export default function VersionHeaderActions({
       <SourceUrlModal contractId={contract.id} version={linking ? version : null} onClose={() => setLinking(false)} />
       <SyncVersionModal contract={contract} version={syncing ? version : null} onClose={() => setSyncing(false)} onSynced={onSynced} />
       {contract.canWrite && !editing && (
-        <LifecycleActions lifecycle={version.lifecycle} version={version.version} pending={transitionPending} onTransition={onTransition} />
+        <LifecycleActions contractId={contract.id} lifecycle={version.lifecycle} version={version.version} pending={transitionPending} onTransition={onTransition} />
       )}
       {canEdit && !editing && (
         <Button variant="default" leftSection={<IconPencil size={16} />} onClick={onEdit}>

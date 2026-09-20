@@ -15,6 +15,9 @@ const LINE = {
   recommendedVersionId: 10,
   recommendedVersion: { id: 10, version: "1.0.0", lifecycle: "ACTIVE" as const },
   versionCount: 2,
+  deprecatesOn: null,
+  replacement: null,
+  migrationGuide: null,
   updatedAt: 2,
 };
 const PAGE = { items: [LINE], page: 1, pageSize: 100, total: 1 };
@@ -86,8 +89,17 @@ describe("ReleaseLinesPanel", () => {
     await user.click(screen.getByRole("option", { name: "End of life" }));
     expect(within(dialog).getByRole("combobox", { name: "Recommended version" })).toBeDisabled();
     await user.click(within(dialog).getByRole("button", { name: "Save policy" }));
+    const impact = await screen.findByRole("dialog", { name: "Retirement impact for 1.x" });
+    expect(findCall(mockFetch, "PUT", "/api/v1/contracts/5/release-lines/1")).toBeUndefined();
+    await user.click(within(impact).getByRole("checkbox"));
+    await waitFor(() => expect(within(impact).getByRole("button", { name: "End support" })).toBeEnabled());
+    await user.click(within(impact).getByRole("button", { name: "End support" }));
     await waitFor(() => expect(findCall(mockFetch, "PUT", "/api/v1/contracts/5/release-lines/1")).toBeDefined());
     expect(bodyOf(findCall(mockFetch, "PUT", "/api/v1/contracts/5/release-lines/1"))).toEqual({
+      deprecatesOn: null,
+      replacementContractId: null,
+      replacementMajor: null,
+      migrationGuide: null,
       supportStatus: "END_OF_LIFE",
       supportEndsOn: "2027-12-31",
       supportPolicy: "Security fixes and critical bug fixes.",

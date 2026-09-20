@@ -60,7 +60,7 @@ Line summaries use full SemVer precedence, not lexicographic ordering of prerele
 - `GET /api/v1/contracts/{id}/release-lines`: paged line summaries, default descending major.
 - `GET /api/v1/contracts/{id}/release-lines/{major}`: one line, including its policy,
   explicit pin and effective recommendation.
-- `PUT` the same resource: full replacement of the four policy fields, returning `204`.
+- `PUT` the same resource: full replacement of the policy and lifecycle-plan fields, returning `204`.
 - The existing versions collection accepts a scalar `major` filter, including `0`.
 
 Every authenticated reader can inspect lines. Policy writes require the existing contract
@@ -85,3 +85,54 @@ read-only policy information without write controls. The Playwright journey and 
 The migration is additive; never edit existing migrations. Once new history/notification enum
 values are stored, rolling back to an old binary is unsafe. A rollback needs a compatible binary
 or restoration of a database snapshot taken before rollout.
+
+## Planned deprecation and retirement (0.11.0)
+
+A line can carry `deprecatesOn` (canonical ISO calendar date), `replacementContractId`,
+`replacementMajor`, and `migrationGuide` (trimmed plain text, at most 8,000 characters).
+`supportEndsOn` remains the single support-end date. Both dates may be in the past; when both
+are present, deprecation must be on or before support end. Omitted optional PUT fields clear
+values. These dates are advisory: they never transition versions, change support status,
+clear recommendations, alter compatibility baselines, or restrict writes automatically.
+
+A replacement may be another contract as a whole or an existing major line. The same contract
+requires a different major; direct self-replacement is invalid. Assigning a new reference
+requires an active target, but no write permission on that target. The response's `replacement`
+summary preserves the IDs and indicates `available=false` after target deletion. An unchanged
+unavailable reference can be retained while editing other fields. Targets are advisory links:
+there is no recursive resolution or cross-contract locking. Missing newly selected targets are
+invalid input, not a missing source resource.
+
+The release-line card previews migration instructions; its retirement-impact dialog displays
+them in full. The same dialog precedes an explicit version retirement or a change to
+END_OF_LIFE. It shows cached **contract-level** consumers from the existing Toadie APIs,
+including systems, teams, freshness, and unavailable mappings. It does not infer which major
+or version a consumer uses. No declared consumers is never proof that retirement is safe.
+Missing/stale/failed usage reads are warnings an owner can acknowledge; failure to load the
+Covenant plan must be retried before confirming. Readers may inspect the impact without write
+controls. Ending support still does not retire individual versions; existing transition API
+semantics and writer guards remain unchanged.
+
+## Deadline notifications
+
+Followers receive in-app reminders for both deprecation and support end. The scheduler runs
+on startup and hourly, evaluating calendar dates in UTC. It selects only the current urgency:
+8–30 days remaining, 1–7 days remaining, or the deadline reached (including overdue). A restart
+or newly entered past date catches up with one current reminder per deadline, not every missed
+window. Existing support-end dates become eligible on upgrade. END_OF_LIFE lines, deleted
+contracts/lines, retained lines without versions, and deleted users are excluded. New followers
+may receive the current reminder window; these system notifications have no actor exclusion.
+
+V18 adds an internal nullable notification deduplication key. Reminder insertion and its
+recipient-scoped unique key commit in one database transaction after locking and re-reading
+the active source contract/line. The key includes line ID, deadline kind, date, and window
+(30/7/0); today and overdue share window 0. Concurrent scans, service restarts, deleting a
+notification, or clearing/restoring the same date cannot duplicate it. Changing a date creates
+a new occurrence. Ordinary policy changes retain the established post-commit ContractActivity
+history and notification behavior; scheduled reminders do not create fake user history events.
+
+Candidate scans use bounded keyset batches, then revalidate each line under the parent lock.
+Per-line failures do not stop later reminders; failed transactions remain eligible for retry.
+`LIFECYCLE_REMINDERS_ENABLED=false` disables the worker; normal backend tests disable it and
+exercise `ReleaseLineReminderService` with a fixed UTC clock explicitly. No Toadie call or
+account/team mapping is needed to deliver reminders to Covenant followers.

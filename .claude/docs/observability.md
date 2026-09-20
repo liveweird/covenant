@@ -40,3 +40,12 @@ actor, contract and major-line identifiers, and records `RELEASE_LINE_UPDATED` t
 `ContractActivity` for history and follower notifications. Unchanged replacement PUTs are
 no-ops. Automatic recommendation changes caused by a version transition accompany that
 version's existing transition event; they do not introduce a second user action.
+
+### Scheduled lifecycle notifications
+
+Release-line deadline reminders are structural `RELEASE_LINE_DEPRECATION_DUE` and
+`RELEASE_LINE_SUPPORT_END_DUE` notifications with `contractName`, `major`, `deadline`, and
+`stage`. The SPA translates the stage in the recipient's UI language. They have no actor and
+do not append user-action history. Policy changes still use `RELEASE_LINE_UPDATED`; events
+record date/replacement facts without copying migration-guide text. Reminder scan/line failures
+log warnings and remain retryable. See `release-lines.md` for atomic deduplication and UTC rules.

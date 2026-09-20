@@ -224,6 +224,18 @@ never in Git. Production connections require HTTPS. Failed refreshes retain the 
 usage and show it as stale; architecture usage does not establish an exact version or release
 line. See [the integration reference](.claude/docs/toadie-integration.md) for details.
 
+## Planned deprecation and retirement
+
+Release-line policies can announce deprecation and support-end dates, link to a replacement
+contract or major line, and explain migration steps. Followers receive in-app deadline reminders
+at the current 30-day, 7-day, or reached-deadline window (UTC; checked hourly). Existing support-end
+dates become eligible on upgrade. Dates never change version lifecycle automatically.
+
+Before retiring a version or ending line support, review the declared consumers and teams from
+Toadie, the observation's freshness, and the migration plan. Usage remains contract-level;
+Covenant does not assume which release line those services use. This feature needs no Toadie
+changes. See [release-line rules](.claude/docs/release-lines.md) for details.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

@@ -37,6 +37,7 @@ class MigrationChecksumTest {
         "V15__create_environments.sql" to -121549605,
         "V16__create_contract_release_lines.sql" to 1546691076,
         "V17__create_toadie_usage.sql" to -556852994,
+        "V18__release_line_lifecycle_planning.sql" to 535372252,
     )
 
     @Test

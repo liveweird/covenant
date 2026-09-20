@@ -115,7 +115,7 @@ test.describe.serial("parallel release lines", () => {
     await testInfo.attach("Release lines and support policy", { body: screenshot, contentType: "image/png" });
   });
 
-  test("ending release line support does not retire its contract versions", async ({ page }) => {
+  test("ending release line support requires impact acknowledgement and does not retire its contract versions", async ({ page }) => {
     await login(page);
     await page.goto(contractPath());
     await page.getByRole("button", { name: "Edit policy for 1.x", exact: true }).click();
@@ -124,6 +124,11 @@ test.describe.serial("parallel release lines", () => {
     await page.getByRole("option", { name: "End of life", exact: true }).click();
     await dialog.getByRole("button", { name: "Save policy", exact: true }).click();
     await expect(dialog).toHaveCount(0);
+    const impact = page.getByRole("dialog", { name: "Retirement impact for 1.x", exact: true });
+    await impact.getByRole("checkbox", { name: "I have reviewed the declared usage and its limitations and choose to proceed." }).check();
+    await expect(impact.getByRole("button", { name: "End support", exact: true })).toBeEnabled();
+    await impact.getByRole("button", { name: "End support", exact: true }).click();
+    await expect(impact).toHaveCount(0);
     await expect(line(page, 1)).toContainText("No recommended version");
     await expect(line(page, 2).getByRole("link", { name: "2.0.0", exact: true }).first()).toBeVisible();
     await page.getByRole("link", { name: "Open version 1.9.1", exact: true }).click();

@@ -26,6 +26,14 @@
     "VERSION_IMPORTED": "{{actor}} imported version {{version}} of {{contractName}}.",
     "VERSION_BREAKING_STORED": "{{contractName}} {{version}} was stored with a breaking change and no major bump.",
     "RELEASE_LINE_UPDATED": "{{actor}} updated the support policy for {{contractName}} {{major}}.x ({{supportStatus}}).",
-    "TOADIE_LINKS_UPDATED": "{{actor}} updated the Toadie API links for {{contractName}}."
+    "TOADIE_LINKS_UPDATED": "{{actor}} updated the Toadie API links for {{contractName}}.",
+    "RELEASE_LINE_DEPRECATION_DUE": "Release line {{major}}.x of {{contractName}}: planned deprecation {{deadline}} ({{stage}}).",
+    "RELEASE_LINE_SUPPORT_END_DUE": "Release line {{major}}.x of {{contractName}}: support ends {{deadline}} ({{stage}})."
+  },
+  "deadlineStage": {
+    "DUE_IN_30_DAYS": "within 30 days",
+    "DUE_IN_7_DAYS": "within 7 days",
+    "DUE_TODAY": "today",
+    "OVERDUE": "deadline passed"
   }
 }

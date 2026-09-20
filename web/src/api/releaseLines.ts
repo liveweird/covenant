@@ -25,3 +25,7 @@ export async function listAllReleaseLines(contractId: number): Promise<ReleaseLi
 export async function updateReleaseLine(contractId: number, major: number, body: ReleaseLineUpdateBody): Promise<void> {
   await voidRequest(`/api/v1/contracts/${contractId}/release-lines/${major}`, { method: "PUT", body: JSON.stringify(body) });
 }
+
+export async function getReleaseLine(contractId: number, major: number): Promise<ReleaseLineResponse> {
+  return jsonRequest(`/api/v1/contracts/${contractId}/release-lines/${major}`);
+}

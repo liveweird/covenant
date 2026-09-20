@@ -29,11 +29,13 @@
 3. Inspect the contract history and run an accessibility scan of the release-lines region.
    - *Expected*: the policy change is visible and there are no WCAG A/AA violations.
 
-## Scenario: ending release line support does not retire its contract versions
+## Scenario: ending release line support requires impact acknowledgement and does not retire its contract versions
 
-1. Change 1.x to End of life and save.
+1. Change 1.x to End of life and save the policy.
+   - *Expected*: the retirement-impact review opens instead of changing support immediately.
+2. Acknowledge the declared-usage limitations and click End support.
    - *Expected*: 1.x has no recommended version; 2.x still recommends 2.0.0.
-2. Open version 1.9.1.
+3. Open version 1.9.1.
    - *Expected*: the version is still active, with its Deprecate action available.
 
 ## Not covered here (and why)

@@ -25,6 +25,8 @@ enum class NotificationType {
     VERSION_IMPORTED,
     VERSION_BREAKING_STORED,
     RELEASE_LINE_UPDATED,
+    RELEASE_LINE_DEPRECATION_DUE,
+    RELEASE_LINE_SUPPORT_END_DUE,
     TOADIE_LINKS_UPDATED,
 }
 
@@ -39,6 +41,7 @@ data class Notification(
     val type: NotificationType,
     val params: Map<String, String> = emptyMap(),
     val link: String? = null,
+    val deduplicationKey: String? = null,
 )
 
 @Serializable

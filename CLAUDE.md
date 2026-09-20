@@ -254,3 +254,11 @@ ch.nokillswit
 See `web/CLAUDE.md` for the frontend conventions (flat directories, co-located tests, typed i18n with EN/PL parity, the transport layer, theming — purple is the interactive accent only; red = blocking, orange = waived finding, teal = success).
 
 @.claude/docs/toadie-integration.md
+
+### Planned lifecycle changes (0.11.0)
+
+Release-line policy includes advisory deprecation/support dates, a replacement contract/major,
+and migration guidance. `ReleaseLineReminders.kt` provides the UTC hourly worker and atomic,
+recipient-scoped deduplication; V18 adds the fields and notification key. No automatic retirement
+or Toadie mutation occurs. The SPA requires a consumer-impact review for retirement/end of
+support. Rules, failure semantics and rollout notes live in `.claude/docs/release-lines.md`.

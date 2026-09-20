@@ -28,6 +28,14 @@
     "VERSION_IMPORTED": "{{actor}} zaimportował/a wersję {{version}} kontraktu {{contractName}}.",
     "VERSION_BREAKING_STORED": "{{contractName}} {{version}} zapisano ze zmianą łamiącą bez podniesienia wersji głównej.",
     "RELEASE_LINE_UPDATED": "{{actor}} zaktualizował/a zasady wsparcia dla {{contractName}} {{major}}.x ({{supportStatus}}).",
-    "TOADIE_LINKS_UPDATED": "{{actor}} zaktualizował/a powiązania API w Toadie dla {{contractName}}."
+    "TOADIE_LINKS_UPDATED": "{{actor}} zaktualizował/a powiązania API w Toadie dla {{contractName}}.",
+    "RELEASE_LINE_DEPRECATION_DUE": "Linia {{major}}.x kontraktu {{contractName}}: planowane wycofanie z zalecanego użycia {{deadline}} ({{stage}}).",
+    "RELEASE_LINE_SUPPORT_END_DUE": "Linia {{major}}.x kontraktu {{contractName}}: koniec wsparcia {{deadline}} ({{stage}})."
+  },
+  "deadlineStage": {
+    "DUE_IN_30_DAYS": "w ciągu 30 dni",
+    "DUE_IN_7_DAYS": "w ciągu 7 dni",
+    "DUE_TODAY": "dzisiaj",
+    "OVERDUE": "termin minął"
   }
 }

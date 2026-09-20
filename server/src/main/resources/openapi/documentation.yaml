@@ -1683,8 +1683,16 @@ paths:
     put:
       tags: [contracts]
       operationId: replaceContractReleaseLine
-      summary: Replace a major release line's support policy
-      description: Writers only. A pinned recommendation must be an ACTIVE stable version in this contract and major. END_OF_LIFE rejects a pin and has no effective recommendation.
+      summary: Replace a release line's support policy and lifecycle plan
+      description: >-
+        Writers only. Full replacement of all policy and planning fields: omitted optional
+        members are cleared, including dates, replacement references, migration guidance and
+        the recommendation pin. Dates are advisory and never transition versions or support
+        status automatically. When both dates are present, deprecatesOn must not follow supportEndsOn.
+        A replacement must identify an active contract/line when newly assigned; an unchanged
+        unavailable reference may be retained. The same contract requires a different major.
+        A pinned recommendation must be an ACTIVE stable version in this contract and major.
+        END_OF_LIFE rejects a pin and has no effective recommendation.
       requestBody:
         required: true
         content:
@@ -3600,7 +3608,7 @@ components:
         total: { type: integer, format: int64, minimum: 0 }
     NotificationType:
       type: string
-      enum: [CONTRACT_UPDATED, CONTRACT_OWNER_CHANGED, CONTRACT_DELETED, VERSION_CREATED, VERSION_CONTENT_UPDATED, VERSION_TRANSITIONED, VERSION_DELETED, VERSION_SYNCED, VERSION_SOURCE_CHANGED, VERSION_IMPORTED, VERSION_BREAKING_STORED, RELEASE_LINE_UPDATED, TOADIE_LINKS_UPDATED]
+      enum: [CONTRACT_UPDATED, CONTRACT_OWNER_CHANGED, CONTRACT_DELETED, VERSION_CREATED, VERSION_CONTENT_UPDATED, VERSION_TRANSITIONED, VERSION_DELETED, VERSION_SYNCED, VERSION_SOURCE_CHANGED, VERSION_IMPORTED, VERSION_BREAKING_STORED, RELEASE_LINE_UPDATED, RELEASE_LINE_DEPRECATION_DUE, RELEASE_LINE_SUPPORT_END_DUE, TOADIE_LINKS_UPDATED]
       description: The notification kind; the SPA renders it in the viewer's language. A kind a client build does not know renders as its raw name.
     NotificationResponse:
       type: object
@@ -3613,9 +3621,23 @@ components:
         params:
           type: object
           additionalProperties: { type: string }
-          description: The interpolation values — `contractName`, `actor`, and the event's `version`/`from`/`to`/`name` when present. Never document text.
+          properties:
+            stage: { $ref: '#/components/schemas/ReleaseLineReminderStage' }
+          description: >-
+            Structural interpolation values; never document text. User-action notifications
+            carry contractName, actor and the event's version/from/to/name when relevant.
+            RELEASE_LINE_DEPRECATION_DUE and RELEASE_LINE_SUPPORT_END_DUE always carry
+            contractName, major (decimal string), deadline (YYYY-MM-DD), and stage, with no actor.
+            Reminder dates use UTC. DUE_TODAY and OVERDUE share one delivery window, so passing
+            midnight does not resend a delivered deadline reminder.
         link: { type: string, nullable: true, description: A language-independent SPA path (the contract or the version). }
         wasSeen: { type: boolean }
+    ReleaseLineReminderStage:
+      type: string
+      enum: [DUE_IN_30_DAYS, DUE_IN_7_DAYS, DUE_TODAY, OVERDUE]
+      description: >-
+        The current window when a reminder was minted: 8-30 days remaining, 1-7 days remaining,
+        the deadline date, or a past deadline. Catch-up emits only the current window.
     NotificationPage:
       type: object
       required: [items, page, pageSize, total]
@@ -4444,15 +4466,33 @@ components:
         lifecycle: { $ref: '#/components/schemas/Lifecycle' }
     ReleaseLineUpdateRequest:
       type: object
+      description: Complete support policy and lifecycle plan. Omitted optional fields are cleared.
       required: [supportStatus]
       properties:
         supportStatus: { $ref: '#/components/schemas/SupportStatus' }
         supportEndsOn: { type: string, format: date, nullable: true }
         supportPolicy: { type: string, maxLength: 2000, nullable: true }
         recommendedVersionId: { type: integer, format: int32, minimum: 0, nullable: true }
+        deprecatesOn: { type: string, format: date, nullable: true }
+        replacementContractId: { type: integer, format: int32, minimum: 0, nullable: true }
+        replacementMajor:
+          type: integer
+          format: int32
+          minimum: 0
+          nullable: true
+          description: A replacement major requires replacementContractId; null selects the replacement contract as a whole.
+        migrationGuide: { type: string, maxLength: 8000, nullable: true }
+    ReleaseLineReplacement:
+      type: object
+      required: [contractId, contractName, major, available]
+      properties:
+        contractId: { type: integer, format: int32, minimum: 0 }
+        contractName: { type: string, nullable: true }
+        major: { type: integer, format: int32, minimum: 0, nullable: true }
+        available: { type: boolean }
     ReleaseLineResponse:
       type: object
-      required: [id, contractId, major, supportStatus, supportEndsOn, supportPolicy, recommendedVersionId, latestVersion, recommendedVersion, versionCount, updatedAt]
+      required: [id, contractId, major, supportStatus, supportEndsOn, supportPolicy, recommendedVersionId, deprecatesOn, replacement, migrationGuide, latestVersion, recommendedVersion, versionCount, updatedAt]
       properties:
         id: { type: integer, format: int32, minimum: 0 }
         contractId: { type: integer, format: int32, minimum: 0 }
@@ -4461,6 +4501,11 @@ components:
         supportEndsOn: { type: string, format: date, nullable: true }
         supportPolicy: { type: string, nullable: true }
         recommendedVersionId: { type: integer, format: int32, minimum: 0, nullable: true }
+        deprecatesOn: { type: string, format: date, nullable: true }
+        replacement:
+          allOf: [{ $ref: '#/components/schemas/ReleaseLineReplacement' }]
+          nullable: true
+        migrationGuide: { type: string, nullable: true }
         latestVersion:
           allOf: [{ $ref: '#/components/schemas/ReleaseLineVersionSummary' }]
           nullable: true

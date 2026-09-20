@@ -215,7 +215,10 @@ test.describe.serial("the contract core loop", () => {
   await page.getByRole("dialog").getByRole("button", { name: "Deprecate" }).click();
   await expect(page.getByRole("button", { name: "Retire" })).toBeVisible();
   await page.getByRole("button", { name: "Retire" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Retire" }).click();
+  const retirement = page.getByRole("dialog", { name: "Retirement impact for 1.x" });
+  await retirement.getByRole("checkbox", { name: "I have reviewed the declared usage and its limitations and choose to proceed." }).check();
+  await expect(retirement.getByRole("button", { name: "Retire" })).toBeEnabled();
+  await retirement.getByRole("button", { name: "Retire" }).click();
   await expect(page.getByRole("button", { name: "Retire" })).toHaveCount(0);
   await page.getByRole("link", { name: "Back to the contract" }).click();
   await page.getByRole("button", { name: "More actions" }).click();

@@ -279,6 +279,8 @@ private fun Route.releaseLines(
                 "major" to route.major,
                 "supportStatus" to response.supportStatus.name,
                 "recommendedVersionId" to response.recommendedVersionId?.toLong(),
+                "deprecatesOn" to response.deprecatesOn,
+                "supportEndsOn" to response.supportEndsOn,
             )
             activity.record(
                 contractId,
@@ -288,6 +290,9 @@ private fun Route.releaseLines(
                     "major" to route.major.toString(),
                     "supportStatus" to response.supportStatus.name,
                     "supportEndsOn" to (response.supportEndsOn ?: ""),
+                    "deprecatesOn" to (response.deprecatesOn ?: ""),
+                    "replacementContractId" to (response.replacement?.contractId?.toString() ?: ""),
+                    "replacementMajor" to (response.replacement?.major?.toString() ?: ""),
                     "supportPolicy" to (response.supportPolicy ?: ""),
                     "recommendedVersionId" to (response.recommendedVersionId?.toString() ?: ""),
                 ),

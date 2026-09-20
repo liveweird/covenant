@@ -3,6 +3,7 @@ package ch.nokillswit.contracts
 import ch.nokillswit.authz.CallerPrincipal
 import ch.nokillswit.authz.NotFoundException
 import ch.nokillswit.infra.db.active
+import ch.nokillswit.infra.db.requireActive
 import ch.nokillswit.infra.db.SoftDeletable
 import ch.nokillswit.infra.db.nowMillis
 import ch.nokillswit.infra.paging.PageRequest
@@ -42,6 +43,10 @@ class ReleaseLineService(
         val supportEndsOn = varchar("support_ends_on", 10).nullable()
         val supportPolicy = varchar("support_policy", 2000).nullable()
         val recommendedVersionId = reference("recommended_version_id", ContractVersionService.ContractVersions).nullable()
+        val deprecatesOn = varchar("deprecates_on", 10).nullable()
+        val replacementContractId = reference("replacement_contract_id", ContractService.Contracts).nullable()
+        val replacementMajor = integer("replacement_major").nullable()
+        val migrationGuide = varchar("migration_guide", 8000).nullable()
         val updatedAt = long("updated_at")
         override val markedAsDeleted = bool("marked_as_deleted").default(false)
     }
@@ -74,16 +79,26 @@ class ReleaseLineService(
             throw BadRequestException("An end-of-life release line cannot pin a recommended version")
         }
         val policy = request.supportPolicy?.trim()?.ifEmpty { null }
+        val guide = request.migrationGuide?.trim()?.ifEmpty { null }
+        validateReplacement(contractId, major, request, row)
         val changed = row[ReleaseLines.supportStatus] != request.supportStatus.name ||
             row[ReleaseLines.supportEndsOn] != request.supportEndsOn ||
             row[ReleaseLines.supportPolicy] != policy ||
-            row[ReleaseLines.recommendedVersionId]?.value != pin
+            row[ReleaseLines.recommendedVersionId]?.value != pin ||
+            row[ReleaseLines.deprecatesOn] != request.deprecatesOn ||
+            row[ReleaseLines.replacementContractId]?.value != request.replacementContractId ||
+            row[ReleaseLines.replacementMajor] != request.replacementMajor ||
+            row[ReleaseLines.migrationGuide] != guide
         if (changed) {
             ReleaseLines.update({ ReleaseLines.id eq row[ReleaseLines.id] }) {
                 it[supportStatus] = request.supportStatus.name
                 it[supportEndsOn] = request.supportEndsOn
                 it[supportPolicy] = policy
                 it[recommendedVersionId] = pin
+                it[deprecatesOn] = request.deprecatesOn
+                it[replacementContractId] = request.replacementContractId
+                it[replacementMajor] = request.replacementMajor
+                it[migrationGuide] = guide
                 it[updatedAt] = nowMillis()
             }
         }
@@ -108,15 +123,51 @@ class ReleaseLineService(
     }
 
     private fun validate(request: ReleaseLineUpdateRequest) {
-        request.supportEndsOn?.let {
-            try {
-                if (!DATE_PATTERN.matches(it)) throw DateTimeParseException("non-canonical", it, 0)
-                if (LocalDate.parse(it).toString() != it) throw DateTimeParseException("non-canonical", it, 0)
-            } catch (_: DateTimeParseException) {
-                throw BadRequestException("supportEndsOn must be a valid YYYY-MM-DD date")
-            }
+        request.supportEndsOn?.let { validateDate("supportEndsOn", it) }
+        request.deprecatesOn?.let { validateDate("deprecatesOn", it) }
+        if (request.deprecatesOn != null && request.supportEndsOn != null &&
+            LocalDate.parse(request.deprecatesOn).isAfter(LocalDate.parse(request.supportEndsOn))
+        ) {
+            throw BadRequestException("deprecatesOn must not be after supportEndsOn")
+        }
+        if (request.replacementMajor != null && request.replacementContractId == null) {
+            throw BadRequestException("replacementMajor requires replacementContractId")
+        }
+        if (request.replacementMajor != null && request.replacementMajor < 0) {
+            throw BadRequestException("replacementMajor must be non-negative")
         }
         if ((request.supportPolicy?.length ?: 0) > 2000) throw BadRequestException("supportPolicy must be at most 2000 characters")
+        if ((request.migrationGuide?.trim()?.length ?: 0) > 8000) {
+            throw BadRequestException("migrationGuide must be at most 8000 characters")
+        }
+    }
+
+    private fun validateDate(field: String, value: String) {
+        try {
+            if (!DATE_PATTERN.matches(value)) throw DateTimeParseException("non-canonical", value, 0)
+            if (LocalDate.parse(value).toString() != value) throw DateTimeParseException("non-canonical", value, 0)
+        } catch (_: DateTimeParseException) {
+            throw BadRequestException("$field must be a valid YYYY-MM-DD date")
+        }
+    }
+
+    private suspend fun validateReplacement(
+        contractId: UInt,
+        major: Int,
+        request: ReleaseLineUpdateRequest,
+        current: ResultRow,
+    ) {
+        val targetId = request.replacementContractId ?: return
+        if (targetId == contractId && (request.replacementMajor == null || request.replacementMajor == major)) {
+            throw BadRequestException("A release line cannot replace itself")
+        }
+        val changed = current[ReleaseLines.replacementContractId]?.value != targetId ||
+            current[ReleaseLines.replacementMajor] != request.replacementMajor
+        if (!changed) return
+        ContractService.Contracts.requireActive(targetId, "replacement contract")
+        request.replacementMajor?.let { targetMajor ->
+            if (lineRow(targetId, targetMajor) == null) throw BadRequestException("Replacement release line not found")
+        }
     }
 
     private suspend fun requireRecommended(contractId: UInt, major: Int, id: UInt): UInt {
@@ -146,6 +197,9 @@ class ReleaseLineService(
             }
         }
         val recommended = if (status == SupportStatus.END_OF_LIFE) null else pinned ?: automatic
+        val replacement = row[ReleaseLines.replacementContractId]?.value?.let { replacementId ->
+            replacement(replacementId, row[ReleaseLines.replacementMajor])
+        }
         return ReleaseLineResponse(
             id = row[ReleaseLines.id].value,
             contractId = contractId,
@@ -154,10 +208,28 @@ class ReleaseLineService(
             supportEndsOn = row[ReleaseLines.supportEndsOn],
             supportPolicy = row[ReleaseLines.supportPolicy],
             recommendedVersionId = pinned?.id,
+            deprecatesOn = row[ReleaseLines.deprecatesOn],
+            replacement = replacement,
+            migrationGuide = row[ReleaseLines.migrationGuide],
             latestVersion = latest,
             recommendedVersion = recommended,
             versionCount = versions.size.toLong(),
             updatedAt = row[ReleaseLines.updatedAt],
+        )
+    }
+
+    private suspend fun replacement(contractId: UInt, major: Int?): ReleaseLineReplacement {
+        val contract = ContractService.Contracts.select(
+            ContractService.Contracts.name,
+            ContractService.Contracts.markedAsDeleted,
+        ).where { ContractService.Contracts.id eq contractId }.toList().singleOrNull()
+        val lineAvailable = major == null || lineRow(contractId, major) != null
+        val available = contract != null && !contract[ContractService.Contracts.markedAsDeleted] && lineAvailable
+        return ReleaseLineReplacement(
+            contractId = contractId,
+            contractName = contract?.get(ContractService.Contracts.name),
+            major = major,
+            available = available,
         )
     }
 

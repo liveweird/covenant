@@ -95,3 +95,14 @@ to an immutable connection identity. Link writes use the contract writer lock; r
 I/O outside transactions and publishes only for the claimed configuration revision. Failure
 retains the last complete observation. Explicit link changes use ContractActivity; automatic
 refresh is an observation, not a contract mutation. See `toadie-integration.md`.
+
+### Lifecycle-plan persistence (0.11.0)
+
+V18 adds advisory dates, replacement IDs and plain-text migration guidance to release lines.
+Replacement IDs survive target soft deletion; availability is computed at read time. The same
+migration adds nullable `notifications.deduplication_key` with a unique recipient/key index,
+including soft-deleted rows. Scheduled deadline notifications use that row as their delivery
+ledger, inserting inside the current source-contract-locked transaction. This atomic dedup
+is specific to scheduled delivery; it does not change the post-commit ContractActivity model
+for user mutations. No new business tables or external writes are introduced. See
+`release-lines.md` for reminder windows and upgrade behavior.
