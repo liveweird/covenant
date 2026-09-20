@@ -50,8 +50,12 @@ describe("EditContract page", () => {
     const name = await screen.findByLabelText("Name");
     expect(name).toHaveValue("orders-api");
     await user.type(name, "-v2");
-    await user.click(screen.getByLabelText("Owner", { selector: "input" }));
-    await user.click(await screen.findByRole("option", { name: "Admin User (admin@covenant.local)" }));
+    const owner = screen.getByLabelText("Owner", { selector: "input" });
+    await user.click(owner);
+    await screen.findByRole("option", { name: "Admin User (admin@covenant.local)" });
+    await screen.findByRole("option", { name: "Payments Team" });
+    await user.click(screen.getByRole("option", { name: "Admin User (admin@covenant.local)" }));
+    await waitFor(() => expect(owner).toHaveValue("Admin User (admin@covenant.local)"));
     await user.click(screen.getByRole("button", { name: /^save$/i }));
     expect(await screen.findByRole("heading", { level: 2, name: "Contract page" })).toBeInTheDocument();
     expect(bodyOf(findCall(mockFetch, "PUT", "/api/v1/contracts/5"))).toEqual({ name: "orders-api-v2", description: "Orders" });

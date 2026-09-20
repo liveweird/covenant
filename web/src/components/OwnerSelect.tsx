@@ -34,7 +34,8 @@ export default function OwnerSelect({
   const admin = isAdmin();
   const me = getUserId();
   const [search, setSearch] = useState("");
-  const [debounced] = useDebouncedValue(search.trim(), 300);
+  const [userSearch, setUserSearch] = useState("");
+  const [debounced] = useDebouncedValue(userSearch.trim(), 300);
 
   const teams = useQuery({
     queryKey: ["teams", "picker", admin ? "all" : me],
@@ -69,12 +70,18 @@ export default function OwnerSelect({
       placeholder={t("contracts.owner.pick")}
       data={data}
       value={value}
-      onChange={onChange}
+      onChange={(next) => {
+        setUserSearch("");
+        onChange(next);
+      }}
       error={error}
       disabled={disabled}
       searchable
       searchValue={search}
       onSearchChange={setSearch}
+      // Mantine also sends programmatic selected-option labels through onSearchChange. Native
+      // input events identify actual text edits, so only those drive the remote users query.
+      onInput={(event) => setUserSearch(event.currentTarget.value)}
       nothingFoundMessage={t("contracts.owner.nothingFound")}
       // Admin searches hit the server (the users list); the local fold would hide server matches
       // whose label differs from the query only by what the server already matched.
