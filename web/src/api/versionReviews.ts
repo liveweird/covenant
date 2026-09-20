@@ -8,7 +8,7 @@ export type VersionReviewEntryResponse = components["schemas"]["VersionReviewEnt
 export type VersionReviewEntryKind = components["schemas"]["VersionReviewEntryKind"];
 
 export async function listVersionReviews(contractId: number, versionId: number, page: number, pageSize: number): Promise<VersionReviewPage> {
-  const query = buildQuery({ page, pageSize });
+  const query = buildQuery({ page, pageSize, sort: "-id" });
   return jsonRequest<VersionReviewPage>(`/api/v1/contracts/${contractId}/versions/${versionId}/reviews?${query}`);
 }
 

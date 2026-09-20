@@ -3,6 +3,8 @@ export const hierarchyPath = "/";
 export const contractsPath = "/contracts";
 /** Catalog-wide release-line lifecycle overview. */
 export const lifecycleOverviewPath = "/lifecycle";
+/** Personal/catalog review queue. */
+export const reviewInboxPath = "/reviews";
 /** The catalog-wide Errors report — a read over the stored check findings, not a sub-route of a contract. */
 export const errorsPath = "/errors";
 export const newContractPath = `${contractsPath}/new`;
@@ -16,6 +18,7 @@ export const inferVersionPath = (id: number) => `${contractPath(id)}/infer`;
 /** `view` = a deep link into the Reader or the Source rendering (the page remembers the user's own choice otherwise). */
 export const versionPath = (contractId: number, versionId: number, view?: "reader" | "source") =>
   `${contractPath(contractId)}/versions/${versionId}${view ? `?view=${view}` : ""}`;
+export const versionReviewsPath = (contractId: number, versionId: number) => `${versionPath(contractId, versionId)}#reviews`;
 /** `from` copies one stored document; `major` keeps creation inside a selected release line. */
 export const newVersionPath = (contractId: number, from?: number, major?: number) => {
   const params = new URLSearchParams();

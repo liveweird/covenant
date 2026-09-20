@@ -25,7 +25,8 @@ hierarchy; team/user ownership; SemVer and lifecycle rules; parallel major relea
 independent support policies, deprecation/migration plans, deadline reminders and stable recommendations; read-only provider/consumer usage from
 Toadie's Port ontology; validation, lint, and breaking-change
 detection; import with dry run, guarded URL fetch, source references and sync, diff, download,
-and export; history, followers and in-app notifications; and catalog facets. ADMIN-curated
+and export; history, followers and in-app notifications; optional version reviews with a
+personal/catalog review inbox; lifecycle overview; and catalog facets. ADMIN-curated
 Environments hold HTTP, Kafka, and PostgreSQL targets with passwords encrypted at rest. Try-it
 executes requests against those targets and reports live conformance findings. The contract
 reader renders a server-produced model alongside the source/editor views. The Errors report
@@ -188,6 +189,12 @@ other authenticated collaborators approve/request changes, and all can discuss t
 The requester cannot decide on their own request. Content revisions prevent outdated approvals
 from reviving; content edits and lifecycle changes close rounds atomically. Reviews never block
 publication. Read `.claude/docs/version-reviews.md` before changing this behavior.
+
+The Review inbox (`/reviews`, API `/api/v1/version-reviews/inbox` and `/summary`) shows the
+latest round for each active PROPOSED version. Personal scopes use actual ownership/team
+membership and follows, never ADMIN's write override. Attention counts identify awaiting
+decisions, requested changes and closed rounds needing replacement; no assignment or approval
+gate is implied. See `.claude/docs/review-inbox.md` for filtering and caller-cache semantics.
 
 Validation has two classes. Unparseable documents and type mismatches are hard `400`s that
 cannot be waived. Schema, semantic, and lint findings are

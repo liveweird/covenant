@@ -22,6 +22,7 @@ const Hierarchy = lazy(() => import("./pages/Hierarchy"));
 const Contracts = lazy(() => import("./pages/Contracts"));
 const Errors = lazy(() => import("./pages/Errors"));
 const LifecycleOverview = lazy(() => import("./pages/LifecycleOverview"));
+const ReviewInbox = lazy(() => import("./pages/ReviewInbox"));
 const CreateContract = lazy(() => import("./pages/CreateContract"));
 const EditContract = lazy(() => import("./pages/EditContract"));
 const ContractDetails = lazy(() => import("./pages/ContractDetails"));
@@ -211,6 +212,7 @@ export default function App() {
             <Route path="contracts" element={<Contracts />} />
             <Route path="errors" element={<Errors />} />
             <Route path="lifecycle" element={<LifecycleOverview />} />
+            <Route path="reviews" element={<ReviewInbox />} />
             <Route path="contracts/new" element={<CreateContract />} />
             <Route path="contracts/import" element={<ImportContract />} />
             {/* Literal segments — registered above the "contracts/:id" family so they win the match. */}

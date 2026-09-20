@@ -3,6 +3,7 @@ import { Accordion, Alert, Badge, Button, Group, Pagination, Paper, Stack, Text,
 import { IconCheck, IconMessage, IconMessagePlus, IconRefresh, IconX } from "@tabler/icons-react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "react-router-dom";
 import type { Lifecycle } from "../api/contracts";
 import { ApiError } from "../api/http";
 import {
@@ -34,11 +35,13 @@ export default function VersionReviews({
   disabled: boolean;
 }) {
   const { t } = useTranslation();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
   const autoSelectedPage = useRef<number | null>(null);
+  const scrolledTarget = useRef<string | null>(null);
   const reviews = useQuery({
     queryKey: ["contracts", "version-reviews", contractId, versionId, contentRevision, page],
     queryFn: () => listVersionReviews(contractId, versionId, page, ROUND_PAGE_SIZE),
@@ -51,6 +54,19 @@ export default function VersionReviews({
       setExpanded(reviews.data.items[0] ? String(reviews.data.items[0].id) : null);
     }
   }, [page, reviews.data]);
+
+  useEffect(() => {
+    if (location.hash !== "#reviews" || !reviews.data) return;
+    const target = `${location.key}:${contractId}:${versionId}`;
+    if (scrolledTarget.current === target) return;
+    const frame = requestAnimationFrame(() => {
+      const element = document.getElementById("reviews");
+      if (!element) return;
+      element.scrollIntoView({ block: "start" });
+      scrolledTarget.current = target;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [contractId, location.hash, location.key, reviews.data, versionId]);
 
   function markStale() {
     setStale(true);
@@ -77,7 +93,10 @@ export default function VersionReviews({
       autoSelectedPage.current = 1;
       setPage(1);
       setExpanded(String(round.id));
-      await queryClient.invalidateQueries({ queryKey: ["contracts", "version-reviews", contractId, versionId] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["contracts", "version-reviews", contractId, versionId] }),
+        queryClient.invalidateQueries({ queryKey: ["contracts", "review-inbox"] }),
+      ]);
     },
     onError: (error) => {
       if (error instanceof ApiError && error.status === 409) markStale();
@@ -88,7 +107,8 @@ export default function VersionReviews({
   const canRequest = reviews.data?.canRequest === true && displayedIsCurrent && !disabled && !stale && !refresh.isPending;
 
   return (
-    <Paper withBorder p="md" radius="md" role="region" aria-label={t("versions.reviews.title")}>
+    <Paper id="reviews" withBorder p="md" radius="md" role="region" aria-label={t("versions.reviews.title")}
+      style={{ scrollMarginTop: "calc(48px + var(--mantine-spacing-md))" }}>
       <Stack gap="md">
         <Group justify="space-between" align="flex-start">
           <div>
@@ -198,6 +218,7 @@ function ReviewRound({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["contracts", "version-review-entries", round.id] }),
         queryClient.invalidateQueries({ queryKey: ["contracts", "version-reviews", round.contractId, round.versionId] }),
+        queryClient.invalidateQueries({ queryKey: ["contracts", "review-inbox"] }),
       ]);
     },
     onError: (error) => {

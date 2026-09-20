@@ -139,6 +139,13 @@ their discussion and decision counts, clearly distinguished from current feedbac
 requester can comment but cannot approve/request changes; other authenticated collaborators
 can. No review state disables publication. Shared rules: `.claude/docs/version-reviews.md`.
 
+The Review inbox (`/reviews`, 0.14.0) is a paged server projection of each proposed version's
+latest round. Use caller-scoped query keys under `contracts/review-inbox`; invalidate them
+after review requests and entries. Scope/search apply to list and summary; summary lifts the
+attention filter. Navigate to the version's `#reviews` anchor after loading its content, using
+current review permissions there. Do not add inline decisions against an inbox snapshot or
+treat ADMIN write permission as personal ownership. See `.claude/docs/review-inbox.md`.
+
 ## Changelog & app versioning
 
 The user-facing changelog is a **build-time artifact** — no DB, no API, changes only with a deploy. `src/changelog/entries.ts` holds `ChangelogEntry` rows (`version`, `date` `YYYY-MM-DD`, `en`/`pl` **markdown** bodies), newest first; the app's only human-readable version is `APP_VERSION` in **`src/changelog/version.ts`** — its own tiny module so the shell's eager imports (VersionStamp, the what's-new dot) never pull the bilingual entries into the main bundle (the entries ride the lazy Changelog chunk only). **A release = the new entry at the top of entries.ts + the bump of that one literal** (the Gradle `1.0.0-SNAPSHOT` is unrelated); `entries.test.ts` pins `CHANGELOG[0].version === APP_VERSION`, so forgetting either half fails the suite. Release convention:

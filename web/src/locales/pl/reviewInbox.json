@@ -1,0 +1,51 @@
+{
+  "title": "Skrzynka recenzji",
+  "intro": "Znajdź propozycje wersji powiązane z Tobą, a przed podjęciem działania otwórz dokument i pełną dyskusję recenzji.",
+  "tableAria": "Skrzynka recenzji",
+  "loadFailed": "Nie udało się wczytać skrzynki recenzji",
+  "summaryLoadFailed": "Nie udało się wczytać podsumowania skrzynki recenzji",
+  "refresh": "Odśwież",
+  "empty": "Brak recenzji pasujących do tych filtrów.",
+  "filter": {
+    "search": "Szukaj kontraktów lub wersji",
+    "clearSearch": "Wyczyść wyszukiwanie w skrzynce recenzji",
+    "scope": "Zakres recenzji"
+  },
+  "scope": {
+    "RELATED": "Powiązane ze mną",
+    "OWNED": "Moje",
+    "FOLLOWED": "Obserwowane",
+    "ALL": "Wszystkie kontrakty"
+  },
+  "summary": {
+    "all": "Wszystkie recenzje",
+    "awaiting": "Czekają na moją decyzję",
+    "changes": "Poproszono o zmiany",
+    "needsNew": "Potrzebna nowa recenzja"
+  },
+  "attention": {
+    "AWAITING_MY_REVIEW": "Czeka na moją decyzję",
+    "CHANGES_REQUESTED": "Poproszono o zmiany",
+    "NEEDS_NEW_REVIEW": "Potrzebna nowa recenzja"
+  },
+  "column": {
+    "contract": "Kontrakt",
+    "version": "Wersja",
+    "owner": "Właściciel",
+    "review": "Najnowsza recenzja",
+    "attention": "Wymaga uwagi",
+    "decisions": "Decyzje"
+  },
+  "requestedBy": "{{name}} · {{date}}",
+  "noAttention": "Nie wymaga działania",
+  "approvals_one": "{{count}} zatwierdzenie",
+  "approvals_few": "{{count}} zatwierdzenia",
+  "approvals_many": "{{count}} zatwierdzeń",
+  "approvals_other": "{{count}} zatwierdzeń",
+  "changeRequests_one": "{{count}} prośba o zmiany",
+  "changeRequests_few": "{{count}} prośby o zmiany",
+  "changeRequests_many": "{{count}} próśb o zmiany",
+  "changeRequests_other": "{{count}} próśb o zmiany",
+  "open": "Recenzja",
+  "openAria": "Otwórz recenzję {{contract}} {{version}}"
+}

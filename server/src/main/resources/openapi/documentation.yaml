@@ -2118,6 +2118,71 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '415': { $ref: '#/components/responses/UnsupportedMediaType' }
         '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/version-reviews/inbox:
+    get:
+      tags: [version-reviews]
+      operationId: listReviewInbox
+      summary: List the latest review round for related proposed versions
+      description: |
+        Any authenticated user. Returns at most the latest review round for each active PROPOSED
+        version. `q` searches contract name and version, case- and accent-insensitively. `OWNED`
+        means direct ownership or active owning-team membership, `FOLLOWED` means a subscription,
+        `RELATED` is their union, and `ALL` is the whole catalog; administrator
+        access does not make a contract owned or related. Attention filters select an open/current
+        review awaiting the caller's first decision, an open/current review whose effective
+        decisions include changes requested, or a closed latest round that needs a new review.
+        Sortable fields: `id`, `contractName`, `requestedAt` (default `requestedAt,id`, oldest first).
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Q'
+        - name: scope
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/ReviewInboxScope' }
+        - name: attention
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/ReviewInboxAttention' }
+      responses:
+        '200':
+          description: A page of latest review rounds
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewInboxPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/version-reviews/inbox/summary:
+    get:
+      tags: [version-reviews]
+      operationId: getReviewInboxSummary
+      summary: Count review inbox attention states
+      description: |
+        Applies the inbox `q` (case- and accent-insensitive contract-name or version search) and
+        ownership/follow scope exactly as the list does. `attention` is validated but deliberately
+        ignored, so the total plus all three attention counters remain useful while a tab is selected.
+      parameters:
+        - $ref: '#/components/parameters/Q'
+        - name: scope
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/ReviewInboxScope' }
+        - name: attention
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/ReviewInboxAttention' }
+          description: Accepted for parity with the list and ignored when computing the summary.
+      responses:
+        '200':
+          description: Counts for the filtered inbox
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewInboxSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
   /api/v1/version-reviews/{rid}:
     parameters:
       - $ref: '#/components/parameters/VersionReviewId'
@@ -4972,6 +5037,13 @@ components:
     VersionReviewDecision:
       type: string
       enum: [APPROVED, CHANGES_REQUESTED]
+    ReviewInboxScope:
+      type: string
+      enum: [RELATED, OWNED, FOLLOWED, ALL]
+      default: RELATED
+    ReviewInboxAttention:
+      type: string
+      enum: [AWAITING_MY_REVIEW, CHANGES_REQUESTED, NEEDS_NEW_REVIEW]
     ReviewUserResponse:
       type: object
       required: [id, name, deleted]
@@ -5054,6 +5126,74 @@ components:
         page: { type: integer, minimum: 1 }
         pageSize: { type: integer, minimum: 1, maximum: 100 }
         total: { type: integer, format: int64, minimum: 0 }
+    ReviewInboxContractRef:
+      type: object
+      required: [id, name, type, system, domain, owner, canWrite]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        name: { type: string }
+        type: { $ref: '#/components/schemas/ContractType' }
+        system: { $ref: '#/components/schemas/RefSummary' }
+        domain: { $ref: '#/components/schemas/RefSummary' }
+        owner: { $ref: '#/components/schemas/OwnerRef' }
+        canWrite: { type: boolean }
+    ReviewInboxVersionRef:
+      type: object
+      required: [id, version, contentRevision]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        version: { type: string }
+        contentRevision: { type: integer, format: int64, minimum: 1 }
+    ReviewInboxReview:
+      type: object
+      required: [status, contentRevision, requestedBy, requestedAt, approvalCount, changesRequestedCount]
+      properties:
+        status: { $ref: '#/components/schemas/VersionReviewStatus' }
+        contentRevision: { type: integer, format: int64, minimum: 1 }
+        closeReason:
+          type: string
+          enum: [CONTENT_CHANGED, WITHDRAWN, PUBLISHED]
+          nullable: true
+        requestedBy: { $ref: '#/components/schemas/ReviewUserResponse' }
+        requestedAt: { type: integer, format: int64 }
+        approvalCount: { type: integer, format: int64, minimum: 0 }
+        changesRequestedCount: { type: integer, format: int64, minimum: 0 }
+        myDecision:
+          type: string
+          enum: [APPROVED, CHANGES_REQUESTED]
+          nullable: true
+    ReviewInboxRow:
+      type: object
+      required: [id, contract, version, review, subscribed, owned, awaitingMyReview, changesRequested, needsNewReview, canRequest]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        contract: { $ref: '#/components/schemas/ReviewInboxContractRef' }
+        version: { $ref: '#/components/schemas/ReviewInboxVersionRef' }
+        review: { $ref: '#/components/schemas/ReviewInboxReview' }
+        subscribed: { type: boolean }
+        owned: { type: boolean }
+        awaitingMyReview: { type: boolean }
+        changesRequested: { type: boolean }
+        needsNewReview: { type: boolean }
+        canRequest: { type: boolean }
+    ReviewInboxPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ReviewInboxRow' }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, format: int64, minimum: 0 }
+    ReviewInboxSummary:
+      type: object
+      required: [total, awaitingMyReview, changesRequested, needsNewReview]
+      properties:
+        total: { type: integer, format: int64, minimum: 0 }
+        awaitingMyReview: { type: integer, format: int64, minimum: 0 }
+        changesRequested: { type: integer, format: int64, minimum: 0 }
+        needsNewReview: { type: integer, format: int64, minimum: 0 }
     ImportItem:
       type: object
       required: [systemId, type, name, version, content]

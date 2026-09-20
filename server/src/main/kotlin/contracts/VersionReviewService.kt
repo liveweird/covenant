@@ -180,7 +180,7 @@ class VersionReviewService(
     ): List<VersionReviewResponse> {
         if (rows.isEmpty()) return emptyList()
         val ids = rows.map { it[Reviews.id].value }
-        val facts = summaryFacts(ids)
+        val facts = versionReviewSummaryFacts(ids)
         val activeCaller = isActiveUser(callerId)
         return rows.map { row ->
             val id = row[Reviews.id].value
@@ -219,39 +219,6 @@ class VersionReviewService(
                 canDecide = activeCaller && open && requesterId != callerId,
             )
         }
-    }
-
-    private data class SummaryFacts(
-        val entryCounts: Map<UInt, Long>,
-        val decisions: Map<UInt, Map<UInt, String>>,
-    )
-
-    /** Bounded summary projection: counts plus one latest decision row per reviewer; bodies stay in /entries. */
-    private suspend fun summaryFacts(reviewIds: List<UInt>): SummaryFacts {
-        if (reviewIds.isEmpty()) return SummaryFacts(emptyMap(), emptyMap())
-        val count = Entries.id.count()
-        val entryCounts = Entries.select(Entries.reviewId, count)
-            .where { Entries.reviewId inList reviewIds }
-            .groupBy(Entries.reviewId)
-            .map { it[Entries.reviewId].value to it[count] }.toList().toMap()
-        val later = Entries.alias("later_review_decisions")
-        val laterDecision = later
-            .select(later[Entries.id])
-            .where {
-                (later[Entries.reviewId] eq Entries.reviewId) and
-                    (later[Entries.authorId] eq Entries.authorId) and
-                    (later[Entries.kind] neq VersionReviewEntryKind.COMMENT.name) and
-                    (later[Entries.id] greater Entries.id)
-            }
-        val decisions = Entries.select(Entries.reviewId, Entries.authorId, Entries.kind)
-            .where {
-                (Entries.reviewId inList reviewIds) and
-                    (Entries.kind neq VersionReviewEntryKind.COMMENT.name) and notExists(laterDecision)
-            }
-            .map { Triple(it[Entries.reviewId].value, it[Entries.authorId].value, it[Entries.kind]) }
-            .toList().groupBy({ it.first }, { it.second to it.third })
-            .mapValues { (_, values) -> values.toMap() }
-        return SummaryFacts(entryCounts, decisions)
     }
 
     private fun reviewRows(predicate: Op<Boolean>) = Reviews
@@ -330,6 +297,40 @@ class VersionReviewService(
     private companion object {
         const val MAX_BODY_LENGTH = 4000
     }
+}
+
+internal data class VersionReviewSummaryFacts(
+    val entryCounts: Map<UInt, Long>,
+    val decisions: Map<UInt, Map<UInt, String>>,
+)
+
+/** Bounded summary projection: counts plus one latest decision row per reviewer; bodies stay in /entries. */
+internal suspend fun versionReviewSummaryFacts(reviewIds: List<UInt>): VersionReviewSummaryFacts {
+    if (reviewIds.isEmpty()) return VersionReviewSummaryFacts(emptyMap(), emptyMap())
+    val entries = VersionReviewService.Entries
+    val count = entries.id.count()
+    val entryCounts = entries.select(entries.reviewId, count)
+        .where { entries.reviewId inList reviewIds }
+        .groupBy(entries.reviewId)
+        .map { it[entries.reviewId].value to it[count] }.toList().toMap()
+    val later = entries.alias("later_review_decisions")
+    val laterDecision = later
+        .select(later[entries.id])
+        .where {
+            (later[entries.reviewId] eq entries.reviewId) and
+                (later[entries.authorId] eq entries.authorId) and
+                (later[entries.kind] neq VersionReviewEntryKind.COMMENT.name) and
+                (later[entries.id] greater entries.id)
+        }
+    val decisions = entries.select(entries.reviewId, entries.authorId, entries.kind)
+        .where {
+            (entries.reviewId inList reviewIds) and
+                (entries.kind neq VersionReviewEntryKind.COMMENT.name) and notExists(laterDecision)
+        }
+        .map { Triple(it[entries.reviewId].value, it[entries.authorId].value, it[entries.kind]) }
+        .toList().groupBy({ it.first }, { it.second to it.third })
+        .mapValues { (_, values) -> values.toMap() }
+    return VersionReviewSummaryFacts(entryCounts, decisions)
 }
 
 /** Must be called while the active parent contract is locked by the surrounding transaction. */

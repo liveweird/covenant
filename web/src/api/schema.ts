@@ -1427,6 +1427,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/version-reviews/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the latest review round for related proposed versions
+         * @description Any authenticated user. Returns at most the latest review round for each active PROPOSED
+         *     version. `q` searches contract name and version, case- and accent-insensitively. `OWNED`
+         *     means direct ownership or active owning-team membership, `FOLLOWED` means a subscription,
+         *     `RELATED` is their union, and `ALL` is the whole catalog; administrator
+         *     access does not make a contract owned or related. Attention filters select an open/current
+         *     review awaiting the caller's first decision, an open/current review whose effective
+         *     decisions include changes requested, or a closed latest round that needs a new review.
+         *     Sortable fields: `id`, `contractName`, `requestedAt` (default `requestedAt,id`, oldest first).
+         */
+        get: operations["listReviewInbox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/version-reviews/inbox/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count review inbox attention states
+         * @description Applies the inbox `q` (case- and accent-insensitive contract-name or version search) and
+         *     ownership/follow scope exactly as the list does. `attention` is validated but deliberately
+         *     ignored, so the total plus all three attention counters remain useful while a tab is selected.
+         */
+        get: operations["getReviewInboxSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/version-reviews/{rid}": {
         parameters: {
             query?: never;
@@ -3662,6 +3711,13 @@ export interface components {
         VersionReviewEntryKind: "COMMENT" | "APPROVED" | "CHANGES_REQUESTED";
         /** @enum {string} */
         VersionReviewDecision: "APPROVED" | "CHANGES_REQUESTED";
+        /**
+         * @default RELATED
+         * @enum {string}
+         */
+        ReviewInboxScope: "RELATED" | "OWNED" | "FOLLOWED" | "ALL";
+        /** @enum {string} */
+        ReviewInboxAttention: "AWAITING_MY_REVIEW" | "CHANGES_REQUESTED" | "NEEDS_NEW_REVIEW";
         ReviewUserResponse: {
             /** Format: int32 */
             id: number;
@@ -3736,6 +3792,69 @@ export interface components {
             pageSize: number;
             /** Format: int64 */
             total: number;
+        };
+        ReviewInboxContractRef: {
+            /** Format: int32 */
+            id: number;
+            name: string;
+            type: components["schemas"]["ContractType"];
+            system: components["schemas"]["RefSummary"];
+            domain: components["schemas"]["RefSummary"];
+            owner: components["schemas"]["OwnerRef"];
+            canWrite: boolean;
+        };
+        ReviewInboxVersionRef: {
+            /** Format: int32 */
+            id: number;
+            version: string;
+            /** Format: int64 */
+            contentRevision: number;
+        };
+        ReviewInboxReview: {
+            status: components["schemas"]["VersionReviewStatus"];
+            /** Format: int64 */
+            contentRevision: number;
+            /** @enum {string|null} */
+            closeReason?: "CONTENT_CHANGED" | "WITHDRAWN" | "PUBLISHED" | null;
+            requestedBy: components["schemas"]["ReviewUserResponse"];
+            /** Format: int64 */
+            requestedAt: number;
+            /** Format: int64 */
+            approvalCount: number;
+            /** Format: int64 */
+            changesRequestedCount: number;
+            /** @enum {string|null} */
+            myDecision?: "APPROVED" | "CHANGES_REQUESTED" | null;
+        };
+        ReviewInboxRow: {
+            /** Format: int32 */
+            id: number;
+            contract: components["schemas"]["ReviewInboxContractRef"];
+            version: components["schemas"]["ReviewInboxVersionRef"];
+            review: components["schemas"]["ReviewInboxReview"];
+            subscribed: boolean;
+            owned: boolean;
+            awaitingMyReview: boolean;
+            changesRequested: boolean;
+            needsNewReview: boolean;
+            canRequest: boolean;
+        };
+        ReviewInboxPage: {
+            items: components["schemas"]["ReviewInboxRow"][];
+            page: number;
+            pageSize: number;
+            /** Format: int64 */
+            total: number;
+        };
+        ReviewInboxSummary: {
+            /** Format: int64 */
+            total: number;
+            /** Format: int64 */
+            awaitingMyReview: number;
+            /** Format: int64 */
+            changesRequested: number;
+            /** Format: int64 */
+            needsNewReview: number;
         };
         ImportItem: {
             /** Format: int32 */
@@ -6695,6 +6814,74 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             415: components["responses"]["UnsupportedMediaType"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listReviewInbox: {
+        parameters: {
+            query?: {
+                /** @description 1-based page index. Defaults to 1. */
+                page?: components["parameters"]["Page"];
+                /** @description Rows per page. Defaults to 20, maximum 100. */
+                pageSize?: components["parameters"]["PageSize"];
+                /**
+                 * @description Sort spec. Format: `field` (ascending) or `-field` (descending). Multiple fields are
+                 *     comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
+                 *     sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
+                 *     always appended as a deterministic tiebreaker.
+                 */
+                sort?: components["parameters"]["Sort"];
+                /** @description Case- and accent-insensitive free-text search; each endpoint documents the fields searched. */
+                q?: components["parameters"]["Q"];
+                scope?: components["schemas"]["ReviewInboxScope"];
+                attention?: components["schemas"]["ReviewInboxAttention"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of latest review rounds */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewInboxPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getReviewInboxSummary: {
+        parameters: {
+            query?: {
+                /** @description Case- and accent-insensitive free-text search; each endpoint documents the fields searched. */
+                q?: components["parameters"]["Q"];
+                scope?: components["schemas"]["ReviewInboxScope"];
+                /** @description Accepted for parity with the list and ignored when computing the summary. */
+                attention?: components["schemas"]["ReviewInboxAttention"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Counts for the filtered inbox */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewInboxSummary"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalServerError"];
         };
     };
