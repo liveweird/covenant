@@ -29,6 +29,7 @@ ktor:
       - ch.nokillswit.infra.db.DatabaseKt.configureDatabase
       - ch.nokillswit.infra.db.BootstrapKt.configureBootstrap
       - ch.nokillswit.toadie.ToadieRefreshKt.configureToadieRefresh
+      - ch.nokillswit.contracts.ReleaseLineRemindersKt.configureReleaseLineReminders
       # Public liveness/readiness probes (/api/v1/health, /api/v1/ready); after Database (the probe
       # round-trips it).
       - ch.nokillswit.plugins.HealthKt.configureHealth
@@ -151,6 +152,12 @@ contracts:
   # A contract document's ceiling (bytes). Above it the store paths answer 413 before parsing;
   # well under the 10 MiB request-body backstop (plugins/Http.kt).
   maxDocumentBytes: "$CONTRACT_MAX_DOCUMENT_BYTES:2097152"
+
+lifecycle:
+  reminders:
+    # Disable only for deterministic automated tests or emergency operations. Reminder delivery
+    # remains durable and deduplicated when the scheduler is enabled again.
+    enabled: "$LIFECYCLE_REMINDERS_ENABLED:true"
 
 web:
   # When set, the server serves the built React SPA from this directory (static

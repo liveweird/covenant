@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Anchor, Badge, Button, Group, Select, Stack, Table, Text } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconBrandDatabricks, IconExternalLink, IconLink, IconRefresh } from "@tabler/icons-react";
-import { getContractToadieLinks, getContractToadieUsage, refreshContractToadieUsage } from "../api/toadie";
+import { getContractToadieLinks, getContractToadieUsage, refreshContractToadieUsage, type ToadieLinks } from "../api/toadie";
 import { ApiError } from "../api/http";
 import { usePagedSort } from "../hooks/usePagedSort";
 import ClearableTextInput from "./ClearableTextInput";
@@ -19,12 +19,12 @@ import { formatDateTime } from "../utils/relativeTime";
 const SORT_FIELDS = ["title", "id"] as const;
 type SortField = (typeof SORT_FIELDS)[number];
 
-export default function ContractToadieUsage({ contractId, canWrite }: { contractId: number; canWrite: boolean }) {
+export default function ContractToadieUsage({ contractId, canWrite, consumersOnly = false, onReviewReady }: { contractId: number; canWrite: boolean; consumersOnly?: boolean; onReviewReady?: (ready: boolean) => void }) {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [debouncedSearch] = useDebouncedValue(search, 300);
-  const [role, setRole] = useState<"PROVIDER" | "CONSUMER" | null>(null);
+  const [role, setRole] = useState<"PROVIDER" | "CONSUMER" | null>(consumersOnly ? "CONSUMER" : null);
   const [editing, setEditing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const paging = usePagedSort<SortField>("title", [contractId, debouncedSearch, role], { key: "contractToadieUsage", sortFields: SORT_FIELDS });
@@ -40,6 +40,7 @@ export default function ContractToadieUsage({ contractId, canWrite }: { contract
     refetchInterval: ({ state }) => state.data?.cache.refreshing ? 1500 : false,
   });
   const cache = usage.data?.cache ?? links.data?.cache;
+  useEffect(() => { onReviewReady?.(!links.isFetching && !usage.isFetching); }, [onReviewReady, links.isFetching, usage.isFetching]);
 
   async function refresh() {
     setRefreshError(null);
@@ -62,27 +63,28 @@ export default function ContractToadieUsage({ contractId, canWrite }: { contract
           <Text size="sm" c="dimmed">{t("toadie.usage.intro")}</Text>
         </Stack>
         {canWrite && <Group gap="xs">
-          <Button variant="default" leftSection={<IconLink size={16} />} onClick={() => setEditing(true)} disabled={!links.data}>{t("toadie.usage.editLinks")}</Button>
+          {!consumersOnly && <Button variant="default" leftSection={<IconLink size={16} />} onClick={() => setEditing(true)} disabled={!links.data}>{t("toadie.usage.editLinks")}</Button>}
           <Button variant="default" leftSection={<IconRefresh size={16} />} onClick={() => void refresh()} disabled={!links.data?.connection || cache?.refreshing} loading={cache?.refreshing}>{cache?.refreshing ? t("toadie.usage.refreshing") : t("toadie.usage.refresh")}</Button>
         </Group>}
       </Group>
+      {consumersOnly && <UsageReviewWarning cache={cache} links={links.data} />}
       {cache?.lastSuccessAt != null && <Text size="sm" c="dimmed">{t("toadie.usage.lastRefreshed", { time: formatDateTime(cache.lastSuccessAt, i18n.language) })}</Text>}
       {cache?.lastErrorCode && <Alert color="orange" variant="light">{t("toadie.lastError", { code: cache.lastErrorCode })}</Alert>}
       {(links.isError || usage.isError || refreshError) && <Alert color="red" variant="light" title={t("toadie.usage.loadFailed")}>{refreshError ?? loadErrorMessage(links.error ?? usageError, t)}</Alert>}
       {links.data?.items.length ? <Group gap="xs"><Text size="sm" fw={500}>{t("toadie.usage.links")}:</Text>{links.data.items.map((link) => link.status === "AVAILABLE" && link.url ? <Anchor key={link.id} href={link.url} target="_blank" rel="noreferrer" size="sm" aria-label={t("toadie.usage.openEntity", { name: link.title })}>{link.title}<IconExternalLink size={12} style={{ marginInlineStart: 4 }} /></Anchor> : <Badge key={link.id} color={link.status === "AVAILABLE" ? "gray" : "orange"} variant="light">{link.title} · {link.status === "MISSING" ? t("toadie.usage.missing") : t("toadie.status.disconnected")}</Badge>)}</Group> : links.data && <Text size="sm" c="dimmed">{t("toadie.usage.noLinks")}</Text>}
       <Group align="flex-end">
         <ClearableTextInput label={t("toadie.usage.service")} value={search} onChange={setSearch} clearLabel={t("common.filter.clearName")} />
-        <Select label={t("toadie.usage.role")} value={role} onChange={(value) => setRole(value as typeof role)} placeholder={t("toadie.usage.anyRole")} clearable data={[{ value: "PROVIDER", label: t("toadie.usage.provider") }, { value: "CONSUMER", label: t("toadie.usage.consumer") }]} />
+        {!consumersOnly && <Select label={t("toadie.usage.role")} value={role} onChange={(value) => setRole(value as typeof role)} placeholder={t("toadie.usage.anyRole")} clearable data={[{ value: "PROVIDER", label: t("toadie.usage.provider") }, { value: "CONSUMER", label: t("toadie.usage.consumer") }]} />}
       </Group>
       <Table aria-label={t("toadie.usage.title")}>
         <Table.Thead><Table.Tr>
           <SortHeader field="title" label={t("toadie.usage.service")} activeField={paging.sortField} activeDir={paging.sortDir} onToggle={paging.toggleSort} />
-          <Table.Th>{t("toadie.usage.role")}</Table.Th><Table.Th>{t("toadie.usage.systems")}</Table.Th><Table.Th>{t("toadie.usage.teams")}</Table.Th><Table.Th>{t("toadie.usage.version")}</Table.Th><Table.Th>{t("toadie.usage.releaseLine")}</Table.Th>
+          <Table.Th style={{ minWidth: 95 }}>{t("toadie.usage.role")}</Table.Th><Table.Th>{t("toadie.usage.systems")}</Table.Th><Table.Th>{t("toadie.usage.teams")}</Table.Th><Table.Th>{t("toadie.usage.version")}</Table.Th><Table.Th>{t("toadie.usage.releaseLine")}</Table.Th>
         </Table.Tr></Table.Thead>
         <Table.Tbody>
           {usage.isLoading && !usage.data ? <TableLoadingRow colSpan={6} /> : usage.data?.items.length ? usage.data.items.map((row) => <Table.Tr key={row.id}>
             <Table.Td>{row.url ? <Anchor href={row.url} target="_blank" rel="noreferrer" aria-label={t("toadie.usage.openEntity", { name: row.title })}>{row.title}<IconExternalLink size={12} style={{ marginInlineStart: 4 }} /></Anchor> : <Text size="sm">{row.title}</Text>}<Text size="xs" c="dimmed">{row.identifier}</Text></Table.Td>
-            <Table.Td><Group gap={4}>{row.roles.map((item) => <Badge key={item} variant="light" color={item === "PROVIDER" ? "teal" : "gray"}>{item === "PROVIDER" ? t("toadie.usage.provider") : t("toadie.usage.consumer")}</Badge>)}</Group></Table.Td>
+            <Table.Td><Group gap={4}>{row.roles.map((item) => <Badge key={item} style={{ flexShrink: 0 }} variant="light" color={item === "PROVIDER" ? "teal" : "gray"}>{item === "PROVIDER" ? t("toadie.usage.provider") : t("toadie.usage.consumer")}</Badge>)}</Group></Table.Td>
             <Table.Td>{row.systems.length ? row.systems.map((item) => item.url ? <Anchor key={item.entityId} href={item.url} target="_blank" rel="noreferrer" display="block" size="sm" aria-label={t("toadie.usage.openEntity", { name: item.title })}>{item.title}</Anchor> : <Text key={item.entityId} size="sm">{item.title}</Text>) : "—"}</Table.Td>
             <Table.Td>{row.teams.length ? row.teams.map((item) => item.url ? <Anchor key={item.entityId} href={item.url} target="_blank" rel="noreferrer" display="block" size="sm" aria-label={t("toadie.usage.openEntity", { name: item.title })}>{item.title}</Anchor> : <Text key={item.entityId} size="sm">{item.title}</Text>) : "—"}</Table.Td>
             <Table.Td><Text size="sm" c={row.version == null ? "dimmed" : undefined}>{row.version ?? t("toadie.usage.unknown")}</Text></Table.Td>
@@ -94,4 +96,13 @@ export default function ContractToadieUsage({ contractId, canWrite }: { contract
       {editing && links.data && <ToadieLinksModal contractId={contractId} links={links.data} onClose={() => setEditing(false)} onSaved={async () => { setEditing(false); await queryClient.invalidateQueries({ queryKey: ["contracts"] }); }} />}
     </Stack>
   );
+}
+
+function UsageReviewWarning({ cache, links }: { cache: ToadieLinks["cache"] | undefined; links: ToadieLinks | undefined }) {
+  const { t } = useTranslation();
+  const incomplete = cache?.state !== "CURRENT" || links?.items.some((link) => link.status !== "AVAILABLE");
+  return <>
+    <Alert color="orange" variant="light">{t("contracts.releaseLines.usageScope")}</Alert>
+    {incomplete && <Alert color="orange" variant="light">{t("contracts.releaseLines.incompleteUsage")}</Alert>}
+  </>;
 }

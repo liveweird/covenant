@@ -40,6 +40,7 @@ class NotificationService(private val database: R2dbcDatabase) {
         val params = text("params")
         val link = text("link").nullable()
         val wasSeen = bool("was_seen").default(false)
+        val deduplicationKey = varchar("deduplication_key", 160).nullable()
         override val markedAsDeleted = bool("marked_as_deleted").default(false)
     }
 
@@ -47,16 +48,21 @@ class NotificationService(private val database: R2dbcDatabase) {
     suspend fun createAll(notifications: List<Notification>) {
         if (notifications.isEmpty()) return
         suspendTransaction(database) {
-            val now = System.currentTimeMillis()
-            notifications.forEach { n ->
-                Notifications.insert {
-                    it[recipientId] = n.recipientId
-                    it[timestamp] = now
-                    it[notificationType] = n.type.name
-                    it[params] = encodeParams(n.params)
-                    it[link] = n.link
-                    it[wasSeen] = false
-                }
+            createAllInCurrentTransaction(notifications)
+        }
+    }
+
+    /** Transaction-aware insert used by scheduled reminders so delivery and dedup are atomic. */
+    internal suspend fun createAllInCurrentTransaction(notifications: List<Notification>, now: Long = System.currentTimeMillis()) {
+        notifications.forEach { n ->
+            Notifications.insertIgnore {
+                it[recipientId] = n.recipientId
+                it[timestamp] = now
+                it[notificationType] = n.type.name
+                it[params] = encodeParams(n.params)
+                it[link] = n.link
+                it[wasSeen] = false
+                it[deduplicationKey] = n.deduplicationKey
             }
         }
     }

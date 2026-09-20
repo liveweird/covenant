@@ -6,11 +6,11 @@ import LifecycleActions from "./LifecycleActions";
 describe("LifecycleActions", () => {
   test("offers exactly the allowed moves and fires a forward step directly", async () => {
     const onTransition = vi.fn();
-    const { rerender } = renderWithProviders(<LifecycleActions lifecycle="DRAFT" version="1.0.0" onTransition={onTransition} />);
+    const { rerender } = renderWithProviders(<LifecycleActions contractId={5} lifecycle="DRAFT" version="1.0.0" onTransition={onTransition} />);
     expect(screen.getAllByRole("button")).toHaveLength(1);
     await userEvent.setup().click(screen.getByRole("button", { name: "Propose" }));
     expect(onTransition).toHaveBeenCalledWith("PROPOSED");
-    rerender(<LifecycleActions lifecycle="PROPOSED" version="1.0.0" onTransition={onTransition} />);
+    rerender(<LifecycleActions contractId={5} lifecycle="PROPOSED" version="1.0.0" onTransition={onTransition} />);
     expect(screen.getByRole("button", { name: "Back to draft" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Activate" })).toBeInTheDocument();
   });
@@ -18,7 +18,7 @@ describe("LifecycleActions", () => {
   test("deprecate and retire confirm first; cancel fires nothing", async () => {
     const onTransition = vi.fn();
     const user = userEvent.setup();
-    renderWithProviders(<LifecycleActions lifecycle="ACTIVE" version="1.0.0" onTransition={onTransition} />);
+    renderWithProviders(<LifecycleActions contractId={5} lifecycle="ACTIVE" version="1.0.0" onTransition={onTransition} />);
     await user.click(screen.getByRole("button", { name: "Deprecate" }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText(/Version 1.0.0 will be marked deprecated/)).toBeInTheDocument();
@@ -30,9 +30,9 @@ describe("LifecycleActions", () => {
   });
 
   test("RETIRED renders nothing; disabled blocks every move", () => {
-    const { rerender } = renderWithProviders(<LifecycleActions lifecycle="RETIRED" version="1.0.0" onTransition={vi.fn()} />);
+    const { rerender } = renderWithProviders(<LifecycleActions contractId={5} lifecycle="RETIRED" version="1.0.0" onTransition={vi.fn()} />);
     expect(screen.queryAllByRole("button")).toHaveLength(0);
-    rerender(<LifecycleActions lifecycle="DEPRECATED" version="1.0.0" disabled onTransition={vi.fn()} />);
+    rerender(<LifecycleActions contractId={5} lifecycle="DEPRECATED" version="1.0.0" disabled onTransition={vi.fn()} />);
     expect(screen.getByRole("button", { name: "Retire" })).toBeDisabled();
   });
 });

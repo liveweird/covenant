@@ -6,6 +6,8 @@ import { isIrreversibleTransition, TRANSITIONS } from "../utils/lifecycle";
 
 type Irreversible = "DEPRECATED" | "RETIRED";
 import ConfirmActionModal from "./ConfirmActionModal";
+import RetirementImpactModal from "./RetirementImpactModal";
+import { parseSemver } from "../utils/semver";
 
 /**
  * The transition buttons for one version — exactly the moves the lifecycle allows from its
@@ -14,12 +16,14 @@ import ConfirmActionModal from "./ConfirmActionModal";
  * Disabled while the document has unsaved edits: a transition applies to the STORED text.
  */
 export default function LifecycleActions({
+  contractId,
   lifecycle,
   version,
   disabled = false,
   pending = false,
   onTransition,
 }: {
+  contractId: number;
   lifecycle: Lifecycle;
   version: string;
   disabled?: boolean;
@@ -47,8 +51,11 @@ export default function LifecycleActions({
           </Button>
         ))}
       </Group>
+      {confirming === "RETIRED" && <RetirementImpactModal contractId={contractId} major={parseSemver(version)!.major} canWrite
+        actionDescription={t("versions.transitionConfirm.RETIRED.body", { version })} onClose={() => setConfirming(null)} confirmLabel={t("versions.transition.RETIRED")} pending={pending}
+        onConfirm={() => { onTransition("RETIRED"); setConfirming(null); }} />}
       <ConfirmActionModal
-        opened={confirming !== null}
+        opened={confirming === "DEPRECATED"}
         onClose={() => setConfirming(null)}
         title={confirming ? t(`versions.transitionConfirm.${confirming}.title`) : ""}
         message={confirming ? t(`versions.transitionConfirm.${confirming}.body`, { version }) : ""}

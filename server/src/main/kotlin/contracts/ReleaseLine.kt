@@ -12,10 +12,22 @@ data class ReleaseLineUpdateRequest(
     val supportEndsOn: String? = null,
     val supportPolicy: String? = null,
     val recommendedVersionId: UInt? = null,
+    val deprecatesOn: String? = null,
+    val replacementContractId: UInt? = null,
+    val replacementMajor: Int? = null,
+    val migrationGuide: String? = null,
 )
 
 @Serializable
 data class ReleaseLineVersionSummary(val id: UInt, val version: String, val lifecycle: Lifecycle)
+
+@Serializable
+data class ReleaseLineReplacement(
+    val contractId: UInt,
+    val contractName: String?,
+    val major: Int?,
+    val available: Boolean,
+)
 
 @Serializable
 data class ReleaseLineResponse(
@@ -26,6 +38,9 @@ data class ReleaseLineResponse(
     val supportEndsOn: String?,
     val supportPolicy: String?,
     val recommendedVersionId: UInt?,
+    val deprecatesOn: String?,
+    val replacement: ReleaseLineReplacement?,
+    val migrationGuide: String?,
     val latestVersion: ReleaseLineVersionSummary?,
     val recommendedVersion: ReleaseLineVersionSummary?,
     val versionCount: Long,

@@ -1137,8 +1137,8 @@ export interface paths {
         /** Get one major release line */
         get: operations["getContractReleaseLine"];
         /**
-         * Replace a major release line's support policy
-         * @description Writers only. A pinned recommendation must be an ACTIVE stable version in this contract and major. END_OF_LIFE rejects a pin and has no effective recommendation.
+         * Replace a release line's support policy and lifecycle plan
+         * @description Writers only. Full replacement of all policy and planning fields: omitted optional members are cleared, including dates, replacement references, migration guidance and the recommendation pin. Dates are advisory and never transition versions or support status automatically. When both dates are present, deprecatesOn must not follow supportEndsOn. A replacement must identify an active contract/line when newly assigned; an unchanged unavailable reference may be retained. The same contract requires a different major. A pinned recommendation must be an ACTIVE stable version in this contract and major. END_OF_LIFE rejects a pin and has no effective recommendation.
          */
         put: operations["replaceContractReleaseLine"];
         post?: never;
@@ -2530,7 +2530,7 @@ export interface components {
          * @description The notification kind; the SPA renders it in the viewer's language. A kind a client build does not know renders as its raw name.
          * @enum {string}
          */
-        NotificationType: "CONTRACT_UPDATED" | "CONTRACT_OWNER_CHANGED" | "CONTRACT_DELETED" | "VERSION_CREATED" | "VERSION_CONTENT_UPDATED" | "VERSION_TRANSITIONED" | "VERSION_DELETED" | "VERSION_SYNCED" | "VERSION_SOURCE_CHANGED" | "VERSION_IMPORTED" | "VERSION_BREAKING_STORED" | "RELEASE_LINE_UPDATED" | "TOADIE_LINKS_UPDATED";
+        NotificationType: "CONTRACT_UPDATED" | "CONTRACT_OWNER_CHANGED" | "CONTRACT_DELETED" | "VERSION_CREATED" | "VERSION_CONTENT_UPDATED" | "VERSION_TRANSITIONED" | "VERSION_DELETED" | "VERSION_SYNCED" | "VERSION_SOURCE_CHANGED" | "VERSION_IMPORTED" | "VERSION_BREAKING_STORED" | "RELEASE_LINE_UPDATED" | "RELEASE_LINE_DEPRECATION_DUE" | "RELEASE_LINE_SUPPORT_END_DUE" | "TOADIE_LINKS_UPDATED";
         NotificationResponse: {
             /** Format: int32 */
             id: number;
@@ -2542,14 +2542,21 @@ export interface components {
              */
             timestamp: number;
             type: components["schemas"]["NotificationType"];
-            /** @description The interpolation values — `contractName`, `actor`, and the event's `version`/`from`/`to`/`name` when present. Never document text. */
+            /** @description Structural interpolation values; never document text. User-action notifications carry contractName, actor and the event's version/from/to/name when relevant. RELEASE_LINE_DEPRECATION_DUE and RELEASE_LINE_SUPPORT_END_DUE always carry contractName, major (decimal string), deadline (YYYY-MM-DD), and stage, with no actor. Reminder dates use UTC. DUE_TODAY and OVERDUE share one delivery window, so passing midnight does not resend a delivered deadline reminder. */
             params: {
+                stage?: components["schemas"]["ReleaseLineReminderStage"];
+            } & {
                 [key: string]: string;
             };
             /** @description A language-independent SPA path (the contract or the version). */
             link?: string | null;
             wasSeen: boolean;
         };
+        /**
+         * @description The current window when a reminder was minted: 8-30 days remaining, 1-7 days remaining, the deadline date, or a past deadline. Catch-up emits only the current window.
+         * @enum {string}
+         */
+        ReleaseLineReminderStage: "DUE_IN_30_DAYS" | "DUE_IN_7_DAYS" | "DUE_TODAY" | "OVERDUE";
         NotificationPage: {
             items: components["schemas"]["NotificationResponse"][];
             page: number;
@@ -3250,6 +3257,7 @@ export interface components {
             version: string;
             lifecycle: components["schemas"]["Lifecycle"];
         };
+        /** @description Complete support policy and lifecycle plan. Omitted optional fields are cleared. */
         ReleaseLineUpdateRequest: {
             supportStatus: components["schemas"]["SupportStatus"];
             /** Format: date */
@@ -3257,6 +3265,24 @@ export interface components {
             supportPolicy?: string | null;
             /** Format: int32 */
             recommendedVersionId?: number | null;
+            /** Format: date */
+            deprecatesOn?: string | null;
+            /** Format: int32 */
+            replacementContractId?: number | null;
+            /**
+             * Format: int32
+             * @description A replacement major requires replacementContractId; null selects the replacement contract as a whole.
+             */
+            replacementMajor?: number | null;
+            migrationGuide?: string | null;
+        };
+        ReleaseLineReplacement: {
+            /** Format: int32 */
+            contractId: number;
+            contractName: string | null;
+            /** Format: int32 */
+            major: number | null;
+            available: boolean;
         };
         ReleaseLineResponse: {
             /** Format: int32 */
@@ -3271,6 +3297,10 @@ export interface components {
             supportPolicy: string | null;
             /** Format: int32 */
             recommendedVersionId: number | null;
+            /** Format: date */
+            deprecatesOn: string | null;
+            replacement: components["schemas"]["ReleaseLineReplacement"] | null;
+            migrationGuide: string | null;
             latestVersion: components["schemas"]["ReleaseLineVersionSummary"] | null;
             recommendedVersion: components["schemas"]["ReleaseLineVersionSummary"] | null;
             /** Format: int64 */

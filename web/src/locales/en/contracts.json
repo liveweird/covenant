@@ -92,7 +92,29 @@
     },
     "toast": {
       "saved": "Release-line policy saved"
-    }
+    },
+    "deprecatesOn": "Deprecates on",
+    "deprecationDate": "Planned deprecation: {{date}}",
+    "supportEndDate": "Support ends: {{date}}",
+    "replacementContract": "Replacement contract",
+    "replacementLine": "Replacement release line",
+    "replacementHint": "Search contracts, then optionally select a release line.",
+    "replacementUnavailable": "Unavailable contract #{{id}}{{line}}",
+    "replacementPages": "Replacement contract pages",
+    "anyReplacementLine": "Whole contract",
+    "differentLineRequired": "For this contract, choose a different release line.",
+    "migrationGuide": "Migration instructions",
+    "noMigrationGuide": "No migration instructions provided.",
+    "planHint": "Dates are advisory and evaluated in UTC. They do not change version lifecycle or support status. Followers receive in-app reminders within 30 days, within 7 days, and when a deadline is reached.",
+    "reviewImpact": "Review retirement impact for {{line}}",
+    "impactTitle": "Retirement impact for {{line}}",
+    "endSupport": "End support",
+    "usageScope": "These are declared consumers of the whole contract. Their version and release line are unknown. No declared consumers does not prove that retirement is safe.",
+    "incompleteUsage": "Usage information is incomplete, stale, or unavailable. Review the known consumers and coordinate the migration before proceeding.",
+    "acknowledgeImpact": "I have reviewed the declared usage and its limitations and choose to proceed.",
+    "endSupportHint": "This ends support for the release line. It does not retire individual versions.",
+    "dateOrder": "Deprecation must be on or before the support-end date.",
+    "retryPlan": "Reload plan"
   },
   "validation": {
     "systemRequired": "Pick a system",

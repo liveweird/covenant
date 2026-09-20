@@ -17,6 +17,20 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.11.0",
+    date: "2026-09-20",
+    en: `**Plan deprecation and review retirement impact.**
+
+- Add a deprecation date, replacement contract or release line, and migration instructions to a line's support policy.
+- Followers receive in-app reminders as deprecation and support-end dates approach or pass.
+- Review declared consumers, teams and data freshness before retiring a version or ending line support. Dates stay advisory; lifecycle changes remain explicit owner decisions.`,
+    pl: `**Planuj wycofanie i sprawdzaj jego skutki.**
+
+- Dodawaj do zasad wsparcia linii datę wycofania z zalecanego użycia, kontrakt lub linię zastępczą oraz instrukcje migracji.
+- Osoby obserwujące otrzymują przypomnienia w aplikacji o zbliżającym się lub osiągniętym terminie wycofania i końca wsparcia.
+- Przed wycofaniem wersji lub zakończeniem wsparcia sprawdzaj zadeklarowanych odbiorców, zespoły i aktualność danych. Daty są informacyjne; zmiany cyklu życia wymagają decyzji właściciela/właścicielki.`,
+  },
+  {
     version: "0.10.0",
     date: "2026-09-20",
     en: `**See contract usage from Toadie's Port ontology.**

@@ -22,7 +22,7 @@ and password reset, admin-managed users and per-user feature flags, the synced u
 shared paging, and the React shell (nav model, command palette, theme, changelog). The catalog
 and its SPA are implemented: flat teams with rosters; the Domain → System → Contract → Version
 hierarchy; team/user ownership; SemVer and lifecycle rules; parallel major release lines with
-independent support policies and stable recommendations; read-only provider/consumer usage from
+independent support policies, deprecation/migration plans, deadline reminders and stable recommendations; read-only provider/consumer usage from
 Toadie's Port ontology; validation, lint, and breaking-change
 detection; import with dry run, guarded URL fetch, source references and sync, diff, download,
 and export; history, followers and in-app notifications; and catalog facets. ADMIN-curated

@@ -70,6 +70,18 @@ describe("NotificationsButton", () => {
     await i18n.changeLanguage("en");
   });
 
+  test.each([
+    ["RELEASE_LINE_DEPRECATION_DUE", "DUE_IN_30_DAYS", "planned deprecation", "within 30 days"],
+    ["RELEASE_LINE_SUPPORT_END_DUE", "DUE_IN_7_DAYS", "support ends", "within 7 days"],
+    ["RELEASE_LINE_SUPPORT_END_DUE", "DUE_TODAY", "support ends", "today"],
+    ["RELEASE_LINE_SUPPORT_END_DUE", "OVERDUE", "support ends", "deadline passed"],
+  ])("localizes scheduled reminder %s %s without an invented actor", async (type, stage, action, label) => {
+    serveNotifications(mockFetch, [{ ...ROW, type, params: { contractName: "orders-api", major: "1", deadline: "2027-01-01", stage } }], 1);
+    render();
+    await userEvent.setup().click(await screen.findByRole("button", { name: /^Notifications/ }));
+    expect(await screen.findByText(`Release line 1.x of orders-api: ${action} 2027-01-01 (${label}).`)).toBeInTheDocument();
+  });
+
   test("Open marks the row seen and navigates; seen/unseen and delete post to their endpoints", async () => {
     serveNotifications(mockFetch, [ROW, SEEN], 1);
     const user = userEvent.setup();

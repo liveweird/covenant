@@ -7,6 +7,7 @@ import ch.nokillswit.contracts.ContractType
 import ch.nokillswit.contracts.Lifecycle
 import ch.nokillswit.contracts.ReleaseLinePageResponse
 import ch.nokillswit.contracts.ReleaseLineResponse
+import ch.nokillswit.contracts.ReleaseLineReminderService
 import ch.nokillswit.contracts.ReleaseLineUpdateRequest
 import ch.nokillswit.contracts.SupportStatus
 import ch.nokillswit.contracts.TransitionRequest
@@ -27,11 +28,16 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.testApplication
 import java.util.UUID
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class ReleaseLineTest {
     private fun name(prefix: String) = "$prefix-${UUID.randomUUID().toString().take(8)}"
@@ -210,5 +216,230 @@ class ReleaseLineTest {
         }
         assertEquals(HttpStatusCode.Forbidden, response.status)
         assertEquals(HttpStatusCode.Forbidden.value, response.body<ProblemDetail>().status)
+    }
+
+    @Test
+    fun `lifecycle plan validates dates and replacement while deleted targets remain readable`() = testApplication {
+        usePostgresTestcontainer()
+        val admin = seededClient("lines-plan", UserRole.ADMIN)
+        val source = createContract(admin, "lines-plan-source")
+        admin.postJson("/api/v1/contracts/${source.id}/versions", VersionCreateRequest("1.0.0", ContractFixtures.openApi))
+        admin.postJson("/api/v1/contracts/${source.id}/versions", VersionCreateRequest("2.0.0", ContractFixtures.openApi))
+        val path = "/api/v1/contracts/${source.id}/release-lines/1"
+
+        assertEquals(
+            HttpStatusCode.BadRequest,
+            admin.putJson(
+                path,
+                ReleaseLineUpdateRequest(
+                    SupportStatus.SUPPORTED,
+                    supportEndsOn = "2030-12-31",
+                    deprecatesOn = "2031-01-01",
+                ),
+            ).status,
+        )
+        assertEquals(
+            HttpStatusCode.BadRequest,
+            admin.putJson(path, ReleaseLineUpdateRequest(SupportStatus.SUPPORTED, replacementMajor = 2)).status,
+        )
+        assertEquals(
+            HttpStatusCode.BadRequest,
+            admin.putJson(path, ReleaseLineUpdateRequest(SupportStatus.SUPPORTED, replacementContractId = source.id)).status,
+        )
+        assertEquals(
+            HttpStatusCode.NoContent,
+            admin.putJson(
+                path,
+                ReleaseLineUpdateRequest(SupportStatus.SUPPORTED, replacementContractId = source.id, replacementMajor = 2),
+            ).status,
+            "a different major of the same contract is a valid replacement",
+        )
+
+        val target = createContract(admin, "lines-plan-target")
+        val targetVersion = admin.postJson(
+            "/api/v1/contracts/${target.id}/versions",
+            VersionCreateRequest("3.0.0", ContractFixtures.openApi),
+        ).body<VersionResponse>()
+        val guide = "  Move consumers in two steps.  "
+        val request = ReleaseLineUpdateRequest(
+            supportStatus = SupportStatus.MAINTENANCE,
+            supportEndsOn = "2030-12-31",
+            deprecatesOn = "2030-06-01",
+            replacementContractId = target.id,
+            replacementMajor = 3,
+            migrationGuide = guide,
+        )
+        assertEquals(HttpStatusCode.NoContent, admin.putJson(path, request).status)
+        val planned = admin.get(path).body<ReleaseLineResponse>()
+        assertEquals("2030-06-01", planned.deprecatesOn)
+        assertEquals("Move consumers in two steps.", planned.migrationGuide)
+        assertEquals(target.name, planned.replacement?.contractName)
+        assertTrue(planned.replacement?.available == true)
+
+        val events = admin.get("/api/v1/contracts/${source.id}/events").body<ContractEventPageResponse>()
+        val event = events.items.first { it.type.name == "RELEASE_LINE_UPDATED" }
+        assertEquals("2030-06-01", event.params["deprecatesOn"])
+        assertFalse("migrationGuide" in event.params)
+
+        assertEquals(HttpStatusCode.NoContent, admin.delete("/api/v1/contracts/${target.id}/versions/${targetVersion.id}").status)
+        assertEquals(HttpStatusCode.NoContent, admin.delete("/api/v1/contracts/${target.id}").status)
+        val unavailable = admin.get(path).body<ReleaseLineResponse>().replacement!!
+        assertEquals(target.id, unavailable.contractId)
+        assertEquals(3, unavailable.major)
+        assertFalse(unavailable.available)
+        assertEquals(
+            HttpStatusCode.NoContent,
+            admin.putJson(path, request.copy(supportStatus = SupportStatus.SUPPORTED)).status,
+            "an unchanged deleted reference remains writable so the rest of the policy can be updated",
+        )
+        assertEquals(HttpStatusCode.NoContent, admin.putJson(path, ReleaseLineUpdateRequest(SupportStatus.SUPPORTED)).status)
+        val cleared = admin.get(path).body<ReleaseLineResponse>()
+        assertNull(cleared.deprecatesOn)
+        assertNull(cleared.replacement)
+        assertNull(cleared.migrationGuide)
+        assertEquals(
+            HttpStatusCode.BadRequest,
+            admin.putJson(path, ReleaseLineUpdateRequest(SupportStatus.SUPPORTED, replacementContractId = target.id)).status,
+        )
+        assertEquals(
+            HttpStatusCode.BadRequest,
+            admin.putJson(path, ReleaseLineUpdateRequest(SupportStatus.SUPPORTED, replacementContractId = UInt.MAX_VALUE)).status,
+        )
+    }
+
+    @Test
+    fun `scheduled reminders choose the current urgency bucket and deduplicate per recipient`() = testApplication {
+        usePostgresTestcontainer()
+        val admin = seededClient("lines-reminders", UserRole.ADMIN)
+        val contract = createContract(admin, "lines-reminders")
+        admin.postJson("/api/v1/contracts/${contract.id}/versions", VersionCreateRequest("1.0.0", ContractFixtures.openApi))
+        val follower = seededClient("lines-reminders-follower", UserRole.USER)
+        follower.put("/api/v1/contracts/${contract.id}/subscription")
+        val path = "/api/v1/contracts/${contract.id}/release-lines/1"
+        admin.putJson(
+            path,
+            ReleaseLineUpdateRequest(
+                SupportStatus.SUPPORTED,
+                supportEndsOn = "2030-01-01",
+                deprecatesOn = "2030-01-01",
+            ),
+        )
+
+        suspend fun scanAt(instant: String) {
+            ReleaseLineReminderService(
+                sharedDatabaseForTests(),
+                TestNotifications.service,
+                Clock.fixed(Instant.parse(instant), ZoneOffset.UTC),
+            ).scan()
+        }
+        coroutineScope {
+            val first = async { scanAt("2029-12-10T23:59:59Z") }
+            val second = async { scanAt("2029-12-10T23:59:59Z") }
+            first.await()
+            second.await()
+        }
+        scanAt("2029-12-26T00:00:00Z")
+        scanAt("2030-01-01T12:00:00Z")
+        val lateFollower = seededClient("lines-reminders-late-follower", UserRole.USER)
+        lateFollower.put("/api/v1/contracts/${contract.id}/subscription")
+        scanAt("2030-01-02T00:00:00Z")
+
+        val reminders = follower.get("/api/v1/notifications?pageSize=100").body<NotificationPageResponse>().items
+            .filter { it.type == NotificationType.RELEASE_LINE_DEPRECATION_DUE }
+        assertEquals(3, reminders.size)
+        assertEquals(setOf("DUE_IN_30_DAYS", "DUE_IN_7_DAYS", "DUE_TODAY"), reminders.map { it.params["stage"] }.toSet())
+        reminders.forEach {
+            assertEquals(contract.name, it.params["contractName"])
+            assertEquals("1", it.params["major"])
+            assertEquals("2030-01-01", it.params["deadline"])
+        }
+        val supportReminders = follower.get("/api/v1/notifications?pageSize=100").body<NotificationPageResponse>().items
+            .filter { it.type == NotificationType.RELEASE_LINE_SUPPORT_END_DUE }
+        assertEquals(3, supportReminders.size)
+        assertEquals(setOf("DUE_IN_30_DAYS", "DUE_IN_7_DAYS", "DUE_TODAY"), supportReminders.map { it.params["stage"] }.toSet())
+        val catchup = lateFollower.get("/api/v1/notifications?pageSize=100").body<NotificationPageResponse>().items
+            .single { it.type == NotificationType.RELEASE_LINE_DEPRECATION_DUE }
+        assertEquals("OVERDUE", catchup.params["stage"])
+    }
+
+    @Test
+    fun `reminder dedup survives deletion while changed and cleared dates behave independently`() = testApplication {
+        usePostgresTestcontainer()
+        val admin = seededClient("lines-reminder-date", UserRole.ADMIN)
+        val contract = createContract(admin, "lines-reminder-date")
+        admin.postJson("/api/v1/contracts/${contract.id}/versions", VersionCreateRequest("1.0.0", ContractFixtures.openApi))
+        val follower = seededClient("lines-reminder-date-follower", UserRole.USER)
+        follower.put("/api/v1/contracts/${contract.id}/subscription")
+        val path = "/api/v1/contracts/${contract.id}/release-lines/1"
+        val service = ReleaseLineReminderService(
+            sharedDatabaseForTests(),
+            TestNotifications.service,
+            Clock.fixed(Instant.parse("2029-12-10T00:00:00Z"), ZoneOffset.UTC),
+        )
+
+        admin.putJson(path, ReleaseLineUpdateRequest(SupportStatus.SUPPORTED, deprecatesOn = "2030-01-01"))
+        service.scan()
+        val first = follower.get("/api/v1/notifications?pageSize=100").body<NotificationPageResponse>().items
+            .single { it.type == NotificationType.RELEASE_LINE_DEPRECATION_DUE }
+        assertEquals(HttpStatusCode.NoContent, follower.delete("/api/v1/notifications/${first.id}").status)
+
+        admin.putJson(path, ReleaseLineUpdateRequest(SupportStatus.SUPPORTED, deprecatesOn = "2030-01-02"))
+        service.scan()
+        val changed = follower.get("/api/v1/notifications?pageSize=100").body<NotificationPageResponse>().items
+            .single { it.type == NotificationType.RELEASE_LINE_DEPRECATION_DUE }
+        assertEquals("2030-01-02", changed.params["deadline"])
+        assertEquals(HttpStatusCode.NoContent, follower.delete("/api/v1/notifications/${changed.id}").status)
+
+        admin.putJson(path, ReleaseLineUpdateRequest(SupportStatus.SUPPORTED))
+        service.scan()
+        admin.putJson(path, ReleaseLineUpdateRequest(SupportStatus.SUPPORTED, deprecatesOn = "2030-01-01"))
+        service.scan()
+        val active = follower.get("/api/v1/notifications?pageSize=100").body<NotificationPageResponse>().items
+            .filter { it.type == NotificationType.RELEASE_LINE_DEPRECATION_DUE }
+        assertEquals(emptyList(), active, "soft-deleting a reminder does not release its durable dedup key")
+    }
+
+    @Test
+    fun `reminders suppress end-of-life empty and deleted source lines`() = testApplication {
+        usePostgresTestcontainer()
+        val admin = seededClient("lines-reminder-suppress", UserRole.ADMIN)
+        val follower = seededClient("lines-reminder-suppress-follower", UserRole.USER)
+
+        suspend fun fixture(prefix: String): Pair<ContractResponse, VersionResponse> {
+            val contract = createContract(admin, prefix)
+            val version = admin.postJson(
+                "/api/v1/contracts/${contract.id}/versions",
+                VersionCreateRequest("1.0.0", ContractFixtures.openApi),
+            ).body<VersionResponse>()
+            follower.put("/api/v1/contracts/${contract.id}/subscription")
+            return contract to version
+        }
+
+        val (eol, _) = fixture("lines-reminder-eol")
+        admin.putJson(
+            "/api/v1/contracts/${eol.id}/release-lines/1",
+            ReleaseLineUpdateRequest(SupportStatus.END_OF_LIFE, deprecatesOn = "2030-01-01"),
+        )
+        val (empty, emptyVersion) = fixture("lines-reminder-empty")
+        admin.putJson(
+            "/api/v1/contracts/${empty.id}/release-lines/1",
+            ReleaseLineUpdateRequest(SupportStatus.SUPPORTED, deprecatesOn = "2030-01-01"),
+        )
+        admin.delete("/api/v1/contracts/${empty.id}/versions/${emptyVersion.id}")
+        val (deleted, _) = fixture("lines-reminder-deleted")
+        admin.putJson(
+            "/api/v1/contracts/${deleted.id}/release-lines/1",
+            ReleaseLineUpdateRequest(SupportStatus.SUPPORTED, supportEndsOn = "2030-01-01"),
+        )
+        admin.delete("/api/v1/contracts/${deleted.id}")
+
+        ReleaseLineReminderService(
+            sharedDatabaseForTests(),
+            TestNotifications.service,
+            Clock.fixed(Instant.parse("2030-01-01T00:00:00Z"), ZoneOffset.UTC),
+        ).scan()
+        val reminders = follower.get("/api/v1/notifications?pageSize=100").body<NotificationPageResponse>().items
+            .filter { it.type in setOf(NotificationType.RELEASE_LINE_DEPRECATION_DUE, NotificationType.RELEASE_LINE_SUPPORT_END_DUE) }
+        assertEquals(emptyList(), reminders)
     }
 }

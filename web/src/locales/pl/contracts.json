@@ -94,7 +94,29 @@
     },
     "toast": {
       "saved": "Zapisano zasady linii wydań"
-    }
+    },
+    "deprecatesOn": "Data wycofania z zalecanego użycia",
+    "deprecationDate": "Planowane wycofanie z zalecanego użycia: {{date}}",
+    "supportEndDate": "Koniec wsparcia: {{date}}",
+    "replacementContract": "Kontrakt zastępczy",
+    "replacementLine": "Zastępcza linia wydań",
+    "replacementHint": "Wyszukaj kontrakt, a następnie opcjonalnie wybierz linię wydań.",
+    "replacementUnavailable": "Niedostępny kontrakt #{{id}}{{line}}",
+    "replacementPages": "Strony kontraktów zastępczych",
+    "anyReplacementLine": "Cały kontrakt",
+    "differentLineRequired": "Dla tego kontraktu wybierz inną linię wydań.",
+    "migrationGuide": "Instrukcje migracji",
+    "noMigrationGuide": "Nie podano instrukcji migracji.",
+    "planHint": "Daty są informacyjne i oceniane według UTC. Nie zmieniają cyklu życia wersji ani statusu wsparcia. Osoby obserwujące otrzymują przypomnienia w aplikacji do 30 dni, do 7 dni oraz po osiągnięciu terminu.",
+    "reviewImpact": "Sprawdź skutki wycofania {{line}}",
+    "impactTitle": "Skutki wycofania {{line}}",
+    "endSupport": "Zakończ wsparcie",
+    "usageScope": "To zadeklarowani odbiorcy całego kontraktu. Ich wersja i linia wydań są nieznane. Brak zadeklarowanych odbiorców nie potwierdza, że wycofanie jest bezpieczne.",
+    "incompleteUsage": "Informacje o wykorzystaniu są niepełne, nieaktualne lub niedostępne. Sprawdź znanych odbiorców i uzgodnij migrację przed kontynuowaniem.",
+    "acknowledgeImpact": "Zapoznałem/zapoznałam się z zadeklarowanym wykorzystaniem i ograniczeniami tych danych. Decyduję się kontynuować.",
+    "endSupportHint": "Ta operacja kończy wsparcie linii wydań. Nie wycofuje poszczególnych wersji.",
+    "dateOrder": "Wycofanie z zalecanego użycia musi nastąpić najpóźniej w dniu zakończenia wsparcia.",
+    "retryPlan": "Wczytaj plan ponownie"
   },
   "validation": {
     "systemRequired": "Wybierz system",

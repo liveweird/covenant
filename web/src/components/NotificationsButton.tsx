@@ -47,6 +47,8 @@ const TYPE_META: Record<Kind, { icon: typeof IconBell; color: string }> = {
   VERSION_IMPORTED: { icon: IconFileImport, color: "covenant" },
   VERSION_BREAKING_STORED: { icon: IconAlertTriangle, color: "orange" },
   RELEASE_LINE_UPDATED: { icon: IconSettings, color: "gray" },
+  RELEASE_LINE_DEPRECATION_DUE: { icon: IconAlertTriangle, color: "orange" },
+  RELEASE_LINE_SUPPORT_END_DUE: { icon: IconAlertTriangle, color: "orange" },
   TOADIE_LINKS_UPDATED: { icon: IconLink, color: "gray" },
 };
 
@@ -58,6 +60,11 @@ function lifecycleWord(value: string | undefined, t: TFunction): string | undefi
   return known ? t(`versions.lifecycle.${known}`) : value;
 }
 
+function deadlineStage(stage: string | undefined, t: TFunction): string | undefined {
+  const known = (["DUE_IN_30_DAYS", "DUE_IN_7_DAYS", "DUE_TODAY", "OVERDUE"] as const).find((value) => value === stage);
+  return known ? t(`notifications.deadlineStage.${known}`) : stage;
+}
+
 /** One localized sentence per notification, interpolating the structural params the server stored. */
 function describeNotification(n: NotificationItem, t: TFunction): string {
   if (!KNOWN_KINDS.has(n.type)) return n.type; // forward-compat: an unknown kind shows its raw name
@@ -66,6 +73,7 @@ function describeNotification(n: NotificationItem, t: TFunction): string {
     from: lifecycleWord(n.params.from, t),
     to: lifecycleWord(n.params.to, t),
     supportStatus: supportStatusLabel(n.params.supportStatus, t),
+    stage: deadlineStage(n.params.stage, t),
   };
   return t(`notifications.event.${n.type}`, params);
 }

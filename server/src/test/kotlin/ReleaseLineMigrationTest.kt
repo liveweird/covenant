@@ -27,7 +27,8 @@ class ReleaseLineMigrationTest {
                 connection.createStatement().use { statement ->
                     statement.executeQuery(
                         """
-                        SELECT major, support_status, support_ends_on, support_policy, recommended_version_id
+                        SELECT major, support_status, support_ends_on, support_policy, recommended_version_id,
+                               deprecates_on, replacement_contract_id, replacement_major, migration_guide
                         FROM contract_release_lines
                         ORDER BY major
                         """.trimIndent(),
@@ -39,6 +40,10 @@ class ReleaseLineMigrationTest {
                             assertNull(rows.getString("support_ends_on"))
                             assertNull(rows.getString("support_policy"))
                             assertNull(rows.getObject("recommended_version_id"))
+                            assertNull(rows.getString("deprecates_on"))
+                            assertNull(rows.getObject("replacement_contract_id"))
+                            assertNull(rows.getObject("replacement_major"))
+                            assertNull(rows.getString("migration_guide"))
                         }
                         assertEquals(listOf(1, 2), majors, "deleted parents and deleted versions are excluded")
                     }

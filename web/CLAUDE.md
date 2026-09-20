@@ -165,3 +165,16 @@ Keep selected APIs across picker pages/searches, and preserve removable missing 
 A 202 refresh is accepted work: poll for completion and render failure/staleness without erasing
 last known usage. Missing/disconnected/never-synced is never a successful empty consumer list.
 Use only validated server-generated external links. Shared rules: `.claude/docs/toadie-integration.md`.
+
+## Lifecycle plans and retirement review (0.11.0)
+
+`ReleaseLinePolicyModal` owns the complete support/deprecation/migration form;
+`ReleaseLineReplacementFields` searches and pages contract choices while preserving the
+selection. A same-contract replacement requires another major. Preserve unavailable stored
+references so unrelated policy edits remain possible. `ReleaseLinePlan` clamps guidance in
+summary cards and displays the complete text in `RetirementImpactModal`. That modal precedes
+RETIRED transitions and a change to END_OF_LIFE, with an explicit acknowledgment; it also opens
+read-only from each line. It reuses `ContractToadieUsage` in consumer-only mode. Missing or stale
+usage is a visible warning, while a failed Covenant plan read must be retried. Keep version/line
+adoption explicitly unknown and never present empty usage as retirement approval. Deadline
+notifications translate structural stages; the server supplies no invented actor.
