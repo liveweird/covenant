@@ -21,7 +21,13 @@
      type, and the Name/Version fields prefilled from the document's own title and version.
 5. They pick the seeded system and team as owner and click Import.
    - *Expected*: the import succeeds; opening the version shows it as a Draft.
-6. Teardown: the contract, system, domain and team are deleted via the API.
+6. They open inference for the saved contract, set Version to `2.0.0`, add another HTTP
+   exchange and generate a draft.
+   - *Expected*: the generated document declares `2.0.0`.
+7. They open the draft in the new-version editor and save it.
+   - *Expected*: both the Version field and document retain `2.0.0`; the saved version page
+     shows the contract name and `2.0.0`.
+8. Teardown: the contract, system, domain and team are deleted via the API.
 
 ## Scenario: admin describes the users table through an environment and imports the inferred ODCS draft
 

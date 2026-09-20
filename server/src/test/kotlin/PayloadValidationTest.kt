@@ -5,6 +5,8 @@ import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.put
+import io.ktor.client.request.header
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.testApplication
@@ -18,6 +20,18 @@ import kotlin.test.assertFalse
  * 400 with fixed, client-safe vocabulary — never a 500, never internal class names.
  */
 class PayloadValidationTest {
+
+    @Test
+    fun `JSON sent as plain text is a 415 problem with an occurrence path`() = testApplication {
+        usePostgresTestcontainer()
+        val response = jsonClient().post("/api/v1/login") {
+            header("Content-Type", "text/plain")
+            setBody("""{"email":"nobody@example.test","password":"unused"}""")
+        }
+        assertEquals(HttpStatusCode.UnsupportedMediaType, response.status)
+        assertContains(response.bodyAsText(), "application/json")
+        assertContains(response.bodyAsText(), "\"instance\":\"/api/v1/login\"")
+    }
 
     @Test
     fun `malformed JSON is a 400 problem without internal class names`() = testApplication {

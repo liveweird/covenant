@@ -156,7 +156,7 @@ object OpenApiCoverage {
      * per-IP buckets — `RateLimitResponseTest` + one case per bucket), `500`/`default` (the catch-all —
      * no honest way to force one through the public API).
      */
-    private val CROSS_CUTTING_STATUSES = setOf("400", "401", "413", "429", "500", "default")
+    private val CROSS_CUTTING_STATUSES = setOf("400", "401", "413", "415", "429", "500", "default")
 
     fun record(method: String, path: String, status: Int) {
         val template = templates.firstOrNull { it.regex.matches(path) }?.path ?: "(no template: $path)"

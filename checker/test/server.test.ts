@@ -1,7 +1,8 @@
 import { spawn } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import type { CheckRequest, CheckResponse } from "../src/check.ts";
+import { CheckBusy } from "../src/isolation.ts";
+import type { CheckRequest, CheckResponse } from "../src/protocol.ts";
 import { configFromEnv, handler, type CheckerConfig } from "../src/server.ts";
 
 function listen(
@@ -24,12 +25,21 @@ const OPENAPI = 'openapi: 3.1.0\ninfo:\n  title: T\n  version: "1"\npaths: {}\n'
 
 describe("configFromEnv", () => {
   test("defaults and overrides", () => {
-    expect(configFromEnv({})).toEqual({ port: 9090, token: undefined, maxBodyBytes: 2 * 1024 * 1024, timeoutMs: 20_000 });
-    expect(configFromEnv({ PORT: "1", CHECKER_TOKEN: " t ", CHECKER_MAX_BYTES: "10", CHECKER_TIMEOUT_MS: "5" })).toEqual({
+    expect(configFromEnv({})).toEqual({
+      port: 9090,
+      token: undefined,
+      maxBodyBytes: 2 * 1024 * 1024,
+      timeoutMs: 20_000,
+      maxConcurrentChecks: 1,
+      maxQueuedChecks: 8,
+    });
+    expect(configFromEnv({ PORT: "1", CHECKER_TOKEN: " t ", CHECKER_MAX_BYTES: "10", CHECKER_TIMEOUT_MS: "5", CHECKER_MAX_CONCURRENT: "3", CHECKER_MAX_QUEUED: "4" })).toEqual({
       port: 1,
       token: "t",
       maxBodyBytes: 10,
       timeoutMs: 5,
+      maxConcurrentChecks: 3,
+      maxQueuedChecks: 4,
     });
     expect(configFromEnv({ CHECKER_TOKEN: "   " }).token).toBeUndefined();
   });
@@ -39,7 +49,7 @@ describe("the HTTP contract", () => {
   let server: Server;
   let base: string;
   beforeAll(async () => {
-    ({ server, base } = await listen({ port: 0, token: "secret", maxBodyBytes: 4096, timeoutMs: 20_000 }));
+    ({ server, base } = await listen({ port: 0, token: "secret", maxBodyBytes: 4096, timeoutMs: 20_000, maxConcurrentChecks: 1, maxQueuedChecks: 8 }));
   });
   afterAll(() => server.close());
 
@@ -68,13 +78,30 @@ describe("the HTTP contract", () => {
     expect(missing.headers.get("content-type")).toBe("application/problem+json");
     const wrong = await post(JSON.stringify({ type: "ODCS", content: "a: 1" }), { "x-checker-token": "nope" });
     expect(wrong.status).toBe(401);
-    expect(await wrong.json()).toMatchObject({ status: 401, title: "Unauthorized" });
+    expect(await wrong.json()).toMatchObject({ status: 401, title: "Unauthorized", instance: "/check" });
   });
 
-  test("malformed JSON and a wrong shape are 400", async () => {
+  test("malformed JSON, unknown members, and a wrong shape are 400", async () => {
     expect((await post("{ not json")).status).toBe(400);
     expect((await post(JSON.stringify({ type: "WSDL", content: "x" }))).status).toBe(400);
     expect((await post(JSON.stringify({ type: "OPENAPI" }))).status).toBe(400);
+    const typo = await post(JSON.stringify({ type: "ASYNCAPI", content: "x", previousContnet: "baseline" }));
+    expect(typo.status).toBe(400);
+    expect(await typo.json()).toMatchObject({ instance: "/check" });
+  });
+
+  test("a missing or non-JSON Content-Type is 415, while JSON parameters are accepted", async () => {
+    const body = JSON.stringify({ type: "ODCS", content: "a: 1" });
+    const missing = await fetch(`${base}/check`, {
+      method: "POST",
+      headers: { "x-checker-token": "secret" },
+      body,
+    });
+    expect(missing.status).toBe(415);
+    expect(missing.headers.get("content-type")).toBe("application/problem+json");
+    expect(await missing.json()).toMatchObject({ title: "Unsupported Media Type", instance: "/check" });
+    expect((await post(body, { "x-checker-token": "secret", "content-type": "text/plain" })).status).toBe(415);
+    expect((await post(body, { "x-checker-token": "secret", "content-type": "application/json; charset=utf-8" })).status).toBe(200);
   });
 
   test("a body over the cap is 413", async () => {
@@ -91,7 +118,7 @@ describe("the HTTP contract", () => {
 describe("the per-request budget", () => {
   test("an exhausted budget is 504", async () => {
     const never = () => new Promise<CheckResponse>(() => undefined);
-    const { server, base } = await listen({ port: 0, token: undefined, maxBodyBytes: 1 << 20, timeoutMs: 20 }, never);
+    const { server, base } = await listen({ port: 0, token: undefined, maxBodyBytes: 1 << 20, timeoutMs: 20, maxConcurrentChecks: 1, maxQueuedChecks: 8 }, never);
     try {
       const res = await fetch(`${base}/check`, {
         method: "POST",
@@ -99,7 +126,21 @@ describe("the per-request budget", () => {
         body: JSON.stringify({ type: "ODCS", content: "a: 1" }),
       });
       expect(res.status).toBe(504);
-      expect(await res.json()).toMatchObject({ status: 504, title: "Gateway Timeout" });
+      expect(await res.json()).toMatchObject({ status: 504, title: "Gateway Timeout", instance: "/check" });
+    } finally {
+      server.close();
+    }
+  });
+
+  test("the production child is terminated when its budget expires", async () => {
+    const { server, base } = await listen({ port: 0, token: undefined, maxBodyBytes: 1 << 20, timeoutMs: 1, maxConcurrentChecks: 1, maxQueuedChecks: 8 });
+    try {
+      const res = await fetch(`${base}/check`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type: "OPENAPI", content: OPENAPI }),
+      });
+      expect(res.status).toBe(504);
     } finally {
       server.close();
     }
@@ -107,7 +148,7 @@ describe("the per-request budget", () => {
 
   test("an engine crash is a 500 problem (the server treats it as CHECKER_UNAVAILABLE)", async () => {
     const boom = () => Promise.reject(new Error("engine exploded"));
-    const { server, base } = await listen({ port: 0, token: undefined, maxBodyBytes: 1 << 20, timeoutMs: 1000 }, boom);
+    const { server, base } = await listen({ port: 0, token: undefined, maxBodyBytes: 1 << 20, timeoutMs: 1000, maxConcurrentChecks: 1, maxQueuedChecks: 8 }, boom);
     try {
       const res = await fetch(`${base}/check`, {
         method: "POST",
@@ -115,6 +156,26 @@ describe("the per-request budget", () => {
         body: JSON.stringify({ type: "ODCS", content: "a: 1" }),
       });
       expect(res.status).toBe(500);
+    } finally {
+      server.close();
+    }
+  });
+
+  test("a saturated checker is a 503 problem with an instance", async () => {
+    const busy = () => Promise.reject(new CheckBusy());
+    const { server, base } = await listen(
+      { port: 0, token: undefined, maxBodyBytes: 1 << 20, timeoutMs: 1000, maxConcurrentChecks: 1, maxQueuedChecks: 8 },
+      busy,
+    );
+    try {
+      const res = await fetch(`${base}/check`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type: "ODCS", content: "a: 1" }),
+      });
+      expect(res.status).toBe(503);
+      expect(res.headers.get("content-type")).toBe("application/problem+json");
+      expect(await res.json()).toMatchObject({ status: 503, title: "Service Unavailable", instance: "/check" });
     } finally {
       server.close();
     }
@@ -150,6 +211,16 @@ describe("boot smoke (real Node ESM, not vitest's interop)", () => {
       });
       const res = await fetch(`http://127.0.0.1:${port}/healthz`);
       expect(res.status).toBe(200);
+      const cyclic = await fetch(`http://127.0.0.1:${port}/check`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          type: "ASYNCAPI",
+          content: "asyncapi: 3.0.0\ninfo: {title: t, version: 1.0.0}\nchannels: {}\nx-cycle: &a\n  self: *a\n",
+        }),
+      });
+      expect(cyclic.status).toBe(200);
+      expect(await cyclic.json()).toMatchObject({ findings: [expect.objectContaining({ code: "cyclic-alias-not-allowed" })] });
       const checked = await fetch(`http://127.0.0.1:${port}/check`, {
         method: "POST",
         headers: { "content-type": "application/json" },

@@ -43,7 +43,11 @@ data class SyncStateResponse(
 
 /** `POST …/{vid}/sync` — the repo copy, fetched client-side through `POST /contracts/fetch`. */
 @Serializable
-data class SyncRequest(val content: String)
+data class SyncRequest(
+    val content: String,
+    /** The source fetched by the client. Null preserves the legacy race guard only. */
+    val sourceUrl: String? = null,
+)
 
 @Serializable
 data class TransitionRequest(val to: Lifecycle)

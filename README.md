@@ -55,6 +55,7 @@ export for the commit back.
 - a per-contract history timeline, and a repo reference per version with sync-from-source
   (which side moved, a line diff, overwrite or a new version from the repo copy),
 - the **contract reader** — a structured, reader-optimised rendering of any version (the Swagger-UI equivalent, for OpenAPI, AsyncAPI and ODCS alike): operations by tag with parameters, bodies and responses; channels, operations and messages; datasets with their columns, quality rules, servers and service levels — schemas as navigable trees with references resolved, recursion and unresolvable references marked, a table of contents, and findings that jump to the element they concern; a Source toggle keeps the raw document one click away,
+- the **Errors report** across stored findings, a two-way **compatibility report** between versions, and **inference** from HTTP exchanges, messages or database descriptions into a draft; the Observe flow captures samples through Environments,
 - every quality gate wired, locally and in CI.
 
 ## The stack
@@ -73,8 +74,9 @@ export for the commit back.
   CodeMirror 6 editor for the documents (with the contracts feature).
 - **Quality gates**: detekt (zero findings), Kover coverage floors, dependency-family alignment,
   ESLint + sonarjs, knip, Vitest coverage floors, runtime OpenAPI conformance in the server test
-  suite, Playwright e2e with axe accessibility scans, and a GitHub Actions workflow running all of
-  them on every push and pull request.
+  suite, and Playwright e2e with axe accessibility scans. Pushes to `main` and pull requests run
+  the server/web/checker gates, sample-loader tests and E2E static/setup checks; the full browser
+  suite runs nightly and on demand.
 
 ## Running the whole stack (one command)
 
@@ -119,14 +121,18 @@ kubectl apply -f k8s/
 
 ## Local development
 
-Four processes (the checker may run from compose or from source):
+Run each long-lived process in a separate terminal from the repository root:
 
 ```bash
-docker compose up postgres checker  # PostgreSQL on localhost:5434, the checker on the internal network
-./gradlew :server:run               # API on localhost:8082
-cd web && npm install --legacy-peer-deps && npm run dev   # SPA on localhost:5175 (proxies /api)
-cd checker && npm ci && npm run dev # optional: the checker from source on :9090 (then CHECKER_URL=http://localhost:9090 for the API)
+docker compose up postgres mailpit   # database on :5434 and local mail on :8027
+(cd checker && SCARF_ANALYTICS=false npm ci && npm run dev)  # checker on :9090
+CHECKER_URL=http://localhost:9090 ./gradlew :server:run       # API on :8082
+(cd web && npm install --legacy-peer-deps && npm run dev)    # SPA on :5175
 ```
+
+The Compose checker is isolated and has no host port; a host-run JVM uses the source checker
+above. If CHECKER_URL is omitted, the server runs with incomplete checks marked
+`CHECKER_UNAVAILABLE`. The full Compose app reaches its own checker internally.
 
 The local JDK is managed by [mise](https://mise.jdx.dev) (`mise.toml`, Temurin 21).
 

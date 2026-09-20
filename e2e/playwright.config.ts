@@ -1,8 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
 // Blackbox E2E: drives a real browser against the full stack (SPA + server + Postgres) served
-// single-origin at http://localhost:8082 by `docker compose`. The stack is brought up/down by
-// global-setup / global-teardown (unless one is already running locally, which is reused).
+// single-origin at http://localhost:8082 by `docker compose`. The stack is brought up by
+// global-setup (unless one is already running locally, which is reused). Services and data
+// remain intact after the run; starting containers does not establish ownership of volumes.
 // 8082, not 8080/8081 — probing those could happily "reuse" a running Lettuce or Toadie.
 export const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:8082";
 
@@ -19,7 +20,6 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 10_000 },
   globalSetup: "./global-setup.ts",
-  globalTeardown: "./global-teardown.ts",
   use: {
     baseURL: BASE_URL,
     // retain-on-failure, not on-first-retry: retries are 0 locally, so on-first-retry never

@@ -11,14 +11,16 @@ the HTTP contract is [`openapi.yaml`](openapi.yaml).
 
 | Command | What it does |
 | ------- | ------------ |
-| `npm ci` | Install (set `SCARF_ANALYTICS=false` — Spectral's postinstall phones home otherwise) |
+| `SCARF_ANALYTICS=false npm ci` | Install without Spectral's postinstall analytics |
 | `npm run dev` | Run from source with reload on `:9090` (`tsx watch`) |
 | `npm run build && npm start` | Compile to `dist/` and run it (what the image does) |
 | `npm run lint` / `npm run knip` / `npm run typecheck` | The static gates (zero findings, no baseline) |
 | `npm test` / `npm run test:coverage` | Vitest: the HTTP contract, the mapping, the `$ref` refusal, one fixture per format |
 
 Smoke: `curl -s localhost:9090/healthz` and
-`curl -s -XPOST localhost:9090/check -H 'content-type: application/json' -d '{"type":"OPENAPI","content":"openapi: 3.1.0\ninfo: {title: T, version: \"1\"}\npaths: {}\n"}'`.
+from the repository root:
+`node -e 'const fs=require("node:fs"); process.stdout.write(JSON.stringify({type:"OPENAPI",content:fs.readFileSync("checker/test/fixtures/openapi/petstore-3.1.yaml","utf8")}))' | curl -sS -XPOST localhost:9090/check -H 'content-type: application/json' --data-binary @-`.
 
 Env: `PORT` (9090), `CHECKER_TOKEN` (optional shared secret, header `X-Checker-Token`),
-`CHECKER_MAX_BYTES` (2 MiB), `CHECKER_TIMEOUT_MS` (20000).
+`CHECKER_MAX_BYTES` (2 MiB), `CHECKER_TIMEOUT_MS` (20000), `CHECKER_MAX_CONCURRENT`
+(1 child process), and `CHECKER_MAX_QUEUED` (8 waiting requests).

@@ -8,6 +8,11 @@ import ch.nokillswit.contracts.ImportRequest
 import ch.nokillswit.contracts.ImportResponse
 import ch.nokillswit.contracts.ImportStatus
 import ch.nokillswit.contracts.VersionPageResponse
+import ch.nokillswit.contracts.ContractService
+import ch.nokillswit.contracts.ContractVersionService
+import ch.nokillswit.contracts.VersionCreateRequest
+import ch.nokillswit.contracts.checks.ChecksService
+import ch.nokillswit.contracts.checks.CheckerClientKey
 import ch.nokillswit.users.UserRole
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -19,11 +24,79 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.jetbrains.exposed.v1.r2dbc.transactions.suspendTransaction
 
 /** Import and its dry run: report & skip, the statuses, the waiver, and dry-run/real-run parity. */
 class ContractImportTest {
 
     private fun name(prefix: String) = "$prefix-${UUID.randomUUID().toString().substring(0, 8)}"
+
+    @Test
+    fun `invalid source leaves no empty contract and a real import checks once`() = testApplication {
+        val checker = TestChecker.Stub(emptyList())
+        configureApp()
+        application { attributes.put(CheckerClientKey, checker) }
+        startApplication()
+        val admin = seededClient("impatomic", UserRole.ADMIN)
+        val systemId = TestContracts.seedSystem("impatomic")
+        val teamId = TestTeams.seed(name("t"))
+        val invalidName = name("invalid-source")
+        val invalid = admin.postJson(
+            "/api/v1/contracts/import",
+            ImportRequest(
+                listOf(
+                    ImportItem(
+                        systemId, ContractType.OPENAPI, invalidName, ownerTeamId = teamId,
+                        version = "1.0.0", content = ContractFixtures.openApi, sourceUrl = "ftp://invalid.example/spec.yaml",
+                    ),
+                ),
+            ),
+        ).body<ImportResponse>().results.single()
+        assertEquals(ImportStatus.INVALID, invalid.status)
+        assertEquals(
+            0,
+            admin.get("/api/v1/contracts?systemId=$systemId&q=$invalidName").body<ch.nokillswit.contracts.ContractPageResponse>().total,
+        )
+
+        val valid = admin.postJson(
+            "/api/v1/contracts/import",
+            ImportRequest(
+                listOf(
+                    ImportItem(
+                        systemId, ContractType.OPENAPI, name("checked-once"), ownerTeamId = teamId,
+                        version = "1.0.0", content = ContractFixtures.openApi,
+                    ),
+                ),
+            ),
+        ).body<ImportResponse>().results.single()
+        assertEquals(ImportStatus.CREATED, valid.status)
+        assertEquals(1, checker.calls, "the saved report comes from the single prepared check")
+    }
+
+    @Test
+    fun `contract and first version roll back together when insertion fails after parent creation`() = testApplication {
+        usePostgresTestcontainer()
+        val database = sharedDatabaseForTests()
+        val teams = ch.nokillswit.teams.TeamService(database)
+        val contracts = ContractService(database, teams)
+        val versions = ContractVersionService(database, ChecksService(TestChecker.silent), contracts)
+        val adminId = TestUsers.seed(uniqueEmail("improllback"), "pw", role = UserRole.ADMIN)
+        val caller = ch.nokillswit.authz.CallerPrincipal(adminId, "rollback@example.test", setOf(UserRole.ADMIN))
+        val systemId = TestContracts.seedSystem("improllback")
+        val teamId = TestTeams.seed(name("rollback-team"))
+        val contractName = name("rollback-contract")
+        val create = ContractCreateRequest(systemId, ContractType.OPENAPI, contractName, ownerTeamId = teamId)
+        val prepared = versions.prepare(null, ContractType.OPENAPI, VersionCreateRequest("1.0.0", ContractFixtures.openApi))
+
+        val failure = runCatching {
+            suspendTransaction(database) {
+                val contractId = contracts.create(create, caller)
+                versions.insertPrepared(contractId, prepared, UInt.MAX_VALUE, allowInvalid = true)
+            }
+        }.exceptionOrNull()
+        assertNotNull(failure, "the invalid createdBy FK must fail after the parent insert")
+        assertNull(contracts.findActiveId(systemId, contractName), "the nested parent insert must roll back with the failed version")
+    }
 
     @Test
     fun `a mixed batch classifies every row and the dry run predicts the same statuses`() = testApplication {

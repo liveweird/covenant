@@ -170,6 +170,7 @@
   "deleteFailed": "Could not delete the version",
   "deleteNotDraft": "Only a DRAFT version can be deleted — this one is part of the contract's history.",
   "sync": {
+    "conflict": "The version or its source changed during synchronization. Close this dialog and try again.",
     "action": "Sync from source",
     "title": "Sync {{version}} from its source",
     "sourceLabel": "Source:",

@@ -21,6 +21,8 @@ import ch.nokillswit.contracts.VersionResponse
 import ch.nokillswit.contracts.checks.CheckReport
 import ch.nokillswit.contracts.checks.BreakingChanges
 import ch.nokillswit.contracts.checks.CheckerClientKey
+import ch.nokillswit.contracts.checks.CheckerClient
+import ch.nokillswit.contracts.checks.CheckerResponse
 import ch.nokillswit.contracts.checks.Finding
 import ch.nokillswit.contracts.checks.OpenApiBreaking
 import ch.nokillswit.contracts.checks.DocumentFormat
@@ -39,6 +41,10 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.testApplication
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -58,6 +64,252 @@ class ContractVersionTest {
     }
 
     private fun path(c: ContractResponse) = "/api/v1/contracts/${c.id}/versions"
+
+    @Test
+    fun `writer revoked while checking cannot store the prepared version`() = testApplication {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val checker = object : CheckerClient {
+            override suspend fun check(type: ContractType, content: String, previousContent: String?): CheckerResponse {
+                entered.complete(Unit)
+                release.await()
+                return CheckerResponse(emptyList())
+            }
+        }
+        configureApp()
+        application { attributes.put(CheckerClientKey, checker) }
+        startApplication()
+        val systemId = TestContracts.seedSystem("vrevoke")
+        val memberEmail = uniqueEmail("vrevoke")
+        val memberId = TestUsers.seed(memberEmail, "pw", role = UserRole.USER)
+        val member = authedClient(memberEmail, "pw")
+        val teamId = TestTeams.seed(name("team"), listOf(memberId))
+        val contract = member.postJson(
+            "/api/v1/contracts",
+            ContractCreateRequest(systemId, ContractType.OPENAPI, name("contract"), ownerTeamId = teamId),
+        ).body<ContractResponse>()
+
+        coroutineScope {
+            val pending = async {
+                member.postJson(path(contract), VersionCreateRequest("1.0.0", ContractFixtures.openApi))
+            }
+            entered.await()
+            TestTeams.service.removeMember(teamId, memberId)
+            release.complete(Unit)
+            assertEquals(HttpStatusCode.Forbidden, pending.await().status)
+        }
+        assertEquals(0, member.get(path(contract)).body<VersionPageResponse>().total)
+    }
+
+    @Test
+    fun `lifecycle transition refreshes only the ODCS status finding`() = testApplication {
+        usePostgresTestcontainer()
+        val admin = seededClient("vstatus", UserRole.ADMIN)
+        val contract = admin.contract("vstatus", ContractType.ODCS)
+        val draft = admin.postJson(path(contract), VersionCreateRequest("2.0.0", ContractFixtures.odcs)).body<VersionResponse>()
+        assertTrue(draft.findings.any { it.code == "STATUS_MISMATCH" })
+        val unrelated = draft.findings.single { it.code == "VERSION_MISMATCH" }
+        val checkedAt = draft.checkedAt
+        val proposed = admin.postJson(
+            "${path(contract)}/${draft.id}/transition",
+            TransitionRequest(Lifecycle.PROPOSED),
+        ).body<VersionResponse>()
+        assertTrue(proposed.findings.any { it.code == "STATUS_MISMATCH" })
+        val active = admin.postJson(
+            "${path(contract)}/${draft.id}/transition",
+            TransitionRequest(Lifecycle.ACTIVE),
+        ).body<VersionResponse>()
+        assertFalse(active.findings.any { it.code == "STATUS_MISMATCH" })
+        assertEquals(unrelated, active.findings.single { it.code == "VERSION_MISMATCH" })
+        assertEquals(draft.checkErrors, active.checkErrors)
+        assertEquals(draft.checkWarnings, active.checkWarnings)
+        assertEquals(draft.checkInfos - 1, active.checkInfos)
+        assertEquals(checkedAt, active.checkedAt)
+        assertEquals(draft.checkComplete, active.checkComplete)
+    }
+
+    @Test
+    fun `recheck refuses to attach an old verdict after content changes`() = testApplication {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val calls = AtomicInteger()
+        val checker = object : CheckerClient {
+            override suspend fun check(type: ContractType, content: String, previousContent: String?): CheckerResponse {
+                if (calls.incrementAndGet() == 2) {
+                    entered.complete(Unit)
+                    release.await()
+                }
+                return CheckerResponse(emptyList())
+            }
+        }
+        configureApp()
+        application { attributes.put(CheckerClientKey, checker) }
+        startApplication()
+        val admin = seededClient("vrecheck", UserRole.ADMIN)
+        val contract = admin.contract("vrecheck")
+        val version = admin.postJson(path(contract), VersionCreateRequest("1.0.0", ContractFixtures.openApi)).body<VersionResponse>()
+        val changed = ContractFixtures.openApi + "\n# changed while recheck ran\n"
+
+        coroutineScope {
+            val pending = async { admin.post("${path(contract)}/${version.id}/recheck") }
+            entered.await()
+            assertEquals(
+                HttpStatusCode.OK,
+                admin.putJson("${path(contract)}/${version.id}/content", VersionContentRequest(changed)).status,
+            )
+            release.complete(Unit)
+            assertEquals(HttpStatusCode.Conflict, pending.await().status)
+        }
+        assertEquals(changed, admin.get("${path(contract)}/${version.id}").body<VersionResponse>().content)
+    }
+
+    @Test
+    fun `create refuses a prepared report when the active baseline changes`() = testApplication {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val checker = object : CheckerClient {
+            override suspend fun check(type: ContractType, content: String, previousContent: String?): CheckerResponse {
+                if (content.contains("candidate waiting for baseline")) {
+                    entered.complete(Unit)
+                    release.await()
+                }
+                return CheckerResponse(emptyList())
+            }
+        }
+        configureApp()
+        application { attributes.put(CheckerClientKey, checker) }
+        startApplication()
+        val admin = seededClient("vbaseline", UserRole.ADMIN)
+        val contract = admin.contract("vbaseline")
+        admin.activate(contract, "1.0.0", ContractFixtures.openApi)
+        val candidate = ContractFixtures.openApi + "\n# candidate waiting for baseline\n"
+
+        coroutineScope {
+            val pending = async { admin.postJson(path(contract), VersionCreateRequest("3.0.0", candidate)) }
+            entered.await()
+            admin.activate(contract, "2.0.0", ContractFixtures.openApiJson)
+            release.complete(Unit)
+            assertEquals(HttpStatusCode.Conflict, pending.await().status)
+        }
+        assertEquals(
+            listOf("2.0.0", "1.0.0"),
+            admin.get(path(contract)).body<VersionPageResponse>().items.map { it.version },
+        )
+    }
+
+    @Test
+    fun `sync refuses fetched content when the source changes during validation`() = testApplication {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val checker = object : CheckerClient {
+            override suspend fun check(type: ContractType, content: String, previousContent: String?): CheckerResponse {
+                if (content.contains("sync waiting for source")) {
+                    entered.complete(Unit)
+                    release.await()
+                }
+                return CheckerResponse(emptyList())
+            }
+        }
+        configureApp()
+        application { attributes.put(CheckerClientKey, checker) }
+        startApplication()
+        val admin = seededClient("vsource-race", UserRole.ADMIN)
+        val contract = admin.contract("vsource-race")
+        val original = "https://example.com/contracts/original.yaml"
+        val replacement = "https://example.com/contracts/replacement.yaml"
+        val version = admin.postJson(
+            path(contract),
+            VersionCreateRequest("1.0.0", ContractFixtures.openApi, original),
+        ).body<VersionResponse>()
+        val fetched = ContractFixtures.openApi + "\n# sync waiting for source\n"
+
+        coroutineScope {
+            val pending = async {
+                admin.postJson("${path(contract)}/${version.id}/sync", SyncRequest(fetched, original))
+            }
+            entered.await()
+            assertEquals(
+                HttpStatusCode.NoContent,
+                admin.putJson("${path(contract)}/${version.id}/source", VersionSourceRequest(replacement)).status,
+            )
+            release.complete(Unit)
+            assertEquals(HttpStatusCode.Conflict, pending.await().status)
+        }
+        val stored = admin.get("${path(contract)}/${version.id}").body<VersionResponse>()
+        assertEquals(replacement, stored.sourceUrl)
+        assertEquals(ContractFixtures.openApi, stored.content)
+    }
+
+    @Test
+    fun `concurrent creates cannot leave the latest pointer on the lower version`() = testApplication {
+        val lowerEntered = CompletableDeferred<Unit>()
+        val higherEntered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val checker = object : CheckerClient {
+            override suspend fun check(type: ContractType, content: String, previousContent: String?): CheckerResponse {
+                when {
+                    content.contains("lower concurrent create") -> lowerEntered.complete(Unit)
+                    content.contains("higher concurrent create") -> higherEntered.complete(Unit)
+                }
+                if (content.contains("concurrent create")) release.await()
+                return CheckerResponse(emptyList())
+            }
+        }
+        configureApp()
+        application { attributes.put(CheckerClientKey, checker) }
+        startApplication()
+        val admin = seededClient("vlatest", UserRole.ADMIN)
+        val contract = admin.contract("vlatest")
+
+        coroutineScope {
+            val lower = async {
+                admin.postJson(
+                    path(contract),
+                    VersionCreateRequest("1.0.0", ContractFixtures.openApi + "\n# lower concurrent create\n"),
+                )
+            }
+            val higher = async {
+                admin.postJson(
+                    path(contract),
+                    VersionCreateRequest("2.0.0", ContractFixtures.openApi + "\n# higher concurrent create\n"),
+                )
+            }
+            lowerEntered.await()
+            higherEntered.await()
+            release.complete(Unit)
+            assertEquals(HttpStatusCode.Created, higher.await().status)
+            assertTrue(lower.await().status in setOf(HttpStatusCode.Created, HttpStatusCode.BadRequest))
+        }
+        assertEquals("2.0.0", admin.get("/api/v1/contracts/${contract.id}").body<ContractResponse>().latestVersion?.version)
+    }
+
+    @Test
+    fun `concurrent delete and publication cannot both succeed`() = testApplication {
+        usePostgresTestcontainer()
+        val admin = seededClient("vdelete-race", UserRole.ADMIN)
+        val contract = admin.contract("vdelete-race")
+        val draft = admin.postJson(path(contract), VersionCreateRequest("1.0.0", ContractFixtures.openApi)).body<VersionResponse>()
+        val start = CompletableDeferred<Unit>()
+
+        coroutineScope {
+            val transition = async {
+                start.await()
+                admin.postJson("${path(contract)}/${draft.id}/transition", TransitionRequest(Lifecycle.PROPOSED))
+            }
+            val deletion = async {
+                start.await()
+                admin.delete("${path(contract)}/${draft.id}")
+            }
+            start.complete(Unit)
+            val transitionStatus = transition.await().status
+            val deleteStatus = deletion.await().status
+            val validOutcomes = setOf(
+                HttpStatusCode.OK to HttpStatusCode.Conflict,
+                HttpStatusCode.NotFound to HttpStatusCode.NoContent,
+            )
+            assertTrue(transitionStatus to deleteStatus in validOutcomes, "$transitionStatus / $deleteStatus")
+        }
+    }
 
     @Test
     fun `create - a clean draft stores the text byte-exact with its metadata and an empty report`() = testApplication {
@@ -517,6 +769,14 @@ class ContractVersionTest {
             val admin = seededClient("vsync", UserRole.ADMIN)
             val c = admin.contract("vsync")
             val v = admin.postJson(path(c), VersionCreateRequest("1.0.0", ContractFixtures.openApi, repoUrl)).body<VersionResponse>()
+            assertEquals(
+                HttpStatusCode.Conflict,
+                admin.postJson(
+                    "${path(c)}/${v.id}/sync",
+                    SyncRequest(ContractFixtures.openApi, "https://example.com/a-different-source.yaml"),
+                ).status,
+                "the fetched source identity must still match the version reference",
+            )
             val localEdit = VersionContentRequest(ContractFixtures.openApi + "\n# local\n")
             val edited = admin.putJson("${path(c)}/${v.id}/content", localEdit).body<VersionResponse>()
             assertEquals(v.lastSyncedAt, edited.lastSyncedAt, "a local edit never moves the sync stamp")

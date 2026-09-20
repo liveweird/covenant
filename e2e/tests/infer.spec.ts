@@ -93,6 +93,22 @@ test("user infers an OpenAPI draft from a pasted exchange and saves it as the co
   await expect(page.getByRole("heading", { name: `${row.name} 1.0.0` })).toBeVisible();
   await expect(page.getByText("Draft", { exact: true })).toBeVisible();
 
+  // An existing contract preserves an explicitly chosen version through the inference hand-off.
+  await page.goto(`/contracts/${row.contractId}/infer`);
+  await expect(page.getByRole("heading", { name: "Infer a contract" })).toBeVisible();
+  await page.getByLabel("Version", { exact: true }).fill("2.0.0");
+  await page.getByLabel("URL", { exact: true }).fill("https://api.example.test/orders/43");
+  await fillCodeEditor(page, "Response body", '{"id":43,"total":25}');
+  await page.getByRole("button", { name: "Add sample" }).click();
+  await page.getByRole("button", { name: "Generate draft" }).click();
+  await expect(page.locator('.cm-content[aria-label="Inferred document"]')).toContainText("2.0.0");
+  await page.getByRole("button", { name: "Open in editor" }).click();
+  await expect(page).toHaveURL(new RegExp(`/contracts/${row.contractId}/versions/new$`));
+  await expect(page.getByLabel("Version", { exact: true })).toHaveValue("2.0.0");
+  await expect(page.getByRole("textbox", { name: "Contract document" })).toContainText("2.0.0");
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByRole("heading", { name: `${row.name} 2.0.0` })).toBeVisible();
+
   const seeded: SeededContract = { domainId, systemId, teamId, teamName, contractId: row.contractId, contractName: row.name, versionId: row.versionId };
   await teardownSeededContract(api, seeded);
   await api.dispose();

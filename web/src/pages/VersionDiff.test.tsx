@@ -79,6 +79,14 @@ describe("VersionDiff page", () => {
     expect(await screen.findByText("Two versions are needed for a comparison.")).toBeInTheDocument();
   });
 
+  test("a versions-list failure renders inline instead of empty selectors", async () => {
+    serve(mockFetch, { ...base, "GET /api/v1/contracts/5/versions?": { status: 500, body: { title: "Internal Server Error", status: 500 } } });
+    renderPage();
+    expect(await screen.findByText("Could not load the versions")).toBeInTheDocument();
+    expect(screen.getByText("Load failed (500)")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "From" })).not.toBeInTheDocument();
+  });
+
   test("shows the compatibility card for the picked pair", async () => {
     serve(mockFetch, base);
     renderPage();

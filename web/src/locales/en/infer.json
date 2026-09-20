@@ -61,6 +61,8 @@
     "method": "Method",
     "run": "Send",
     "describe": "Describe",
+    "environmentsFailed": "Could not load environments",
+    "relationsFailed": "Could not load database relations",
     "addToSamples": "Add to samples",
     "credentialsHint": "Credentials typed here are sent once and never stored.",
     "http": {

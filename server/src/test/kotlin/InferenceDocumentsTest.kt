@@ -103,6 +103,21 @@ class InferenceDocumentsTest {
     }
 
     @Test
+    fun `OpenAPI - server origins preserve ports unless they are the scheme default`() {
+        for ((url, origin) in mapOf(
+            "http://example.test:443/orders" to "http://example.test:443",
+            "https://example.test:80/orders" to "https://example.test:80",
+            "http://example.test:80/orders" to "http://example.test",
+            "https://example.test:443/orders" to "https://example.test",
+        )) {
+            val response = Inference.build(
+                InferRequest(ContractType.OPENAPI, http = listOf(orderExchange.copy(url = url))), DEFAULT_MAX_DOCUMENT_BYTES,
+            )
+            assertEquals(origin, rootOf(response.content).path("servers")[0].path("url").asText(), url)
+        }
+    }
+
+    @Test
     fun `OpenAPI - a literal path segment is never templated`() {
         val exchange = orderExchange.copy(
             url = "https://api.example.test/orders/alice",

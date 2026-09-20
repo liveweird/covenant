@@ -4,6 +4,8 @@ import io.ktor.client.request.get
 import io.ktor.client.request.options
 import io.ktor.client.request.header
 import io.ktor.client.request.post
+import io.ktor.client.call.body
+import ch.nokillswit.plugins.ProblemDetail
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -15,13 +17,15 @@ class ServerTest {
     @Test
     fun `unauthenticated API request returns a 401 problem+json body`() = testApplication {
         usePostgresTestcontainer()
-        val response = jsonClient().post("/api/v1/logout")
+        val response = jsonClient().post("/api/v1/logout?secret=must-not-be-reflected")
         assertEquals(HttpStatusCode.Unauthorized, response.status)
         assertTrue(
             response.headers["Content-Type"]?.startsWith("application/problem+json") == true,
             "401 challenge must be RFC 7807 problem+json",
         )
         assertContains(response.bodyAsText(), "\"status\":401")
+        assertEquals("/api/v1/logout", response.body<ProblemDetail>().instance)
+        assertFalse(response.bodyAsText().contains("must-not-be-reflected"))
     }
 
     @Test

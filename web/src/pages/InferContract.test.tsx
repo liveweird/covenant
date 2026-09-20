@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { Route, Routes, useLocation } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { fireEvent, renderWithProviders, screen, waitFor } from "../test/render";
+import { jsonResponse } from "../test/http";
 import InferContract from "./InferContract";
 import { bodyOf, CONTRACT, findCall, serve, signIn, VERSION_PAGE, type FetchMock } from "../test/contractsFixtures";
 
@@ -27,11 +29,23 @@ function LocationProbe({ label }: { label: string }) {
   );
 }
 
-function renderPage(route: string) {
+function InferWithRefetch() {
+  const queryClient = useQueryClient();
+  return (
+    <>
+      <button type="button" onClick={() => void queryClient.invalidateQueries({ queryKey: ["contracts"] })}>
+        Refetch contracts
+      </button>
+      <InferContract />
+    </>
+  );
+}
+
+function renderPage(route: string, inferElement = <InferContract />) {
   return renderWithProviders(
     <Routes>
-      <Route path="/contracts/infer" element={<InferContract />} />
-      <Route path="/contracts/:id/infer" element={<InferContract />} />
+      <Route path="/contracts/infer" element={inferElement} />
+      <Route path="/contracts/:id/infer" element={inferElement} />
       <Route path="/contracts/import" element={<LocationProbe label="Import probe" />} />
       <Route path="/contracts/:id/versions/new" element={<LocationProbe label="New version probe" />} />
     </Routes>,
@@ -94,7 +108,141 @@ describe("InferContract page", () => {
 
     await user.click(screen.getByRole("button", { name: "Open in editor" }));
     expect(await screen.findByText("New version probe")).toBeInTheDocument();
-    expect(JSON.parse(screen.getByTestId("state").textContent ?? "null")).toEqual({ content: DRAFT_RESPONSE.content, sourceUrl: null });
+    expect(JSON.parse(screen.getByTestId("state").textContent ?? "null")).toEqual({ content: DRAFT_RESPONSE.content, sourceUrl: null, version: "1.1.1" });
+  });
+
+  test("an existing contract waits for its versions before choosing the inference default", async () => {
+    serve(mockFetch, {
+      "GET /api/v1/contracts/5": { status: 200, body: CONTRACT },
+      "POST /api/v1/contracts/infer": { status: 200, body: DRAFT_RESPONSE },
+    });
+    const baseFetch = mockFetch.getMockImplementation();
+    let resolveVersions!: (response: Response) => void;
+    const delayedVersions = new Promise<Response>((resolve) => {
+      resolveVersions = resolve;
+    });
+    mockFetch.mockImplementation((url: string, init?: RequestInit) =>
+      url.startsWith("/api/v1/contracts/5/versions?") ? delayedVersions : baseFetch?.(url, init),
+    );
+
+    const user = userEvent.setup();
+    renderPage("/contracts/5/infer");
+    expect(screen.getByLabelText("Loading…")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Generate draft" })).not.toBeInTheDocument();
+
+    resolveVersions(jsonResponse(200, VERSION_PAGE));
+    expect(await screen.findByLabelText("Version")).toHaveValue("1.1.1");
+    await user.type(screen.getByLabelText("URL"), "https://api.example.test/orders/42");
+    await user.click(screen.getByRole("button", { name: "Add sample" }));
+    await user.click(screen.getByRole("button", { name: "Generate draft" }));
+    await screen.findByText("Templated /orders/42 as /orders/{orderId}");
+    expect(bodyOf(findCall(mockFetch, "POST", "/api/v1/contracts/infer"))).toMatchObject({ version: "1.1.1" });
+  });
+
+  test("an existing contract renders a versions prerequisite failure", async () => {
+    serve(mockFetch, {
+      "GET /api/v1/contracts/5": { status: 200, body: CONTRACT },
+      "GET /api/v1/contracts/5/versions?": { status: 500, body: { title: "Internal Server Error", status: 500 } },
+    });
+    renderPage("/contracts/5/infer");
+    expect(await screen.findByText("Load failed (500)")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Generate draft" })).not.toBeInTheDocument();
+  });
+
+  test("metadata edits invalidate the draft and the selected version reaches an existing contract's editor", async () => {
+    serve(mockFetch, {
+      "GET /api/v1/contracts/5": { status: 200, body: CONTRACT },
+      "GET /api/v1/contracts/5/versions?": { status: 200, body: VERSION_PAGE },
+      "POST /api/v1/contracts/infer": { status: 200, body: DRAFT_RESPONSE },
+    });
+    const user = userEvent.setup();
+    renderPage("/contracts/5/infer");
+    await user.type(await screen.findByLabelText("URL"), "https://api.example.test/orders/42");
+    await user.click(screen.getByRole("button", { name: "Add sample" }));
+    const version = screen.getByLabelText("Version");
+    await user.clear(version);
+    await user.type(version, "9.0.0");
+    await user.click(screen.getByRole("button", { name: "Generate draft" }));
+    expect(await screen.findByText("Templated /orders/42 as /orders/{orderId}")).toBeInTheDocument();
+
+    await user.clear(version);
+    await user.type(version, "10.0.0");
+    expect(screen.getByRole("button", { name: "Open in editor" })).toBeDisabled();
+    expect(screen.queryByText("Templated /orders/42 as /orders/{orderId}")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Generate draft" }));
+    await user.click(await screen.findByRole("button", { name: "Open in editor" }));
+    expect(JSON.parse(screen.getByTestId("state").textContent ?? "null")).toMatchObject({ version: "10.0.0" });
+  });
+
+  test("background contract and version refetches cannot change generated metadata or its handoff", async () => {
+    let contractLoads = 0;
+    let versionLoads = 0;
+    serve(mockFetch, {
+      "GET /api/v1/contracts/5": () => {
+        contractLoads += 1;
+        return { status: 200, body: contractLoads === 1 ? CONTRACT : { ...CONTRACT, name: "renamed-api" } };
+      },
+      "GET /api/v1/contracts/5/versions?": () => {
+        versionLoads += 1;
+        return {
+          status: 200,
+          body: versionLoads === 1
+            ? VERSION_PAGE
+            : { ...VERSION_PAGE, items: [{ ...VERSION_PAGE.items[0], id: 99, version: "5.0.0" }, ...VERSION_PAGE.items] },
+        };
+      },
+      "POST /api/v1/contracts/infer": { status: 200, body: DRAFT_RESPONSE },
+    });
+    const user = userEvent.setup();
+    renderPage("/contracts/5/infer", <InferWithRefetch />);
+    await user.type(await screen.findByLabelText("URL"), "https://api.example.test/orders/42");
+    await user.click(screen.getByRole("button", { name: "Add sample" }));
+    await user.click(screen.getByRole("button", { name: "Generate draft" }));
+    await screen.findByText("Templated /orders/42 as /orders/{orderId}");
+
+    await user.click(screen.getByRole("button", { name: "Refetch contracts" }));
+    await waitFor(() => {
+      expect(contractLoads).toBe(2);
+      expect(versionLoads).toBe(2);
+    });
+    expect(screen.getByLabelText("Name")).toHaveValue("orders-api");
+    expect(screen.getByLabelText("Version")).toHaveValue("1.1.1");
+
+    await user.click(screen.getByRole("button", { name: "Open in editor" }));
+    expect(JSON.parse(screen.getByTestId("state").textContent ?? "null")).toMatchObject({ version: "1.1.1" });
+  });
+
+  test("changing a new contract's name invalidates its generated draft", async () => {
+    serve(mockFetch, { "POST /api/v1/contracts/infer": { status: 200, body: DRAFT_RESPONSE } });
+    const user = userEvent.setup();
+    renderPage("/contracts/infer");
+    await user.type(screen.getByLabelText("URL"), "https://api.example.test/orders/42");
+    await user.click(screen.getByRole("button", { name: "Add sample" }));
+    await user.click(screen.getByRole("button", { name: "Generate draft" }));
+    expect(await screen.findByRole("button", { name: "Open in editor" })).toBeEnabled();
+    await user.type(screen.getByLabelText("Name"), "orders");
+    expect(screen.getByRole("button", { name: "Open in editor" })).toBeDisabled();
+  });
+
+  test("a blank version is normalized consistently for inference and editor handoff", async () => {
+    serve(mockFetch, {
+      "GET /api/v1/contracts/5": { status: 200, body: CONTRACT },
+      "GET /api/v1/contracts/5/versions?": { status: 200, body: VERSION_PAGE },
+      "POST /api/v1/contracts/infer": { status: 200, body: DRAFT_RESPONSE },
+    });
+    const user = userEvent.setup();
+    renderPage("/contracts/5/infer");
+    const version = await screen.findByLabelText("Version");
+    await user.clear(version);
+    await user.type(screen.getByLabelText("URL"), "https://api.example.test/orders/42");
+    await user.click(screen.getByRole("button", { name: "Add sample" }));
+    await user.click(screen.getByRole("button", { name: "Generate draft" }));
+    await screen.findByText("Templated /orders/42 as /orders/{orderId}");
+    expect(version).toHaveValue("1.0.0");
+    expect(bodyOf(findCall(mockFetch, "POST", "/api/v1/contracts/infer"))).toMatchObject({ version: "1.0.0" });
+    await user.click(screen.getByRole("button", { name: "Open in editor" }));
+    expect(JSON.parse(screen.getByTestId("state").textContent ?? "null")).toMatchObject({ version: "1.0.0" });
   });
 
   test("a 400 from infer is shown inline", async () => {

@@ -1,0 +1,6 @@
+# The internal checker protocol is deployed with its sole JVM client and is not the public
+# /api/v1 API. Its stable /check and /healthz paths are the explicit API-VER-001 exception.
+# All document-shape, error and other API rules remain active.
+extends: ./api-guidelines.spectral.yaml
+rules:
+  paths-are-versioned: off

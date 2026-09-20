@@ -8,7 +8,7 @@ in the `{items,page,pageSize,total}` envelope, `sort`, whitelisted filtering), n
 data-format conventions, success codes, RFC 7807 errors, authentication & authorization,
 caching & concurrency, rate limiting, idempotency, input & transport security, HTTP
 protocol, machine-readable SLA/legal terms, OpenAPI-as-contract, and spec ↔ implementation
-conformance. Everything except the known-gaps register is stack-agnostic and portable.
+conformance. The general rules are portable; Covenant-specific exceptions and remaining gaps are identified explicitly.
 
 ## Contents
 
@@ -16,6 +16,7 @@ conformance. Everything except the known-gaps register is stack-agnostic and por
 |---|---|
 | [`API-GUIDELINES.md`](./API-GUIDELINES.md) | The normative rulebook. Every rule has a stable ID (e.g. `API-LIST-002`), a MUST/SHOULD statement, and a concrete check. Ends with the [known-gaps register](./API-GUIDELINES.md#appendix-known-gaps-register). |
 | [`api-guidelines.spectral.yaml`](./api-guidelines.spectral.yaml) | A [Spectral](https://stoplight.io/open-source/spectral) ruleset encoding the machine-checkable subset, runnable against any OpenAPI 3.x spec. |
+| [`checker.spectral.yaml`](./checker.spectral.yaml) | The internal checker profile: inherits every rule except the public version-prefix requirement. |
 | [`examples/conformant.yaml`](./examples/conformant.yaml) | A minimal spec that lints fully clean — including the gap-register hints — the reference for "conformant" and a copy-paste starting point for a new resource. |
 
 ## How to validate an API against it

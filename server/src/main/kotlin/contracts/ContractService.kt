@@ -4,6 +4,7 @@ import ch.nokillswit.authz.CallerPrincipal
 import ch.nokillswit.authz.ConflictException
 import ch.nokillswit.authz.NotFoundException
 import ch.nokillswit.authz.isAdmin
+import ch.nokillswit.authz.requireAdmin
 import ch.nokillswit.contracts.ContractJoins.ownerRef
 import ch.nokillswit.domains.DomainService
 import ch.nokillswit.infra.paging.PageRequest
@@ -21,6 +22,7 @@ import ch.nokillswit.infra.db.requireActive
 import ch.nokillswit.infra.db.nowMillis
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.dao.id.UIntIdTable
+import org.jetbrains.exposed.v1.core.vendors.ForUpdateOption
 import org.jetbrains.exposed.v1.r2dbc.*
 import org.jetbrains.exposed.v1.r2dbc.transactions.suspendTransaction
 
@@ -73,11 +75,16 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
      * ownership so the route can reuse it (events, responses).
      */
     suspend fun authorizeWrite(caller: CallerPrincipal, contractId: UInt): Ownership = suspendTransaction(database) {
-        val ownership = ownershipOf(contractId) ?: throw NotFoundException("Contract not found")
-        val teamIds = if (caller.isAdmin()) emptySet() else teams.activeTeamIdsOf(caller.userId)
-        requireContractWriter(caller, ownership, teamIds)
-        ownership
+        requireCurrentWriter(caller, contractId, lockContract = false)
     }
+
+    /** For a non-database side effect (Kafka publish): authorize at dispatch while locks prevent revocation. */
+    suspend fun <T> withWriterLock(caller: CallerPrincipal, contractId: UInt, block: suspend () -> T): T =
+        suspendTransaction(database) {
+            maxAttempts = 1
+            requireCurrentWriter(caller, contractId)
+            block()
+        }
 
     suspend fun list(filter: ContractListFilter, paging: PageRequest, viewer: Viewer): ContractListResult = suspendTransaction(database) {
         val predicate = buildPredicate(filter) and Contracts.active()
@@ -101,7 +108,7 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
      */
     suspend fun create(request: ContractCreateRequest, caller: CallerPrincipal): UInt = suspendTransaction(database) {
         val ownership = validateContractCreate(request) // re-checked service-side
-        val teamIds = if (caller.isAdmin()) emptySet() else teams.activeTeamIdsOf(caller.userId)
+        val teamIds = currentTeamIds(caller, ownership.teamId, lockMembership = true)
         requireOwnerAssignable(caller, ownership, teamIds)
         requireActiveSystem(request.systemId)
         requireActiveOwner(ownership)
@@ -119,7 +126,17 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
         }[Contracts.id].value
     }
 
-    suspend fun update(id: UInt, request: ContractUpdateRequest): Int = suspendTransaction(database) {
+    /** Import preflight: all FK/owner rules before its potentially slow document check. */
+    internal suspend fun validateCreate(request: ContractCreateRequest, caller: CallerPrincipal) = suspendTransaction(database) {
+        val ownership = validateContractCreate(request)
+        val teamIds = currentTeamIds(caller, ownership.teamId, lockMembership = false)
+        requireOwnerAssignable(caller, ownership, teamIds)
+        requireActiveSystem(request.systemId)
+        requireActiveOwner(ownership)
+    }
+
+    suspend fun update(id: UInt, request: ContractUpdateRequest, caller: CallerPrincipal): Int = suspendTransaction(database) {
+        requireCurrentWriter(caller, id)
         validateContractUpdate(request)
         Contracts.update({ (Contracts.id eq id) and Contracts.active() }) {
             it[name] = request.name
@@ -129,8 +146,9 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
     }
 
     /** ADMIN-only ownership transfer; returns the previous ownership (for the event) or null when missing. */
-    suspend fun transferOwner(id: UInt, ownership: Ownership): Ownership? = suspendTransaction(database) {
-        val previous = ownershipOf(id) ?: return@suspendTransaction null
+    suspend fun transferOwner(id: UInt, ownership: Ownership, caller: CallerPrincipal): Ownership? = suspendTransaction(database) {
+        requireAdmin(caller)
+        val previous = lockedOwnershipOf(id) ?: return@suspendTransaction null
         requireActiveOwner(ownership)
         Contracts.update({ (Contracts.id eq id) and Contracts.active() }) {
             it[ownerTeamId] = ownership.teamId
@@ -144,7 +162,8 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
      * Soft delete — refused (409) while any version is PUBLISHED (ACTIVE/DEPRECATED): retire it
      * first. Soft-deletes the versions with it so their identities are freed as one unit.
      */
-    suspend fun delete(id: UInt): Int = suspendTransaction(database) {
+    suspend fun delete(id: UInt, caller: CallerPrincipal): Int = suspendTransaction(database) {
+        requireCurrentWriter(caller, id)
         val versions = ContractVersionService.ContractVersions
         val published = versions.selectAll()
             .where {
@@ -274,6 +293,49 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
     private suspend fun ownershipOf(id: UInt): Ownership? =
         Contracts.select(Contracts.ownerTeamId, Contracts.ownerUserId)
             .where { (Contracts.id eq id) and Contracts.active() }
+            .map { Ownership(it[Contracts.ownerTeamId]?.value, it[Contracts.ownerUserId]?.value) }
+            .toList().singleOrNull()
+
+    /**
+     * Serializes every contract/version mutation on the active parent. Team membership is locked
+     * with KEY SHARE after the parent lock, so a concurrent roster deletion cannot commit between
+     * this authorization decision and the mutation.
+     */
+    internal suspend fun requireCurrentWriter(
+        caller: CallerPrincipal,
+        contractId: UInt,
+        lockContract: Boolean = true,
+    ): Ownership {
+        val ownership = (if (lockContract) lockedOwnershipOf(contractId) else ownershipOf(contractId))
+            ?: throw NotFoundException("Contract not found")
+        val teamIds = if (ownership.userId == caller.userId) {
+            emptySet()
+        } else {
+            currentTeamIds(caller, ownership.teamId, lockMembership = true)
+        }
+        requireContractWriter(caller, ownership, teamIds)
+        return ownership
+    }
+
+    private suspend fun currentTeamIds(caller: CallerPrincipal, teamId: UInt?, lockMembership: Boolean): Set<UInt> {
+        if (caller.isAdmin() || teamId == null) return emptySet()
+        val query =
+            TeamService.TeamMembers.innerJoin(TeamService.Teams)
+                .select(TeamService.TeamMembers.teamId)
+                .where {
+                    (TeamService.TeamMembers.userId eq caller.userId) and
+                        (TeamService.TeamMembers.teamId eq teamId) and TeamService.Teams.active()
+                }
+        if (lockMembership) {
+            query.forUpdate(ForUpdateOption.PostgreSQL.ForKeyShare(ofTables = arrayOf(TeamService.TeamMembers)))
+        }
+        return query.map { it[TeamService.TeamMembers.teamId].value }.toList().toSet()
+    }
+
+    private suspend fun lockedOwnershipOf(id: UInt): Ownership? =
+        Contracts.select(Contracts.ownerTeamId, Contracts.ownerUserId)
+            .where { (Contracts.id eq id) and Contracts.active() }
+            .forUpdate()
             .map { Ownership(it[Contracts.ownerTeamId]?.value, it[Contracts.ownerUserId]?.value) }
             .toList().singleOrNull()
 

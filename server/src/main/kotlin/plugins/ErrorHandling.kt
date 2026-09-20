@@ -11,6 +11,7 @@ import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.HttpHeaders
 import io.ktor.http.content.TextContent
 import io.ktor.http.decodeURLPart
 import io.ktor.http.withCharset
@@ -58,7 +59,13 @@ suspend fun ApplicationCall.respondProblem(
     title: String = status.description,
     instance: String? = null,
 ) {
-    val problem = ProblemDetail(title = title, status = status.value, detail = detail, instance = instance)
+    // The occurrence path is useful without reflecting query parameters that may contain secrets.
+    val problem = ProblemDetail(
+        title = title,
+        status = status.value,
+        detail = detail ?: status.description,
+        instance = instance ?: request.path(),
+    )
     respond(
         TextContent(
             problemSerializer.encodeToString(ProblemDetail.serializer(), problem),
@@ -198,7 +205,11 @@ fun Application.configureErrorHandling() {
         // that would mislabel PayloadTooLarge (413, mapped above) / a future
         // UnsupportedMediaType (415).
         exception<CannotTransformContentToTypeException> { call, _ ->
-            call.respondProblem(HttpStatusCode.BadRequest, "Request body is missing or not JSON")
+            if (call.request.headers[HttpHeaders.ContentType] == null) {
+                call.respondProblem(HttpStatusCode.BadRequest, "Request body is missing or not JSON")
+            } else {
+                call.respondProblem(HttpStatusCode.UnsupportedMediaType, "Request body must use application/json")
+            }
         }
         exception<UnauthorizedException> { call, cause ->
             call.respondProblem(HttpStatusCode.Unauthorized, cause.message ?: "Unauthorized")

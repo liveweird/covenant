@@ -180,12 +180,14 @@ private fun Route.tryKafkaPublish(preamble: TryPreamble, contractService: Contra
         val schemas = DocumentSchemas.of(ContractType.ASYNCAPI, ctx.root)
         val conformance = KafkaTry.assessPublish(ctx.root, schemas, prepared, request.payload)
         val trail = ctx.trail(caller, contractId, "bootstrap" to target.bootstrapServers, "topic" to prepared.topic)
-        val published = audited(
-            "contract.tried_kafka_publish", trail, failure = "failed",
-            success = { p ->
-                arrayOf("partition" to p.metadata.partition(), "offset" to p.metadata.offset(), "outcome" to "published")
-            },
-        ) { KafkaTry.publish(target, prepared, request) }
+        val published = contractService.withWriterLock(caller, contractId) {
+            audited(
+                "contract.tried_kafka_publish", trail, failure = "failed",
+                success = { p ->
+                    arrayOf("partition" to p.metadata.partition(), "offset" to p.metadata.offset(), "outcome" to "published")
+                },
+            ) { KafkaTry.publish(target, prepared, request) }
+        }
         call.respond(
             HttpStatusCode.OK,
             TryKafkaPublishResponse(

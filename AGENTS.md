@@ -26,7 +26,10 @@ detection; import with dry run, guarded URL fetch, source references and sync, d
 and export; history, followers and in-app notifications; and catalog facets. ADMIN-curated
 Environments hold HTTP, Kafka, and PostgreSQL targets with passwords encrypted at rest. Try-it
 executes requests against those targets and reports live conformance findings. The contract
-reader renders a server-produced model alongside the source/editor views. The checker sidecar
+reader renders a server-produced model alongside the source/editor views. The Errors report
+aggregates stored findings; compatibility compares two versions in both directions. Inference
+builds unsaved drafts from HTTP exchanges, message payloads or database descriptions, with Observe
+capturing samples through Environments. The checker sidecar
 and quality gates cover the implemented stack. When adding a capability one of the two siblings
 already has, **port its implementation rather than inventing a new one**; `CLAUDE.md` lists
 where each one lives.
@@ -59,8 +62,8 @@ This is a Kotlin/Gradle backend plus three standalone npm workspaces:
   `environments` (per-system connection targets), `notifications` (recipient-scoped inbox), and
   `contracts` (the contract catalog — contracts, SemVer/lifecycle versions, the checks pipeline
   under `contracts/checks`, import/export/sync, events/followers, facets, and the tree).
-  `contracts/tryit` owns live HTTP/Kafka/SQL conformance and `contracts/render` owns the reader's
-  normalized view models. Copy `contracts/` for a full feature with ownership and sub-collections;
+  `contracts/tryit` owns live HTTP/Kafka/SQL conformance, `contracts/render` owns the reader's
+  normalized view models, and `contracts/infer` derives draft documents from samples. Copy `contracts/` for a full feature with ownership and sub-collections;
   see `CLAUDE.md` "Package layout" for the detailed map. Cross-cutting wiring and policy live
   in `plugins/`, `audit/`, and `authz/`; database, mail, encryption at rest (`infra/crypto`),
   paging, and shared validation infrastructure live in `infra/`.
@@ -91,11 +94,12 @@ registered in `application.yaml`. `plugins/Routing.kt` is only the final SPA/sta
 - `docker compose up --build`: build and run PostgreSQL, the checker, the API, and the SPA at
   `http://localhost:8082` (sign in as `admin@covenant.local` / `changeme`); Mailpit captures
   reset and MFA email at `http://localhost:8027`.
-- `docker compose up postgres checker`: start only the development database (host port **5434**,
-  not 5432/5433 — Lettuce and Toadie may occupy those on the same machine) and the sidecar.
+- `docker compose up postgres mailpit`: start the development database on **5434** and mail catcher.
+  For a host-run JVM, run `cd checker && npm run dev` separately and set
+  `CHECKER_URL=http://localhost:9090`; the Compose checker has no host port.
 - `./gradlew build`: compile and verify the Gradle modules with the JDK 21 toolchain (the local
   dev JDK is pinned in `mise.toml`).
-- `./gradlew :server:run`: start Ktor/Netty on port 8082.
+- `CHECKER_URL=http://localhost:9090 ./gradlew :server:run`: start Ktor/Netty on port 8082 with the source checker.
 - `./gradlew test` or `./gradlew :server:test`: run Kotlin tests; Docker is required for
   Testcontainers (OrbStack without `/var/run/docker.sock`: export
   `DOCKER_HOST=unix://$HOME/.orbstack/run/docker.sock`).
@@ -112,8 +116,9 @@ registered in `application.yaml`. `plugins/Routing.kt` is only the final SPA/sta
   the checker's gates; `npm run dev` runs it on :9090.
 - `cd e2e && npm ci && npx playwright install chromium && npm test`: install and run Playwright
   against the full stack on port 8082. `npm run lint`, `npm run knip`, `npm run typecheck`, and
-  `npm run check:scenarios` are the Docker-free static gates.
-- `.github/workflows/ci.yml` runs the server, web, checker, and e2e-static gates on pushes to
+  `npm run check:scenarios`, and `npm run test:setup` are the Docker-free gates.
+  Setup reuses or starts the default stack and leaves services and volumes intact.
+- `.github/workflows/ci.yml` runs the server, web, checker, sample-loader, and e2e-static gates on pushes to
   `main` and on pull requests
   (including server OpenAPI coverage and frontend spec → `schema.ts` drift, and builds both
   images on `main`); `e2e.yml` runs the blackbox suite nightly against `main` and on demand.
@@ -175,6 +180,9 @@ lint, and breaking-change verdicts; an unreachable checker degrades to a report-
 `CHECKER_UNAVAILABLE` finding. The document text is stored byte-exact and never rewritten.
 
 Breaking changes are compared against the highest ACTIVE version strictly below the candidate.
+Writes revalidate current ownership and the prepared check context under the parent contract
+lock; stale baselines, recheck content or sync references return `409`. Each import item commits
+its contract/version pair atomically after one check pass. See `.claude/docs/persistence.md`.
 A break without a major version bump adds the soft, waivable `BREAKING_WITHOUT_MAJOR_BUMP`
 error. Try-it findings use `CONFORMANCE`: they describe a live observation and are never stored
 on the version. HTTP requests, Kafka publish/tail, and read-only SQL sampling run on the server

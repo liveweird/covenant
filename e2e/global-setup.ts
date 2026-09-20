@@ -1,12 +1,11 @@
 import { execSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BASE_URL } from "./playwright.config";
+import { ensureStack } from "./stack.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "..");
-export const STARTED_MARKER = resolve(here, ".playwright", "stack-started");
 
 async function responds(url: string): Promise<boolean> {
   try {
@@ -28,19 +27,13 @@ async function waitForUp(url: string, timeoutMs: number): Promise<void> {
 }
 
 export default async function globalSetup(): Promise<void> {
-  // Reuse a stack that's already up (fast local iteration); don't tear it down afterward.
-  if (await responds(BASE_URL)) {
-    console.log(`[e2e] Reusing the app already running at ${BASE_URL}`);
-    return;
-  }
-
-  console.log("[e2e] Starting the stack: docker compose up -d --build …");
-  execSync("docker compose up -d --build", { cwd: repoRoot, stdio: "inherit" });
-
-  console.log(`[e2e] Waiting for ${BASE_URL} …`);
-  await waitForUp(BASE_URL, 240_000);
-
-  mkdirSync(dirname(STARTED_MARKER), { recursive: true });
-  writeFileSync(STARTED_MARKER, "started-by-e2e");
-  console.log("[e2e] Stack is up.");
+  await ensureStack(BASE_URL, {
+    responds,
+    start: () => {
+      console.log("[e2e] Starting the stack: docker compose up -d --build …");
+      execSync("docker compose up -d --build", { cwd: repoRoot, stdio: "inherit" });
+    },
+    wait: (url) => waitForUp(url, 240_000),
+  });
+  console.log(`[e2e] Using ${BASE_URL}; services and volumes will be left intact.`);
 }

@@ -16,6 +16,10 @@ npx --yes @stoplight/spectral-cli lint <target-spec> \
   --ruleset api-guidelines/api-guidelines.spectral.yaml
 ```
 
+For `checker/openapi.yaml`, use `--ruleset api-guidelines/checker.spectral.yaml` instead.
+This records the internal sidecar's deliberate unversioned-path exception without suppressing
+any other rule.
+
 Interpret by severity (the model is documented in `api-guidelines/README.md`):
 
 - **error** — a real violation; report it as a finding, citing the rule ID from the message.

@@ -160,7 +160,7 @@ tasks.withType<Test> {
 
 // The OpenAPI COVERAGE gate: OpenApiCoverage (test JVM shutdown hook) writes every declared
 // (operation, status) pair the suite never exercised to gaps.txt — minus the statuses shared plugins
-// produce for every route alike (400/401/413/429, pinned once each) and the unforceable 500/default.
+// produce for every route alike (400/401/413/415/429, pinned once each) and the unforceable 500/default.
 // A non-empty file fails the task, but only when the WHOLE suite ran (a `--tests` filter legitimately
 // leaves most of the spec unexercised).
 tasks.test {

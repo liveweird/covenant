@@ -1,31 +1,12 @@
 import { parseDocument } from "yaml";
 import { breakingAsyncApi, validateAsyncApi } from "./engines/asyncapi.ts";
 import { lintAsyncApi, lintOpenApi } from "./engines/spectral.ts";
-import { ENGINES, type EngineVersion } from "./engines/index.ts";
-import { CONTRACT_TYPES, finalizeFindings, type ContractType, type Finding } from "./findings.ts";
+import { ENGINES } from "./engines/index.ts";
+import { finalizeFindings, type Finding } from "./findings.ts";
+import type { CheckRequest, CheckResponse } from "./protocol.ts";
 import { externalRefFindings } from "./refs.ts";
 
-export interface CheckRequest {
-  type: ContractType;
-  content: string;
-  previousContent?: string;
-}
-
-export interface CheckResponse {
-  findings: Finding[];
-  engine: EngineVersion[];
-}
-
-export function isCheckRequest(value: unknown): value is CheckRequest {
-  if (value === null || typeof value !== "object") return false;
-  const v = value as Record<string, unknown>;
-  return (
-    typeof v.type === "string" &&
-    (CONTRACT_TYPES as readonly string[]).includes(v.type) &&
-    typeof v.content === "string" &&
-    (v.previousContent === undefined || typeof v.previousContent === "string")
-  );
-}
+export type { CheckRequest, CheckResponse } from "./protocol.ts";
 
 /**
  * The dispatch: parse once (YAML reads JSON too) for the `$ref` pre-scan and the Swagger 2.0
@@ -51,8 +32,14 @@ async function collect(request: CheckRequest): Promise<Finding[]> {
       column: error.linePos?.[0]?.col,
     }));
   }
-  const root = parsed.toJS() as unknown;
-  const external = externalRefFindings(root);
+  let root: unknown;
+  try {
+    root = parsed.toJS() as unknown;
+  } catch {
+    return [unsafeExpansionFinding()];
+  }
+  const previous = request.type === "ASYNCAPI" ? parseForRefScan(request.previousContent) : undefined;
+  const external = [...externalRefFindings(root), ...externalRefFindings(previous?.root)];
   if (external.length > 0) return external;
 
   switch (request.type) {
@@ -70,10 +57,16 @@ async function collect(request: CheckRequest): Promise<Finding[]> {
       }
       return lintOpenApi(request.content);
     case "ASYNCAPI": {
+      let breakingWork: Promise<Finding[]> = Promise.resolve([]);
+      if (request.previousContent !== undefined) {
+        breakingWork = previous?.malformed || previous?.unsafe
+          ? Promise.resolve([skippedBaselineFinding(previous.unsafe ? "unsafe YAML alias expansion" : "the previous document does not parse")])
+          : breakingAsyncApi(request.previousContent, request.content);
+      }
       const [semantic, lint, breaking] = await Promise.all([
         validateAsyncApi(request.content),
         lintAsyncApi(request.content),
-        request.previousContent === undefined ? [] : breakingAsyncApi(request.previousContent, request.content),
+        breakingWork,
       ]);
       return [...semantic, ...lint, ...breaking];
     }
@@ -81,6 +74,36 @@ async function collect(request: CheckRequest): Promise<Finding[]> {
       // The JVM's JSON Schema validation is the whole ODCS gate in milestone 1.
       return [];
   }
+}
+
+/** Parse a baseline only for the offline guard; the diff engine owns malformed-baseline reporting. */
+function parseForRefScan(content: string | undefined): { root: unknown; malformed: boolean; unsafe: boolean } | undefined {
+  if (content === undefined) return undefined;
+  const parsed = parseDocument(content, { uniqueKeys: false });
+  if (parsed.errors.length > 0) return { root: undefined, malformed: true, unsafe: false };
+  try {
+    return { root: parsed.toJS() as unknown, malformed: false, unsafe: false };
+  } catch {
+    return { root: undefined, malformed: false, unsafe: true };
+  }
+}
+
+function unsafeExpansionFinding(): Finding {
+  return {
+    severity: "ERROR",
+    source: "SCHEMA",
+    code: "unsafe-yaml-alias-expansion",
+    message: "YAML alias expansion exceeds the safe document limit",
+  };
+}
+
+function skippedBaselineFinding(reason: string): Finding {
+  return {
+    severity: "INFO",
+    source: "BREAKING",
+    code: "asyncapi-diff-skipped",
+    message: `Breaking changes against the active version could not be computed — ${reason}`,
+  };
 }
 
 function isSwagger2(root: unknown): boolean {

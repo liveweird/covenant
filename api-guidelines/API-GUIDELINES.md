@@ -69,7 +69,11 @@ needs them and documented as read-only. Related resources are fetched via their 
 endpoints; **MUST NOT** embed full related objects inside a resource response. Compound
 fetching (`include`-style) MAY be introduced later per-endpoint, but is not part of this
 standard today.
-**Check:** resource schemas are flat; cross-references are `*Id` scalars.
+
+Covenant's documented exception is a small, read-only related-resource summary (for example
+`owner`, `system`, or `team`) where the catalog UI needs its id and label together. These are
+projections, not writable embedded resources; mutation inputs still refer to resources by id.
+**Check:** resource schemas are flat or use these documented summaries; cross-references are `*Id` scalars.
 
 ### API-STRUCT-004 — List envelope `[both]`
 **MUST** return every collection as the envelope
@@ -90,7 +94,10 @@ members and per-resource `*Page` schema exist.
 ### API-RES-001 — Resource-based paths under the version prefix `[both]`
 **MUST** name paths after resources, all under the version prefix (API-VER-001):
 a collection is `/api/v1/plural`, a single item is `/api/v1/plural/{id}`.
-**Check (spectral):** every path starts `/api/v<major>/`.
+The internal-only checker retains `/check` and `/healthz`: its server and client ship together,
+and it is not a public API. Lint that contract with `checker.spectral.yaml`, which disables
+only the version-prefix rule; all other mechanical rules remain active.
+**Check (spectral):** every public API path starts `/api/v<major>/`.
 
 ### API-RES-002 — Collections are plural, kebab-case `[spectral]`
 **MUST** name collections as plural nouns; multi-word names use `kebab-case`
@@ -111,6 +118,11 @@ new state; omitted optional members mean "unset", not "keep"); `PUT` and `DELETE
 idempotent; `POST` is not. **MUST NOT** mutate on `GET`. `PATCH` (partial update) is not
 used; introduce it only deliberately, per-resource, never alongside `PUT` for the same
 resource.
+
+Covenant's deliberate exception is an Environment's write-only password: omission preserves
+the existing encrypted value, because a read cannot supply it for a replacement. An explicit
+non-empty string replaces it; an empty string also preserves it. Removing the target clears its credentials. Other editable fields
+retain full-replacement semantics.
 **Check (spectral):** `GET`/`DELETE` declare no `requestBody`.
 
 ### API-RES-005 — Path ids are constrained `[spectral]`
@@ -297,7 +309,9 @@ resource, and the created resource (or a creation report) in the body.
 ### API-OK-003 — Updates → `200` or `204`, consistently `[llm/manual]`
 **MUST** answer a successful update (`PUT`) with `200` (returning the updated resource) or
 `204 No Content`, applying one convention consistently across the API (this codebase uses
-`204` everywhere; the client re-fetches when it needs the new state).
+`204` for ordinary replacements; the client re-fetches when it needs the new state).
+Contract-version content replacement deliberately returns `200` with the saved version and
+its check report, so the editor receives the findings from that exact save.
 **Check:** update responses follow the documented convention.
 
 ### API-OK-004 — No-body operations → `204` `[both]`
@@ -660,7 +674,7 @@ prioritized. Reviewers cite these as "registered gap"; the Spectral ruleset carr
 | Rule | Gap | Adoption pointer |
 |---|---|---|
 | API-ERR-004 | `X-Request-Id` is read but not echoed or generated | `CallId` config in `plugins/Monitoring.kt`: add `replyToHeader(HttpHeaders.XRequestId)` + `generate { ... }`; declare the header on responses in the spec |
-| API-ERR-007 | Generic unique-violation `409`s carry no `instance` URI | `ConflictException` rides `ProblemDetail` (`plugins/ErrorHandling.kt`); no Covenant conflict site populates `instance` yet — adopt it where the service knows the conflicting row's id (the tag-claim and last-admin `409`s could; the generic 23505 handler never can, and existence-disclosure rules apply per API-ERR-006) |
+| API-ERR-007 | Duplicate-style `409`s identify the failing request, not the conflicting resource | All problems carry an occurrence path in `instance`; add a conflicting-resource link where the service knows the row id and API-ERR-006 permits disclosure. The generic 23505 handler cannot safely infer it |
 | API-RATE-001 | No `Retry-After` / `RateLimit-*` headers on `429`s | Set `Retry-After` where the wait is known (login lockout knows its window); add headers to the shared `TooManyRequests` response |
 | API-CACHE-001/002 | No `ETag`/`304`; `Cache-Control` only on CSS | Install `ConditionalHeaders`; extend the `CachingHeaders` config in `plugins/Http.kt` with deliberate per-class policies (`no-store` on API responses) |
 | API-CACHE-003 | No `If-Match`/`ETag`/`412` conditional writes anywhere; unguarded full-document writes are last-write-wins (see the inventory below) | Add `ETag` + `If-Match` handling to the concurrency-sensitive `PUT`s if contention ever materializes; a `version` column + `409` is the R2DBC-friendly alternative |
@@ -671,16 +685,22 @@ prioritized. Reviewers cite these as "registered gap"; the Spectral ruleset carr
 
 ### Lost-update inventory (the API-CACHE-003 row's per-write record)
 
-Per API-CACHE-003, each concurrency-sensitive write documents its defense (audited 2026-09-05
-against Covenant's scaffold write surface — the previous inventories described Toadie's and
-Lettuce's; re-audit when the contract catalog lands):
+Per API-CACHE-003, each concurrency-sensitive write documents its defense (updated 2026-09-20
+for the implemented catalog):
 
-- **Accepted last-write-wins** — every Covenant full-replace write, accepted because writers are
-  few and scoped (users PUT is ADMIN-only, per-user features PUT is a wholesale replace by
-  design). Two admins editing the same account simultaneously can overwrite each other — a
-  deliberate, documented trade-off at this scale. The contract catalog will add its own rows:
-  registry PUTs (domains, systems, teams — single-ADMIN-curated) and the contract-version
-  content PUT (owner-team-scoped, DRAFT/PROPOSED only).
-- **Domain-guarded** — none yet in the scaffold: the contract-version LIFECYCLE is the first
-  workflow-shaped resource (DRAFT → PROPOSED → ACTIVE → DEPRECATED → RETIRED); its transition
-  endpoint answers `409` on an illegal or stale transition (Lettuce's source-status pattern).
+- **Accepted last-write-wins** — full replacements of users, feature flags, language,
+  teams, domains, systems, environments, contract metadata and editable version content.
+  Permissions limit writers but do not prevent one authorized editor from overwriting
+  another. Version-content saves do not compare the previous document hash; conditional
+  writes remain a registered gap.
+- **Domain guards** — contract mutations serialize on the active parent contract. Version
+  writes revalidate ownership, lifecycle, uniqueness, ordering and the applicable ACTIVE
+  baseline before committing. Checks run outside the transaction; a changed baseline or
+  lifecycle causes `409`. Recheck additionally compares the checked document before storing
+  its report. Lifecycle transitions and deletion re-read their guards under the same lock.
+- **Source synchronization** — sync compares the source reference during the write; the SPA
+  also sends the reference used to fetch its content. Clients omitting that optional reference
+  cannot detect source changes that happened before their sync request reached the server.
+  Source-reference updates themselves remain last-write-wins.
+- **Atomic import** — each imported contract/version pair commits together after one check
+  pass. Batch items commit independently; import is not a batch-wide transaction.

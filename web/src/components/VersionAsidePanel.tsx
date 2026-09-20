@@ -1,4 +1,4 @@
-import { Box, Divider, Paper, Stack } from "@mantine/core";
+import { Alert, Box, Divider, Paper, Stack } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import type { ContractResponse } from "../api/contracts";
@@ -7,8 +7,10 @@ import type { VersionView } from "../hooks/useVersionView";
 import { readerToc } from "../utils/readerToc";
 import CompatibilityCard from "./CompatibilityCard";
 import FindingsPanel from "./FindingsPanel";
+import LoadingBlock from "./LoadingBlock";
 import ReaderToc from "./ReaderToc";
 import classes from "../theme.module.css";
+import { loadErrorMessage } from "../utils/saveError";
 
 /**
  * The version page's single side panel: Contents (Reader view only, once the render model has
@@ -64,6 +66,20 @@ export default function VersionAsidePanel({
                 <Divider />
               </Stack>
             </Box>
+          )}
+          {!editing && compatibility.isLoading && (
+            <>
+              <LoadingBlock mih={48} />
+              <Divider />
+            </>
+          )}
+          {!editing && compatibility.isError && (
+            <>
+              <Alert color="red" variant="light" title={t("versions.compatibility.title")}>
+                {loadErrorMessage(compatibility.error, t)}
+              </Alert>
+              <Divider />
+            </>
           )}
           {!editing && compatibility.data && (
             <>

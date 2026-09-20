@@ -16,9 +16,6 @@ export interface Finding {
   column?: number;
 }
 
-export type ContractType = "OPENAPI" | "ASYNCAPI" | "ODCS";
-export const CONTRACT_TYPES: readonly ContractType[] = ["OPENAPI", "ASYNCAPI", "ODCS"];
-
 /** At most this many findings leave the checker; a final INFO marks the cut. */
 export const MAX_FINDINGS = 500;
 

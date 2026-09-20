@@ -14,15 +14,24 @@ import {
   type MessageBatchSample,
   type RelationSample,
 } from "../api/infer";
+import type { Finding } from "../api/versions";
 import { isString, useStoredState } from "../hooks/useStoredState";
+import { loadErrorMessage } from "../utils/saveError";
 import { HTTP_METHODS, hasTryTarget, rowsToRecord, tryErrorMessage, tryTargetOf, type KeyValueRow } from "../utils/tryIt";
 import KeyValueEditor from "./KeyValueEditor";
 import LazyCodeEditor from "./LazyCodeEditor";
+import FindingsPanel from "./FindingsPanel";
+import LoadingBlock from "./LoadingBlock";
 
 type Sample = HttpExchangeSample | MessageBatchSample | RelationSample;
 
 function environmentLabel(e: EnvironmentResponse, scoped: boolean): string {
   return scoped ? e.name : `${e.systemName} / ${e.name}`;
+}
+
+function CaptureNotes({ notes }: { notes: readonly Finding[] }) {
+  if (notes.length === 0) return null;
+  return <FindingsPanel findings={notes} mode="stored" />;
 }
 
 function ObserveHttpLeg({ environmentId, onAdd }: { environmentId: number; onAdd: (sample: HttpExchangeSample) => void }) {
@@ -49,19 +58,19 @@ function ObserveHttpLeg({ environmentId, onAdd }: { environmentId: number; onAdd
   return (
     <Stack gap="sm">
       <Group align="flex-end" gap="sm" wrap="wrap">
-        <Select label={t("infer.observe.method")} data={HTTP_METHODS} value={method} onChange={(v) => v && setMethod(v)} w={140} allowDeselect={false} />
+        <Select label={t("infer.observe.method")} data={HTTP_METHODS} value={method} onChange={(v) => { if (v) { setMethod(v); observe.reset(); } }} w={140} allowDeselect={false} />
         <TextInput
           label={t("infer.observe.http.path")}
           placeholder="/orders/42"
           value={path}
-          onChange={(e) => setPath(e.currentTarget.value)}
+          onChange={(e) => { setPath(e.currentTarget.value); observe.reset(); }}
           style={{ flex: 1, minWidth: 200 }}
         />
       </Group>
-      <KeyValueEditor label={t("tryIt.http.query")} rows={query} onChange={setQuery} />
-      <KeyValueEditor label={t("tryIt.http.headers")} rows={headers} onChange={setHeaders} hint={t("infer.observe.credentialsHint")} />
-      <TextInput label={t("tryIt.http.contentType")} value={contentType} onChange={(e) => setContentType(e.currentTarget.value)} w={260} />
-      <LazyCodeEditor value={body} onChange={setBody} format="json" ariaLabel={t("tryIt.http.body")} minHeight={120} />
+      <KeyValueEditor label={t("tryIt.http.query")} rows={query} onChange={(next) => { setQuery(next); observe.reset(); }} />
+      <KeyValueEditor label={t("tryIt.http.headers")} rows={headers} onChange={(next) => { setHeaders(next); observe.reset(); }} hint={t("infer.observe.credentialsHint")} />
+      <TextInput label={t("tryIt.http.contentType")} value={contentType} onChange={(e) => { setContentType(e.currentTarget.value); observe.reset(); }} w={260} />
+      <LazyCodeEditor value={body} onChange={(next) => { setBody(next); observe.reset(); }} format="json" ariaLabel={t("tryIt.http.body")} minHeight={120} />
       <Button
         leftSection={<IconSend size={16} />}
         onClick={() => observe.mutate()}
@@ -78,12 +87,15 @@ function ObserveHttpLeg({ environmentId, onAdd }: { environmentId: number; onAdd
         </Alert>
       )}
       {data && (
-        <Group justify="space-between" align="center">
-          <Text size="sm">{t("infer.observe.http.result", { status: data.sample.status })}</Text>
-          <Button size="xs" variant="default" onClick={() => onAdd(data.sample)}>
-            {t("infer.observe.addToSamples")}
-          </Button>
-        </Group>
+        <Stack gap="sm">
+          <Group justify="space-between" align="center">
+            <Text size="sm">{t("infer.observe.http.result", { status: data.sample.status })}</Text>
+            <Button size="xs" variant="default" onClick={() => onAdd(data.sample)}>
+              {t("infer.observe.addToSamples")}
+            </Button>
+          </Group>
+          <CaptureNotes notes={data.notes} />
+        </Stack>
       )}
     </Stack>
   );
@@ -100,8 +112,8 @@ function ObserveKafkaLeg({ environmentId, onAdd }: { environmentId: number; onAd
   return (
     <Stack gap="sm">
       <Group align="flex-end" gap="sm" wrap="wrap">
-        <TextInput label={t("tryIt.kafka.channel")} value={topic} onChange={(e) => setTopic(e.currentTarget.value)} style={{ flex: 1, minWidth: 200 }} />
-        <NumberInput label={t("tryIt.kafka.limit")} min={1} max={50} value={limit} onChange={setLimit} w={120} />
+        <TextInput label={t("tryIt.kafka.channel")} value={topic} onChange={(e) => { setTopic(e.currentTarget.value); observe.reset(); }} style={{ flex: 1, minWidth: 200 }} />
+        <NumberInput label={t("tryIt.kafka.limit")} min={1} max={50} value={limit} onChange={(next) => { setLimit(next); observe.reset(); }} w={120} />
         <Button leftSection={<IconDatabaseSearch size={16} />} onClick={() => observe.mutate()} loading={observe.isPending} variant="default" disabled={!topic.trim()}>
           {t("infer.observe.run")}
         </Button>
@@ -112,12 +124,15 @@ function ObserveKafkaLeg({ environmentId, onAdd }: { environmentId: number; onAd
         </Alert>
       )}
       {data && (
-        <Group justify="space-between" align="center">
-          <Text size="sm">{t("infer.observe.kafka.result", { count: data.sample.payloads?.length ?? 0 })}</Text>
-          <Button size="xs" variant="default" onClick={() => onAdd(data.sample)}>
-            {t("infer.observe.addToSamples")}
-          </Button>
-        </Group>
+        <Stack gap="sm">
+          <Group justify="space-between" align="center">
+            <Text size="sm">{t("infer.observe.kafka.result", { count: data.sample.payloads?.length ?? 0 })}</Text>
+            <Button size="xs" variant="default" onClick={() => onAdd(data.sample)}>
+              {t("infer.observe.addToSamples")}
+            </Button>
+          </Group>
+          <CaptureNotes notes={data.notes} />
+        </Stack>
       )}
     </Stack>
   );
@@ -133,6 +148,14 @@ function ObserveSqlLeg({ environmentId, onAdd }: { environmentId: number; onAdd:
   const observe = useMutation({
     mutationFn: () => observeSql({ environmentId, relation: relation ?? "" }),
   });
+  if (relations.isLoading) return <LoadingBlock mih={48} />;
+  if (relations.isError) {
+    return (
+      <Alert color="red" variant="light" title={t("infer.observe.relationsFailed")}>
+        {loadErrorMessage(relations.error, t)}
+      </Alert>
+    );
+  }
   const options = (relations.data?.relations ?? []).map((r) => {
     const qualified = r.schema ? `${r.schema}.${r.name}` : r.name;
     return { value: qualified, label: `${qualified} (${r.kind})` };
@@ -145,7 +168,7 @@ function ObserveSqlLeg({ environmentId, onAdd }: { environmentId: number; onAdd:
           label={t("tryIt.sql.dataset")}
           data={options}
           value={relation}
-          onChange={setRelation}
+          onChange={(next) => { setRelation(next); observe.reset(); }}
           searchable
           allowDeselect={false}
           style={{ flex: 1, minWidth: 240 }}
@@ -160,12 +183,15 @@ function ObserveSqlLeg({ environmentId, onAdd }: { environmentId: number; onAdd:
         </Alert>
       )}
       {data && (
-        <Group justify="space-between" align="center">
-          <Text size="sm">{t("infer.observe.sql.result", { count: data.sample.columns?.length ?? 0 })}</Text>
-          <Button size="xs" variant="default" onClick={() => onAdd(data.sample)}>
-            {t("infer.observe.addToSamples")}
-          </Button>
-        </Group>
+        <Stack gap="sm">
+          <Group justify="space-between" align="center">
+            <Text size="sm">{t("infer.observe.sql.result", { count: data.sample.columns?.length ?? 0 })}</Text>
+            <Button size="xs" variant="default" onClick={() => onAdd(data.sample)}>
+              {t("infer.observe.addToSamples")}
+            </Button>
+          </Group>
+          <CaptureNotes notes={data.notes} />
+        </Stack>
       )}
     </Stack>
   );
@@ -197,6 +223,15 @@ export default function InferObservePanel({
   const [stored, setStored] = useStoredState(`tryIt.environment.${systemId ?? "all"}`, "", isString);
   const selected = usable.find((e) => String(e.id) === stored) ?? usable[0] ?? null;
 
+  if (environments.isLoading) return <LoadingBlock mih={48} />;
+  if (environments.isError) {
+    return (
+      <Alert color="red" variant="light" title={t("infer.observe.environmentsFailed")}>
+        {loadErrorMessage(environments.error, t)}
+      </Alert>
+    );
+  }
+
   return (
     <Stack gap="md">
       <Select
@@ -208,9 +243,9 @@ export default function InferObservePanel({
         disabled={usable.length === 0}
         allowDeselect={false}
       />
-      {selected && target === "http" && <ObserveHttpLeg environmentId={selected.id} onAdd={onAdd} />}
-      {selected && target === "kafka" && <ObserveKafkaLeg environmentId={selected.id} onAdd={onAdd} />}
-      {selected && target === "postgres" && <ObserveSqlLeg environmentId={selected.id} onAdd={onAdd} />}
+      {selected && target === "http" && <ObserveHttpLeg key={selected.id} environmentId={selected.id} onAdd={onAdd} />}
+      {selected && target === "kafka" && <ObserveKafkaLeg key={selected.id} environmentId={selected.id} onAdd={onAdd} />}
+      {selected && target === "postgres" && <ObserveSqlLeg key={selected.id} environmentId={selected.id} onAdd={onAdd} />}
     </Stack>
   );
 }

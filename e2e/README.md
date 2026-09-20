@@ -11,24 +11,25 @@ and only speaks HTTP/DOM.
 cd e2e
 npm install
 npm run install:browsers      # one-time: download Chromium
-npm test                      # brings the stack up (docker compose), runs specs, tears it down
+npm test                      # reuses or starts the stack, runs specs, leaves the stack intact
 ```
 
 - `global-setup.ts` starts `docker compose up -d --build` and waits for `:8082` — **unless a stack
   is already running there**, which it reuses (fast local iteration: keep `docker compose up` or a
   local `WEB_STATIC_DIR=… ./gradlew :server:run` going and just run `npm test`).
-  `global-teardown.ts` only runs `docker compose down` if setup started the stack — the
-  postgres volume is deliberately kept, so the local database (your own demo data included)
-  survives e2e runs; `docker compose down -v` manually when you want a pristine one.
-- Requires Docker. Override the target with `E2E_BASE_URL`. (8082, not 8080/8081 — probing those could
-  happily "reuse" a running Lettuce or Toadie.)
+  Setup never tears down services or volumes, including after a failed start or test run. Tests
+  clean up only the records they own; existing demo data stays intact.
+- Docker is needed only when starting the default stack. `E2E_BASE_URL` can target an already
+  running stack; an unavailable custom URL fails without starting the default Compose project.
+  (8082, not 8080/8081 — probing those could reuse a running Lettuce or Toadie.)
 
-Two Docker-free static gates ride every spec change — run both before merging, like the web
+Docker-free gates ride every spec change — run them before merging, like the web
 package's lint/knip:
 
 ```bash
 npm run typecheck             # tsc --noEmit — Playwright only TRANSPILES TS, it never checks it
 npm run check:scenarios       # spec ↔ scenario parity: files exist, test() titles == headings
+npm run test:setup            # stack reuse/start/failure paths preserve services and data
 ```
 
 `check:scenarios` enforces the same-commit rule below mechanically (both directions, orphan
@@ -92,7 +93,7 @@ the same commit** — this list is the coverage map, the scenario file is the de
   new version, compare, team, edit-user, user-features), `/reset-password`, the not-found page, and
   the overlays scoped to their dialog (the notifications drawer, the Try it drawer, a registry editor
   modal); `color-contrast` included (the theme's tokens are AA-tested in `web/src/theme.test.ts`).
-- [`auth.spec.ts`](scenarios/auth.md) — login / logout / invalid credentials / guarded deep link.
+- [`auth.spec.ts`](scenarios/auth.md) — login / logout / invalid credentials / guarded deep link with query and hash.
 - [`changelog.spec.ts`](scenarios/changelog.md) — the what's-new dot on a fresh device
   leads to the changelog via the version stamp and clears once read (no language switching
   — it runs as the seed admin; see `i18n.spec.ts`).
@@ -119,7 +120,8 @@ the same commit** — this list is the coverage map, the scenario file is the de
   OpenAPI draft (the templated path and the `INFER_PATH_TEMPLATED` note reviewed before saving),
   and a PostgreSQL table described live through an environment becomes an ODCS draft (`physicalType`,
   a property and its primary key checked in the preview) — both opened in the ordinary editor and
-  saved as DRAFT through the ordinary Import flow; teardown of everything.
+  saved as DRAFT through the ordinary Import flow; an existing contract preserves a chosen
+  version through inference → new-version editor → save; teardown of everything.
 - [`i18n.spec.ts`](scenarios/i18n.md) — the synced per-user language: a throwaway user
   switches to Polish, the choice survives a reload AND a wiped-device re-login (served from
   the stored value), and the admin's English flips it back; seeded accounts stay English.

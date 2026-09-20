@@ -39,7 +39,12 @@ function useAuth(): { token: string | null; isAuthenticated: boolean } {
   return { token, isAuthenticated: token !== null };
 }
 
-type LocationStateWithFrom = { from?: { pathname?: string } } | null;
+type LocationStateWithFrom = { from?: { pathname?: string; search?: string; hash?: string } } | null;
+
+function destination(state: LocationStateWithFrom): string {
+  const from = state?.from;
+  return from?.pathname ? `${from.pathname}${from.search ?? ""}${from.hash ?? ""}` : "/";
+}
 
 export function RequireAuth(): ReactElement {
   const { isAuthenticated } = useAuth();
@@ -64,8 +69,7 @@ export function RedirectIfAuthed({ children }: { children: ReactElement }): Reac
   const { isAuthenticated } = useAuth();
   const location = useLocation();
   if (isAuthenticated) {
-    const from = (location.state as LocationStateWithFrom)?.from?.pathname;
-    return <Navigate to={from ?? "/"} replace />;
+    return <Navigate to={destination(location.state as LocationStateWithFrom)} replace />;
   }
   return children;
 }

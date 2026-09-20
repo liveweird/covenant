@@ -6,9 +6,10 @@ import type { DocumentFormat } from "../api/versions";
  * repo copy (`SyncVersionModal.tsx`) and the Infer page's generated draft (`InferContract.tsx`)
  * both seed a document screen this way. `type` rides along only when the destination does not
  * already know it (a new contract via `ImportContract`) — `NewVersion` ignores it, since the
- * contract's type is fixed.
+ * contract's type is fixed. Inference also carries the catalog version selected alongside the
+ * generated document, so its metadata and the document cannot silently diverge at the handoff.
  */
-export type SeededDocument = { content: string; sourceUrl: string | null; type?: ContractType };
+export type SeededDocument = { content: string; sourceUrl: string | null; type?: ContractType; version?: string };
 
 /** The server's rule (DocumentParser.detectFormat): a `{`/`[` first significant character is JSON. */
 export function detectFormat(text: string): DocumentFormat {

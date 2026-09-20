@@ -1,7 +1,8 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { timingSafeEqual } from "node:crypto";
-import { check, isCheckRequest, type CheckRequest, type CheckResponse } from "./check.ts";
 import { ENGINES } from "./engines/index.ts";
+import { CheckBusy, CheckTimeout, isolatedCheck } from "./isolation.ts";
+import { isCheckRequest, type CheckRequest, type CheckResponse } from "./protocol.ts";
 
 /** Runtime knobs — every default documented in .claude/docs/checker.md. */
 export interface CheckerConfig {
@@ -9,6 +10,8 @@ export interface CheckerConfig {
   token: string | undefined;
   maxBodyBytes: number;
   timeoutMs: number;
+  maxConcurrentChecks: number;
+  maxQueuedChecks: number;
 }
 
 export function configFromEnv(env: NodeJS.ProcessEnv = process.env): CheckerConfig {
@@ -17,6 +20,8 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env): CheckerConf
     token: env.CHECKER_TOKEN?.trim() || undefined,
     maxBodyBytes: Number(env.CHECKER_MAX_BYTES ?? 2 * 1024 * 1024),
     timeoutMs: Number(env.CHECKER_TIMEOUT_MS ?? 20_000),
+    maxConcurrentChecks: Number(env.CHECKER_MAX_CONCURRENT ?? 1),
+    maxQueuedChecks: Number(env.CHECKER_MAX_QUEUED ?? 8),
   };
 }
 
@@ -29,8 +34,8 @@ function respondJson(res: ServerResponse, status: number, body: unknown, content
 }
 
 /** RFC 7807, the main API's shape (API-ERR-001/002). */
-function respondProblem(res: ServerResponse, status: number, title: string, detail: string): void {
-  respondJson(res, status, { type: "about:blank", title, status, detail }, PROBLEM_JSON);
+function respondProblem(res: ServerResponse, status: number, title: string, detail: string, instance: string): void {
+  respondJson(res, status, { type: "about:blank", title, status, detail, instance }, PROBLEM_JSON);
 }
 
 class BodyTooLarge extends Error {}
@@ -68,8 +73,6 @@ function tokenMatches(config: CheckerConfig, req: IncomingMessage): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-class CheckTimeout extends Error {}
-
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new CheckTimeout()), ms);
@@ -87,23 +90,28 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 /** `checkFn` is a test seam (a never-resolving check exercises the 504 path); production passes nothing. */
-export function handler(config: CheckerConfig, checkFn: (request: CheckRequest) => Promise<CheckResponse> = check) {
+export function handler(config: CheckerConfig, checkFn?: (request: CheckRequest) => Promise<CheckResponse>) {
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const url = new URL(req.url ?? "/", "http://checker");
+    const instance = url.pathname;
     if (req.method === "GET" && url.pathname === "/healthz") {
       respondJson(res, 200, { status: "ok", engines: ENGINES });
       return;
     }
     if (url.pathname !== "/check") {
-      respondProblem(res, 404, "Not Found", "Unknown path");
+      respondProblem(res, 404, "Not Found", "Unknown path", instance);
       return;
     }
     if (req.method !== "POST") {
-      respondProblem(res, 405, "Method Not Allowed", "Use POST /check");
+      respondProblem(res, 405, "Method Not Allowed", "Use POST /check", instance);
       return;
     }
     if (!tokenMatches(config, req)) {
-      respondProblem(res, 401, "Unauthorized", "Missing or wrong X-Checker-Token");
+      respondProblem(res, 401, "Unauthorized", "Missing or wrong X-Checker-Token", instance);
+      return;
+    }
+    if (!isJsonContentType(req.headers["content-type"])) {
+      respondProblem(res, 415, "Unsupported Media Type", "Content-Type must be application/json", instance);
       return;
     }
     let body: string;
@@ -111,9 +119,9 @@ export function handler(config: CheckerConfig, checkFn: (request: CheckRequest) 
       body = await readBody(req, config.maxBodyBytes);
     } catch (error) {
       if (error instanceof BodyTooLarge) {
-        respondProblem(res, 413, "Payload Too Large", `Request body exceeds ${config.maxBodyBytes} bytes`);
+        respondProblem(res, 413, "Payload Too Large", `Request body exceeds ${config.maxBodyBytes} bytes`, instance);
       } else {
-        respondProblem(res, 400, "Bad Request", "Request body could not be read");
+        respondProblem(res, 400, "Bad Request", "Request body could not be read", instance);
       }
       return;
     }
@@ -121,26 +129,36 @@ export function handler(config: CheckerConfig, checkFn: (request: CheckRequest) 
     try {
       parsed = JSON.parse(body);
     } catch {
-      respondProblem(res, 400, "Bad Request", "Request body is not JSON");
+      respondProblem(res, 400, "Bad Request", "Request body is not JSON", instance);
       return;
     }
     if (!isCheckRequest(parsed)) {
-      respondProblem(res, 400, "Bad Request", "Expected {type: OPENAPI|ASYNCAPI|ODCS, content: string, previousContent?: string}");
+      respondProblem(res, 400, "Bad Request", "Expected only {type: OPENAPI|ASYNCAPI|ODCS, content: string, previousContent?: string}", instance);
       return;
     }
     try {
-      respondJson(res, 200, await withTimeout(checkFn(parsed), config.timeoutMs));
+      const result = checkFn
+        ? await withTimeout(checkFn(parsed), config.timeoutMs)
+        : await isolatedCheck(parsed, config.timeoutMs, config.maxConcurrentChecks, config.maxQueuedChecks);
+      respondJson(res, 200, result);
     } catch (error) {
       if (error instanceof CheckTimeout) {
-        respondProblem(res, 504, "Gateway Timeout", `Check exceeded ${config.timeoutMs} ms`);
+        respondProblem(res, 504, "Gateway Timeout", `Check exceeded ${config.timeoutMs} ms`, instance);
+      } else if (error instanceof CheckBusy) {
+        respondProblem(res, 503, "Service Unavailable", "Checker queue is full", instance);
       } else {
         // An engine crash on a hostile document is the checker's bug, not the caller's — the
         // JVM treats any non-2xx as CHECKER_UNAVAILABLE and proceeds on its own verdicts.
         console.error("[checker] check failed", error);
-        respondProblem(res, 500, "Internal Server Error", "Check failed");
+        respondProblem(res, 500, "Internal Server Error", "Check failed", instance);
       }
     }
   };
+}
+
+function isJsonContentType(header: string | string[] | undefined): boolean {
+  const value = Array.isArray(header) ? header[0] : header;
+  return value?.split(";", 1)[0]?.trim().toLowerCase() === "application/json";
 }
 
 export function startServer(config: CheckerConfig = configFromEnv()) {

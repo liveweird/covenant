@@ -71,6 +71,14 @@ describe("VersionPage", () => {
     expect(screen.queryByText("Compatibility with 1.0.0 (active):")).not.toBeInTheDocument();
   });
 
+  test("a compact compatibility failure renders inline beside the stored document", async () => {
+    serve(mockFetch, { ...base, "GET /api/v1/contracts/5/versions/11/compatibility?": { status: 500, body: { title: "Internal Server Error", status: 500 } } });
+    renderPage();
+    await screen.findByRole("heading", { level: 2, name: "orders-api 1.1.0" });
+    expect(await screen.findByText("Load failed (500)")).toBeInTheDocument();
+    expect(screen.getByText("Compatibility")).toBeInTheDocument();
+  });
+
   test("no active predecessor shows a dimmed line instead of the badge", async () => {
     serve(mockFetch, base);
     renderPage("/contracts/5/versions/10");
