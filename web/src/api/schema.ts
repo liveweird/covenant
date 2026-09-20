@@ -2159,7 +2159,7 @@ export interface components {
             mapping: components["schemas"]["ToadieMapping"];
         };
         ToadieConnectionCreateRequest: components["schemas"]["ToadieConnectionRequest"] & {
-            /** @description Write-only API key */
+            /** @description Write-only API key, required on create. */
             apiKey: string;
         };
         ToadieConnectionResponse: {
