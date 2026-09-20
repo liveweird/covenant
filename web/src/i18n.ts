@@ -22,6 +22,7 @@ import enReader from "./locales/en/reader.json";
 import enHierarchy from "./locales/en/hierarchy.json";
 import enSystems from "./locales/en/systems.json";
 import enTeams from "./locales/en/teams.json";
+import enToadie from "./locales/en/toadie.json";
 import enTryIt from "./locales/en/tryIt.json";
 import enUsers from "./locales/en/users.json";
 import enVersions from "./locales/en/versions.json";
@@ -76,6 +77,7 @@ export const en = {
   hierarchy: enHierarchy,
   systems: enSystems,
   teams: enTeams,
+  toadie: enToadie,
   tryIt: enTryIt,
   users: enUsers,
   versions: enVersions,

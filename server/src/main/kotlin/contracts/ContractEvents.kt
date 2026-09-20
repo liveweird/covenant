@@ -22,6 +22,7 @@ enum class ContractEventType {
     VERSION_SOURCE_CHANGED, VERSION_SYNCED,
     IMPORTED,
     RELEASE_LINE_UPDATED,
+    TOADIE_LINKS_UPDATED,
 }
 
 @Serializable

@@ -609,6 +609,168 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/toadie-connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List configured Toadie connections
+         * @description Any authenticated user. Sortable: `id`, `name`, `createdAt`, `updatedAt`; default `id` ascending.
+         */
+        get: operations["listToadieConnections"];
+        put?: never;
+        /**
+         * Create a Toadie connection
+         * @description ADMIN only. The API key is encrypted at rest and never returned. Development accepts HTTP targets; production requires HTTPS.
+         */
+        post: operations["createToadieConnection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/toadie-connections/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        /** Get a sanitized Toadie connection */
+        get: operations["getToadieConnection"];
+        /**
+         * Replace a Toadie connection
+         * @description ADMIN only. Omitted API key retains the encrypted value. The base URL is immutable; mapping changes invalidate the snapshot.
+         */
+        put: operations["updateToadieConnection"];
+        post?: never;
+        /**
+         * Soft-delete a Toadie connection
+         * @description ADMIN only. Existing contract links remain visible as disconnected.
+         */
+        delete: operations["deleteToadieConnection"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/toadie-connections/{id}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queue a complete Toadie snapshot refresh
+         * @description ADMIN only. Concurrent requests coalesce; another request inside 30 seconds returns 429.
+         */
+        post: operations["refreshToadieConnection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/toadie-connections/{id}/apis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List cached API entities for a connection
+         * @description Any authenticated user. `q` searches identifier and title case- and accent-insensitively. Sortable: `id`, `title`; default `id` ascending.
+         */
+        get: operations["listToadieApis"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/{contractId}/toadie-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contractId: number;
+            };
+            cookie?: never;
+        };
+        /** Get a contract's explicit Toadie API links */
+        get: operations["getContractToadieLinks"];
+        /**
+         * Replace a contract's explicit Toadie API links
+         * @description Contract writer only. At most 100 unique API entity IDs, all present in the current snapshot. A null connection with an empty list clears links.
+         */
+        put: operations["replaceContractToadieLinks"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/{contractId}/toadie-usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contractId: number;
+            };
+            cookie?: never;
+        };
+        /**
+         * Get cached providers and consumers for a contract's linked APIs
+         * @description Any authenticated user. `q` searches service identifier and title case- and accent-insensitively; `role` is exact. Sortable: `id`, `title`; default `id` ascending.
+         */
+        get: operations["getContractToadieUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/{contractId}/toadie-usage/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contractId: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queue refresh of the linked Toadie connection
+         * @description Contract writer only. Refresh changes only the cache; it never changes contract lifecycle or authorization.
+         */
+        post: operations["refreshContractToadieUsage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contracts": {
         parameters: {
             query?: never;
@@ -1974,6 +2136,142 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ToadieMapping: {
+            /** @default service */
+            serviceBlueprint: string;
+            /** @default api */
+            apiBlueprint: string;
+            /** @default provides_apis */
+            providesRelation: string;
+            /** @default consumes_apis */
+            consumesRelation: string;
+            /** @default system */
+            systemRelation: string;
+        };
+        ToadieConnectionRequest: {
+            name: string;
+            baseUrl: string;
+            browserUrl: string;
+            /** @description Write-only; required on create and omitted/null on replace to retain the stored key. */
+            apiKey?: string | null;
+            enabled: boolean;
+            refreshIntervalMinutes: number;
+            mapping: components["schemas"]["ToadieMapping"];
+        };
+        ToadieConnectionCreateRequest: components["schemas"]["ToadieConnectionRequest"] & {
+            /** @description Write-only API key, required on create. */
+            apiKey: string;
+        };
+        ToadieConnectionResponse: {
+            /** Format: int32 */
+            id: number;
+            name: string;
+            baseUrl: string;
+            browserUrl: string;
+            enabled: boolean;
+            refreshIntervalMinutes: number;
+            mapping: components["schemas"]["ToadieMapping"];
+            hasApiKey: boolean;
+            /** Format: int64 */
+            createdAt: number;
+            /** Format: int64 */
+            updatedAt: number;
+            /** Format: int64 */
+            lastAttemptAt: number | null;
+            /** Format: int64 */
+            lastSuccessAt: number | null;
+            refreshing: boolean;
+            lastErrorCode: string | null;
+            stale: boolean;
+        };
+        ToadieConnectionPage: {
+            items: components["schemas"]["ToadieConnectionResponse"][];
+            page: number;
+            pageSize: number;
+            /** Format: int64 */
+            total: number;
+        };
+        /** @enum {string} */
+        ToadieCacheState: "UNLINKED" | "NEVER_SYNCED" | "CURRENT" | "STALE" | "DISABLED" | "DISCONNECTED";
+        ToadieCacheStatus: {
+            state: components["schemas"]["ToadieCacheState"];
+            /** Format: int64 */
+            lastAttemptAt: number | null;
+            /** Format: int64 */
+            lastSuccessAt: number | null;
+            refreshing: boolean;
+            lastErrorCode: string | null;
+        };
+        ToadieConnectionRef: {
+            /** Format: int32 */
+            id: number;
+            name: string;
+            browserUrl: string;
+        };
+        ToadieEntityRef: {
+            entityId: string;
+            identifier: string;
+            title: string;
+            url: string | null;
+        };
+        ToadieEntityPage: {
+            items: components["schemas"]["ToadieEntityRef"][];
+            page: number;
+            pageSize: number;
+            /** Format: int64 */
+            total: number;
+        };
+        ToadieLinksRequest: {
+            /** Format: int32 */
+            connectionId: number | null;
+            apiEntityIds: string[];
+        };
+        /** @enum {string} */
+        ToadieLinkStatus: "AVAILABLE" | "MISSING" | "DISCONNECTED";
+        ToadieLinkResponse: {
+            /** Format: int32 */
+            id: number;
+            /** Format: int32 */
+            connectionId: number;
+            apiEntityId: string;
+            identifier: string;
+            title: string;
+            url: string | null;
+            status: components["schemas"]["ToadieLinkStatus"];
+        };
+        ToadieLinksResponse: {
+            /** Format: int32 */
+            contractId: number;
+            connection: components["schemas"]["ToadieConnectionRef"] | null;
+            cache: components["schemas"]["ToadieCacheStatus"];
+            items: components["schemas"]["ToadieLinkResponse"][];
+        };
+        /** @enum {string} */
+        ToadieUsageRole: "PROVIDER" | "CONSUMER";
+        ToadieUsageRow: {
+            id: string;
+            identifier: string;
+            title: string;
+            url: string | null;
+            roles: components["schemas"]["ToadieUsageRole"][];
+            providedApiEntityIds: string[];
+            consumedApiEntityIds: string[];
+            systems: components["schemas"]["ToadieEntityRef"][];
+            teams: components["schemas"]["ToadieEntityRef"][];
+            /** @description Unknown in Toadie's current model; always null. */
+            version: string | null;
+            /** @description Unknown in Toadie's current model; always null. */
+            releaseLine: string | null;
+        };
+        ToadieUsageResponse: {
+            items: components["schemas"]["ToadieUsageRow"][];
+            page: number;
+            pageSize: number;
+            /** Format: int64 */
+            total: number;
+            connection: components["schemas"]["ToadieConnectionRef"] | null;
+            cache: components["schemas"]["ToadieCacheStatus"];
+        };
         SystemResponse: {
             /** Format: int32 */
             id: number;
@@ -2205,7 +2503,7 @@ export interface components {
             versions: components["schemas"]["ExportedVersion"][];
         };
         /** @enum {string} */
-        ContractEventType: "CREATED" | "UPDATED" | "OWNER_CHANGED" | "DELETED" | "VERSION_CREATED" | "VERSION_CONTENT_UPDATED" | "VERSION_TRANSITIONED" | "VERSION_DELETED" | "VERSION_RECHECKED" | "VERSION_SOURCE_CHANGED" | "VERSION_SYNCED" | "IMPORTED" | "RELEASE_LINE_UPDATED";
+        ContractEventType: "CREATED" | "UPDATED" | "OWNER_CHANGED" | "DELETED" | "VERSION_CREATED" | "VERSION_CONTENT_UPDATED" | "VERSION_TRANSITIONED" | "VERSION_DELETED" | "VERSION_RECHECKED" | "VERSION_SOURCE_CHANGED" | "VERSION_SYNCED" | "IMPORTED" | "RELEASE_LINE_UPDATED" | "TOADIE_LINKS_UPDATED";
         ContractEventResponse: {
             /** Format: int32 */
             id: number;
@@ -2232,7 +2530,7 @@ export interface components {
          * @description The notification kind; the SPA renders it in the viewer's language. A kind a client build does not know renders as its raw name.
          * @enum {string}
          */
-        NotificationType: "CONTRACT_UPDATED" | "CONTRACT_OWNER_CHANGED" | "CONTRACT_DELETED" | "VERSION_CREATED" | "VERSION_CONTENT_UPDATED" | "VERSION_TRANSITIONED" | "VERSION_DELETED" | "VERSION_SYNCED" | "VERSION_SOURCE_CHANGED" | "VERSION_IMPORTED" | "VERSION_BREAKING_STORED" | "RELEASE_LINE_UPDATED";
+        NotificationType: "CONTRACT_UPDATED" | "CONTRACT_OWNER_CHANGED" | "CONTRACT_DELETED" | "VERSION_CREATED" | "VERSION_CONTENT_UPDATED" | "VERSION_TRANSITIONED" | "VERSION_DELETED" | "VERSION_SYNCED" | "VERSION_SOURCE_CHANGED" | "VERSION_IMPORTED" | "VERSION_BREAKING_STORED" | "RELEASE_LINE_UPDATED" | "TOADIE_LINKS_UPDATED";
         NotificationResponse: {
             /** Format: int32 */
             id: number;
@@ -3366,6 +3664,8 @@ export interface components {
     };
     parameters: {
         ResourceId: number;
+        /** @description Case- and accent-insensitive free-text search; each endpoint documents the fields searched. */
+        Q: string;
         /** @description 1-based page index. Defaults to 1. */
         Page: number;
         /** @description Rows per page. Defaults to 20, maximum 100. */
@@ -3391,8 +3691,6 @@ export interface components {
         ContractType: components["schemas"]["ContractType"][];
         /** @description Repeatable — any-of over lifecycles (the LATEST version's on the contracts list/tree). */
         ContractLifecycle: components["schemas"]["Lifecycle"][];
-        /** @description Case- and accent-insensitive substring over name OR description. */
-        ContractQuery: string;
         ContractHasErrors: boolean;
         /** @description Repeatable — any-of over lifecycles, of the VERSION itself (the Errors report's rows — not a contract's latest version, which ContractLifecycle reads instead). */
         VersionLifecycle: components["schemas"]["Lifecycle"][];
@@ -4571,6 +4869,344 @@ export interface operations {
             500: components["responses"]["InternalServerError"];
         };
     };
+    listToadieConnections: {
+        parameters: {
+            query?: {
+                /** @description 1-based page index. Defaults to 1. */
+                page?: components["parameters"]["Page"];
+                /** @description Rows per page. Defaults to 20, maximum 100. */
+                pageSize?: components["parameters"]["PageSize"];
+                /**
+                 * @description Sort spec. Format: `field` (ascending) or `-field` (descending). Multiple fields are
+                 *     comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
+                 *     sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
+                 *     always appended as a deterministic tiebreaker.
+                 */
+                sort?: components["parameters"]["Sort"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of sanitized connections */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToadieConnectionPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    createToadieConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToadieConnectionCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Created; Location points to the connection */
+            201: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToadieConnectionResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getToadieConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Connection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToadieConnectionResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    updateToadieConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToadieConnectionRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["UnsupportedMediaType"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    deleteToadieConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    refreshToadieConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Refresh accepted or already in progress */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listToadieApis: {
+        parameters: {
+            query?: {
+                /** @description 1-based page index. Defaults to 1. */
+                page?: components["parameters"]["Page"];
+                /** @description Rows per page. Defaults to 20, maximum 100. */
+                pageSize?: components["parameters"]["PageSize"];
+                /**
+                 * @description Sort spec. Format: `field` (ascending) or `-field` (descending). Multiple fields are
+                 *     comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
+                 *     sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
+                 *     always appended as a deterministic tiebreaker.
+                 */
+                sort?: components["parameters"]["Sort"];
+                /** @description Case- and accent-insensitive free-text search; each endpoint documents the fields searched. */
+                q?: components["parameters"]["Q"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cached API page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToadieEntityPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getContractToadieLinks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contractId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Link state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToadieLinksResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    replaceContractToadieLinks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contractId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToadieLinksRequest"];
+            };
+        };
+        responses: {
+            /** @description Replaced */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            415: components["responses"]["UnsupportedMediaType"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getContractToadieUsage: {
+        parameters: {
+            query?: {
+                /** @description 1-based page index. Defaults to 1. */
+                page?: components["parameters"]["Page"];
+                /** @description Rows per page. Defaults to 20, maximum 100. */
+                pageSize?: components["parameters"]["PageSize"];
+                /**
+                 * @description Sort spec. Format: `field` (ascending) or `-field` (descending). Multiple fields are
+                 *     comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
+                 *     sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
+                 *     always appended as a deterministic tiebreaker.
+                 */
+                sort?: components["parameters"]["Sort"];
+                /** @description Case- and accent-insensitive free-text search; each endpoint documents the fields searched. */
+                q?: components["parameters"]["Q"];
+                role?: components["schemas"]["ToadieUsageRole"];
+            };
+            header?: never;
+            path: {
+                contractId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cached usage projection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToadieUsageResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    refreshContractToadieUsage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contractId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Refresh accepted or already in progress */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
     listContracts: {
         parameters: {
             query?: {
@@ -4593,8 +5229,8 @@ export interface operations {
                 ownerUserId?: components["parameters"]["ContractOwnerUserId"];
                 /** @description Repeatable — any-of over lifecycles (the LATEST version's on the contracts list/tree). */
                 lifecycle?: components["parameters"]["ContractLifecycle"];
-                /** @description Case- and accent-insensitive substring over name OR description. */
-                q?: components["parameters"]["ContractQuery"];
+                /** @description Case- and accent-insensitive free-text search; each endpoint documents the fields searched. */
+                q?: components["parameters"]["Q"];
                 hasErrors?: components["parameters"]["ContractHasErrors"];
             };
             header?: never;
@@ -4656,8 +5292,8 @@ export interface operations {
                 type?: components["parameters"]["ContractType"];
                 /** @description Repeatable — any-of over lifecycles (the LATEST version's on the contracts list/tree). */
                 lifecycle?: components["parameters"]["ContractLifecycle"];
-                /** @description Case- and accent-insensitive substring over name OR description. */
-                q?: components["parameters"]["ContractQuery"];
+                /** @description Case- and accent-insensitive free-text search; each endpoint documents the fields searched. */
+                q?: components["parameters"]["Q"];
                 ownerTeamId?: components["parameters"]["ContractOwnerTeamId"];
                 ownerUserId?: components["parameters"]["ContractOwnerUserId"];
             };
@@ -4688,8 +5324,8 @@ export interface operations {
                 type?: components["parameters"]["ContractType"];
                 /** @description Repeatable — any-of over lifecycles (the LATEST version's on the contracts list/tree). */
                 lifecycle?: components["parameters"]["ContractLifecycle"];
-                /** @description Case- and accent-insensitive substring over name OR description. */
-                q?: components["parameters"]["ContractQuery"];
+                /** @description Case- and accent-insensitive free-text search; each endpoint documents the fields searched. */
+                q?: components["parameters"]["Q"];
                 ownerTeamId?: components["parameters"]["ContractOwnerTeamId"];
                 ownerUserId?: components["parameters"]["ContractOwnerUserId"];
             };
@@ -4739,8 +5375,8 @@ export interface operations {
                 severity?: components["parameters"]["ErrorSeverity"];
                 /** @description Repeatable — any-of over finding sources; every enum value is accepted, though SYNTAX, CONFORMANCE and INFERENCE never match a stored finding (empty = any). */
                 source?: components["parameters"]["ErrorSource"];
-                /** @description Case- and accent-insensitive substring over name OR description. */
-                q?: components["parameters"]["ContractQuery"];
+                /** @description Case- and accent-insensitive free-text search; each endpoint documents the fields searched. */
+                q?: components["parameters"]["Q"];
             };
             header?: never;
             path?: never;
@@ -4777,8 +5413,8 @@ export interface operations {
                 severity?: components["parameters"]["ErrorSeverity"];
                 /** @description Repeatable — any-of over finding sources; every enum value is accepted, though SYNTAX, CONFORMANCE and INFERENCE never match a stored finding (empty = any). */
                 source?: components["parameters"]["ErrorSource"];
-                /** @description Case- and accent-insensitive substring over name OR description. */
-                q?: components["parameters"]["ContractQuery"];
+                /** @description Case- and accent-insensitive free-text search; each endpoint documents the fields searched. */
+                q?: components["parameters"]["Q"];
             };
             header?: never;
             path?: never;

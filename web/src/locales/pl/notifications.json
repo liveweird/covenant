@@ -27,6 +27,7 @@
     "VERSION_SOURCE_CHANGED": "{{actor}} zmienił/a powiązanie ze źródłem {{contractName}} {{version}}.",
     "VERSION_IMPORTED": "{{actor}} zaimportował/a wersję {{version}} kontraktu {{contractName}}.",
     "VERSION_BREAKING_STORED": "{{contractName}} {{version}} zapisano ze zmianą łamiącą bez podniesienia wersji głównej.",
-    "RELEASE_LINE_UPDATED": "{{actor}} zaktualizował/a zasady wsparcia dla {{contractName}} {{major}}.x ({{supportStatus}})."
+    "RELEASE_LINE_UPDATED": "{{actor}} zaktualizował/a zasady wsparcia dla {{contractName}} {{major}}.x ({{supportStatus}}).",
+    "TOADIE_LINKS_UPDATED": "{{actor}} zaktualizował/a powiązania API w Toadie dla {{contractName}}."
   }
 }

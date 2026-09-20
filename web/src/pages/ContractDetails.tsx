@@ -23,6 +23,7 @@ import ReleaseLinesPanel from "../components/ReleaseLinesPanel";
 import SortHeader from "../components/SortHeader";
 import TableLoadingRow from "../components/TableLoadingRow";
 import TypeBadge from "../components/TypeBadge";
+import ContractToadieUsage from "../components/ContractToadieUsage";
 import { useDeleteConfirm } from "../hooks/useDeleteConfirm";
 import { usePagedSort } from "../hooks/usePagedSort";
 import { useVersionDownload } from "../hooks/useVersionDownload";
@@ -321,6 +322,7 @@ export default function ContractDetails() {
         </Table.Tbody>
       </Table>
       <PaginationBar total={versions.data?.total ?? 0} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} />
+      <ContractToadieUsage contractId={id} canWrite={data.canWrite} />
       <ContractHistory contractId={id} />
       <ConfirmDeleteModal
         confirm={removeVersion}

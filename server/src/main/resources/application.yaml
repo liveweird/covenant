@@ -28,6 +28,7 @@ ktor:
       - ch.nokillswit.contracts.checks.ChecksKt.configureChecks
       - ch.nokillswit.infra.db.DatabaseKt.configureDatabase
       - ch.nokillswit.infra.db.BootstrapKt.configureBootstrap
+      - ch.nokillswit.toadie.ToadieRefreshKt.configureToadieRefresh
       # Public liveness/readiness probes (/api/v1/health, /api/v1/ready); after Database (the probe
       # round-trips it).
       - ch.nokillswit.plugins.HealthKt.configureHealth
@@ -37,6 +38,7 @@ ktor:
       - ch.nokillswit.domains.DomainRoutesKt.configureDomainRoutes
       - ch.nokillswit.systems.SystemRoutesKt.configureSystemRoutes
       - ch.nokillswit.environments.EnvironmentRoutesKt.configureEnvironmentRoutes
+      - ch.nokillswit.toadie.ToadieRoutesKt.configureToadieRoutes
       - ch.nokillswit.contracts.ContractRoutesKt.configureContractRoutes
       - ch.nokillswit.contracts.ContractVersionRoutesKt.configureContractVersionRoutes
       - ch.nokillswit.notifications.NotificationRoutesKt.configureNotificationRoutes

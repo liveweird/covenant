@@ -47,6 +47,7 @@ const TYPE_META: Record<Kind, { icon: typeof IconBell; color: string }> = {
   VERSION_IMPORTED: { icon: IconFileImport, color: "covenant" },
   VERSION_BREAKING_STORED: { icon: IconAlertTriangle, color: "orange" },
   RELEASE_LINE_UPDATED: { icon: IconSettings, color: "gray" },
+  TOADIE_LINKS_UPDATED: { icon: IconLink, color: "gray" },
 };
 
 const KNOWN_KINDS = new Set<string>(Object.keys(TYPE_META));

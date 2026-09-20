@@ -25,6 +25,7 @@ enum class NotificationType {
     VERSION_IMPORTED,
     VERSION_BREAKING_STORED,
     RELEASE_LINE_UPDATED,
+    TOADIE_LINKS_UPDATED,
 }
 
 /**

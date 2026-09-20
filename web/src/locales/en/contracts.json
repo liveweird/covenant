@@ -167,7 +167,8 @@
       "versionSourceSet": "Version {{version}}: source linked",
       "versionSourceCleared": "Version {{version}}: source unlinked",
       "versionSynced": "Version {{version}} synced from its source",
-      "releaseLineUpdated": "Release line {{major}}.x support policy updated ({{status}})"
+      "releaseLineUpdated": "Release line {{major}}.x support policy updated ({{status}})",
+      "toadieLinksUpdated": "Toadie API links updated"
     },
     "detail": {
       "name": "Name: {{name}}",

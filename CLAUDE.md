@@ -55,6 +55,16 @@ version is distinct from a line recommendation; defaults use UNSPECIFIED support
 permissions and rollout rules. The contract SPA exposes line summaries, policy editing,
 line-filtered versions and line-aware creation.
 
+### Toadie usage integration (0.10.0)
+
+The `toadie/` server package reads Toadie’s existing Port GraphQL API through ADMIN-curated
+connections with encrypted machine keys. Contract writers link one or more remote APIs;
+read-only usage shows provider/consumer services, systems and teams. Periodic/manual refresh
+preserves the last successful observation on failure. It never synchronizes authorization or
+infers version adoption. See `.claude/docs/toadie-integration.md` for mapping, transport,
+concurrency, cache semantics and deployment. The SPA adds Toadie connection administration
+and a Usage from Toadie panel on contract details.
+
 ### The contract standards (the domain reference)
 
 **`.claude/docs/contract-standards.md` is the local offline reference for the formats Covenant stores, validates and diffs** — OpenAPI 3.0 vs 3.1, AsyncAPI 2.6 vs 3.x, ODCS 3.x, JSON Schema 2020-12, Avro, SemVer 2.0 and how Covenant maps changes onto version bumps. Consult it when designing any contract feature instead of browsing; each section names the upstream source it snapshots — re-check upstream (and update the snapshot) when adding a validation rule. The official JSON Schemas the JVM validates against are vendored under `server/src/main/resources/schemas/` (its README records versions and origins; never hand-edit them).
@@ -242,3 +252,5 @@ ch.nokillswit
 ### Frontend (`web/`)
 
 See `web/CLAUDE.md` for the frontend conventions (flat directories, co-located tests, typed i18n with EN/PL parity, the transport layer, theming — purple is the interactive accent only; red = blocking, orange = waived finding, teal = success).
+
+@.claude/docs/toadie-integration.md

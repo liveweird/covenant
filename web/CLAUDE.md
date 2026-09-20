@@ -154,3 +154,14 @@ when it is absent from the first global page; never reject a backport merely bec
 version exists. Preserve explicitly edited values and seeded documents. Policy dates are
 advisory, END_OF_LIFE clears the explicit recommendation, and an empty/UNSPECIFIED line must
 not imply support or deployment. Shared domain rules live in `.claude/docs/release-lines.md`.
+
+## Toadie usage (0.10.0)
+
+Connection administration uses the existing registry/editor patterns. API keys are write-only;
+leaving the key blank on update retains it. Server and browser URLs are separate. The contract
+usage panel renders cached provider/consumer roles, systems and teams, explicitly unknown
+version/line, and per-connection freshness. Link editing and contract refresh require canWrite.
+Keep selected APIs across picker pages/searches, and preserve removable missing selections.
+A 202 refresh is accepted work: poll for completion and render failure/staleness without erasing
+last known usage. Missing/disconnected/never-synced is never a successful empty consumer list.
+Use only validated server-generated external links. Shared rules: `.claude/docs/toadie-integration.md`.

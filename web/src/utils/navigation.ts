@@ -1,8 +1,9 @@
 import type { ParseKeys } from "i18next";
-import { IconAlertTriangle, IconFileText, IconFolders, IconHistory, IconKey, IconPlugConnected, IconServer2, IconSitemap, IconToggleLeft, IconUsers, IconUsersGroup, IconWand, type Icon } from "@tabler/icons-react";
+import { IconAlertTriangle, IconBrandDatabricks, IconFileText, IconFolders, IconHistory, IconKey, IconPlugConnected, IconServer2, IconSitemap, IconToggleLeft, IconUsers, IconUsersGroup, IconWand, type Icon } from "@tabler/icons-react";
 import { contractsPath, errorsPath, hierarchyPath, inferContractPath } from "./contractLinks";
 import { teamsPath } from "./teamLinks";
 import { environmentsPath } from "./environmentLinks";
+import { toadieConnectionsPath } from "./toadieLinks";
 
 export type NavLeaf = {
   to: string;
@@ -50,6 +51,7 @@ const NAV_SECTIONS: ReadonlyArray<NavSection> = [
     items: [
       { to: "/users", label: "appShell.nav.users", icon: IconUsers, adminOnly: true },
       { to: "/feature-flags", label: "appShell.nav.featureFlags", icon: IconToggleLeft, adminOnly: true },
+      { to: toadieConnectionsPath, label: "appShell.nav.toadieConnections", icon: IconBrandDatabricks, adminOnly: true },
     ],
   },
 ];
