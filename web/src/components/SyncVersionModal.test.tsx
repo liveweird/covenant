@@ -51,7 +51,7 @@ describe("SyncVersionModal", () => {
     expect(bodyOf(findCall(mockFetch, "POST", "/api/v1/contracts/fetch"))).toEqual({ url: "https://raw.githubusercontent.com/acme/contracts/main/orders.yaml" });
     await userEvent.setup().click(screen.getByRole("button", { name: "Overwrite stored document" }));
     await waitFor(() => expect(findCall(mockFetch, "POST", "/api/v1/contracts/5/versions/11/sync")).toBeDefined());
-    expect(bodyOf(findCall(mockFetch, "POST", "/api/v1/contracts/5/versions/11/sync"))).toEqual({ content: REPO_COPY });
+    expect(bodyOf(findCall(mockFetch, "POST", "/api/v1/contracts/5/versions/11/sync"))).toEqual({ content: REPO_COPY, sourceUrl: SOURCE });
     await waitFor(() => expect(onSynced).toHaveBeenCalled());
     expect(onClose).toHaveBeenCalled();
   });
@@ -60,6 +60,28 @@ describe("SyncVersionModal", () => {
     serve(mockFetch, routes(CONTENT));
     renderModal(LINKED);
     expect(await screen.findByText("Covenant and the repository are in sync")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Overwrite stored document" })).toBeDisabled();
+  });
+
+  test("changing the source loads a new copy and sends the reference paired with that copy", async () => {
+    const nextSource = "https://example.test/next.yaml";
+    const nextCopy = REPO_COPY.replace("/orders", "/next-orders");
+    serve(mockFetch, routes(REPO_COPY));
+    const props = { contract: CONTRACT, onClose: vi.fn(), onSynced: vi.fn() };
+    const view = renderWithProviders(<SyncVersionModal {...props} version={LINKED} />);
+    expect(await screen.findByText("Changed in the repository")).toBeInTheDocument();
+    serve(mockFetch, routes(nextCopy));
+    view.rerender(<SyncVersionModal {...props} version={{ ...LINKED, sourceUrl: nextSource }} />);
+    await waitFor(() => expect(screen.getByRole("group", { name: "Changes between the stored document and the repository copy" })).toHaveTextContent("/next-orders"));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Overwrite stored document" }));
+    await waitFor(() => expect(findCall(mockFetch, "POST", "/api/v1/contracts/5/versions/11/sync")).toBeDefined());
+    expect(bodyOf(findCall(mockFetch, "POST", "/api/v1/contracts/5/versions/11/sync"))).toEqual({ content: nextCopy, sourceUrl: nextSource });
+  });
+
+  test("a failed repository check blocks confirmation instead of presenting an empty findings list", async () => {
+    serve(mockFetch, { ...routes(REPO_COPY), "POST /api/v1/contracts/versions/check": { status: 500, body: { detail: "unavailable" } } });
+    renderModal(LINKED);
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Overwrite stored document" })).toBeDisabled();
   });
 

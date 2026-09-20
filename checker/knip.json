@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["test/**/*.test.ts"],
+  "entry": ["src/check-child.ts", "test/**/*.test.ts", "test/fixtures/isolation-child.mjs"],
   "project": ["src/**", "test/**"],
   "ignoreDependencies": ["@stoplight/types"]
 }

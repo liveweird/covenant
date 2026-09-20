@@ -9,14 +9,14 @@ vi.mock("../components/LazyCodeEditor", async () => (await import("../test/codeE
 
 const editorValue = () => (screen.getByRole("textbox", { name: "Contract document" }) as HTMLTextAreaElement).value;
 
-function renderPage(route = "/contracts/5/versions/new") {
+function renderPage(route = "/contracts/5/versions/new", state?: unknown) {
   return renderWithProviders(
     <Routes>
       <Route path="/contracts/:id/versions/new" element={<NewVersion />} />
       <Route path="/contracts/:id/versions/:vid" element={<h2>Version page</h2>} />
       <Route path="/contracts/:id" element={<h2>Contract page</h2>} />
     </Routes>,
-    { route },
+    { route, state },
   );
 }
 
@@ -38,6 +38,13 @@ describe("NewVersion page", () => {
     "GET /api/v1/contracts/5/versions/11": { status: 200, body: VERSION },
     "POST /api/v1/contracts/versions/check": { status: 200, body: CLEAN_REPORT },
   };
+
+  test("an inferred document uses the selected catalog version from its handoff", async () => {
+    serve(mockFetch, base);
+    renderPage("/contracts/5/versions/new", { content: CONTENT, sourceUrl: null, version: "9.0.0" });
+    expect(await screen.findByLabelText("Version")).toHaveValue("9.0.0");
+    expect(await screen.findByRole("textbox", { name: "Contract document" })).toHaveValue(CONTENT);
+  });
 
   test("defaults to the next patch, bumps off the highest, validates the number, and copies ?from=", async () => {
     serve(mockFetch, base);

@@ -318,7 +318,7 @@ private fun Route.contractItem(
         contractService.authorizeWrite(caller, route.id)
         val request = sanitizedContractUpdate(call.receive())
         validateContractUpdate(request)
-        contractService.update(route.id, request).orNotFound("Contract")
+        contractService.update(route.id, request, caller).orNotFound("Contract")
         audit("contract.updated", "byUserId" to caller.userId.toLong(), "contractId" to route.id.toLong())
         activity.record(route.id, caller.userId, ContractEventType.UPDATED, mapOf("name" to request.name))
         call.respond(HttpStatusCode.NoContent)
@@ -328,7 +328,7 @@ private fun Route.contractItem(
         requireAdmin(caller)
         val request = call.receive<OwnerUpdateRequest>()
         val ownership = ownershipOf(request.ownerTeamId, request.ownerUserId)
-        val previous = contractService.transferOwner(route.parent.id, ownership).orNotFound("Contract")
+        val previous = contractService.transferOwner(route.parent.id, ownership, caller).orNotFound("Contract")
         audit(
             "contract.owner_changed",
             "byUserId" to caller.userId.toLong(),
@@ -345,7 +345,7 @@ private fun Route.contractItem(
     delete<ContractsRoute.Id> { route ->
         val caller = call.caller()
         contractService.authorizeWrite(caller, route.id)
-        contractService.delete(route.id).orNotFound("Contract")
+        contractService.delete(route.id, caller).orNotFound("Contract")
         audit("contract.deleted", "byUserId" to caller.userId.toLong(), "contractId" to route.id.toLong())
         // The deletion event lands in a history the API can no longer reach — kept for the record.
         activity.record(route.id, caller.userId, ContractEventType.DELETED)

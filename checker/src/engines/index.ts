@@ -1,11 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
-
-export interface EngineVersion {
-  name: string;
-  version: string;
-}
+import type { EngineVersion } from "../protocol.ts";
 
 const require = createRequire(import.meta.url);
 

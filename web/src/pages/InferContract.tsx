@@ -56,20 +56,24 @@ export default function InferContract() {
 
   const [name, setName] = useState("");
   const [version, setVersion] = useState<string | null>(null);
+  const [generatedMetadata, setGeneratedMetadata] = useState<{ name: string; version: string } | null>(null);
   const defaultVersion = existing ? (highest ? (bumpSemver(highest, "patch") ?? "1.0.0") : "1.0.0") : "1.0.0";
-  const effectiveVersion = version ?? defaultVersion;
+  const currentVersion = version ?? defaultVersion;
+  const currentName = existing ? (contract.data?.name ?? "") : name;
+  const effectiveVersion = generatedMetadata?.version ?? currentVersion;
+  const effectiveName = generatedMetadata?.name ?? currentName;
+  const inferenceVersion = effectiveVersion.trim() || "1.0.0";
 
   const [httpSamples, setHttpSamples] = useState<HttpExchangeSample[]>([]);
   const [messageSamples, setMessageSamples] = useState<MessageBatchSample[]>([]);
   const [relationSamples, setRelationSamples] = useState<RelationSample[]>([]);
 
-  const effectiveName = existing ? (contract.data?.name ?? "") : name;
   const infer = useMutation({
     mutationFn: () =>
       inferDocument({
         type,
         name: effectiveName.trim() || null,
-        version: effectiveVersion.trim() || null,
+        version: inferenceVersion,
         http: type === "OPENAPI" ? httpSamples : [],
         messages: type === "ASYNCAPI" ? messageSamples : [],
         relations: type === "ODCS" ? relationSamples : [],
@@ -77,15 +81,20 @@ export default function InferContract() {
   });
   const draft = infer.data;
 
-  // A stale draft/preview must never survive a type switch or an edit to the sample set it was
-  // generated from — every path that changes either resets the mutation, so "Open in editor"
-  // (disabled on `!draft`) reflects only a draft that matches the CURRENT type and samples.
+  function resetDraft() {
+    setGeneratedMetadata(null);
+    infer.reset();
+  }
+
+  // A stale draft/preview must never survive a type, metadata, or sample edit — every path that
+  // changes an inference input resets the mutation, so "Open in editor" (disabled on `!draft`)
+  // reflects only a draft generated from the values currently shown.
   function changeType(next: ContractType) {
     setTypeChoice(next);
     setHttpSamples([]);
     setMessageSamples([]);
     setRelationSamples([]);
-    infer.reset();
+    resetDraft();
   }
 
   const samples: readonly InferSample[] = type === "OPENAPI" ? httpSamples : type === "ASYNCAPI" ? messageSamples : relationSamples;
@@ -94,19 +103,27 @@ export default function InferContract() {
     if (type === "OPENAPI") setHttpSamples((prev) => [...prev, sample as HttpExchangeSample]);
     else if (type === "ASYNCAPI") setMessageSamples((prev) => [...prev, sample as MessageBatchSample]);
     else setRelationSamples((prev) => [...prev, sample as RelationSample]);
-    infer.reset();
+    resetDraft();
   }
   function removeSample(index: number) {
     if (type === "OPENAPI") setHttpSamples((prev) => prev.filter((_, i) => i !== index));
     else if (type === "ASYNCAPI") setMessageSamples((prev) => prev.filter((_, i) => i !== index));
     else setRelationSamples((prev) => prev.filter((_, i) => i !== index));
-    infer.reset();
+    resetDraft();
+  }
+
+  function generateDraft() {
+    // The server defaults a missing version to 1.0.0 inside the generated document. Reflect the
+    // same normalized value in the visible metadata and in the later editor handoff.
+    setGeneratedMetadata({ name: effectiveName, version: inferenceVersion });
+    if (!effectiveVersion.trim()) setVersion(inferenceVersion);
+    infer.mutate();
   }
 
   function openInEditor() {
     if (!draft) return;
     if (existing && id != null) {
-      const seeded: SeededDocument = { content: draft.content, sourceUrl: null };
+      const seeded: SeededDocument = { content: draft.content, sourceUrl: null, version: inferenceVersion };
       navigate(newVersionPath(id), { state: seeded });
     } else {
       const seeded: SeededDocument = { content: draft.content, sourceUrl: null, type };
@@ -125,6 +142,16 @@ export default function InferContract() {
       />
     );
   }
+  if (existing && (versions.isLoading || versions.isError || !versions.data)) {
+    return (
+      <EditPageLoadState
+        isLoading={versions.isLoading}
+        message={loadErrorMessage(versions.error, t)}
+        backTo={contractPath(id as number)}
+        backLabel={t("contracts.backToContract")}
+      />
+    );
+  }
 
   return (
     <Stack gap="md">
@@ -140,11 +167,23 @@ export default function InferContract() {
         <Stack gap="md">
           {!existing && <SegmentedControl value={typeChoice} onChange={(v) => changeType(v as ContractType)} data={[...CONTRACT_TYPES]} />}
           <Group align="flex-end" gap="sm" wrap="wrap">
-            <TextInput label={t("common.field.name")} value={effectiveName} onChange={(e) => setName(e.currentTarget.value)} disabled={existing} w={280} />
+            <TextInput
+              label={t("common.field.name")}
+              value={effectiveName}
+              onChange={(e) => {
+                setName(e.currentTarget.value);
+                resetDraft();
+              }}
+              disabled={existing}
+              w={280}
+            />
             <TextInput
               label={t("versions.field.version")}
               value={effectiveVersion}
-              onChange={(e) => setVersion(e.currentTarget.value)}
+              onChange={(e) => {
+                setVersion(e.currentTarget.value);
+                resetDraft();
+              }}
               ff="monospace"
               w={180}
             />
@@ -176,7 +215,7 @@ export default function InferContract() {
                 <HarUpload
                   onAdd={(exchanges) => {
                     setHttpSamples((prev) => [...prev, ...exchanges]);
-                    infer.reset();
+                    resetDraft();
                   }}
                 />
               </Tabs.Panel>
@@ -194,7 +233,7 @@ export default function InferContract() {
               <Text fw={600} size="sm">
                 {t("infer.preview.title")}
               </Text>
-              <Button leftSection={<IconWand size={16} />} onClick={() => infer.mutate()} loading={infer.isPending} disabled={samples.length === 0}>
+              <Button leftSection={<IconWand size={16} />} onClick={generateDraft} loading={infer.isPending} disabled={samples.length === 0}>
                 {t("infer.generate")}
               </Button>
             </Group>

@@ -19,7 +19,7 @@ import { showSuccessToast } from "../utils/toast";
 const SYNC_ERROR_KEYS = {
   forbidden: "contracts.saveForbidden",
   notFound: "versions.gone",
-  conflict: "versions.contentLocked",
+  conflict: "versions.sync.conflict",
   invalid: "versions.sync.invalid",
   failedStatus: "common.error.saveFailedStatus",
   failed: "common.error.saveFailedNetwork",
@@ -97,14 +97,15 @@ function SyncModalBody({
   // Keyed OUTSIDE the ["contracts"] prefix on purpose: the post-sync invalidation must never
   // re-trigger the server-side outbound fetch (or the check of the fetched copy).
   const repoFetch = useQuery({
-    queryKey: ["repoCopy", version.id],
-    queryFn: () => fetchContractUrl(normalizeSourceUrl(sourceUrl)),
+    queryKey: ["repoCopy", version.id, sourceUrl],
+    queryFn: async () => ({ content: await fetchContractUrl(normalizeSourceUrl(sourceUrl)), sourceUrl }),
     staleTime: 0,
     gcTime: 0,
   });
-  const repo = repoFetch.data ?? null;
+  const fetched = repoFetch.data ?? null;
+  const repo = fetched?.content ?? null;
   const repoCheck = useQuery({
-    queryKey: ["repoFindings", version.id],
+    queryKey: ["repoFindings", version.id, sourceUrl, repoFetch.dataUpdatedAt],
     queryFn: () => {
       // `enabled` gates but does not narrow — guard honestly instead of casting.
       if (repo == null) throw new Error("repo copy checked before it was fetched");
@@ -130,15 +131,17 @@ function SyncModalBody({
     ? loadErrorMessage(syncState.error, t)
     : repoFetch.isError
       ? saveErrorMessage(repoFetch.error, t, FETCH_URL_ERROR_KEYS)
-      : null;
+      : repoCheck.isError
+        ? loadErrorMessage(repoCheck.error, t)
+        : null;
   const ready = !loading && loadError == null && repo != null;
 
   async function onConfirm() {
-    if (repo == null) return;
+    if (fetched == null) return;
     onSyncingChange(true);
     setSyncError(null);
     try {
-      await syncVersion(contract.id, version.id, repo);
+      await syncVersion(contract.id, version.id, fetched.content, fetched.sourceUrl);
       showSuccessToast(t("versions.toast.synced"));
       onSyncingChange(false);
       onClose();
@@ -152,8 +155,8 @@ function SyncModalBody({
   }
 
   function onNewVersion() {
-    if (repo == null) return;
-    const seeded: SeededDocument = { content: repo, sourceUrl };
+    if (fetched == null) return;
+    const seeded: SeededDocument = { content: fetched.content, sourceUrl: fetched.sourceUrl };
     onClose();
     navigate(newVersionPath(contract.id, version.id), { state: seeded });
   }

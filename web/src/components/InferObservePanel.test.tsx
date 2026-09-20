@@ -92,4 +92,64 @@ describe("InferObservePanel", () => {
     await user.click(await screen.findByRole("option", { name: "billing / prod" }));
     await waitFor(() => expect(select).toHaveValue("billing / prod"));
   });
+
+  test("switching environments clears a completed capture from the previous environment", async () => {
+    serve(mockFetch, {
+      "GET /api/v1/environments?": { status: 200, body: { items: [HTTP_ENV, OTHER_SYSTEM_HTTP_ENV], page: 1, pageSize: 100, total: 2 } },
+      "POST /api/v1/contracts/infer/observe/http": { status: 200, body: { sample: { method: "GET", path: "/orders", status: 200 }, notes: [] } },
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<InferObservePanel type="OPENAPI" systemId={null} onAdd={vi.fn()} />);
+    await user.type(await screen.findByLabelText("Path"), "/orders");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("Answered with status 200")).toBeInTheDocument();
+    const select = screen.getByRole("combobox", { name: "Environment" });
+    await user.click(select);
+    await user.click(await screen.findByRole("option", { name: "billing / prod" }));
+    expect(screen.queryByText("Answered with status 200")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add to samples" })).not.toBeInTheDocument();
+  });
+
+  test("capture notes are visible and editing an input clears the captured result", async () => {
+    serve(mockFetch, {
+      "GET /api/v1/environments?": { status: 200, body: { items: [HTTP_ENV], page: 1, pageSize: 100, total: 1 } },
+      "POST /api/v1/contracts/infer/observe/http": {
+        status: 200,
+        body: { sample: { method: "GET", path: "/large", status: 200 }, notes: [{ severity: "INFO", source: "INFERENCE", code: "BODY_SKIPPED", message: "The oversized response body was skipped" }] },
+      },
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<InferObservePanel type="OPENAPI" systemId={7} onAdd={vi.fn()} />);
+    const path = await screen.findByLabelText("Path");
+    await user.type(path, "/large");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("The oversized response body was skipped")).toBeInTheDocument();
+    await user.type(path, "/changed");
+    expect(screen.queryByText("The oversized response body was skipped")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add to samples" })).not.toBeInTheDocument();
+  });
+
+  test("environment and relation prerequisite failures render inline", async () => {
+    serve(mockFetch, { "GET /api/v1/environments?": { status: 500, body: { title: "Internal Server Error", status: 500 } } });
+    const first = renderWithProviders(<InferObservePanel type="OPENAPI" systemId={7} onAdd={vi.fn()} />);
+    expect(screen.getByLabelText("Loading…")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Environment" })).not.toBeInTheDocument();
+    expect(await screen.findByText("Could not load environments")).toBeInTheDocument();
+    expect(screen.getByText("Load failed (500)")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Environment" })).not.toBeInTheDocument();
+    first.unmount();
+
+    mockFetch.mockReset();
+    serve(mockFetch, {
+      "GET /api/v1/environments?": { status: 200, body: { items: [PG_ENV], page: 1, pageSize: 100, total: 1 } },
+      "POST /api/v1/contracts/infer/observe/sql/relations": { status: 500, body: { title: "Internal Server Error", status: 500 } },
+    });
+    renderWithProviders(<InferObservePanel type="ODCS" systemId={7} onAdd={vi.fn()} />);
+    expect(await screen.findByRole("combobox", { name: "Environment" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Loading…")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Dataset" })).not.toBeInTheDocument();
+    expect(await screen.findByText("Could not load database relations")).toBeInTheDocument();
+    expect(screen.getByText("Load failed (500)")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Dataset" })).not.toBeInTheDocument();
+  });
 });

@@ -69,6 +69,8 @@
     "method": "Metoda",
     "run": "Wyślij",
     "describe": "Opisz",
+    "environmentsFailed": "Nie udało się wczytać środowisk",
+    "relationsFailed": "Nie udało się wczytać relacji bazy danych",
     "addToSamples": "Dodaj do próbek",
     "credentialsHint": "Dane uwierzytelniające wpisane tutaj są wysyłane jednorazowo i nigdy nie są zapisywane.",
     "http": {

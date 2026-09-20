@@ -18,7 +18,7 @@ test("invalid credentials are rejected", async ({ page }) => {
 });
 
 test("a deep link is guarded and lands back after signing in", async ({ page }) => {
-  await page.goto("/some/deep/path");
+  await page.goto("/some/deep/path?tab=history#details");
   // Anonymous → bounced to the sign-in form.
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
 
@@ -26,6 +26,7 @@ test("a deep link is guarded and lands back after signing in", async ({ page }) 
   await page.getByRole("textbox", { name: "Password" }).fill("changeme");
   await page.getByRole("button", { name: "Sign in" }).click();
 
+  await expect(page).toHaveURL(/\/some\/deep\/path\?tab=history#details$/);
   // Back at the requested path — inside the shell it renders the not-found page (no blank).
   await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
   await expect(accountMenu(page)).toBeVisible();

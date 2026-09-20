@@ -965,6 +965,7 @@ export interface paths {
          *     `allowInvalid=true` (the editor's Save-anyway; the findings are re-obtainable through
          *     `POST /contracts/versions/check`). The check report is stored with the text; the
          *     response carries content and findings. Documents above 2 MiB are `413`.
+         *     A changed ACTIVE baseline during checking returns `409`; retry with fresh state.
          */
         post: operations["createContractVersion"];
         delete?: never;
@@ -1015,7 +1016,7 @@ export interface paths {
         get: operations["getContractVersionContent"];
         /**
          * Replace the document of a DRAFT/PROPOSED version
-         * @description Writers only. `409` from ACTIVE on (the document is read-only — add a version). The same HARD/SOFT gate and `allowInvalid` waiver as create; answers the fresh version (the findings are the product of the save).
+         * @description Writers only. `409` from ACTIVE on (the document is read-only — add a version). The same HARD/SOFT gate and `allowInvalid` waiver as create; answers the fresh version (the findings are the product of the save). A lifecycle or ACTIVE-baseline change during checking also returns `409`. Concurrent content edits remain last-write-wins.
          */
         put: operations["updateContractVersionContent"];
         post?: never;
@@ -1041,6 +1042,7 @@ export interface paths {
          * Move the version along its lifecycle
          * @description Writers only. DRAFT → PROPOSED, PROPOSED → DRAFT | ACTIVE, ACTIVE → DEPRECATED,
          *     DEPRECATED → RETIRED; anything else is `409`. Several ACTIVE versions may coexist.
+         *     Refreshes the local ODCS status-mismatch finding without rerunning the checker.
          */
         post: operations["transitionContractVersion"];
         delete?: never;
@@ -1063,7 +1065,7 @@ export interface paths {
         put?: never;
         /**
          * Re-run the checks on the stored document
-         * @description Writers only — the recovery after a checker outage (`checkComplete = false`). Stores the fresh report; the text is untouched.
+         * @description Writers only — the recovery after a checker outage (`checkComplete = false`). Stores the fresh report; the text is untouched. Returns 409 if content, lifecycle or the ACTIVE baseline changed while checking.
          */
         post: operations["recheckContractVersion"];
         delete?: never;
@@ -1120,8 +1122,9 @@ export interface paths {
          *     confirmed the diff; the server runs the whole check pipeline on the repo copy, ALWAYS
          *     waives soft findings (the import posture — the repo is the source of truth; HARD findings
          *     stay a `400`), stores the text and stamps `lastSyncedAt = updatedAt` with the text as the
-         *     new baseline. `409` when the lifecycle locks the text, `400` when the version has no
-         *     reference. Recorded in the history even when the copy matched: pulling it is the act.
+         *     new baseline. `409` when the lifecycle locks the text or the lifecycle, source reference
+         *     or ACTIVE baseline changed during checking; `400` when the version has no reference.
+         *     Send `sourceUrl` to also detect source changes since the client fetched the document. Recorded in the history even when the copy matched: pulling it is the act.
          */
         post: operations["syncContractVersion"];
         delete?: never;
@@ -1864,14 +1867,14 @@ export interface components {
             securityProtocol: components["schemas"]["KafkaSecurityProtocol"];
             saslMechanism?: components["schemas"]["KafkaSaslMechanism"] | null;
             username?: string | null;
-            /** @description Write-only. Absent on a PUT keeps the stored password. */
+            /** @description Write-only. Absent, null or empty on a PUT keeps the stored password; an explicit non-empty string replaces it. Removing the target clears its stored credentials. */
             password?: string | null;
         };
         PostgresTargetRequest: {
             /** @description `jdbc:postgresql://host:port/db`, parameters limited to ssl, sslmode, currentSchema, ApplicationName. Give the try-it feature a READ-ONLY role. */
             jdbcUrl: string;
             username: string;
-            /** @description Write-only. Absent on a PUT keeps the stored password. */
+            /** @description Write-only. Absent, null or empty on a PUT keeps the stored password; an explicit non-empty string replaces it. Removing the target clears its stored credentials. */
             password?: string | null;
         };
         EnvironmentRequest: {
@@ -2924,6 +2927,8 @@ export interface components {
         SyncRequest: {
             /** @description The repo copy's raw text, at most 2 MiB (fetched client-side through POST /contracts/fetch). */
             content: string;
+            /** @description Expected stored reference from which the caller fetched content. A mismatch returns 409. Omitted by legacy clients; omission only protects against source changes during server processing. */
+            sourceUrl?: string | null;
         };
         VersionContentRequest: {
             content: string;
@@ -3058,7 +3063,7 @@ export interface components {
         HttpExchangeSample: {
             /** @description GET, PUT, POST, DELETE, OPTIONS, HEAD or PATCH. */
             method: string;
-            /** @description An absolute http(s) URL (its origin becomes a servers[] entry) or a bare '/path'. */
+            /** @description An absolute http(s) URL (its origin becomes a servers[] entry) or a bare '/path'. Must be a concrete path, without template braces (including percent-encoded braces). */
             url: string;
             /** @description Values feed type inference only — never written into the document. */
             query?: components["schemas"]["StringMap"];
@@ -3161,7 +3166,7 @@ export interface components {
         RelationListResponse: {
             relations: components["schemas"]["RelationSummary"][];
         };
-        /** @description RFC 7807 problem detail. Served as `application/problem+json`. */
+        /** @description RFC 7807 problem detail. Served as `application/problem+json`; instance is the request path without query parameters. */
         ProblemDetail: {
             /**
              * @description A URI reference identifying the problem type.
@@ -3173,12 +3178,21 @@ export interface components {
             /** @description HTTP status code. */
             status: number;
             /** @description Human-readable explanation specific to this occurrence. */
-            detail?: string;
+            detail: string;
             /** @description URI reference of the specific occurrence (the request path). */
-            instance?: string;
+            instance: string;
         };
     };
     responses: {
+        /** @description Request body must use application/json. A missing body or Content-Type remains a 400. */
+        UnsupportedMediaType: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["ProblemDetail"];
+            };
+        };
         /** @description Malformed request */
         BadRequest: {
             headers: {
@@ -3376,6 +3390,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            415: components["responses"]["UnsupportedMediaType"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
             /** @description MFA is enabled for the account but this deployment cannot send email */
@@ -3413,6 +3428,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            415: components["responses"]["UnsupportedMediaType"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
         };
@@ -3441,6 +3457,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            415: components["responses"]["UnsupportedMediaType"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
         };
@@ -3466,6 +3483,7 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -3490,6 +3508,7 @@ export interface operations {
                 content?: never;
             };
             400: components["responses"]["BadRequest"];
+            415: components["responses"]["UnsupportedMediaType"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
             /** @description This deployment cannot send email (password reset unavailable) */
@@ -3583,6 +3602,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
             413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -3640,6 +3660,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -3711,6 +3732,7 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -3748,6 +3770,7 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -3793,6 +3816,7 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -3861,6 +3885,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
             413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -3917,6 +3942,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -4063,6 +4089,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
             413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -4119,6 +4146,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -4213,6 +4241,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
             413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -4269,6 +4298,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -4363,6 +4393,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
             413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -4419,6 +4450,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -4521,6 +4553,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
             413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -4700,6 +4733,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -4728,6 +4762,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -4756,6 +4791,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -4783,6 +4819,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
             502: components["responses"]["BadGateway"];
         };
@@ -4840,6 +4877,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -4895,6 +4933,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -5036,6 +5075,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -5157,6 +5197,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -5190,6 +5231,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -5218,6 +5260,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -5248,6 +5291,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -5309,6 +5353,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -5668,6 +5713,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
             502: components["responses"]["BadGateway"];
@@ -5701,6 +5747,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            415: components["responses"]["UnsupportedMediaType"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
             502: components["responses"]["BadGateway"];
@@ -5736,6 +5783,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
             502: components["responses"]["BadGateway"];
@@ -5769,6 +5817,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            415: components["responses"]["UnsupportedMediaType"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
             502: components["responses"]["BadGateway"];
@@ -5799,6 +5848,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -5828,6 +5878,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
             502: components["responses"]["BadGateway"];
@@ -5858,6 +5909,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            415: components["responses"]["UnsupportedMediaType"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
             502: components["responses"]["BadGateway"];
@@ -5888,6 +5940,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            415: components["responses"]["UnsupportedMediaType"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
             502: components["responses"]["BadGateway"];
@@ -5918,6 +5971,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            415: components["responses"]["UnsupportedMediaType"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
             502: components["responses"]["BadGateway"];

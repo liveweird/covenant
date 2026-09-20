@@ -130,8 +130,8 @@ export async function setVersionSource(contractId: number, versionId: number, so
  * The repo → Covenant overwrite with the copy the client fetched: the server waives soft findings
  * itself (the import posture — no Save-anyway here), a HARD finding or a locked lifecycle rejects.
  */
-export async function syncVersion(contractId: number, versionId: number, content: string): Promise<VersionResponse> {
-  return jsonRequest<VersionResponse>(`/api/v1/contracts/${contractId}/versions/${versionId}/sync`, { method: "POST", body: JSON.stringify({ content }) });
+export async function syncVersion(contractId: number, versionId: number, content: string, sourceUrl?: string): Promise<VersionResponse> {
+  return jsonRequest<VersionResponse>(`/api/v1/contracts/${contractId}/versions/${versionId}/sync`, { method: "POST", body: JSON.stringify({ content, sourceUrl }) });
 }
 
 /** The live check — findings-so-far for an in-progress document; never a 400 for document problems. */

@@ -50,7 +50,7 @@ export default function NewVersion() {
   });
   const highest = versions.data?.items[0]?.version ?? null;
 
-  const [version, setVersion] = useState<string | null>(null);
+  const [version, setVersion] = useState<string | null>(seeded?.version ?? null);
   const [content, setContent] = useState<string | null>(seeded?.content ?? null);
   // The text as fetched from its URL: the create carries the reference only while the text is
   // still that copy byte for byte — an edited fetch is no longer "the repo copy right now".

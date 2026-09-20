@@ -9,7 +9,12 @@ import { consumeSignedOut, notifyAuthChange } from "../auth";
 import AuthCard from "../components/AuthCard";
 import { MAX_EMAIL_LENGTH } from "../utils/userForm";
 
-type LocationState = { from?: { pathname?: string } } | null;
+type LocationState = { from?: { pathname?: string; search?: string; hash?: string } } | null;
+
+function destination(state: LocationState): string {
+  const from = state?.from;
+  return from?.pathname ? `${from.pathname}${from.search ?? ""}${from.hash ?? ""}` : "/";
+}
 
 export default function Login() {
   const { t } = useTranslation();
@@ -32,8 +37,7 @@ export default function Login() {
 
   function finishSignIn() {
     notifyAuthChange();
-    const from = (location.state as LocationState)?.from?.pathname;
-    navigate(from ?? "/", { replace: true });
+    navigate(destination(location.state as LocationState), { replace: true });
   }
 
   async function onSubmit(values: { email: string; password: string }) {

@@ -1,9 +1,21 @@
 import { describe, expect, test } from "vitest";
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, useLocation } from "react-router-dom";
 import { renderWithProviders, screen } from "./test/render";
 import { RedirectIfAuthed, RequireAdmin, RequireAuth, consumeSignedOut, flagSignedOut } from "./auth";
 
 const TOKEN_KEY = "covenant.auth.token";
+
+function LocationProbe() {
+  const location = useLocation();
+  return (
+    <div
+      data-testid="location"
+      data-pathname={location.pathname}
+      data-search={location.search}
+      data-hash={location.hash}
+    />
+  );
+}
 
 function TestRoutes() {
   return (
@@ -12,6 +24,7 @@ function TestRoutes() {
       <Route element={<RequireAuth />}>
         <Route path="/" element={<div>home page</div>} />
         <Route path="/secret" element={<div>secret page</div>} />
+        <Route path="/contracts/:id/diff" element={<LocationProbe />} />
         <Route element={<RequireAdmin />}>
           <Route path="/admin-only" element={<div>admin page</div>} />
         </Route>
@@ -42,6 +55,24 @@ describe("route guards", () => {
       { route: "/login" },
     );
     expect(screen.getByText("home page")).toBeInTheDocument();
+  });
+
+  test("RedirectIfAuthed preserves the saved destination's query string and hash", () => {
+    localStorage.setItem(TOKEN_KEY, "token");
+    renderWithProviders(
+      <Routes>
+        <Route path="/login" element={<RedirectIfAuthed><div>login page</div></RedirectIfAuthed>} />
+        <Route path="/contracts/:id/diff" element={<LocationProbe />} />
+      </Routes>,
+      {
+        route: "/login",
+        state: { from: { pathname: "/contracts/5/diff", search: "?from=10&to=11", hash: "#compatibility" } },
+      },
+    );
+    const destination = screen.getByTestId("location");
+    expect(destination).toHaveAttribute("data-pathname", "/contracts/5/diff");
+    expect(destination).toHaveAttribute("data-search", "?from=10&to=11");
+    expect(destination).toHaveAttribute("data-hash", "#compatibility");
   });
 
   test("RequireAdmin sends a regular user home and renders the outlet for an admin", () => {

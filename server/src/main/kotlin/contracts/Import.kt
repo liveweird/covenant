@@ -6,6 +6,7 @@ import ch.nokillswit.plugins.isUniqueViolation
 import io.ktor.server.plugins.BadRequestException
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
+import org.jetbrains.exposed.v1.r2dbc.transactions.suspendTransaction
 
 /**
  * Import (`POST /contracts/import`, dry-run `POST /contracts/import/check`): each item is one
@@ -81,7 +82,6 @@ data class ImportResponse(val results: List<ImportItemResult>)
 class ContractImporter(
     private val contracts: ContractService,
     private val versions: ContractVersionService,
-    private val checks: ch.nokillswit.contracts.checks.ChecksService,
 ) {
     suspend fun run(request: ImportRequest, caller: CallerPrincipal, store: Boolean): List<ImportItemResult> {
         // The dry run must predict intra-batch duplicates the way the real run would hit them.
@@ -107,12 +107,35 @@ class ContractImporter(
             val rejection =
                 if (existingId != null) rejectExisting(base, item, semver, existingId, caller) else rejectNew(item, caller, seenBefore)
             if (rejection != null) return rejection
+            sanitizedSourceUrl(item.sourceUrl)
+            if (existingId == null && !seenBefore) {
+                contracts.validateCreate(
+                    ContractCreateRequest(
+                        item.systemId, item.type, item.name, item.description, item.ownerTeamId, item.ownerUserId,
+                    ),
+                    caller,
+                )
+            }
             // The check runs in both modes: the dry run reports the findings it WOULD store — the
             // breaking-change baseline included, when the contract already has an ACTIVE version.
-            val baseline = existingId?.let { versions.baselineFor(it, semver) }
-            val report = checks.check(
-                item.type, item.content, declaredVersion = item.version, lifecycle = Lifecycle.DRAFT, baseline = baseline,
+            val prepared = versions.prepare(
+                existingId,
+                item.type,
+                VersionCreateRequest(item.version, item.content, item.sourceUrl),
             )
+            val report = prepared.report
+            if (store) {
+                if (existingId != null) {
+                    contracts.authorizeWrite(caller, existingId)
+                } else {
+                    contracts.validateCreate(
+                        ContractCreateRequest(
+                            item.systemId, item.type, item.name, item.description, item.ownerTeamId, item.ownerUserId,
+                        ),
+                        caller,
+                    )
+                }
+            }
             if (report.hardFindings.isNotEmpty()) {
                 return base.copy(status = ImportStatus.INVALID, message = report.hardFindings.joinToString("; ") { it.message })
             }
@@ -126,7 +149,7 @@ class ContractImporter(
                 message = report.softErrors.takeIf { it.isNotEmpty() }?.joinToString("; ") { "${it.code}: ${it.message}" },
             )
             seen.add(key)
-            if (store) store(predicted, item, existingId, caller) else predicted
+            if (store) store(predicted, item, existingId, caller, prepared) else predicted
         } catch (e: CancellationException) {
             throw e
         } catch (e: ForbiddenException) {
@@ -151,11 +174,11 @@ class ContractImporter(
         existingId: UInt,
         caller: CallerPrincipal,
     ): ImportItemResult? {
+        contracts.authorizeWrite(caller, existingId)
         val type = contracts.typeOf(existingId)
         if (type != item.type) {
             return base.copy(status = ImportStatus.INVALID, message = "The existing contract is $type, not ${item.type}")
         }
-        contracts.authorizeWrite(caller, existingId)
         if (versions.exists(existingId, item.version)) return base.copy(status = ImportStatus.CONFLICT, message = ALREADY_EXISTS)
         val top = versions.highestOf(existingId)
         if (top != null && semver <= top) {
@@ -176,19 +199,39 @@ class ContractImporter(
         return null
     }
 
-    private suspend fun store(predicted: ImportItemResult, item: ImportItem, existingId: UInt?, caller: CallerPrincipal): ImportItemResult {
-        val contractId = existingId ?: contracts.create(
-            ContractCreateRequest(item.systemId, item.type, item.name, item.description, item.ownerTeamId, item.ownerUserId),
-            caller,
+    private suspend fun store(
+        predicted: ImportItemResult,
+        item: ImportItem,
+        existingId: UInt?,
+        caller: CallerPrincipal,
+        prepared: PreparedVersion,
+    ): ImportItemResult = suspendTransaction(versions.database) {
+        val contractId = if (existingId != null) {
+            contracts.requireCurrentWriter(caller, existingId)
+            if (contracts.findActiveId(item.systemId, item.name) != existingId || contracts.typeOf(existingId) != item.type) {
+                throw ch.nokillswit.authz.ConflictException("The target contract changed underneath you — reload and retry")
+            }
+            existingId
+        } else {
+            contracts.create(
+                ContractCreateRequest(item.systemId, item.type, item.name, item.description, item.ownerTeamId, item.ownerUserId),
+                caller,
+            )
+        }
+        contracts.requireCurrentWriter(caller, contractId)
+        val saved = versions.insertPrepared(contractId, prepared, caller.userId, allowInvalid = true)
+        val report = prepared.report
+        predicted.copy(
+            status = statusOf(existingId != null, report.softErrors.isNotEmpty()),
+            contractId = contractId,
+            versionId = saved.response.id,
+            errors = saved.response.checkErrors,
+            warnings = saved.response.checkWarnings,
+            breaking = saved.response.findings.any {
+                it.code == ch.nokillswit.contracts.checks.BreakingChanges.CODE_WITHOUT_MAJOR_BUMP
+            },
+            message = saved.waived.takeIf { it.isNotEmpty() }?.joinToString("; ") { "${it.code}: ${it.message}" },
         )
-        val saved = versions.create(
-            contractId,
-            item.type,
-            VersionCreateRequest(item.version, item.content, item.sourceUrl),
-            caller.userId,
-            allowInvalid = true,
-        )
-        return predicted.copy(contractId = contractId, versionId = saved.response.id)
     }
 
     private fun statusOf(added: Boolean, withFindings: Boolean) = when {

@@ -189,9 +189,12 @@ private fun validateBody(body: String?, contentType: String?, label: String, whi
 }
 
 private fun isPathOrAbsoluteUrl(url: String): Boolean {
-    if (url.startsWith("/")) return true
     val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return false
-    return (uri.scheme == "http" || uri.scheme == "https") && uri.host != null
+    // Samples represent actual exchanges, never path templates. Check the decoded path too:
+    // an encoded brace otherwise becomes a template after URI.path is read by the builder.
+    if (uri.path == null || uri.path.any { it == '{' || it == '}' }) return false
+    return if (url.startsWith("/")) uri.rawAuthority == null
+    else (uri.scheme == "http" || uri.scheme == "https") && uri.host != null
 }
 
 private fun validateMessageSamples(messages: List<MessageBatchSample>) {

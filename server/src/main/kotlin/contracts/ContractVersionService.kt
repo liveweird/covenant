@@ -1,5 +1,6 @@
 package ch.nokillswit.contracts
 
+import ch.nokillswit.authz.CallerPrincipal
 import ch.nokillswit.authz.ConflictException
 import ch.nokillswit.authz.NotFoundException
 import ch.nokillswit.contracts.checks.Baseline
@@ -67,7 +68,11 @@ internal fun Query.applySemverPaging(req: PageRequest, columns: Map<String, Colu
 /** What a store path produced: the row's fresh response plus what it waived (for the audit). */
 data class VersionSaveResult(val response: VersionResponse, val waived: List<Finding>)
 
-class ContractVersionService(private val database: R2dbcDatabase, private val checks: ChecksService) {
+class ContractVersionService(
+    internal val database: R2dbcDatabase,
+    private val checks: ChecksService,
+    private val contracts: ContractService,
+) {
     object ContractVersions : UIntIdTable("contract_versions"), SoftDeletable {
         val contractId = reference("contract_id", ContractService.Contracts)
         val version = varchar("version", length = SemVer.MAX_LENGTH)
@@ -122,58 +127,86 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
         contractId: UInt,
         type: ContractType,
         request: VersionCreateRequest,
-        createdBy: UInt,
+        caller: CallerPrincipal,
         allowInvalid: Boolean,
     ): VersionSaveResult {
         val semver = SemVer.parse(request.version)
         val source = sanitizedSourceUrl(request.sourceUrl) // re-checked service-side too
-        val baseline = baselineFor(contractId, semver)
+        val baseline = baselineRowFor(contractId, semver)
         val report = checks.check(
-            type, request.content, declaredVersion = request.version, lifecycle = Lifecycle.DRAFT, baseline = baseline,
+            type, request.content, declaredVersion = request.version, lifecycle = Lifecycle.DRAFT, baseline = baseline?.baseline,
         )
-        val waived = requireOrWaive(report, allowInvalid)
+        val prepared = PreparedVersion(request, semver, source, report, baseline)
         return suspendTransaction(database) {
-            requireContract(contractId)
-            // The exact duplicate is the 409 (the row exists, ahead of the partial index); anything
-            // else at or below the top is the 400 the SemVer rule owns.
-            if (versionExists(contractId, request.version)) throw ConflictException("Version ${request.version} already exists")
-            highest(contractId)?.let { top ->
-                if (semver <= top) throw BadRequestException(
-                    "Version ${request.version} must be greater than the highest existing version $top",
-                )
-            }
-            val stamp = nowMillis()
-            val id = ContractVersions.insert {
-                it[ContractVersions.contractId] = contractId
-                it[version] = request.version
-                it[semverMajor] = semver.major
-                it[semverMinor] = semver.minor
-                it[semverPatch] = semver.patch
-                it[semverPrerelease] = semver.prerelease
-                it[lifecycle] = Lifecycle.DRAFT.name
-                it[format] = report.format!!.name
-                it[content] = request.content
-                it[contentSha256] = sha256(request.content)
-                it[docTitle] = report.title
-                it[docDescription] = report.description
-                it[specVersion] = report.specVersion
-                it[findings] = json.encodeToString(findingsSerializer, report.findings)
-                it[checkErrors] = report.errors
-                it[checkWarnings] = report.warnings
-                it[checkInfos] = report.infos
-                it[checkComplete] = report.checkerAvailable
-                it[checkedAt] = stamp
-                it[ContractVersions.createdBy] = createdBy
-                it[createdAt] = stamp
-                it[updatedAt] = stamp
-                // A text pulled from its repo copy is, right now, in sync with it.
-                it[sourceUrl] = source
-                it[lastSyncedAt] = if (source != null) stamp else 0
-                it[syncedContent] = if (source != null) request.content else null
-            }[ContractVersions.id].value
-            recomputeLatest(contractId)
-            VersionSaveResult(rowOf(contractId, id)!!.toResponse(), waived)
+            contracts.requireCurrentWriter(caller, contractId)
+            insertPrepared(contractId, prepared, caller.userId, allowInvalid)
         }
+    }
+
+    /** Runs the slow checker once; the returned baseline identity must still match at insertion. */
+    internal suspend fun prepare(
+        contractId: UInt?,
+        type: ContractType,
+        request: VersionCreateRequest,
+    ): PreparedVersion {
+        val semver = SemVer.parse(request.version)
+        val source = sanitizedSourceUrl(request.sourceUrl)
+        val baseline = contractId?.let { baselineRowFor(it, semver) }
+        val report = checks.check(
+            type, request.content, declaredVersion = request.version, lifecycle = Lifecycle.DRAFT, baseline = baseline?.baseline,
+        )
+        return PreparedVersion(request, semver, source, report, baseline)
+    }
+
+    /** Caller owns the surrounding transaction and has already locked/authorized the parent. */
+    internal suspend fun insertPrepared(
+        contractId: UInt,
+        prepared: PreparedVersion,
+        createdBy: UInt,
+        allowInvalid: Boolean,
+    ): VersionSaveResult {
+        if (baselineRowFor(contractId, prepared.semver) != prepared.baseline) staleContext()
+        if (versionExists(contractId, prepared.request.version)) {
+            throw ConflictException("Version ${prepared.request.version} already exists")
+        }
+        highest(contractId)?.let { top ->
+            if (prepared.semver <= top) throw BadRequestException(
+                "Version ${prepared.request.version} must be greater than the highest existing version $top",
+            )
+        }
+        val waived = requireOrWaive(prepared.report, allowInvalid)
+        val stamp = nowMillis()
+        val report = prepared.report
+        val request = prepared.request
+        val id = ContractVersions.insert {
+            it[ContractVersions.contractId] = contractId
+            it[version] = request.version
+            it[semverMajor] = prepared.semver.major
+            it[semverMinor] = prepared.semver.minor
+            it[semverPatch] = prepared.semver.patch
+            it[semverPrerelease] = prepared.semver.prerelease
+            it[lifecycle] = Lifecycle.DRAFT.name
+            it[format] = report.format!!.name
+            it[content] = request.content
+            it[contentSha256] = sha256(request.content)
+            it[docTitle] = report.title
+            it[docDescription] = report.description
+            it[specVersion] = report.specVersion
+            it[findings] = json.encodeToString(findingsSerializer, report.findings)
+            it[checkErrors] = report.errors
+            it[checkWarnings] = report.warnings
+            it[checkInfos] = report.infos
+            it[checkComplete] = report.checkerAvailable
+            it[checkedAt] = stamp
+            it[ContractVersions.createdBy] = createdBy
+            it[createdAt] = stamp
+            it[updatedAt] = stamp
+            it[sourceUrl] = prepared.source
+            it[lastSyncedAt] = if (prepared.source != null) stamp else 0
+            it[syncedContent] = if (prepared.source != null) request.content else null
+        }[ContractVersions.id].value
+        recomputeLatest(contractId)
+        return VersionSaveResult(rowOf(contractId, id)!!.toResponse(), waived)
     }
 
     /** Replaces the text of a DRAFT/PROPOSED version (409 otherwise); the same HARD/SOFT gate as create. */
@@ -182,8 +215,9 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
         versionId: UInt,
         type: ContractType,
         content: String,
+        caller: CallerPrincipal,
         allowInvalid: Boolean,
-    ): VersionSaveResult = storeContent(contractId, versionId, type, content, allowInvalid, sync = false)
+    ): VersionSaveResult = storeContent(contractId, versionId, type, content, caller, allowInvalid, sync = false, expectedSourceUrl = null)
 
     /**
      * The repo → Covenant sync: the repo copy (fetched client-side through the guarded
@@ -191,8 +225,16 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
      * ALWAYS waived (the import posture — the repo is the source of truth), HARD ones stay a 400,
      * the lifecycle lock stays a 409, and a version without a reference is a 400.
      */
-    suspend fun sync(contractId: UInt, versionId: UInt, type: ContractType, content: String): VersionSaveResult =
-        storeContent(contractId, versionId, type, content, allowInvalid = true, sync = true)
+    suspend fun sync(
+        contractId: UInt,
+        versionId: UInt,
+        type: ContractType,
+        content: String,
+        caller: CallerPrincipal,
+        expectedSourceUrl: String?,
+    ): VersionSaveResult = storeContent(
+        contractId, versionId, type, content, caller, allowInvalid = true, sync = true, expectedSourceUrl = expectedSourceUrl,
+    )
 
     /**
      * Sets or clears the version's repo reference (any lifecycle — a reference is metadata, not
@@ -200,7 +242,13 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
      * from) and never bumps `updatedAt` (that signal means "text edited since the sync").
      * Returns the change, or null for a missing version.
      */
-    suspend fun updateSource(contractId: UInt, versionId: UInt, sourceUrl: String?): SourceChange? = suspendTransaction(database) {
+    suspend fun updateSource(
+        contractId: UInt,
+        versionId: UInt,
+        sourceUrl: String?,
+        caller: CallerPrincipal,
+    ): SourceChange? = suspendTransaction(database) {
+        contracts.requireCurrentWriter(caller, contractId)
         val next = sanitizedSourceUrl(sourceUrl) // re-checked service-side too
         val row = rowOf(contractId, versionId) ?: return@suspendTransaction null
         val previous = row[ContractVersions.sourceUrl]
@@ -225,8 +273,10 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
         versionId: UInt,
         type: ContractType,
         content: String,
+        caller: CallerPrincipal,
         allowInvalid: Boolean,
         sync: Boolean,
+        expectedSourceUrl: String?,
     ): VersionSaveResult {
         val current = suspendTransaction(
             database,
@@ -234,11 +284,28 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
         if (!current.lifecycle.contentEditable) throw ConflictException(
             "A ${current.lifecycle} version's document is read-only — create a new version instead",
         )
-        if (sync && current.sourceUrl == null) throw BadRequestException("The version has no source reference to sync from")
-        val baseline = baselineFor(contractId, SemVer.parse(current.version))
-        val report = checks.check(type, content, declaredVersion = current.version, lifecycle = current.lifecycle, baseline = baseline)
-        val waived = requireOrWaive(report, allowInvalid)
+        val sourceSnapshot = current.sourceUrl
+        if (sync && sourceSnapshot == null) throw BadRequestException("The version has no source reference to sync from")
+        if (sync && expectedSourceUrl != null && sourceSnapshot != expectedSourceUrl) {
+            throw ConflictException("The source reference changed underneath you — reload and retry")
+        }
+        val baseline = baselineRowFor(contractId, SemVer.parse(current.version))
+        val report = checks.check(
+            type, content, declaredVersion = current.version, lifecycle = current.lifecycle, baseline = baseline?.baseline,
+        )
         return suspendTransaction(database) {
+            contracts.requireCurrentWriter(caller, contractId)
+            val fresh = rowOf(contractId, versionId) ?: throw NotFoundException("Version not found")
+            val freshLifecycle = Lifecycle.valueOf(fresh[ContractVersions.lifecycle])
+            if (!freshLifecycle.contentEditable) throw ConflictException(
+                "A $freshLifecycle version's document is read-only — create a new version instead",
+            )
+            if (freshLifecycle != current.lifecycle) staleContext()
+            if (baselineRowFor(contractId, SemVer.parse(current.version)) != baseline) staleContext()
+            if (sync && fresh[ContractVersions.sourceUrl] != sourceSnapshot) {
+                staleContext("The source reference changed underneath you — reload and retry")
+            }
+            val waived = requireOrWaive(report, allowInvalid)
             val stamp = nowMillis()
             val rows = ContractVersions.update(
                 {
@@ -274,15 +341,21 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
      * Re-runs the pipeline on the stored text (the recovery after a checker outage); no waiver
      * question — nothing new is stored but the report.
      */
-    suspend fun recheck(contractId: UInt, versionId: UInt, type: ContractType): VersionResponse {
+    suspend fun recheck(contractId: UInt, versionId: UInt, type: ContractType, caller: CallerPrincipal): VersionResponse {
         val current = suspendTransaction(
             database,
         ) { rowOf(contractId, versionId)?.toResponse() } ?: throw NotFoundException("Version not found")
-        val baseline = baselineFor(contractId, SemVer.parse(current.version))
+        val baseline = baselineRowFor(contractId, SemVer.parse(current.version))
         val report = checks.check(
-            type, current.content, declaredVersion = current.version, lifecycle = current.lifecycle, baseline = baseline,
+            type, current.content, declaredVersion = current.version, lifecycle = current.lifecycle, baseline = baseline?.baseline,
         )
         return suspendTransaction(database) {
+            contracts.requireCurrentWriter(caller, contractId)
+            val fresh = rowOf(contractId, versionId) ?: throw NotFoundException("Version not found")
+            if (fresh[ContractVersions.contentSha256] != current.contentSha256 ||
+                Lifecycle.valueOf(fresh[ContractVersions.lifecycle]) != current.lifecycle ||
+                baselineRowFor(contractId, SemVer.parse(current.version)) != baseline
+            ) staleContext()
             ContractVersions.update({ (ContractVersions.id eq versionId) and ContractVersions.active() }) {
                 it[findings] = json.encodeToString(findingsSerializer, report.findings)
                 it[checkErrors] = report.errors
@@ -299,8 +372,10 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
     suspend fun transition(
         contractId: UInt,
         versionId: UInt,
+        caller: CallerPrincipal,
         to: Lifecycle,
     ): Pair<Lifecycle, VersionResponse> = suspendTransaction(database) {
+        contracts.requireCurrentWriter(caller, contractId)
         val row = rowOf(contractId, versionId) ?: throw NotFoundException("Version not found")
         val from = Lifecycle.valueOf(row[ContractVersions.lifecycle])
         from.requireTransitionTo(to)
@@ -311,20 +386,42 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
             it[updatedAt] = nowMillis()
         }
         if (rows == 0) throw ConflictException("The version changed underneath you — reload and retry")
+        val refreshed = rowOf(contractId, versionId)!!
+        val refreshedFindings = checks.refreshLifecycleFinding(
+            ContractType.valueOf(
+                ContractService.Contracts.select(ContractService.Contracts.type)
+                    .where { ContractService.Contracts.id eq contractId }
+                    .map { it[ContractService.Contracts.type] }.toList().single(),
+            ),
+            refreshed[ContractVersions.content],
+            to,
+            json.decodeFromString(findingsSerializer, refreshed[ContractVersions.findings]),
+        )
+        ContractVersions.update({ ContractVersions.id eq versionId }) {
+            it[findings] = json.encodeToString(findingsSerializer, refreshedFindings)
+            it[checkErrors] = refreshedFindings.count { finding -> finding.severity == ch.nokillswit.contracts.checks.Severity.ERROR }
+            it[checkWarnings] = refreshedFindings.count { finding -> finding.severity == ch.nokillswit.contracts.checks.Severity.WARN }
+            it[checkInfos] = refreshedFindings.count { finding -> finding.severity == ch.nokillswit.contracts.checks.Severity.INFO }
+        }
+        recomputeLatest(contractId)
         from to rowOf(contractId, versionId)!!.toResponse()
     }
 
     /** Only a DRAFT may be deleted (409 otherwise); the latest pointer is recomputed. Returns the deleted version's string. */
-    suspend fun delete(contractId: UInt, versionId: UInt): String = suspendTransaction(database) {
+    suspend fun delete(contractId: UInt, versionId: UInt, caller: CallerPrincipal): String = suspendTransaction(database) {
+        contracts.requireCurrentWriter(caller, contractId)
         val row = rowOf(contractId, versionId) ?: throw NotFoundException("Version not found")
         val lifecycle = Lifecycle.valueOf(row[ContractVersions.lifecycle])
         if (!lifecycle.deletable) throw ConflictException(
             "Only a DRAFT version may be deleted — a $lifecycle version is part of the contract's history",
         )
-        ContractVersions.update({ (ContractVersions.id eq versionId) and ContractVersions.active() }) {
+        val rows = ContractVersions.update({
+            (ContractVersions.id eq versionId) and ContractVersions.active() and (ContractVersions.lifecycle eq lifecycle.name)
+        }) {
             it[markedAsDeleted] = true
             it[updatedAt] = nowMillis()
         }
+        if (rows == 0) staleContext()
         recomputeLatest(contractId)
         row[ContractVersions.version]
     }
@@ -368,12 +465,6 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
             throw BadRequestException("The document has ${soft.size} blocking finding(s): $listed")
         }
         return soft
-    }
-
-    private suspend fun requireContract(contractId: UInt) {
-        val c = ContractService.Contracts
-        val ok = c.select(c.id).where { (c.id eq contractId) and (c.markedAsDeleted eq false) }.count() > 0
-        if (!ok) throw NotFoundException("Contract not found")
     }
 
     /** Loads the contract's active versions (a small set) and compares in Kotlin — full SemVer precedence. */
@@ -455,6 +546,17 @@ class ContractVersionService(private val database: R2dbcDatabase, private val ch
         const val MAX_LISTED = 5
     }
 }
+
+internal data class PreparedVersion(
+    val request: VersionCreateRequest,
+    val semver: SemVer,
+    val source: String?,
+    val report: CheckReport,
+    val baseline: BaselineRow?,
+)
+
+private fun staleContext(message: String = "The validation context changed underneath you — reload and retry"): Nothing =
+    throw ConflictException(message)
 
 /** What `updateSource` did: the version's number and the reference before/after (equal = no-op). */
 data class SourceChange(val version: String, val previous: String?, val next: String?) {

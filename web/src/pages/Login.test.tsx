@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders, screen, waitFor } from "../test/render";
 import { jsonResponse } from "../test/http";
+import { Route, Routes, useLocation } from "react-router-dom";
 import Login from "./Login";
+
+function DestinationProbe() {
+  const location = useLocation();
+  return <div>{`${location.pathname}${location.search}${location.hash}`}</div>;
+}
 
 const SESSION = {
   token: "access-1",
@@ -45,6 +51,19 @@ describe("Login", () => {
     renderWithProviders(<Login />, { route: "/login" });
     await submit();
     await waitFor(() => expect(localStorage.getItem("covenant.auth.token")).toBe("access-1"));
+  });
+
+  test("a successful login restores the deep link's query string and hash", async () => {
+    fetchMock().mockResolvedValueOnce(jsonResponse(200, SESSION));
+    renderWithProviders(
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/contracts" element={<DestinationProbe />} />
+      </Routes>,
+      { route: "/login", state: { from: { pathname: "/contracts", search: "?type=OPENAPI", hash: "#quality-probe" } } },
+    );
+    await submit();
+    expect(await screen.findByText("/contracts?type=OPENAPI#quality-probe")).toBeInTheDocument();
   });
 
   test("401 shows the invalid-credentials message", async () => {

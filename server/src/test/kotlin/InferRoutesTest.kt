@@ -58,6 +58,17 @@ class InferRoutesTest {
     }
 
     @Test
+    fun `400 for path templates including encoded braces instead of a concrete exchange`() = testApplication {
+        usePostgresTestcontainer()
+        val user = seededClient("infer400template")
+        for (url in listOf("/orders/{orderId}", "/orders/%7BorderId%7D", "https://example.test/orders/%7BorderId%7D")) {
+            val samples = listOf(http[0].copy(url = "/orders/1"), http[0].copy(url = url))
+            val response = user.postJson("/api/v1/contracts/infer", InferRequest(ContractType.OPENAPI, http = samples))
+            assertEquals(HttpStatusCode.BadRequest, response.status, url)
+        }
+    }
+
+    @Test
     fun `400 for an invalid method`() = testApplication {
         usePostgresTestcontainer()
         val user = seededClient("infer400method")

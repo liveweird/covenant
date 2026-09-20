@@ -58,8 +58,12 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
         '500':
           $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
         '504':
           $ref: '#/components/responses/GatewayTimeout'
 components:
@@ -72,6 +76,7 @@ components:
   schemas:
     CheckRequest:
       type: object
+      additionalProperties: false
       required: [type, content]
       properties:
         type:
@@ -132,7 +137,7 @@ components:
           type: string
     ProblemDetail:
       type: object
-      required: [type, title, status]
+      required: [type, title, status, detail, instance]
       properties:
         type:
           type: string
@@ -142,9 +147,12 @@ components:
           type: integer
         detail:
           type: string
+        instance:
+          type: string
+          description: URI reference of the specific occurrence (the request path).
   responses:
     BadRequest:
-      description: Malformed request body or unknown contract type.
+      description: Malformed request body, unknown member, or unknown contract type.
       content:
         application/problem+json:
           schema:
@@ -161,14 +169,26 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/ProblemDetail'
+    UnsupportedMediaType:
+      description: The request Content-Type is not application/json.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
     GatewayTimeout:
-      description: The engines exceeded CHECKER_TIMEOUT_MS.
+      description: Queueing plus engine execution exceeded CHECKER_TIMEOUT_MS.
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/ProblemDetail'
     InternalServerError:
       description: An engine crashed; the server treats it as CHECKER_UNAVAILABLE.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    ServiceUnavailable:
+      description: The bounded check queue is full.
       content:
         application/problem+json:
           schema:

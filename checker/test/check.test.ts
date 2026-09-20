@@ -1,9 +1,20 @@
 import { readFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { describe, expect, test } from "vitest";
 import { check } from "../src/check.ts";
 import type { Finding } from "../src/findings.ts";
 
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
+const CYCLIC = "asyncapi: 3.0.0\ninfo: {title: t, version: 1.0.0}\nchannels: {}\nx-cycle: &a\n  self: *a\n";
+
+function aliasBomb(): string {
+  const lines = ["asyncapi: 3.0.0", "info: {title: t, version: 1.0.0}", "channels: {}", "x-a: &a [x,x,x,x,x,x,x,x,x,x]"];
+  for (const name of "bcdefghijk") {
+    const previous = String.fromCharCode(name.charCodeAt(0) - 1);
+    lines.push(`x-${name}: &${name} [*${previous},*${previous},*${previous},*${previous},*${previous},*${previous},*${previous},*${previous},*${previous},*${previous}]`);
+  }
+  return `${lines.join("\n")}\n`;
+}
 
 describe("check — OPENAPI", () => {
   test("a lint-clean 3.1 document yields no ERRORs and reports the engines", async () => {
@@ -103,6 +114,67 @@ describe("check — ASYNCAPI breaking changes (previousContent)", () => {
   test("an unparseable baseline is skipped too", async () => {
     const { findings } = await check({ type: "ASYNCAPI", content: current, previousContent: "asyncapi: 3.0.0\ninfo: [oops\n" });
     expect(breaking(findings).map((f) => f.code)).toEqual(["asyncapi-diff-skipped"]);
+  });
+
+  test("cyclic YAML aliases in the current or previous document are refused before engines run", async () => {
+    const cyclicCurrent = await check({ type: "ASYNCAPI", content: CYCLIC });
+    expect(cyclicCurrent.findings).toEqual([
+      expect.objectContaining({ code: "cyclic-alias-not-allowed", path: "/x-cycle/self" }),
+    ]);
+
+    const cyclicPrevious = await check({ type: "ASYNCAPI", content: current, previousContent: CYCLIC });
+    expect(cyclicPrevious.findings).toEqual([
+      expect.objectContaining({ code: "cyclic-alias-not-allowed", path: "/x-cycle/self" }),
+    ]);
+  });
+
+  test("excessive YAML alias expansion is deterministic for current and previous documents", async () => {
+    const unsafeCurrent = await check({ type: "ASYNCAPI", content: aliasBomb() });
+    expect(unsafeCurrent.findings).toEqual([
+      expect.objectContaining({ severity: "ERROR", code: "unsafe-yaml-alias-expansion" }),
+    ]);
+
+    const unsafePrevious = await check({ type: "ASYNCAPI", content: current, previousContent: aliasBomb() });
+    expect(breaking(unsafePrevious.findings)).toEqual([
+      expect.objectContaining({ severity: "INFO", code: "asyncapi-diff-skipped" }),
+    ]);
+  });
+
+  test("a baseline file ref is refused before the diff parser can read it", async () => {
+    const fileRef = new URL("./fixtures/asyncapi/streetlights-3.0.yaml", import.meta.url).href;
+    const previousContent = current.replace(
+      '$ref: "#/components/schemas/lightMeasuredPayload"',
+      `$ref: "${fileRef}"`,
+    );
+    const { findings } = await check({ type: "ASYNCAPI", content: current, previousContent });
+    expect(findings).toEqual([
+      expect.objectContaining({
+        code: "external-ref-not-allowed",
+        path: "/components/messages/lightMeasured/payload/$ref",
+      }),
+    ]);
+  });
+
+  test("a baseline HTTP ref is refused without contacting even a loopback server", async () => {
+    let requests = 0;
+    const server = createServer((_req, res) => {
+      requests += 1;
+      res.end('{}');
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      const address = server.address();
+      const port = typeof address === "object" && address ? address.port : 0;
+      const previousContent = current.replace(
+        '$ref: "#/components/schemas/lightMeasuredPayload"',
+        `$ref: "http://127.0.0.1:${port}/schema.json"`,
+      );
+      const { findings } = await check({ type: "ASYNCAPI", content: current, previousContent });
+      expect(findings.map((finding) => finding.code)).toEqual(["external-ref-not-allowed"]);
+      expect(requests).toBe(0);
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+    }
   });
 
   test("OPENAPI ignores previousContent — the JVM computes its breaking changes", async () => {

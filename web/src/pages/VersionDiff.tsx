@@ -77,16 +77,24 @@ export default function VersionDiff() {
         description={t("versions.diff.intro")}
         backTo={{ to: contractPath(id), label: t("contracts.backToContract") }}
       />
-      <Group align="flex-end" gap="md" wrap="wrap">
-        <Select label={t("versions.diff.from")} data={options} value={fromId != null ? String(fromId) : null} onChange={(v) => pick("from", v)} allowDeselect={false} w={240} />
-        <Select label={t("versions.diff.to")} data={options} value={toId != null ? String(toId) : null} onChange={(v) => pick("to", v)} allowDeselect={false} w={240} />
-        <Switch label={t("versions.diff.hideUnchanged")} checked={hideUnchanged} onChange={(e) => setHideUnchanged(e.currentTarget.checked)} pb={6} />
-        {stats && (
-          <Text size="sm" c="dimmed" pb={6}>
-            {t("versions.diff.stats", { added: stats.added, removed: stats.removed })}
-          </Text>
-        )}
-      </Group>
+      {versions.isLoading && <LoadingBlock mih={80} />}
+      {versions.isError && (
+        <Alert color="red" variant="light" title={t("versions.loadFailed")}>
+          {loadErrorMessage(versions.error, t)}
+        </Alert>
+      )}
+      {versions.data && (
+        <Group align="flex-end" gap="md" wrap="wrap">
+          <Select label={t("versions.diff.from")} data={options} value={fromId != null ? String(fromId) : null} onChange={(v) => pick("from", v)} allowDeselect={false} w={240} />
+          <Select label={t("versions.diff.to")} data={options} value={toId != null ? String(toId) : null} onChange={(v) => pick("to", v)} allowDeselect={false} w={240} />
+          <Switch label={t("versions.diff.hideUnchanged")} checked={hideUnchanged} onChange={(e) => setHideUnchanged(e.currentTarget.checked)} pb={6} />
+          {stats && (
+            <Text size="sm" c="dimmed" pb={6}>
+              {t("versions.diff.stats", { added: stats.added, removed: stats.removed })}
+            </Text>
+          )}
+        </Group>
+      )}
       {items.length < 2 && versions.data && (
         <Alert color="gray" variant="light">
           {t("versions.diff.needTwo")}

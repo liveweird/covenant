@@ -108,6 +108,30 @@ class ChecksService(private val checkerProvider: () -> CheckerClient) {
         )
     }
 
+    /**
+     * Lifecycle transitions do not rerun slow validators. Only the ODCS status cross-check is
+     * lifecycle-dependent, so replace that one finding and preserve the rest of the snapshot.
+     */
+    fun refreshLifecycleFinding(
+        type: ContractType,
+        content: String,
+        lifecycle: Lifecycle,
+        findings: List<Finding>,
+    ): List<Finding> {
+        val retained = findings.filterNot { it.code == CODE_STATUS_MISMATCH }
+        if (type != ContractType.ODCS) return retained
+        val parsed = DocumentParser.parse(content) as? ParseOutcome.Parsed ?: return retained
+        val status = Metadata.declaredStatus(type, parsed.root) ?: return retained
+        return if (status.equals(lifecycle.name, ignoreCase = true)) {
+            retained
+        } else {
+            retained + Finding(
+                Severity.INFO, FindingSource.SEMANTIC, CODE_STATUS_MISMATCH,
+                "The document declares status '$status' but the version's lifecycle is ${lifecycle.name}", "/status",
+            )
+        }
+    }
+
     /** One direction: the facts of comparing `old` (`oldVersion`/`oldContent`) against `newContent`. */
     private suspend fun breakingFacts(type: ContractType, oldVersion: SemVer, oldContent: String, newContent: String): DirectionResult {
         val parsedNew = when (val outcome = DocumentParser.parse(newContent)) {

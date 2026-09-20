@@ -65,12 +65,12 @@ suspend fun Application.configureDatabase() {
     // application.yaml therefore lists BEFORE this module).
     val contractService = ContractService(database, teamService)
     attributes.put(ContractServiceKey, contractService)
-    val versionService = ContractVersionService(database, attributes[ChecksServiceKey])
+    val versionService = ContractVersionService(database, attributes[ChecksServiceKey], contractService)
     attributes.put(ContractVersionServiceKey, versionService)
     // The import pipeline and the SSRF-guarded fetcher: stateless collaborators, built here rather than
     // in a route file so every service has ONE home (a test pre-puts ContractUrlFetcherKey to aim the
     // fetch at a fixture — the routes read the key per request).
-    attributes.put(ContractImporterKey, ContractImporter(contractService, versionService, attributes[ChecksServiceKey]))
+    attributes.put(ContractImporterKey, ContractImporter(contractService, versionService))
     attributes.put(ContractUrlFetcherKey, ContractUrlFetcher())
     val eventService = ContractEventService(database)
     attributes.put(ContractEventServiceKey, eventService)

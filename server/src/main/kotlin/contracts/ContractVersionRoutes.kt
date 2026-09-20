@@ -101,7 +101,7 @@ private fun Route.versionCollection(deps: VersionRouteDeps) {
         deps.requireDocumentSize(request.content)
         val allowInvalid = call.request.queryParameters.optionalBoolean("allowInvalid") ?: false
         val type = contractService.typeOf(contractId).orNotFound("Contract")
-        val saved = versionService.create(contractId, type, request, caller.userId, allowInvalid)
+        val saved = versionService.create(contractId, type, request, caller, allowInvalid)
         audit(
             "contract_version.created",
             "byUserId" to caller.userId.toLong(),
@@ -199,7 +199,7 @@ private fun Route.versionWrites(deps: VersionRouteDeps) {
         deps.requireDocumentSize(request.content)
         val allowInvalid = call.request.queryParameters.optionalBoolean("allowInvalid") ?: false
         val type = contractService.typeOf(contractId).orNotFound("Contract")
-        val saved = versionService.updateContent(contractId, route.parent.vid, type, request.content, allowInvalid)
+        val saved = versionService.updateContent(contractId, route.parent.vid, type, request.content, caller, allowInvalid)
         audit(
             "contract_version.content_updated",
             "byUserId" to caller.userId.toLong(),
@@ -224,7 +224,7 @@ private fun Route.versionWrites(deps: VersionRouteDeps) {
         val contractId = route.parent.parent.parent.id
         contractService.authorizeWrite(caller, contractId)
         val request = call.receive<TransitionRequest>()
-        val (from, response) = versionService.transition(contractId, route.parent.vid, request.to)
+        val (from, response) = versionService.transition(contractId, route.parent.vid, caller, request.to)
         audit(
             "contract_version.transitioned",
             "byUserId" to caller.userId.toLong(),
@@ -245,7 +245,7 @@ private fun Route.versionWrites(deps: VersionRouteDeps) {
         val caller = call.caller()
         val contractId = route.parent.parent.id
         contractService.authorizeWrite(caller, contractId)
-        val version = versionService.delete(contractId, route.vid)
+        val version = versionService.delete(contractId, route.vid, caller)
         audit(
             "contract_version.deleted",
             "byUserId" to caller.userId.toLong(),
@@ -269,7 +269,7 @@ private fun Route.versionSourceAndSync(deps: VersionRouteDeps) {
         contractService.authorizeWrite(caller, contractId)
         val request = call.receive<VersionSourceRequest>()
         val sourceUrl = sanitizedSourceUrl(request.sourceUrl)
-        val change = versionService.updateSource(contractId, route.parent.vid, sourceUrl).orNotFound("Version")
+        val change = versionService.updateSource(contractId, route.parent.vid, sourceUrl, caller).orNotFound("Version")
         if (change.changed) {
             // Scheme/host only — a source URL may embed query-string tokens (the fetch audit's rule).
             audit(
@@ -302,7 +302,7 @@ private fun Route.versionSourceAndSync(deps: VersionRouteDeps) {
         val request = call.receive<SyncRequest>()
         deps.requireDocumentSize(request.content)
         val type = contractService.typeOf(contractId).orNotFound("Contract")
-        val saved = versionService.sync(contractId, route.parent.vid, type, request.content)
+        val saved = versionService.sync(contractId, route.parent.vid, type, request.content, caller, request.sourceUrl)
         audit(
             "contract_version.synced",
             "byUserId" to caller.userId.toLong(),
@@ -324,7 +324,7 @@ private fun Route.versionSourceAndSync(deps: VersionRouteDeps) {
         val contractId = route.parent.parent.parent.id
         contractService.authorizeWrite(caller, contractId)
         val type = contractService.typeOf(contractId).orNotFound("Contract")
-        val response = versionService.recheck(contractId, route.parent.vid, type)
+        val response = versionService.recheck(contractId, route.parent.vid, type, caller)
         audit(
             "contract_version.rechecked",
             "byUserId" to caller.userId.toLong(),
