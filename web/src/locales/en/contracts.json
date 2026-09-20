@@ -1,6 +1,6 @@
 {
   "title": "Contracts",
-  "intro": "Every contract in the catalog — APIs, event streams and data views — with its owner and its latest version.",
+  "intro": "Every contract in the catalog — APIs, event streams and data views — with its owner and highest version.",
   "newContract": "New contract",
   "import": "Import",
   "infer": "Infer…",
@@ -54,8 +54,45 @@
     "hasErrors": "Only with errors"
   },
   "column": {
-    "latest": "Latest version",
+    "latest": "Highest version",
     "updated": "Updated"
+  },
+  "releaseLines": {
+    "title": "Release lines",
+    "lineAria": "Release line {{line}}",
+    "empty": "No release lines yet",
+    "loadFailed": "Could not load the release lines",
+    "latestVersion": "Latest version in this line",
+    "recommendedVersion": "Recommended version",
+    "noVersions": "No versions in this line",
+    "noRecommendedVersion": "No recommended version",
+    "supportEndsOn": "Support ends on",
+    "noSupportEnd": "No support end date",
+    "supportPolicy": "Support policy",
+    "noSupportPolicy": "No support policy specified",
+    "versionCount": "Versions",
+    "versionCountValue_one": "{{count}} version",
+    "versionCountValue_other": "{{count}} versions",
+    "filterVersions": "Filter versions in {{line}}",
+    "newVersion": "New version in {{line}}",
+    "editPolicy": "Edit policy for {{line}}",
+    "editTitle": "Edit policy for {{line}}",
+    "supportStatus": "Support status",
+    "recommendedHint": "Leave empty to recommend the highest active stable version automatically.",
+    "automaticRecommendation": "Automatic — highest active stable version",
+    "recommendationsLoadFailed": "Could not load the versions available for recommendation",
+    "savePolicy": "Save policy",
+    "saveInvalid": "The release-line policy is invalid",
+    "saveConflict": "The release line changed — close the dialog and try again",
+    "status": {
+      "UNSPECIFIED": "Not specified",
+      "SUPPORTED": "Supported",
+      "MAINTENANCE": "Maintenance",
+      "END_OF_LIFE": "End of life"
+    },
+    "toast": {
+      "saved": "Release-line policy saved"
+    }
   },
   "validation": {
     "systemRequired": "Pick a system",
@@ -129,7 +166,8 @@
       "imported": "Version {{version}} imported",
       "versionSourceSet": "Version {{version}}: source linked",
       "versionSourceCleared": "Version {{version}}: source unlinked",
-      "versionSynced": "Version {{version}} synced from its source"
+      "versionSynced": "Version {{version}} synced from its source",
+      "releaseLineUpdated": "Release line {{major}}.x support policy updated ({{status}})"
     },
     "detail": {
       "name": "Name: {{name}}",

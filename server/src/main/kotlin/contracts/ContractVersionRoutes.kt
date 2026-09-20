@@ -13,6 +13,7 @@ import ch.nokillswit.contracts.checks.ChecksServiceKey
 import ch.nokillswit.contracts.checks.DocumentFormat
 import ch.nokillswit.contracts.checks.auditCheckerUnavailable
 import ch.nokillswit.infra.paging.optionalBoolean
+import ch.nokillswit.infra.paging.optionalUInt
 import ch.nokillswit.infra.paging.parsePaging
 import ch.nokillswit.infra.paging.repeatedValues
 import ch.nokillswit.infra.paging.toPage
@@ -90,7 +91,11 @@ private fun Route.versionCollection(deps: VersionRouteDeps) {
             Lifecycle.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) }
                 ?: throw BadRequestException("Unknown lifecycle: $raw")
         }
-        val result = versionService.list(contractId, VersionListFilter(lifecycles), paging)
+        val major = call.request.queryParameters.optionalUInt("major")?.let {
+            if (it > Int.MAX_VALUE.toUInt()) throw BadRequestException("major must be at most ${Int.MAX_VALUE}")
+            it.toInt()
+        }
+        val result = versionService.list(contractId, VersionListFilter(lifecycles, major), paging)
         call.respond(HttpStatusCode.OK, paging.toPage(result.items, result.total))
     }
     post<ContractsRoute.Id.Versions> { route ->
@@ -350,7 +355,7 @@ private fun Route.documentChecks(deps: VersionRouteDeps) {
         val request = call.receive<DocumentCheckRequest>()
         deps.requireDocumentSize(request.content)
         val declared = request.version?.trim()?.takeIf { it.isNotEmpty() }
-        // Naming the contract adds the breaking-change step against its highest ACTIVE
+        // Naming the contract adds the breaking-change step against its highest eligible published
         // version below the candidate (an unknown id simply has no baseline — no 404 here).
         val baseline = request.contractId?.let { versionService.baselineFor(it, declared?.let(SemVer::parseOrNull)) }
         val report = checks.check(request.type, request.content, declaredVersion = declared, baseline = baseline)
@@ -419,10 +424,10 @@ private data class CompatibilityFrom(val ref: VersionRef?, val baseline: Baselin
 
 /**
  * `against` given → the full row (id, version, lifecycle all known — malformed/foreign/missing is
- * a 404); omitted → the contract's ACTIVE baseline below `to`, read WITH its row id in ONE
+ * a 404); omitted → the contract's published baseline below `to`, read WITH its row id in ONE
  * transaction (`ContractVersionService.baselineRowFor` — a second lookup could see a version that
- * transitioned in between and answer `from` null beside a `bump`; lifecycle is ACTIVE by
- * construction). No baseline at all → both sides null, `ChecksService.compatibility` answers UNKNOWN.
+ * transitioned in between and answer `from` null beside a `bump`). No baseline at all → both
+ * sides null, `ChecksService.compatibility` answers UNKNOWN.
  */
 private suspend fun resolveCompatibilityFrom(
     versionService: ContractVersionService,
@@ -435,7 +440,7 @@ private suspend fun resolveCompatibilityFrom(
         return CompatibilityFrom(VersionRef(row.id, row.version, row.lifecycle), Baseline(SemVer.parse(row.version), row.content))
     }
     val row = versionService.baselineRowFor(contractId, toVersion) ?: return CompatibilityFrom(null, null)
-    return CompatibilityFrom(VersionRef(row.id, row.baseline.version.toString(), Lifecycle.ACTIVE), row.baseline)
+    return CompatibilityFrom(VersionRef(row.id, row.baseline.version.toString(), row.lifecycle), row.baseline)
 }
 
 /** Whether the stored report carries the waived breaking gate — the one verdict followers are told about. */

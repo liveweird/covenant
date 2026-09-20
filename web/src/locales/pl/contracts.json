@@ -1,6 +1,6 @@
 {
   "title": "Kontrakty",
-  "intro": "Każdy kontrakt w katalogu — API, strumienie zdarzeń i widoki danych — z właścicielem i najnowszą wersją.",
+  "intro": "Każdy kontrakt w katalogu — API, strumienie zdarzeń i widoki danych — z właścicielem i najwyższą wersją.",
   "newContract": "Nowy kontrakt",
   "import": "Importuj",
   "infer": "Wywnioskuj…",
@@ -54,8 +54,47 @@
     "hasErrors": "Tylko z błędami"
   },
   "column": {
-    "latest": "Najnowsza wersja",
+    "latest": "Najwyższa wersja",
     "updated": "Zmieniono"
+  },
+  "releaseLines": {
+    "title": "Linie wydań",
+    "lineAria": "Linia wydań {{line}}",
+    "empty": "Brak linii wydań",
+    "loadFailed": "Nie udało się wczytać linii wydań",
+    "latestVersion": "Najnowsza wersja w tej linii",
+    "recommendedVersion": "Zalecana wersja",
+    "noVersions": "Brak wersji w tej linii",
+    "noRecommendedVersion": "Brak zalecanej wersji",
+    "supportEndsOn": "Koniec wsparcia",
+    "noSupportEnd": "Nie podano daty końca wsparcia",
+    "supportPolicy": "Zasady wsparcia",
+    "noSupportPolicy": "Nie podano zasad wsparcia",
+    "versionCount": "Wersje",
+    "versionCountValue_one": "{{count}} wersja",
+    "versionCountValue_few": "{{count}} wersje",
+    "versionCountValue_many": "{{count}} wersji",
+    "versionCountValue_other": "{{count}} wersji",
+    "filterVersions": "Filtruj wersje w {{line}}",
+    "newVersion": "Nowa wersja w {{line}}",
+    "editPolicy": "Edytuj zasady dla {{line}}",
+    "editTitle": "Edytuj zasady dla {{line}}",
+    "supportStatus": "Status wsparcia",
+    "recommendedHint": "Pozostaw puste, aby automatycznie zalecać najwyższą aktywną stabilną wersję.",
+    "automaticRecommendation": "Automatycznie — najwyższa aktywna stabilna wersja",
+    "recommendationsLoadFailed": "Nie udało się wczytać wersji dostępnych jako zalecenie",
+    "savePolicy": "Zapisz zasady",
+    "saveInvalid": "Zasady linii wydań są nieprawidłowe",
+    "saveConflict": "Linia wydań zmieniła się — zamknij okno i spróbuj ponownie",
+    "status": {
+      "UNSPECIFIED": "Nie określono",
+      "SUPPORTED": "Wspierana",
+      "MAINTENANCE": "Utrzymanie",
+      "END_OF_LIFE": "Koniec wsparcia"
+    },
+    "toast": {
+      "saved": "Zapisano zasady linii wydań"
+    }
   },
   "validation": {
     "systemRequired": "Wybierz system",
@@ -129,7 +168,8 @@
       "imported": "Wersja {{version}} zaimportowana",
       "versionSourceSet": "Wersja {{version}}: powiązano ze źródłem",
       "versionSourceCleared": "Wersja {{version}}: usunięto powiązanie ze źródłem",
-      "versionSynced": "Wersja {{version}} zsynchronizowana ze źródłem"
+      "versionSynced": "Wersja {{version}} zsynchronizowana ze źródłem",
+      "releaseLineUpdated": "Zaktualizowano zasady wsparcia linii {{major}}.x ({{status}})"
     },
     "detail": {
       "name": "Nazwa: {{name}}",

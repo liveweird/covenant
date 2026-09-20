@@ -6,7 +6,7 @@ import io.ktor.server.plugins.BadRequestException
  * SemVer 2.0.0 (https://semver.org/spec/v2.0.0.html): `MAJOR.MINOR.PATCH[-prerelease][+build]`.
  * Stored verbatim; the parsed parts back SQL ordering, and [compareTo] is the full precedence
  * rule — numeric-then-lexical prerelease identifiers, a prerelease BELOW its release, build
- * metadata ignored — deciding "a new version must exceed the highest existing one".
+ * metadata ignored — deciding ordering and precedence identity.
  */
 data class SemVer(
     val major: Int,
@@ -64,17 +64,20 @@ data class SemVer(
             for (i in 0 until minOf(xs.size, ys.size)) {
                 val x = xs[i]
                 val y = ys[i]
-                val xn = x.toLongOrNull()
-                val yn = y.toLongOrNull()
+                val xn = x.all(Char::isDigit)
+                val yn = y.all(Char::isDigit)
                 val c = when {
-                    xn != null && yn != null -> xn.compareTo(yn)
-                    xn != null -> -1 // numeric identifiers rank below alphanumeric ones
-                    yn != null -> 1
+                    xn && yn -> compareNumericIdentifiers(x, y)
+                    xn -> -1 // numeric identifiers rank below alphanumeric ones
+                    yn -> 1
                     else -> x.compareTo(y)
                 }
                 if (c != 0) return c
             }
             return xs.size.compareTo(ys.size) // a longer identifier list ranks higher
         }
+
+        private fun compareNumericIdentifiers(a: String, b: String): Int =
+            a.length.compareTo(b.length).takeIf { it != 0 } ?: a.compareTo(b)
     }
 }

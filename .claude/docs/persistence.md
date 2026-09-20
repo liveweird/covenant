@@ -63,7 +63,7 @@ ownership transfer and source changes. The current writer guard also holds the r
 row through the write; see `authorization.md`.
 
 The checks pipeline runs outside these locks. A prepared save includes the report and the exact
-ACTIVE baseline identity used to produce it; the final transaction rejects a changed baseline or
+published baseline identity (ACTIVE or DEPRECATED) used to produce it; the final transaction rejects a changed baseline or
 lifecycle with `409`. Recheck also compares the checked content hash. Sync compares its source
 reference and accepts the client's optional expected `sourceUrl`, binding the SPA's fetched copy
 to that reference. Ordinary editable-content replacements remain last-write-wins; these context
@@ -74,3 +74,13 @@ an invalid source or failed version insert leaves no empty contract behind. The 
 per-item, and its response counts/findings come from the saved result. Lifecycle transitions
 refresh only the local ODCS status mismatch and counts, preserving other findings and the
 checker-completeness timestamp. No checker call runs inside that transition transaction.
+
+### Release-line persistence (0.9.0)
+
+The additive release-line migration creates per-contract major-line metadata and backfills
+nondeleted version majors with UNSPECIFIED support and automatic recommendations. A partial
+unique version index ignores build metadata when enforcing SemVer identity. First-version and
+line creation commit together. Policy changes, version transitions that clear a recommendation
+pin, and parent deletion use the same contract lock; deleting the last draft retains its line.
+The line's effective recommendation is computed from ACTIVE stable versions, independently of
+the global highest-version pointer. See `release-lines.md` for the complete rules.

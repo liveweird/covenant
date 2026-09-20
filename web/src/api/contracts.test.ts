@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { checkImportContracts, fetchContractUrl, getContractTree, importContracts, listContracts } from "./contracts";
 import { checkDocument, getVersionContent, softRejectionFindings } from "./versions";
+import { listAllReleaseLines, updateReleaseLine } from "./releaseLines";
 import { ApiError } from "./http";
 import { jsonResponse } from "../test/http";
 import { CLEAN_REPORT, signIn, SOFT_ERROR } from "../test/contractsFixtures";
@@ -46,6 +47,24 @@ describe("contracts + versions API wrappers", () => {
     expect(await getVersionContent(5, 11)).toBe("openapi: 3.1.0\n");
     mockFetch.mockResolvedValueOnce(jsonResponse(404, { title: "Not Found", status: 404 }));
     await expect(getVersionContent(5, 12)).rejects.toBeInstanceOf(ApiError);
+  });
+
+  test("release-line transport pages to total and sends a full replacement", async () => {
+    const line = {
+      id: 1, contractId: 5, major: 1, supportStatus: "SUPPORTED", supportEndsOn: null, supportPolicy: null,
+      recommendedVersionId: null, latestVersion: null, recommendedVersion: null, versionCount: 0, updatedAt: 1,
+    };
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse(200, { items: [line], page: 1, pageSize: 100, total: 2 }))
+      .mockResolvedValueOnce(jsonResponse(200, { items: [{ ...line, id: 2, major: 0 }], page: 2, pageSize: 100, total: 2 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    expect((await listAllReleaseLines(5)).map((item) => item.major)).toEqual([1, 0]);
+    expect(mockFetch.mock.calls[0][0]).toBe("/api/v1/contracts/5/release-lines?page=1&pageSize=100&sort=-major");
+    expect(mockFetch.mock.calls[1][0]).toBe("/api/v1/contracts/5/release-lines?page=2&pageSize=100&sort=-major");
+    const body = { supportStatus: "MAINTENANCE" as const, supportEndsOn: "2027-12-31", supportPolicy: "Critical fixes", recommendedVersionId: 10 };
+    await updateReleaseLine(5, 1, body);
+    expect(mockFetch.mock.calls[2][0]).toBe("/api/v1/contracts/5/release-lines/1");
+    expect(JSON.parse(mockFetch.mock.calls[2][1].body)).toEqual(body);
   });
 
   test("softRejectionFindings re-checks only a strict save's blocking-findings 400 and returns the soft errors", async () => {

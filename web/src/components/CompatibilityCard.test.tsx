@@ -91,11 +91,11 @@ describe("CompatibilityCard — full variant", () => {
     expect(within(card).getByText(NOTE.message)).toBeInTheDocument();
   });
 
-  test("no ACTIVE predecessor renders the noBaseline alert instead of the sentences", () => {
+  test("no published predecessor renders the noBaseline alert instead of the sentences", () => {
     const r = report({ from: null, verdict: "UNKNOWN", bump: undefined });
     renderWithProviders(<CompatibilityCard variant="full" report={r} />);
     const card = screen.getByRole("region", { name: "Compatibility" });
-    expect(within(card).getByText("No active version to compare with")).toBeInTheDocument();
+    expect(within(card).getByText("No published version to compare with")).toBeInTheDocument();
     expect(within(card).queryByText("What breaks consumers of 1.0.0")).not.toBeInTheDocument();
   });
 
@@ -122,16 +122,16 @@ describe("CompatibilityCard — full variant", () => {
 });
 
 describe("CompatibilityCard — compact variant", () => {
-  test("names the active baseline, the verdict badge and links to the diff", () => {
+  test("names the published baseline, the verdict badge and links to the diff", () => {
     renderWithProviders(<CompatibilityCard variant="compact" report={report({ verdict: "BACKWARD" })} contractId={5} />);
-    expect(screen.getByText("Compatibility with 1.0.0 (active):")).toBeInTheDocument();
+    expect(screen.getByText("Compatibility with 1.0.0 (published):")).toBeInTheDocument();
     expect(screen.getByText("Backward compatible")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Details" })).toHaveAttribute("href", "/contracts/5/diff?from=10&to=11");
   });
 
-  test("no ACTIVE predecessor shows a dimmed line and no link", () => {
+  test("no published predecessor shows a dimmed line and no link", () => {
     renderWithProviders(<CompatibilityCard variant="compact" report={report({ from: null, verdict: "UNKNOWN", bump: undefined })} contractId={5} />);
-    expect(screen.getByText("No active version to compare with")).toBeInTheDocument();
+    expect(screen.getByText("No published version to compare with")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Details" })).not.toBeInTheDocument();
   });
 });

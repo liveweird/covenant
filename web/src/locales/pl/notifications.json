@@ -26,6 +26,7 @@
     "VERSION_SYNCED": "{{actor}} zsynchronizował/a {{contractName}} {{version}} ze źródłem.",
     "VERSION_SOURCE_CHANGED": "{{actor}} zmienił/a powiązanie ze źródłem {{contractName}} {{version}}.",
     "VERSION_IMPORTED": "{{actor}} zaimportował/a wersję {{version}} kontraktu {{contractName}}.",
-    "VERSION_BREAKING_STORED": "{{contractName}} {{version}} zapisano ze zmianą łamiącą bez podniesienia wersji głównej."
+    "VERSION_BREAKING_STORED": "{{contractName}} {{version}} zapisano ze zmianą łamiącą bez podniesienia wersji głównej.",
+    "RELEASE_LINE_UPDATED": "{{actor}} zaktualizował/a zasady wsparcia dla {{contractName}} {{major}}.x ({{supportStatus}})."
   }
 }

@@ -14,7 +14,7 @@ import kotlinx.serialization.Serializable
  *   new=`from` yields no facts.
  *
  * `verdict` names the pair (`FULL`/`BACKWARD`/`FORWARD`/`NONE`/`UNKNOWN` — a direction could not
- * be computed: no ACTIVE predecessor, an unparseable side, a differ skip, the checker down for
+ * be computed: no published predecessor, an unparseable side, a differ skip, the checker down for
  * AsyncAPI); `bump` is the "why" sentence — a MINOR/PATCH bump of `to` over `from` PROMISES
  * backward compatibility, MAJOR permits a break, `DOWNGRADE` when `from` is actually the newer one.
  */

@@ -22,6 +22,8 @@ describe("semver", () => {
       expect(compareSemver(v(ordered[i - 1]), v(ordered[i])), `${ordered[i - 1]} < ${ordered[i]}`).toBeLessThan(0);
     }
     expect(compareSemver(v("1.0.0+a"), v("1.0.0+b"))).toBe(0);
+    expect(compareSemver(v("1.0.0-rc.2"), v("1.0.0-rc.10"))).toBeLessThan(0);
+    expect(compareSemver(v("1.0.0-9007199254740992"), v("1.0.0-9007199254740993"))).toBeLessThan(0);
   });
 
   test("bumps one axis and turns a prerelease into its release on patch", () => {

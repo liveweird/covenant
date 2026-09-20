@@ -60,7 +60,7 @@ data class CheckReport(
     val infos: Int,
     /** False when the checker sidecar could not be reached — its LINT/SEMANTIC verdicts are missing. */
     val checkerAvailable: Boolean,
-    /** The ACTIVE version the document was compared against for breaking changes; null when none applied. */
+    /** The ACTIVE or DEPRECATED version used for breaking changes; null when none applied. */
     val baselineVersion: String? = null,
 ) {
     val hardFindings: List<Finding> get() = findings.filter { it.hard }

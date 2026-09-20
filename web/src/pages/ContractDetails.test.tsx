@@ -71,6 +71,26 @@ describe("ContractDetails page", () => {
     unmount();
   });
 
+  test("a release-line action filters the versions request and the dropdown can clear it", async () => {
+    const line = {
+      id: 21, contractId: 5, major: 1, supportStatus: "UNSPECIFIED", supportEndsOn: null, supportPolicy: null,
+      latestVersion: { id: 11, version: "1.1.0", lifecycle: "DRAFT" }, recommendedVersionId: null,
+      recommendedVersion: null, versionCount: 2, updatedAt: 2,
+    };
+    serve(mockFetch, {
+      "GET /api/v1/contracts/5": { status: 200, body: CONTRACT },
+      "GET /api/v1/contracts/5/versions?": { status: 200, body: VERSION_PAGE },
+      "GET /api/v1/contracts/5/release-lines?": { status: 200, body: { items: [line], page: 1, pageSize: 100, total: 1 } },
+      "GET /api/v1/contracts/5/events?": { status: 200, body: EVENTS_PAGE },
+    });
+    const user = userEvent.setup();
+    renderPage();
+    const lines = await screen.findByRole("region", { name: "Release lines" });
+    await user.click(within(lines).getByRole("button", { name: "Filter versions in 1.x" }));
+    await waitFor(() => expect(calledUrl(mockFetch, "GET", (url) => url.includes("/versions?") && url.includes("major=1"))).toBeDefined());
+    expect(screen.getByRole("combobox", { name: "Release line" })).toHaveValue("1.x");
+  });
+
   test("a reader has no write actions; the More menu still exports", async () => {
     serve(mockFetch, {
       "GET /api/v1/contracts/5": { status: 200, body: { ...CONTRACT, canWrite: false } },

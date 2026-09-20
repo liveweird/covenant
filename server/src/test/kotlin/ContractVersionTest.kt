@@ -334,7 +334,7 @@ class ContractVersionTest {
     }
 
     @Test
-    fun `semver rules - malformed 400, duplicate 409, not above the highest 400, prereleases order correctly`() = testApplication {
+    fun `semver rules - malformed 400, precedence duplicate 409, backports allowed, prereleases order correctly`() = testApplication {
         usePostgresTestcontainer()
         val admin = seededClient("vsemver", UserRole.ADMIN)
         val c = admin.contract("vsemver")
@@ -342,22 +342,21 @@ class ContractVersionTest {
         assertEquals(HttpStatusCode.Created, admin.postJson(path(c), VersionCreateRequest("1.2.0-rc.1", ContractFixtures.openApi)).status)
         assertEquals(HttpStatusCode.Conflict, admin.postJson(path(c), VersionCreateRequest("1.2.0-rc.1", ContractFixtures.openApi)).status)
         val low = admin.postJson(path(c), VersionCreateRequest("1.1.9", ContractFixtures.openApi))
-        assertEquals(HttpStatusCode.BadRequest, low.status)
-        assertTrue(low.body<ProblemDetail>().detail!!.contains("greater than"))
+        assertEquals(HttpStatusCode.Created, low.status)
         assertEquals(
             HttpStatusCode.Created,
             admin.postJson(path(c), VersionCreateRequest("1.2.0", ContractFixtures.openApi)).status,
             "a release follows its prerelease",
         )
         assertEquals(
-            HttpStatusCode.BadRequest,
+            HttpStatusCode.Created,
             admin.postJson(path(c), VersionCreateRequest("1.2.0-rc.2", ContractFixtures.openApi)).status,
-            "a prerelease is below its release",
+            "a prerelease may be added after its release",
         )
         val page = admin.get(path(c)).body<VersionPageResponse>()
-        assertEquals(listOf("1.2.0", "1.2.0-rc.1"), page.items.map { it.version }, "highest first by default")
+        assertEquals(listOf("1.2.0", "1.2.0-rc.2", "1.2.0-rc.1", "1.1.9"), page.items.map { it.version }, "highest first by default")
         assertEquals(
-            listOf("1.2.0-rc.1", "1.2.0"),
+            listOf("1.1.9", "1.2.0-rc.1", "1.2.0-rc.2", "1.2.0"),
             admin.get("${path(c)}?sort=version").body<VersionPageResponse>().items.map { it.version },
         )
         assertEquals(HttpStatusCode.BadRequest, admin.get("${path(c)}?sort=content").status)
@@ -624,7 +623,10 @@ class ContractVersionTest {
         assertTrue(fact.message.contains("'items.name' was removed"), fact.message)
         val gate = minor.findings.single { it.code == BreakingChanges.CODE_WITHOUT_MAJOR_BUMP }
         assertEquals(Severity.ERROR, gate.severity)
-        assertTrue(gate.message.contains("1 breaking change against active version 1.0.0") && gate.message.contains("2.0.0"), gate.message)
+        assertTrue(
+            gate.message.contains("1 breaking change against published version 1.0.0") && gate.message.contains("2.0.0"),
+            gate.message,
+        )
         assertEquals(1, minor.checkErrors)
 
         val major = admin.postJson(path(c), VersionCreateRequest("2.0.0", narrowedPetstore))
@@ -636,7 +638,7 @@ class ContractVersionTest {
     }
 
     @Test
-    fun `breaking changes - the baseline is the highest ACTIVE version BELOW the candidate, drafts never count`() = testApplication {
+    fun `breaking changes - the baseline is the highest published version BELOW the candidate, drafts never count`() = testApplication {
         usePostgresTestcontainer()
         val admin = seededClient("vbase", UserRole.ADMIN)
         val c = admin.contract("vbase")
@@ -657,6 +659,33 @@ class ContractVersionTest {
         val draft = admin.get(path(c)).body<VersionPageResponse>().items.single { it.version == "1.1.0" }
         val edited = admin.putJson("${path(c)}/${draft.id}/content", VersionContentRequest(narrowedPetstore)).body<VersionResponse>()
         assertFalse(edited.findings.any { it.source == FindingSource.BREAKING })
+    }
+
+    @Test
+    fun `breaking baseline stays within the candidate line when possible and includes deprecated but not retired`() = testApplication {
+        usePostgresTestcontainer()
+        val admin = seededClient("vlinebase", UserRole.ADMIN)
+        val c = admin.contract("vlinebase")
+        admin.activate(c, "1.0.0", ContractFixtures.openApi)
+        val two = admin.activate(c, "2.0.0", ContractFixtures.openApi)
+        admin.postJson("${path(c)}/${two.id}/transition", TransitionRequest(Lifecycle.DEPRECATED))
+        val url = "/api/v1/contracts/versions/check"
+        val sameLine = admin.postJson(
+            url,
+            DocumentCheckRequest(ContractType.OPENAPI, narrowedPetstore, "2.1.0", c.id),
+        ).body<CheckReport>()
+        assertEquals("2.0.0", sameLine.baselineVersion)
+        val olderLine = admin.postJson(
+            url,
+            DocumentCheckRequest(ContractType.OPENAPI, narrowedPetstore, "1.1.0", c.id),
+        ).body<CheckReport>()
+        assertEquals("1.0.0", olderLine.baselineVersion, "a higher major is never a predecessor")
+        admin.postJson("${path(c)}/${two.id}/transition", TransitionRequest(Lifecycle.RETIRED))
+        val afterRetirement = admin.postJson(
+            url,
+            DocumentCheckRequest(ContractType.OPENAPI, narrowedPetstore, "3.0.0", c.id),
+        ).body<CheckReport>()
+        assertEquals("1.0.0", afterRetirement.baselineVersion)
     }
 
     @Test

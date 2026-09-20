@@ -46,9 +46,9 @@ describe("FindingsPanel", () => {
     expect(screen.getByRole("checkbox", { name: "Note" })).toBeDisabled();
   });
 
-  test("a live check that compared against an active version says so", () => {
+  test("a live check that compared against a published version says so", () => {
     renderWithProviders(<FindingsPanel findings={[]} mode="live" baselineVersion="1.4.0" />);
-    expect(screen.getByText("Compared against active version 1.4.0 for breaking changes")).toBeInTheDocument();
+    expect(screen.getByText("Compared against published version 1.4.0 for breaking changes")).toBeInTheDocument();
   });
 
   test("the empty states: waiting before the first live answer, then clean; an incomplete stored check is flagged", () => {

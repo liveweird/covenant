@@ -12,7 +12,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class VersionCreateRequest(
-    /** SemVer 2.0; unique per contract and greater than every existing version. */
+    /** SemVer 2.0; unique by precedence per contract (build metadata does not distinguish versions). */
     val version: String,
     /** The raw YAML or JSON text, at most `contracts.maxDocumentBytes` bytes. */
     val content: String,
@@ -59,7 +59,7 @@ data class DocumentCheckRequest(
     val content: String,
     /** When known, the SemVer the document is (to be) stored as — drives the version cross-check. */
     val version: String? = null,
-    /** When known, the contract the document belongs to — its highest ACTIVE version below `version` is the breaking baseline. */
+    /** When known, the contract whose highest eligible published predecessor is the breaking baseline. */
     val contractId: UInt? = null,
 )
 
@@ -113,7 +113,7 @@ data class VersionListItem(
 
 typealias VersionPageResponse = PageResponse<VersionListItem>
 
-data class VersionListFilter(val lifecycles: List<Lifecycle> = emptyList())
+data class VersionListFilter(val lifecycles: List<Lifecycle> = emptyList(), val major: Int? = null)
 
 data class VersionListResult(val items: List<VersionListItem>, val total: Long)
 

@@ -48,7 +48,8 @@ from Lettuce, that any new or edited spec must satisfy:
   read-only" when applicable). Today: `auth` and `changelog` (device-local
   localStorage only) are read-only; `accessibility` owns one API-seeded fixture contract with its
   domain/system/team (`e2e-axe-*`); `contracts` owns its throwaway domain/system/team/contract/user
-  (`e2e-dom-*`/`e2e-sys-*`/`e2e-team-*`/`e2e-petstore-*`/`e2e-readonly-*`); `errors` owns its
+  (`e2e-dom-*`/`e2e-sys-*`/`e2e-team-*`/`e2e-petstore-*`/`e2e-readonly-*`); `release-lines` owns its API-seeded `e2e-lines-*` contract, published versions and registries;
+  `errors` owns its
   throwaway API-seeded domain/system/team/contract (`e2e-errors-*`); `environments` owns its
   throwaway domain/system/environment and user; `notifications` owns its throwaway
   domain/system/team/contract and follower; `tryit` owns its throwaway domain/system/environment/
@@ -105,6 +106,9 @@ the same commit** — this list is the coverage map, the scenario file is the de
   the live check until the Major bump → the History section read; (3) teardown through the delete
   rules (draft deletes, an active version blocks the contract, deprecate → retire, then delete);
   plus a regular user's read-only tree, page and list.
+- [`release-lines.spec.ts`](scenarios/release-lines.md) — older-minor maintenance backports while
+  a newer major stays active, deprecated-version baselines, independent support policies and
+  pinned recommendations, line filtering, accessibility, and ending support without retiring versions.
 - [`errors.spec.ts`](scenarios/errors.md) — the catalog-wide Errors report: a soft-error version
   stored via the `allowInvalid` waiver shows up with its `OAS_PARSE` finding badge, the "Error"
   severity chip narrows it away and back, and its version link opens the version page; teardown of

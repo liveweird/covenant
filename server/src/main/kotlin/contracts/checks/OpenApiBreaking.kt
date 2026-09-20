@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory
 
 /**
  * OpenAPI breaking changes (milestone 2): the candidate document against the baseline (the
- * highest ACTIVE version below it) through openapi-diff-core, walked into one BREAKING finding
+ * highest eligible published version below it) through openapi-diff-core, walked into one BREAKING finding
  * per incompatible element — a removed operation, a removed or newly required parameter, an
  * incompatible parameter/request body/response schema, a removed response, a changed security
  * requirement. Both trees are parsed WITHOUT resolving external `$ref`s (never a fetch); the

@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Alert, Box, Button, Grid, Group, Paper, Select, Stack, Text, TextInput } from "@mantine/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getContract } from "../api/contracts";
+import { getContract, type ContractType } from "../api/contracts";
 import { ApiError } from "../api/http";
-import { createVersion, getVersion, listVersions } from "../api/versions";
+import { createVersion, getVersion, listAllVersions } from "../api/versions";
 import DocumentSourcePicker from "../components/DocumentSourcePicker";
 import EditPageLoadState from "../components/EditPageLoadState";
 import FindingsPanel from "../components/FindingsPanel";
@@ -19,7 +19,7 @@ import { contractPath, contractsPath, versionPath } from "../utils/contractLinks
 import { blankTemplate, detectFormat, MAX_DOCUMENT_BYTES, type SeededDocument, utf8Length } from "../utils/document";
 import { toDiagnostics } from "../utils/findingDiagnostics";
 import { loadErrorMessage } from "../utils/saveError";
-import { bumpSemver, compareSemver, isValidSemver, MAX_VERSION_LENGTH, parseSemver, type BumpKind } from "../utils/semver";
+import { bumpSemver, isValidSemver, MAX_VERSION_LENGTH, parseSemver, type BumpKind } from "../utils/semver";
 import { showSuccessToast } from "../utils/toast";
 import classes from "../theme.module.css";
 
@@ -42,13 +42,8 @@ export default function NewVersion() {
   const seeded = useLocation().state as SeededDocument | null;
   const id = Number(idParam);
   const fromParam = seeded ? null : params.get("from");
+  const requestedMajor = startingMajor(seeded?.version, params.get("major"));
   const contract = useQuery({ queryKey: ["contracts", "detail", id], queryFn: () => getContract(id), enabled: Number.isFinite(id) });
-  const versions = useQuery({
-    queryKey: ["contracts", "versions", id, "all"],
-    queryFn: () => listVersions(id, { page: 1, pageSize: 100, sort: "-version" }),
-    enabled: Number.isFinite(id),
-  });
-  const highest = versions.data?.items[0]?.version ?? null;
 
   const [version, setVersion] = useState<string | null>(seeded?.version ?? null);
   const [content, setContent] = useState<string | null>(seeded?.content ?? null);
@@ -64,34 +59,28 @@ export default function NewVersion() {
     queryFn: () => getVersion(id, Number(copyFrom)),
     enabled: copyFrom != null && Number.isFinite(Number(copyFrom)),
   });
+  const selectedMajor = requestedMajor ?? (source.data ? parseSemver(source.data.version)?.major : undefined);
+  const versions = useQuery({
+    queryKey: ["contracts", "versions", id, "all", selectedMajor ?? "all"],
+    queryFn: () => listAllVersions(id, selectedMajor),
+    enabled: Number.isFinite(id) && (copyFrom == null || selectedMajor != null),
+  });
+  const highest = versions.data?.[0]?.version ?? null;
+  const bumpBase = source.data?.version ?? highest;
 
-  // Defaults resolve once the data is in: the next patch after the highest (or 1.0.0), and
-  // the copied text (or the type's blank template). A user edit wins from then on.
-  const effectiveVersion = version ?? (highest ? (bumpSemver(highest, "patch") ?? "") : "1.0.0");
+  // Defaults resolve once the selected line/source is in: the next patch in that line (or
+  // 1.0.0), and the copied text (or type template). Explicit user edits win from then on.
+  const effectiveVersion = version ?? (bumpBase ? (bumpSemver(bumpBase, "patch") ?? "") : initialVersion(selectedMajor));
   const type = contract.data?.type;
-  const effectiveContent =
-    content ?? (copyFrom != null ? (source.data?.content ?? "") : type ? blankTemplate(type, effectiveVersion, contract.data?.name ?? "") : "");
+  const effectiveContent = initialContent(content, copyFrom, source.data?.content, type, effectiveVersion, contract.data?.name ?? "");
   const format = detectFormat(effectiveContent);
-  // Naming the contract adds the breaking-change comparison against its highest ACTIVE version
+  // Naming the contract adds the breaking-change comparison against its highest published version
   // (an unparsable URL id is NaN, which the hook's JSON body carries as null — no branch needed).
   const check = useDocumentCheck({ type: type ?? "OPENAPI", content: type ? effectiveContent : "", version: effectiveVersion || null, contractId: id });
-  const diagnostics = useMemo(() => toDiagnostics(check.findings, effectiveContent), [check.findings, effectiveContent]);
+  const diagnostics = toDiagnostics(check.findings, effectiveContent);
 
-  const versionError = (() => {
-    if (!effectiveVersion.trim()) return t("versions.validation.versionRequired");
-    if (effectiveVersion.length > MAX_VERSION_LENGTH || !isValidSemver(effectiveVersion)) return t("versions.validation.versionFormat");
-    if (highest) {
-      const a = parseSemver(effectiveVersion);
-      const b = parseSemver(highest);
-      if (a && b && compareSemver(a, b) <= 0) return t("versions.validation.versionNotAbove", { highest });
-    }
-    return null;
-  })();
-  const contentError = !effectiveContent.trim()
-    ? t("versions.validation.contentRequired")
-    : utf8Length(effectiveContent) > MAX_DOCUMENT_BYTES
-      ? t("versions.validation.contentTooLarge")
-      : null;
+  const versionError = validateVersion(effectiveVersion, t("versions.validation.versionRequired"), t("versions.validation.versionFormat"));
+  const contentError = validateContent(effectiveContent, t("versions.validation.contentRequired"), t("versions.validation.contentTooLarge"));
   const hasHard = check.findings.some((f) => f.source === "SYNTAX");
 
   const save = useVersionSave({
@@ -125,7 +114,7 @@ export default function NewVersion() {
   if (!data.canWrite) {
     return <EditPageLoadState isLoading={false} message={t("contracts.saveForbidden")} backTo={contractPath(id)} backLabel={t("contracts.backToContract")} />;
   }
-  const copyOptions = (versions.data?.items ?? []).map((v) => ({ value: String(v.id), label: `${v.version} (${t(`versions.lifecycle.${v.lifecycle}`)})` }));
+  const copyOptions = (versions.data ?? []).map((v) => ({ value: String(v.id), label: `${v.version} (${t(`versions.lifecycle.${v.lifecycle}`)})` }));
 
   return (
     <Stack gap="md">
@@ -139,6 +128,7 @@ export default function NewVersion() {
         }
         backTo={{ to: contractPath(id), label: t("contracts.backToContract") }}
       />
+      <SourceLoadAlert error={source.isError ? source.error : null} />
       <Paper withBorder p="lg" radius="md">
         <Stack gap="md">
           <Group align="flex-end" gap="sm" wrap="wrap">
@@ -155,7 +145,7 @@ export default function NewVersion() {
             />
             <Group gap={4} pb={versionError ? 26 : 6}>
               {BUMPS.map((kind) => (
-                <Button key={kind} size="xs" variant="default" disabled={!highest} onClick={() => highest && setVersion(bumpSemver(highest, kind) ?? "")}>
+                <Button key={kind} size="xs" variant="default" disabled={!bumpBase} onClick={() => bumpBase && setVersion(bumpSemver(bumpBase, kind) ?? "")}>
                   {t(`versions.bump.${kind}`)}
                 </Button>
               ))}
@@ -188,11 +178,7 @@ export default function NewVersion() {
         <Grid.Col span={{ base: 12, lg: 8 }}>
           <Stack gap="xs">
             <LazyCodeEditor value={effectiveContent} onChange={setContent} format={format} diagnostics={diagnostics} jumpTo={jump} ariaLabel={t("versions.editorAria")} />
-            {contentError && (
-              <Text size="sm" c="red">
-                {contentError}
-              </Text>
-            )}
+            <ContentError message={contentError} />
           </Stack>
         </Grid.Col>
         <Grid.Col span={{ base: 12, lg: 4 }}>
@@ -210,11 +196,7 @@ export default function NewVersion() {
           </Box>
         </Grid.Col>
       </Grid>
-      {save.error && (
-        <Alert color="red" variant="light" title={save.error.message}>
-          {save.error.detail}
-        </Alert>
-      )}
+      <SaveError error={save.error} />
       <Paper withBorder p="md" radius="md" className={`${classes.stickyActions} ${classes.stickyActionsPage}`}>
         <Group justify="space-between">
           <Text size="sm" c="dimmed">
@@ -224,7 +206,7 @@ export default function NewVersion() {
             <Button variant="default" onClick={() => navigate(contractPath(id))} disabled={save.submitting}>
               {t("common.action.cancel")}
             </Button>
-            <Button onClick={() => void save.submit()} loading={save.submitting} disabled={!!versionError || !!contentError || hasHard}>
+            <Button onClick={() => void save.submit()} loading={save.submitting} disabled={!!versionError || !!contentError || hasHard || source.isError}>
               {t("versions.saveDraft")}
             </Button>
           </Group>
@@ -233,4 +215,68 @@ export default function NewVersion() {
       <SaveAnywayModal findings={save.waiverFindings} onCancel={save.cancelWaiver} onConfirm={() => void save.saveAnyway()} saving={save.submitting} />
     </Stack>
   );
+}
+
+function parseMajor(raw: string | null): number | undefined {
+  if (raw == null || !/^\d+$/.test(raw)) return undefined;
+  const value = Number(raw);
+  return Number.isSafeInteger(value) ? value : undefined;
+}
+
+function startingMajor(seededVersion: string | undefined, majorParam: string | null): number | undefined {
+  return seededVersion ? parseSemver(seededVersion)?.major : parseMajor(majorParam);
+}
+
+function initialVersion(major: number | undefined): string {
+  if (major == null) return "1.0.0";
+  return major === 0 ? "0.1.0" : `${major}.0.0`;
+}
+
+function initialContent(
+  edited: string | null,
+  copyFrom: string | null,
+  sourceContent: string | undefined,
+  type: ContractType | undefined,
+  version: string,
+  contractName: string,
+): string {
+  if (edited != null) return edited;
+  if (copyFrom != null) return sourceContent ?? "";
+  return type ? blankTemplate(type, version, contractName) : "";
+}
+
+function validateVersion(value: string, requiredMessage: string, formatMessage: string): string | null {
+  if (!value.trim()) return requiredMessage;
+  return value.length > MAX_VERSION_LENGTH || !isValidSemver(value) ? formatMessage : null;
+}
+
+function validateContent(value: string, requiredMessage: string, tooLargeMessage: string): string | null {
+  if (!value.trim()) return requiredMessage;
+  return utf8Length(value) > MAX_DOCUMENT_BYTES ? tooLargeMessage : null;
+}
+
+function SourceLoadAlert({ error }: { error: unknown | null }) {
+  const { t } = useTranslation();
+  if (!error) return null;
+  return (
+    <Alert color="red" variant="light" title={t("versions.sourceVersionLoadFailed")}>
+      {loadErrorMessage(error, t)}
+    </Alert>
+  );
+}
+
+function ContentError({ message }: { message: string | null }) {
+  return message ? (
+    <Text size="sm" c="red">
+      {message}
+    </Text>
+  ) : null;
+}
+
+function SaveError({ error }: { error: { message: string; detail?: string } | null }) {
+  return error ? (
+    <Alert color="red" variant="light" title={error.message}>
+      {error.detail}
+    </Alert>
+  ) : null;
 }

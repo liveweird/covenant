@@ -1223,7 +1223,7 @@ paths:
         cross-checks — returned as findings-so-far: a broken document is a `200` whose report
         carries the HARD finding, never a `400`. Pass `version` to get the declared-version
         cross-check; pass `contractId` too and the document is compared against that contract's
-        highest ACTIVE version below `version` (the report's `baselineVersion`): each breaking
+        highest ACTIVE or DEPRECATED version below `version` (the report's `baselineVersion`): each breaking
         change is a `BREAKING` finding — INFO once `version` carries the MAJOR bump, otherwise
         WARN plus one soft ERROR `BREAKING_WITHOUT_MAJOR_BUMP`. Nothing stored, no audit.
       requestBody:
@@ -1449,6 +1449,64 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
         '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/{id}/release-lines:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [contracts]
+      operationId: listContractReleaseLines
+      summary: List a contract's major release lines
+      description: Any authenticated user. Default sort `-major`; sortable by `major` and `updatedAt`.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+      responses:
+        '200':
+          description: A page of release lines
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReleaseLinePage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/{id}/release-lines/{major}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+      - $ref: '#/components/parameters/ReleaseLineMajor'
+    get:
+      tags: [contracts]
+      operationId: getContractReleaseLine
+      summary: Get one major release line
+      responses:
+        '200':
+          description: The release line and its effective recommendation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReleaseLineResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    put:
+      tags: [contracts]
+      operationId: replaceContractReleaseLine
+      summary: Replace a major release line's support policy
+      description: Writers only. A pinned recommendation must be an ACTIVE stable version in this contract and major. END_OF_LIFE rejects a pin and has no effective recommendation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReleaseLineUpdateRequest' }
+      responses:
+        '204': { description: "Replaced, or already equal" }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
   /api/v1/contracts/{id}/versions:
     parameters:
       - $ref: '#/components/parameters/ResourceId'
@@ -1459,12 +1517,13 @@ paths:
       description: |
         Any authenticated user. Default sort `-version` (highest SemVer first — `version` sorts by
         the parsed triple, a release above its prereleases); also `id`, `lifecycle`, `createdAt`,
-        `updatedAt`. `lifecycle` is a repeatable any-of filter.
+        `updatedAt`. `lifecycle` is a repeatable any-of filter; `major` is a scalar major-line filter.
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
         - $ref: '#/components/parameters/Sort'
         - $ref: '#/components/parameters/ContractLifecycle'
+        - $ref: '#/components/parameters/VersionMajor'
       responses:
         '200':
           description: A page of versions
@@ -1481,8 +1540,8 @@ paths:
       operationId: createContractVersion
       summary: Add a DRAFT version
       description: |
-        Writers only. `version` must be SemVer 2.0, unique on the contract (`409`) and greater
-        than every existing version (`400`). The document must pass the HARD gate — parseable,
+        Writers only. `version` must be SemVer 2.0 and unique by SemVer precedence on the contract
+        (`409`; build metadata does not distinguish versions). The document must pass the HARD gate — parseable,
         the contract's standard (`400`, never waivable); a SOFT `ERROR` finding blocks unless
         `allowInvalid=true` (the editor's Save-anyway; the findings are re-obtainable through
         `POST /contracts/versions/check`). The check report is stored with the text; the
@@ -1924,7 +1983,7 @@ paths:
         required: false
         description: |
           The OLDER/reference version's id (`vid` is the newer/candidate side); omitted, the
-          contract's highest ACTIVE version below `vid` is used. `against == vid` is legal (→
+          contract's highest ACTIVE or DEPRECATED version below `vid` is used. `against == vid` is legal (→
           `FULL`, identical). Must be a version of the SAME contract.
         schema: { type: integer, format: int32, minimum: 0 }
     get:
@@ -1936,7 +1995,7 @@ paths:
         Computes BOTH directions between the pair: backward (do `from`'s consumers still work
         against `to`?) and forward (do `to`'s consumers already work against `from`?), the same raw
         breaking-change facts the check pipeline draws on, and names the two-way `verdict` plus the
-        SemVer `bump` between them. With no ACTIVE predecessor and no `against`, the report answers
+        SemVer `bump` between them. With no published predecessor and no `against`, the report answers
         `200` with `from: null` and `verdict: UNKNOWN`.
       responses:
         '200':
@@ -2346,6 +2405,17 @@ components:
       name: vid
       in: path
       required: true
+      schema: { type: integer, format: int32, minimum: 0 }
+    ReleaseLineMajor:
+      name: major
+      in: path
+      required: true
+      schema: { type: integer, format: int32, minimum: 0 }
+    VersionMajor:
+      name: major
+      in: query
+      required: false
+      description: Filter versions to one SemVer major release line. Repetition is invalid.
       schema: { type: integer, format: int32, minimum: 0 }
     AllowInvalid:
       name: allowInvalid
@@ -3163,7 +3233,7 @@ components:
           items: { $ref: '#/components/schemas/ExportedVersion' }
     ContractEventType:
       type: string
-      enum: [CREATED, UPDATED, OWNER_CHANGED, DELETED, VERSION_CREATED, VERSION_CONTENT_UPDATED, VERSION_TRANSITIONED, VERSION_DELETED, VERSION_RECHECKED, VERSION_SOURCE_CHANGED, VERSION_SYNCED, IMPORTED]
+      enum: [CREATED, UPDATED, OWNER_CHANGED, DELETED, VERSION_CREATED, VERSION_CONTENT_UPDATED, VERSION_TRANSITIONED, VERSION_DELETED, VERSION_RECHECKED, VERSION_SOURCE_CHANGED, VERSION_SYNCED, IMPORTED, RELEASE_LINE_UPDATED]
     ContractEventResponse:
       type: object
       required: [id, contractId, userId, userName, timestamp, type, params]
@@ -3190,7 +3260,7 @@ components:
         total: { type: integer, format: int64, minimum: 0 }
     NotificationType:
       type: string
-      enum: [CONTRACT_UPDATED, CONTRACT_OWNER_CHANGED, CONTRACT_DELETED, VERSION_CREATED, VERSION_CONTENT_UPDATED, VERSION_TRANSITIONED, VERSION_DELETED, VERSION_SYNCED, VERSION_SOURCE_CHANGED, VERSION_IMPORTED, VERSION_BREAKING_STORED]
+      enum: [CONTRACT_UPDATED, CONTRACT_OWNER_CHANGED, CONTRACT_DELETED, VERSION_CREATED, VERSION_CONTENT_UPDATED, VERSION_TRANSITIONED, VERSION_DELETED, VERSION_SYNCED, VERSION_SOURCE_CHANGED, VERSION_IMPORTED, VERSION_BREAKING_STORED, RELEASE_LINE_UPDATED]
       description: The notification kind; the SPA renders it in the viewer's language. A kind a client build does not know renders as its raw name.
     NotificationResponse:
       type: object
@@ -3958,14 +4028,14 @@ components:
         baselineVersion:
           type: string
           nullable: true
-          description: The ACTIVE version the document was compared against for breaking changes; null when none applied.
+          description: The ACTIVE or DEPRECATED version the document was compared against for breaking changes; null when none applied.
     CompatibilityVerdict:
       type: string
       enum: [FULL, BACKWARD, FORWARD, NONE, UNKNOWN]
       description: |
         `FULL` (both directions compatible), `BACKWARD` (consumers of `from` still work against
         `to`), `FORWARD` (consumers of `to` already worked against `from`), `NONE` (neither), or
-        `UNKNOWN` (a direction could not be computed — no ACTIVE predecessor, an unparseable side,
+        `UNKNOWN` (a direction could not be computed — no published predecessor, an unparseable side,
         a differ skip, the checker down for AsyncAPI).
     VersionBump:
       type: string
@@ -3999,7 +4069,7 @@ components:
         from:
           allOf: [{ $ref: '#/components/schemas/VersionRef' }]
           nullable: true
-          description: The older/reference side; null when no ACTIVE predecessor exists and `against` was omitted.
+          description: The older/reference side; null when no published predecessor exists and `against` was omitted.
         to: { $ref: '#/components/schemas/VersionRef' }
         verdict: { $ref: '#/components/schemas/CompatibilityVerdict' }
         bump:
@@ -4021,7 +4091,54 @@ components:
           type: integer
           minimum: 0
           nullable: true
-          description: The contract the document belongs to — its highest ACTIVE version below `version` becomes the breaking-change baseline.
+          description: The contract the document belongs to — its highest ACTIVE or DEPRECATED version below `version` becomes the breaking-change baseline.
+    SupportStatus:
+      type: string
+      enum: [UNSPECIFIED, SUPPORTED, MAINTENANCE, END_OF_LIFE]
+    ReleaseLineVersionSummary:
+      type: object
+      required: [id, version, lifecycle]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        version: { type: string }
+        lifecycle: { $ref: '#/components/schemas/Lifecycle' }
+    ReleaseLineUpdateRequest:
+      type: object
+      required: [supportStatus]
+      properties:
+        supportStatus: { $ref: '#/components/schemas/SupportStatus' }
+        supportEndsOn: { type: string, format: date, nullable: true }
+        supportPolicy: { type: string, maxLength: 2000, nullable: true }
+        recommendedVersionId: { type: integer, format: int32, minimum: 0, nullable: true }
+    ReleaseLineResponse:
+      type: object
+      required: [id, contractId, major, supportStatus, supportEndsOn, supportPolicy, recommendedVersionId, latestVersion, recommendedVersion, versionCount, updatedAt]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        contractId: { type: integer, format: int32, minimum: 0 }
+        major: { type: integer, format: int32, minimum: 0 }
+        supportStatus: { $ref: '#/components/schemas/SupportStatus' }
+        supportEndsOn: { type: string, format: date, nullable: true }
+        supportPolicy: { type: string, nullable: true }
+        recommendedVersionId: { type: integer, format: int32, minimum: 0, nullable: true }
+        latestVersion:
+          allOf: [{ $ref: '#/components/schemas/ReleaseLineVersionSummary' }]
+          nullable: true
+        recommendedVersion:
+          allOf: [{ $ref: '#/components/schemas/ReleaseLineVersionSummary' }]
+          nullable: true
+        versionCount: { type: integer, format: int64, minimum: 0 }
+        updatedAt: { type: integer, format: int64 }
+    ReleaseLinePage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ReleaseLineResponse' }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, format: int64, minimum: 0 }
     VersionCreateRequest:
       type: object
       required: [version, content]

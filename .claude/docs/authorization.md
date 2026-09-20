@@ -34,3 +34,8 @@ the bounded external send, with transaction retries disabled so a database retry
 
 - **The HR read-only auditor role** (audited `hr.read`/`hr.list` cross-user reads) — with it, Lettuce's rule that every HR-privileged read is audit-logged.
 - **The management-chain rule** (`teams/ManagementChain.kt` — transitive manager rights) — **deliberately NOT ported**: Covenant's teams are flat (membership only, no manager, no chain). Port only if a hierarchy of teams ever becomes a requirement.
+
+**Release-line policies (0.9.0).** Authenticated users can list/read release lines. PUT uses the
+existing contract writer guard before decoding the body and `requireCurrentWriter` in the
+committing transaction. The recommended version must belong to that contract and major and be
+ACTIVE and stable. Support status/date never grants permissions or changes version lifecycle.

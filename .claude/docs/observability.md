@@ -34,3 +34,9 @@ Field-naming convention: the acting caller is `byUserId` everywhere except the a
 Never log secrets (passwords, tokens); emails/ids are fine. When adding a security-relevant mutation or denial path, emit an `audit(...)` event alongside it and extend this list in the same change (Toadie's one sanctioned exception was a per-user view-state PUT written on every drag — pure view state may stay unaudited, with a documented justification) — in Lettuce this catalog grows to every user/team/content mutation, and the convention transfers wholesale. Tested in `AuditTest` via a Logback `ListAppender` on the audit logger (the shared `LogCapture` helper in `TestEnvironment.kt`).
 
 **Health probes** (`plugins/Health.kt`): `GET /api/v1/health` answers `{status: ok}` whenever the process serves requests (the image's `HEALTHCHECK`, the compose healthcheck and the k8s liveness probe); `GET /api/v1/ready` additionally round-trips the database (one `SELECT` on `users`, 3 s budget) and answers a `503` problem while it fails (the k8s readiness probe and the e2e global setup wait on it). Both are public and unaudited — they are called every few seconds and disclose nothing. Tests: `HealthTest` (the `ReadinessProbeKey` seam swaps the database probe for a failing one).
+
+**Release-line policies (0.9.0).** A changed policy emits `contract.release_line_updated` with
+actor, contract and major-line identifiers, and records `RELEASE_LINE_UPDATED` through
+`ContractActivity` for history and follower notifications. Unchanged replacement PUTs are
+no-ops. Automatic recommendation changes caused by a version transition accompany that
+version's existing transition event; they do not introduce a second user action.

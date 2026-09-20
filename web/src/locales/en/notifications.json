@@ -24,6 +24,7 @@
     "VERSION_SYNCED": "{{actor}} synced {{contractName}} {{version}} from its source.",
     "VERSION_SOURCE_CHANGED": "{{actor}} changed the source link of {{contractName}} {{version}}.",
     "VERSION_IMPORTED": "{{actor}} imported version {{version}} of {{contractName}}.",
-    "VERSION_BREAKING_STORED": "{{contractName}} {{version}} was stored with a breaking change and no major bump."
+    "VERSION_BREAKING_STORED": "{{contractName}} {{version}} was stored with a breaking change and no major bump.",
+    "RELEASE_LINE_UPDATED": "{{actor}} updated the support policy for {{contractName}} {{major}}.x ({{supportStatus}})."
   }
 }

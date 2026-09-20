@@ -54,13 +54,13 @@ export const COMPATIBILITY = {
   forward: { compatible: false, findings: [FINDING] },
   checkerAvailable: true,
 };
-/** No ACTIVE predecessor below `to` — `from: null`, `verdict: UNKNOWN`, both directions carry the skipped note. */
+/** No published predecessor below `to` — `from: null`, `verdict: UNKNOWN`, both directions carry the skipped note. */
 export const COMPATIBILITY_NO_BASELINE = {
   from: null,
   to: { id: 10, version: "1.0.0", lifecycle: "ACTIVE" as const },
   verdict: "UNKNOWN" as const,
-  backward: { compatible: null, findings: [{ severity: "INFO" as const, source: "SYSTEM" as const, code: "BREAKING_CHECK_SKIPPED", message: "no active version to compare against" }] },
-  forward: { compatible: null, findings: [{ severity: "INFO" as const, source: "SYSTEM" as const, code: "BREAKING_CHECK_SKIPPED", message: "no active version to compare against" }] },
+  backward: { compatible: null, findings: [{ severity: "INFO" as const, source: "SYSTEM" as const, code: "BREAKING_CHECK_SKIPPED", message: "no published version to compare against" }] },
+  forward: { compatible: null, findings: [{ severity: "INFO" as const, source: "SYSTEM" as const, code: "BREAKING_CHECK_SKIPPED", message: "no published version to compare against" }] },
   checkerAvailable: true,
 };
 export const EVENT = { id: 31, contractId: 5, userId: 1, userName: "Ada Admin", timestamp: 1_700_000_000_000, type: "VERSION_TRANSITIONED" as const, params: { version: "1.0.0", from: "PROPOSED", to: "ACTIVE" } };
@@ -107,6 +107,7 @@ export type FetchMock = Mock;
  */
 export function serve(mockFetch: FetchMock, routes: Record<string, Route> = {}) {
   const table: Record<string, Route> = {
+    "GET /api/v1/contracts/5/release-lines?": { status: 200, body: { items: [], page: 1, pageSize: 100, total: 0 } },
     "GET /api/v1/systems?": { status: 200, body: SYSTEMS_PAGE },
     "GET /api/v1/domains?": { status: 200, body: DOMAINS_PAGE },
     "GET /api/v1/teams?": { status: 200, body: TEAMS_PAGE },

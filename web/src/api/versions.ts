@@ -46,15 +46,26 @@ type Lifecycle = components["schemas"]["Lifecycle"];
 
 export type SaveOptions = { allowInvalid?: boolean };
 
-type VersionListQuery = { page: number; pageSize: number; sort?: string; lifecycle?: Lifecycle };
+type VersionListQuery = { page: number; pageSize: number; sort?: string; lifecycle?: Lifecycle; major?: number };
 
 function withWaiver(path: string, options?: SaveOptions): string {
   return options?.allowInvalid ? `${path}?allowInvalid=true` : path;
 }
 
 export async function listVersions(contractId: number, q: VersionListQuery): Promise<VersionPage> {
-  const params = buildQuery({ page: q.page, pageSize: q.pageSize, sort: q.sort, lifecycle: q.lifecycle });
+  const params = buildQuery({ page: q.page, pageSize: q.pageSize, sort: q.sort, lifecycle: q.lifecycle, major: q.major });
   return jsonRequest<VersionPage>(`/api/v1/contracts/${contractId}/versions?${params}`);
+}
+
+/** Fetch every version in a contract or major line without assuming the server's maximum page size. */
+export async function listAllVersions(contractId: number, major?: number): Promise<VersionListItem[]> {
+  const pageSize = 100;
+  const items: VersionListItem[] = [];
+  for (let page = 1; ; page += 1) {
+    const result = await listVersions(contractId, { page, pageSize, sort: "-version", major });
+    items.push(...result.items);
+    if (items.length >= result.total || result.items.length === 0) return items;
+  }
 }
 
 export async function getVersion(contractId: number, versionId: number): Promise<VersionResponse> {
@@ -69,7 +80,7 @@ export async function getVersionModel(contractId: number, versionId: number): Pr
 
 /**
  * The two-way compatibility report between this version (`to`) and another (`against`, the
- * older/reference side) — omitted `against` means the contract's highest ACTIVE version below
+ * older/reference side) — omitted `against` means the contract's highest published version below
  * `to` (and, with none, `from: null`/`verdict: UNKNOWN`). Pure and unstored, like `getVersionModel`.
  */
 export async function getVersionCompatibility(contractId: number, versionId: number, against?: number): Promise<CompatibilityReport> {

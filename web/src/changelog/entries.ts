@@ -17,6 +17,22 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.9.0",
+    date: "2026-09-20",
+    en: `**Maintain several release lines in parallel.**
+
+- Keep 1.x and 2.x available together, and add maintenance backports even after newer minor or major versions exist.
+- Give each major line its own support status, support-end date and policy notes, with an automatic or pinned recommended stable version.
+- Browse and create versions within a release line. The highest catalog version is shown separately from recommendations.
+- Compatibility checks use the relevant published predecessor, including deprecated versions. Ending support for a line leaves version lifecycles unchanged.`,
+    pl: `**Utrzymuj kilka linii wydań równolegle.**
+
+- Udostępniaj jednocześnie linie 1.x i 2.x oraz dodawaj poprawki do starszych wersji także po utworzeniu nowszych wersji minor lub major.
+- Określaj osobno dla każdej linii major status wsparcia, datę jego zakończenia i zasady oraz wybieraj zalecaną stabilną wersję automatycznie lub ręcznie.
+- Przeglądaj i twórz wersje w wybranej linii wydań. Najwyższa wersja w katalogu jest pokazywana oddzielnie od rekomendacji.
+- Sprawdzanie zgodności uwzględnia właściwą wcześniejszą opublikowaną wersję, również przestarzałą. Zakończenie wsparcia linii nie zmienia cyklu życia jej wersji.`,
+  },
+  {
     version: "0.8.1",
     date: "2026-09-20",
     en: `**Maintenance and reliability fixes.**

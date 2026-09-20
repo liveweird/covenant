@@ -110,7 +110,8 @@ private val UNIQUE_CONSTRAINT_DETAILS = mapOf(
     "uq_systems_domain_name_active" to "A system with this name already exists in this domain",
     "uq_environments_system_name_active" to "An environment with this name already exists in this system",
     "uq_contracts_system_name_active" to "A contract with this name already exists in this system",
-    "uq_contract_versions_version_active" to "This version already exists on the contract",
+    "uq_contract_versions_precedence_active" to "This SemVer precedence already exists on the contract",
+    "uq_contract_release_lines_contract_major" to "This release line already exists on the contract",
 )
 
 private fun Throwable.uniqueViolationDetail(): String {

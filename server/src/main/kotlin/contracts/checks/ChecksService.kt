@@ -19,7 +19,7 @@ val ChecksServiceKey = AttributeKey<ChecksService>("ChecksService")
  * 4. the JVM validator for the type (SOFT: SCHEMA/SEMANTIC);
  * 5. the checker sidecar for OPENAPI/ASYNCAPI (SOFT: LINT/SEMANTIC) — any failure becomes one
  *    `SYSTEM WARN CHECKER_UNAVAILABLE` finding and `checkerAvailable = false`, never an error;
- * 6. the breaking-change step when a `baseline` (the contract's highest ACTIVE version below the
+ * 6. the breaking-change step when a `baseline` (the contract's highest eligible published version below the
  *    candidate) is known — openapi-diff / the checker's `@asyncapi/diff` pass / `OdcsBreaking`
  *    report the facts, `BreakingChanges.settle` decides WARN vs INFO by the MAJOR bump and adds
  *    the soft `ERROR` `BREAKING_WITHOUT_MAJOR_BUMP` when the bump is missing;
@@ -83,13 +83,13 @@ class ChecksService(private val checkerProvider: () -> CheckerClient) {
      * The two-way compatibility report between an arbitrary pair (`contracts/checks/Compatibility.kt`):
      * `backward` = the facts of comparing old=`from` → new=`to`, `forward` = old=`to` → new=`from` —
      * the same raw facts `BreakingChanges`/`settle` draw on, kept at their WARN severity (no
-     * MAJOR-bump flip here; that sentence is the SPA's). `from == null` (no ACTIVE predecessor)
+     * MAJOR-bump flip here; that sentence is the SPA's). `from == null` (no published predecessor)
      * answers UNKNOWN without touching any engine; identical text on both sides short-circuits to
      * `compatible = true` twice, likewise without an engine call.
      */
     suspend fun compatibility(type: ContractType, from: Baseline?, toVersion: SemVer, toContent: String): CompatibilityOutcome {
         if (from == null) {
-            val note = CompatibilityDirection(null, listOf(skippedFinding("no active version to compare against")))
+            val note = CompatibilityDirection(null, listOf(skippedFinding("no published version to compare against")))
             return CompatibilityOutcome(CompatibilityVerdict.UNKNOWN, null, note, note, checkerAvailable = true)
         }
         if (from.content == toContent) {

@@ -183,6 +183,11 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
                 it[versions.markedAsDeleted] = true
                 it[versions.updatedAt] = stamp
             }
+            val lines = ReleaseLineService.ReleaseLines
+            lines.update({ (lines.contractId eq id) and lines.active() }) {
+                it[lines.markedAsDeleted] = true
+                it[lines.updatedAt] = stamp
+            }
         }
         rows
     }

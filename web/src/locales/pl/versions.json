@@ -1,8 +1,8 @@
 {
   "newVersion": "Nowa wersja",
   "newTitle": "Nowa wersja {{name}}",
-  "newIntroHighest": "Najwyższa dotychczasowa wersja to {{highest}} — nowa musi być wyższa.",
-  "newIntroFirst": "Kontrakt nie ma jeszcze wersji — ta będzie pierwsza.",
+  "newIntroHighest": "Wybrana linia wydań kończy się obecnie na {{highest}}.",
+  "newIntroFirst": "Wybrana linia wydań nie ma jeszcze wersji.",
   "newFromThis": "Nowa wersja na podstawie tej",
   "compare": "Porównaj wersje",
   "compareWithLatest": "Porównaj z najnowszą",
@@ -17,6 +17,7 @@
   "empty": "Brak wersji",
   "emptyWriter": "Brak wersji — dodaj pierwszy dokument",
   "loadFailed": "Nie udało się wczytać wersji",
+  "sourceVersionLoadFailed": "Nie udało się wczytać wybranej wersji początkowej",
   "notFound": "Ta wersja nie istnieje (lub została usunięta).",
   "gone": "Ta wersja już nie istnieje — odśwież stronę",
   "editorAria": "Dokument kontraktu",
@@ -37,7 +38,9 @@
     "title": "Tytuł dokumentu",
     "specVersion": "Spec",
     "startFrom": "Zacznij od",
-    "startFromHint": "Skopiuj dokument zapisanej wersji jako punkt wyjścia"
+    "startFromHint": "Skopiuj dokument zapisanej wersji jako punkt wyjścia",
+    "releaseLine": "Linia wydań",
+    "allReleaseLines": "Wszystkie linie wydań"
   },
   "bump": {
     "major": "Główna",
@@ -153,8 +156,8 @@
     },
     "breaksTitle": "Co psuje integracje korzystające z {{version}}",
     "nothing": "Nic.",
-    "noBaseline": "Brak aktywnej wersji do porównania",
-    "compact": "Zgodność z {{from}} (aktywna):",
+    "noBaseline": "Brak opublikowanej wersji do porównania",
+    "compact": "Zgodność z {{from}} (opublikowana):",
     "details": "Szczegóły",
     "checkerUnavailable": "Nie udało się połączyć z mechanizmem sprawdzającym AsyncAPI — nie można zweryfikować tego kierunku."
   },

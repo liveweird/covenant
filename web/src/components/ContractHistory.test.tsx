@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { renderWithProviders, screen, within } from "../test/render";
 import ContractHistory from "./ContractHistory";
 import { EVENT, serve, signIn, type FetchMock } from "../test/contractsFixtures";
+import i18n from "../i18n";
 
 const at = (id: number, type: string, params: Record<string, string>) => ({ ...EVENT, id, type, params });
 
@@ -33,8 +34,10 @@ describe("ContractHistory", () => {
       at(11, "VERSION_SOURCE_CHANGED", { version: "1.2.0", sourceUrl: "https://github.com/acme/c/blob/main/o.yaml" }),
       at(12, "VERSION_SOURCE_CHANGED", { version: "1.2.0", sourceUrl: "" }),
       at(13, "VERSION_SYNCED", { version: "1.2.0" }),
+      at(14, "RELEASE_LINE_UPDATED", { major: "1", supportStatus: "MAINTENANCE" }),
+      at(15, "RELEASE_LINE_UPDATED", { major: "9", supportStatus: "FUTURE_SUPPORT" }),
     ];
-    serve(mockFetch, { "GET /api/v1/contracts/5/events?": { status: 200, body: { items, page: 1, pageSize: 20, total: 13 } } });
+    serve(mockFetch, { "GET /api/v1/contracts/5/events?": { status: 200, body: { items, page: 1, pageSize: 20, total: 15 } } });
     renderWithProviders(<ContractHistory contractId={5} />);
     const region = await screen.findByRole("region", { name: "History" });
     // The region renders while loading; wait for the first entry before the synchronous sweep.
@@ -55,11 +58,26 @@ describe("ContractHistory", () => {
       "Source: https://github.com/acme/c/blob/main/o.yaml",
       "Version 1.2.0: source unlinked",
       "Version 1.2.0 synced from its source",
+      "Release line 1.x support policy updated (Maintenance)",
+      "Release line 9.x support policy updated (FUTURE_SUPPORT)",
     ]) {
       expect(within(region).getByText(text)).toBeInTheDocument();
     }
-    expect(within(region).getAllByText(/Ada Admin ·/)).toHaveLength(13);
+    expect(within(region).getAllByText(/Ada Admin ·/)).toHaveLength(15);
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+  });
+
+  test("localizes a release-line support status in Polish", async () => {
+    await i18n.changeLanguage("pl");
+    serve(mockFetch, {
+      "GET /api/v1/contracts/5/events?": {
+        status: 200,
+        body: { items: [at(14, "RELEASE_LINE_UPDATED", { major: "1", supportStatus: "MAINTENANCE" })], page: 1, pageSize: 10, total: 1 },
+      },
+    });
+    renderWithProviders(<ContractHistory contractId={5} />);
+    expect(await screen.findByText("Zaktualizowano zasady wsparcia linii 1.x (Utrzymanie)")).toBeInTheDocument();
+    await i18n.changeLanguage("en");
   });
 
   test("pages through a long history, newest first as the server sends it", async () => {
