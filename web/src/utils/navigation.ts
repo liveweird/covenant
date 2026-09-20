@@ -1,6 +1,6 @@
 import type { ParseKeys } from "i18next";
-import { IconAlertTriangle, IconBrandDatabricks, IconCalendarStats, IconFileText, IconFolders, IconHistory, IconKey, IconPlugConnected, IconServer2, IconSitemap, IconToggleLeft, IconUsers, IconUsersGroup, IconWand, type Icon } from "@tabler/icons-react";
-import { contractsPath, errorsPath, hierarchyPath, inferContractPath, lifecycleOverviewPath } from "./contractLinks";
+import { IconAlertTriangle, IconBrandDatabricks, IconCalendarStats, IconFileText, IconFolders, IconHistory, IconKey, IconMessageCheck, IconPlugConnected, IconServer2, IconSitemap, IconToggleLeft, IconUsers, IconUsersGroup, IconWand, type Icon } from "@tabler/icons-react";
+import { contractsPath, errorsPath, hierarchyPath, inferContractPath, lifecycleOverviewPath, reviewInboxPath } from "./contractLinks";
 import { teamsPath } from "./teamLinks";
 import { environmentsPath } from "./environmentLinks";
 import { toadieConnectionsPath } from "./toadieLinks";
@@ -34,6 +34,7 @@ const NAV_SECTIONS: ReadonlyArray<NavSection> = [
       { to: hierarchyPath, label: "appShell.nav.hierarchy", icon: IconSitemap },
       { to: contractsPath, label: "appShell.nav.contracts", icon: IconFileText },
       { to: lifecycleOverviewPath, label: "appShell.nav.lifecycle", icon: IconCalendarStats },
+      { to: reviewInboxPath, label: "appShell.nav.reviewInbox", icon: IconMessageCheck },
       { to: inferContractPath, label: "appShell.nav.infer", icon: IconWand },
       { to: errorsPath, label: "appShell.nav.errors", icon: IconAlertTriangle },
     ],

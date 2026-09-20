@@ -1,0 +1,47 @@
+{
+  "title": "Review inbox",
+  "intro": "Find proposed versions related to you, then open the document and its full review discussion before acting.",
+  "tableAria": "Review inbox",
+  "loadFailed": "Could not load the review inbox",
+  "summaryLoadFailed": "Could not load the review inbox summary",
+  "refresh": "Refresh",
+  "empty": "No review items match these filters.",
+  "filter": {
+    "search": "Search contracts or versions",
+    "clearSearch": "Clear review inbox search",
+    "scope": "Review scope"
+  },
+  "scope": {
+    "RELATED": "Relevant to me",
+    "OWNED": "Owned",
+    "FOLLOWED": "Followed",
+    "ALL": "All contracts"
+  },
+  "summary": {
+    "all": "All reviews",
+    "awaiting": "Awaiting my decision",
+    "changes": "Changes requested",
+    "needsNew": "Needs new review"
+  },
+  "attention": {
+    "AWAITING_MY_REVIEW": "Awaiting my decision",
+    "CHANGES_REQUESTED": "Changes requested",
+    "NEEDS_NEW_REVIEW": "Needs new review"
+  },
+  "column": {
+    "contract": "Contract",
+    "version": "Version",
+    "owner": "Owner",
+    "review": "Latest review",
+    "attention": "Attention",
+    "decisions": "Decisions"
+  },
+  "requestedBy": "{{name}} · {{date}}",
+  "noAttention": "No action needed",
+  "approvals_one": "{{count}} approval",
+  "approvals_other": "{{count}} approvals",
+  "changeRequests_one": "{{count}} change request",
+  "changeRequests_other": "{{count}} change requests",
+  "open": "Review",
+  "openAria": "Review {{contract}} {{version}}"
+}

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
-import { useQuery } from "@tanstack/react-query";
+import { QueryClient, useQuery } from "@tanstack/react-query";
 import { getVersion } from "../api/versions";
 import { bodyOf, findCall, signIn, type FetchMock } from "../test/contractsFixtures";
 import { jsonResponse } from "../test/http";
@@ -65,6 +65,7 @@ describe("VersionReviews", () => {
     expect(screen.getByText(/Former owner \(deleted\)/)).toBeInTheDocument();
     expect(screen.getByText("Old reviewer (deleted)")).toBeInTheDocument();
     expect(screen.getByText("Newest first")).toBeInTheDocument();
+    expect(mockFetch.mock.calls.some(([url]) => String(url).includes("sort=-id"))).toBe(true);
     expect(mockFetch.mock.calls.some(([url]) => String(url).includes("sort=-createdAt%2C-id"))).toBe(true);
     const control = screen.getByRole("button", { name: /Review #41/ });
     await user.click(control);
@@ -83,8 +84,10 @@ describe("VersionReviews", () => {
       if (url === "/api/v1/version-reviews/41/entries" && init?.method === "POST") return pending;
       return Promise.resolve(jsonResponse(404, { title: "Not Found", status: 404 }));
     });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(["contracts", "review-inbox", "sentinel"], { total: 1 });
     const user = userEvent.setup();
-    renderWithProviders(<VersionReviews contractId={5} versionId={11} lifecycle="PROPOSED" contentRevision={7} disabled={false} />);
+    renderWithProviders(<VersionReviews contractId={5} versionId={11} lifecycle="PROPOSED" contentRevision={7} disabled={false} />, { queryClient });
     await screen.findByLabelText("Review comment");
     await user.type(screen.getByLabelText("Review comment"), "Looks good");
     await user.click(screen.getByRole("button", { name: "Approve" }));
@@ -93,6 +96,7 @@ describe("VersionReviews", () => {
     expect(screen.getByRole("button", { name: "Request changes" })).toBeDisabled();
     finishPost();
     expect(await screen.findByText("Looks good")).toBeInTheDocument();
+    expect(queryClient.getQueryState(["contracts", "review-inbox", "sentinel"])?.isInvalidated).toBe(true);
   });
 
   test("a displayed/list revision mismatch offers an explicit refresh and recovers both queries", async () => {
@@ -122,10 +126,49 @@ describe("VersionReviews", () => {
       if (url === "/api/v1/contracts/5/versions/11/reviews" && init?.method === "POST") return Promise.resolve(jsonResponse(201, ROUND));
       return Promise.resolve(jsonResponse(404, { title: "Not Found", status: 404 }));
     });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(["contracts", "review-inbox", "sentinel"], { total: 0 });
     const user = userEvent.setup();
-    renderWithProviders(<VersionReviews contractId={5} versionId={11} lifecycle="PROPOSED" contentRevision={7} disabled={false} />);
+    renderWithProviders(<VersionReviews contractId={5} versionId={11} lifecycle="PROPOSED" contentRevision={7} disabled={false} />, { queryClient });
     await user.click(await screen.findByRole("button", { name: "Request review" }));
     await waitFor(() => expect(bodyOf(findCall(mockFetch, "POST", "/api/v1/contracts/5/versions/11/reviews"))).toEqual({ expectedContentRevision: 7 }));
+    expect(queryClient.getQueryState(["contracts", "review-inbox", "sentinel"])?.isInvalidated).toBe(true);
+  });
+
+  test("scrolls once for a reviews hash navigation without jumping again on review data or page changes", async () => {
+    const original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollIntoView");
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scrollIntoView });
+    try {
+      mockFetch.mockImplementation((url: string) => {
+        const parsed = new URL(url, "http://localhost");
+        if (parsed.pathname.endsWith("/reviews")) {
+          const page = Number(parsed.searchParams.get("page"));
+          return Promise.resolve(jsonResponse(200, reviewsPage({ page, total: 6, items: [{ ...ROUND, id: page === 1 ? 41 : 42 }] })));
+        }
+        if (parsed.pathname.includes("/entries")) return Promise.resolve(jsonResponse(200, { items: [], page: 1, pageSize: 10, total: 0 }));
+        return Promise.resolve(jsonResponse(404, { title: "Not Found", status: 404 }));
+      });
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      const user = userEvent.setup();
+      renderWithProviders(<VersionReviews contractId={5} versionId={11} lifecycle="PROPOSED" contentRevision={7} disabled={false} />, {
+        route: "/contracts/5/versions/11#reviews",
+        queryClient,
+      });
+      const latest = await screen.findByRole("button", { name: /Review #41/ });
+      expect(latest).toHaveAttribute("aria-expanded", "true");
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" }));
+      expect(screen.getByRole("region", { name: "Reviews" }).getAttribute("style")).toContain("scroll-margin-top: calc(48px + var(--mantine-spacing-md))");
+
+      await queryClient.refetchQueries({ queryKey: ["contracts", "version-reviews", 5, 11] });
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      await user.click(screen.getByRole("button", { name: "2" }));
+      expect(await screen.findByRole("button", { name: /Review #42/ })).toHaveAttribute("aria-expanded", "true");
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    } finally {
+      if (original) Object.defineProperty(HTMLElement.prototype, "scrollIntoView", original);
+      else Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+    }
   });
 
   test("a requester can discuss but cannot decide", async () => {

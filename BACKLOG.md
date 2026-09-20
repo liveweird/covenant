@@ -25,6 +25,8 @@ to the existing integration and have their own implementation scope.
 
 ## Recently completed
 
+- Review inbox with personal/followed/catalog scopes and latest-round attention (0.14.0).
+
 - Optional version review and discussion, content-bound decisions and preserved review history (0.13.0).
 
 - Catalog-wide lifecycle overview, deadline/plan attention and cached contract-level usage (0.12.0).

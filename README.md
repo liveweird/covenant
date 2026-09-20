@@ -258,6 +258,13 @@ an explicit owner action and is never blocked by missing reviews or requested ch
 Reviews are optional, with no assigned reviewers or approval quota. See
 [the review reference](.claude/docs/version-reviews.md) for permissions and history semantics.
 
+The **Review inbox** brings these requests together. It defaults to contracts you own, your
+teams own, or you follow; switch to Owned, Followed, or All contracts as needed. Filter for
+reviews awaiting your decision, changes requested, or proposals needing a fresh review after
+an earlier round closed. Search and page results, then open the current document's Reviews
+section. Only each proposed version's latest round appears; earlier discussion stays in its
+history. See [the inbox reference](.claude/docs/review-inbox.md).
+
 ## Product backlog
 
 See [the backlog](BACKLOG.md) for proposed next steps and deferred work, including CI/CD integration.

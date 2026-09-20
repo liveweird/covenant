@@ -17,6 +17,20 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.14.0",
+    date: "2026-09-20",
+    en: `**Find contract reviews that need attention.**
+
+- Open the Review inbox for proposed versions of contracts you own, your teams own, or you follow; broaden the scope to the whole catalog when needed.
+- Find reviews awaiting your decision, requests for changes, and proposals needing a fresh review. Older rounds disappear from the inbox when a newer request supersedes them.
+- Search and page the results, then open the document's Reviews section. Reviews remain optional and never block publication.`,
+    pl: `**Znajduj recenzje kontraktów wymagające uwagi.**
+
+- Otwórz Skrzynkę recenzji, aby zobaczyć proponowane wersje kontraktów należących do Ciebie lub Twoich zespołów oraz kontraktów, które obserwujesz. W razie potrzeby rozszerz zakres na cały katalog.
+- Znajduj recenzje czekające na Twoją decyzję, prośby o zmiany i propozycje wymagające nowej recenzji. Nowa runda zastępuje poprzednią w skrzynce.
+- Wyszukuj i przeglądaj wyniki, a następnie otwieraj sekcję recenzji dokumentu. Recenzje pozostają opcjonalne i nigdy nie blokują publikacji.`,
+  },
+  {
     version: "0.13.0",
     date: "2026-09-20",
     en: `**Review proposed contract versions together.**

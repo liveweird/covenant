@@ -28,6 +28,7 @@ describe("activeNavPath", () => {
     expect(activeNavPath("/users/3/edit", leaves)).toBe("/users");
     expect(activeNavPath("/feature-flags", leaves)).toBe("/feature-flags");
     expect(activeNavPath("/lifecycle", leaves)).toBe("/lifecycle");
+    expect(activeNavPath("/reviews", leaves)).toBe("/reviews");
     expect(activeNavPath("/teams/3", leaves)).toBe("/teams");
   });
 

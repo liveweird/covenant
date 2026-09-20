@@ -20,6 +20,7 @@ import enInfer from "./locales/en/infer.json";
 import enLifecycleOverview from "./locales/en/lifecycleOverview.json";
 import enNotifications from "./locales/en/notifications.json";
 import enReader from "./locales/en/reader.json";
+import enReviewInbox from "./locales/en/reviewInbox.json";
 import enHierarchy from "./locales/en/hierarchy.json";
 import enSystems from "./locales/en/systems.json";
 import enTeams from "./locales/en/teams.json";
@@ -76,6 +77,7 @@ export const en = {
   lifecycleOverview: enLifecycleOverview,
   notifications: enNotifications,
   reader: enReader,
+  reviewInbox: enReviewInbox,
   hierarchy: enHierarchy,
   systems: enSystems,
   teams: enTeams,

@@ -57,6 +57,7 @@ describe("App shell", () => {
       expect(within(catalog).getByRole("link", { name: "Hierarchy" })).toHaveAttribute("href", "/");
       expect(within(catalog).getByRole("link", { name: "Contracts" })).toHaveAttribute("href", "/contracts");
       expect(within(catalog).getByRole("link", { name: "Lifecycle" })).toHaveAttribute("href", "/lifecycle");
+      expect(within(catalog).getByRole("link", { name: "Review inbox" })).toHaveAttribute("href", "/reviews");
       expect(within(catalog).getByRole("link", { name: "Infer" })).toHaveAttribute("href", "/contracts/infer");
       expect(within(catalog).getByRole("link", { name: "Errors" })).toHaveAttribute("href", "/errors");
       const registries = screen.getByRole("group", { name: "Registries" });
@@ -82,6 +83,7 @@ describe("App shell", () => {
       expect(screen.getByRole("link", { name: "Hierarchy" })).toHaveAttribute("href", "/");
       expect(screen.getByRole("link", { name: "Contracts" })).toHaveAttribute("href", "/contracts");
       expect(screen.getByRole("link", { name: "Lifecycle" })).toHaveAttribute("href", "/lifecycle");
+      expect(screen.getByRole("link", { name: "Review inbox" })).toHaveAttribute("href", "/reviews");
       expect(screen.getByRole("link", { name: "Errors" })).toHaveAttribute("href", "/errors");
       expect(localStorage.getItem("covenant.viewSettings.appShell.navCollapsed")).toBe("true");
     });
