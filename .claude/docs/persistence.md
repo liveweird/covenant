@@ -24,7 +24,7 @@ adds lifecycle planning/reminders, and `V19` adds version reviews (see `version-
 The foundation combines Toadie's auth/users migrations with the flat teams, registries and
 contract catalog:
 
-- `V1__init` — the `users` table: `name` (≤50), `email` (≤254), `password_hash`, `role` with `CHECK ("role" IN ('ADMIN', 'USER'))` (single-column role storage; the wire shape stays a `roles` set, see `.claude/docs/authorization.md`), `password_changed_at` (epoch millis, 0 = never — `/refresh` rejects older tokens), `language VARCHAR(10) NOT NULL DEFAULT 'en'` (the per-user language, Lettuce's V61 / Toadie's V18 folded in — no CHECK, `SUPPORTED_LANGUAGES` in `users/Languages.kt` is the whitelist; drives the UI at sign-in and every server-composed email; set at create, changed only via `PUT /users/{id}/language`), `marked_as_deleted`; plus the partial unique index `uq_users_email_active` over active rows.
+- `V1__init` — the `users` table: `name` (≤50), `email` (≤254), `password_hash`, `role` with `CHECK ("role" IN ('ADMIN', 'USER'))` (single-column role storage; the wire shape stays a `roles` set, see `.claude/docs/authorization.md`), `password_changed_at` (epoch millis, 0 = never — retained as a timestamp; V20 credential revisions govern refresh acceptance), `language VARCHAR(10) NOT NULL DEFAULT 'en'` (the per-user language, Lettuce's V61 / Toadie's V18 folded in — no CHECK, `SUPPORTED_LANGUAGES` in `users/Languages.kt` is the whitelist; drives the UI at sign-in and every server-composed email; set at create, changed only via `PUT /users/{id}/language`), `marked_as_deleted`; plus the partial unique index `uq_users_email_active` over active rows.
 - `V2__create_revoked_tokens` — the JWT blocklist for `/logout`: `jti` PK + `expires_at`, with an index on `expires_at` (the revoke path prunes expired rows opportunistically, so the table stays tiny).
 - `V3__seed_admin` — the bootstrap administrator `admin@covenant.local` / `changeme`, idempotent via `ON CONFLICT DO NOTHING`; production neutralizes it at startup (see "Default admin" in `.claude/docs/security.md`).
 - `V4__enable_unaccent_extension` — Lettuce's unaccent migration, backing every `containsNormalized` substring filter (see `infra/db/Sql.kt`).
@@ -119,3 +119,17 @@ ledger, inserting inside the current source-contract-locked transaction. This at
 is specific to scheduled delivery; it does not change the post-commit ContractActivity model
 for user mutations. No new business tables or external writes are introduced. See
 `release-lines.md` for reminder windows and upgrade behavior.
+
+### Credential revision (V20)
+
+`users.credential_revision` is an internal nonnegative BIGINT generation, initially zero.
+Every password update/reset and conditional bootstrap rotation increments it atomically in
+SQL with the hash update. It is carried in signed refresh tokens and pending MFA challenges;
+refresh/MFA acceptance compares it with the current user row. It is not exposed in user DTOs.
+`password_changed_at` remains a timestamp, not an authorization boundary. Pre-0.14.1 refresh
+tokens lack the generation and require a fresh sign-in after deployment; existing access
+tokens retain their usual expiry. Stop/drain the old application before starting the new server, whose Flyway bootstrap applies
+V20 before serving requests. Do not mix old/new replicas: old code does not advance the
+revision. The supplied single-instance Kubernetes Deployment uses `Recreate` to enforce this
+cutover, with brief downtime; Compose replaces its single app container. Do not roll back to
+pre-0.14.1 password writers while revision-bearing refresh tokens remain valid.

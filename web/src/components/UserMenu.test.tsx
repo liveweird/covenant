@@ -7,6 +7,12 @@ import UserMenu from "./UserMenu";
 
 const ME = { id: 7, name: "Alice Admin", email: "alice@covenant.local", roles: ["ADMIN"], disabledFeatures: [], language: "en" };
 
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+};
+
 function stubFetch(handler: (url: string, init?: RequestInit) => Response | undefined) {
   const mockFetch = vi.fn((url: string, init?: RequestInit) =>
     Promise.resolve(handler(url, init) ?? new Response(null, { status: 204 })),
@@ -89,13 +95,17 @@ describe("UserMenu", () => {
     expect(screen.getByRole("menuitem", { name: "Sign out" })).toBeInTheDocument();
   });
 
-  test("Sign out clears the session and lands on the login route", async () => {
-    stubFetch(() => undefined);
+  test("Sign out clears and navigates without waiting for server revocation", async () => {
+    const revokeResponse = deferred<Response>();
+    vi.stubGlobal("fetch", vi.fn((url: string) =>
+      url === "/api/v1/users/7" ? Promise.resolve(Response.json(ME)) : revokeResponse.promise,
+    ));
     const user = userEvent.setup();
     renderMenu();
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(await screen.findByRole("menuitem", { name: "Sign out" }));
     await waitFor(() => expect(localStorage.getItem("covenant.auth.token")).toBeNull());
     expect(await screen.findByText("login page")).toBeInTheDocument();
+    revokeResponse.resolve(new Response(null, { status: 204 }));
   });
 });

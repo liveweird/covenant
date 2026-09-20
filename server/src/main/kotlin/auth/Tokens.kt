@@ -30,8 +30,17 @@ fun JwtConfig.issueRefreshToken(
     email: String,
     roles: Set<UserRole>,
     disabledFeatures: Set<Feature>,
+    credentialRevision: Long,
 ): IssuedToken =
-    issueToken(userId, email, roles, disabledFeatures, TOKEN_TYPE_REFRESH, refreshExpiresInSeconds)
+    issueToken(
+        userId,
+        email,
+        roles,
+        disabledFeatures,
+        TOKEN_TYPE_REFRESH,
+        refreshExpiresInSeconds,
+        credentialRevision,
+    )
 
 private fun JwtConfig.issueToken(
     userId: UInt,
@@ -40,19 +49,21 @@ private fun JwtConfig.issueToken(
     disabledFeatures: Set<Feature>,
     typ: String,
     ttlSeconds: Long,
+    credentialRevision: Long? = null,
 ): IssuedToken {
     val now = System.currentTimeMillis()
     val expiresAt = now + ttlSeconds * 1000
     val token = JWT.create()
         .withAudience(audience)
         .withIssuer(issuer)
-        .withIssuedAt(Date(now)) // compared against users.password_changed_at on /refresh
+        .withIssuedAt(Date(now))
         .withJWTId(UUID.randomUUID().toString())
         .withClaim("email", email)
         .withClaim("userId", userId.toLong())
         .withArrayClaim("roles", roles.map { it.name }.sorted().toTypedArray())
         .withArrayClaim("disabledFeatures", disabledFeatures.map { it.name }.sorted().toTypedArray())
         .withClaim("typ", typ)
+        .apply { credentialRevision?.let { withClaim("credentialRevision", it) } }
         .withExpiresAt(Date(expiresAt))
         .sign(Algorithm.HMAC256(secret))
     return IssuedToken(token, expiresAt)

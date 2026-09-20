@@ -39,6 +39,7 @@ class MigrationChecksumTest {
         "V17__create_toadie_usage.sql" to -556852994,
         "V18__release_line_lifecycle_planning.sql" to 535372252,
         "V19__version_reviews.sql" to 1832065989,
+        "V20__user_credential_revision.sql" to 289120118,
     )
 
     @Test

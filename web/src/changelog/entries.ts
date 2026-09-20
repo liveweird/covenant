@@ -17,6 +17,20 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.14.1",
+    date: "2026-09-21",
+    en: `**Keep sign-in sessions consistent.**
+
+- Delayed session renewal can no longer restore a signed-out account or overwrite a newer sign-in.
+- Password changes and resets invalidate earlier session renewal tokens and pending sign-in codes, including changes within the same second.
+- After this update, existing sessions require a fresh sign-in when their access token expires.`,
+    pl: `**Spójne sesje logowania.**
+
+- Opóźnione odnowienie sesji nie przywraca już wylogowanego konta ani nie zastępuje nowszego logowania.
+- Zmiany i resetowanie hasła unieważniają wcześniejsze tokeny odnawiania sesji oraz oczekujące kody logowania, również przy zmianach w tej samej sekundzie.
+- Po tej aktualizacji istniejące sesje wymagają ponownego logowania po wygaśnięciu tokenu dostępu.`,
+  },
+  {
     version: "0.14.0",
     date: "2026-09-20",
     en: `**Find contract reviews that need attention.**

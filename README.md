@@ -113,6 +113,11 @@ findings and how to reload after editing or deleting samples.
 
 ## Running on Kubernetes (local)
 
+The app uses a single replica with `Recreate` updates: the old pod stops before the new one
+starts, so upgrades briefly interrupt service. This prevents older password-update code from
+running alongside the credential-revision-aware server introduced in 0.14.1.
+
+
 With a local cluster that shares the Docker image store (e.g. OrbStack):
 
 ```bash

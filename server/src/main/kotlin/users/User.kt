@@ -37,9 +37,12 @@ data class User(
     // object like the role so /login and /refresh mint the claim from the same read. Never
     // client-settable via PUT — replaced only by PUT /users/{id}/features (ADMIN).
     val disabledFeatures: Set<Feature> = emptySet(),
-    // Epoch millis of the last password change (0 = never). Server-internal; used to
-    // invalidate refresh tokens minted before the change (see /api/v1/refresh).
+    // Epoch millis of the last password change (0 = never). Retained as account metadata;
+    // refresh invalidation uses the exact monotonic revision below.
     val passwordChangedAt: Long = 0,
+    // Incremented atomically with every password mutation and copied into refresh tokens.
+    // Equality on /refresh avoids timestamp precision and clock-ordering ambiguity.
+    val credentialRevision: Long = 0,
     // Per-user language (V18, Lettuce's V61): the UI language at sign-in and the language
     // of every email sent to the user. Set at create; never client-settable via the
     // whole-user PUT — changed only by PUT /users/{id}/language (target user or ADMIN).

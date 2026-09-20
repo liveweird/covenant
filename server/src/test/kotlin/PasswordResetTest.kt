@@ -1,7 +1,10 @@
 package ch.nokillswit
 
 import ch.nokillswit.auth.LoginRequest
+import ch.nokillswit.auth.LoginResponse
 import ch.nokillswit.auth.PasswordResetRequest
+import ch.nokillswit.auth.RefreshRequest
+import io.ktor.client.call.body
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -64,6 +67,10 @@ class PasswordResetTest {
         val auditEvents = LogCapture("ch.nokillswit.audit")
         try {
             val client = jsonClient()
+            val oldSession = client.postJson(
+                "/api/v1/login",
+                LoginRequest(email, "old-password-123"),
+            ).body<LoginResponse>()
             val response = client.post("/api/v1/password-reset") {
                 contentType(ContentType.Application.Json)
                 setBody(PasswordResetRequest(email))
@@ -88,6 +95,18 @@ class PasswordResetTest {
 
             val newLogin = client.postJson("/api/v1/login", LoginRequest(email, newPassword))
             assertEquals(HttpStatusCode.OK, newLogin.status, "the emailed password must work")
+            val newSession = newLogin.body<LoginResponse>()
+
+            assertEquals(
+                HttpStatusCode.Unauthorized,
+                client.postJson("/api/v1/refresh", RefreshRequest(oldSession.refreshToken)).status,
+                "reset must invalidate the pre-reset refresh token",
+            )
+            assertEquals(
+                HttpStatusCode.OK,
+                client.postJson("/api/v1/refresh", RefreshRequest(newSession.refreshToken)).status,
+                "the post-reset generation must refresh immediately",
+            )
 
             val oldLogin = client.postJson("/api/v1/login", LoginRequest(email, "old-password-123"))
             assertEquals(HttpStatusCode.Unauthorized, oldLogin.status, "the old password must be dead")

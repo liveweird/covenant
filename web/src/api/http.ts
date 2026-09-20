@@ -3,7 +3,15 @@
 
 import { flagSignedOut, notifyAuthChange } from "../auth";
 import type { components } from "./schema";
-import { clearSession, getRefreshToken, getToken, persistSession } from "./session";
+import {
+  clearSession,
+  getSessionSnapshot,
+  isSameSession,
+  isSameSessionIdentity,
+  isSessionCurrent,
+  persistRefreshedSession,
+  type SessionSnapshot,
+} from "./session";
 
 export const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
@@ -35,26 +43,33 @@ export function isTimeoutError(err: unknown): boolean {
 // through a transient failure, so signing the user out would discard a working session (and
 // any in-progress form) over a hiccup.
 type RefreshOutcome =
-  | { kind: "ok"; token: string }
+  | { kind: "ok"; session: SessionSnapshot }
   | { kind: "rejected" }
-  | { kind: "unavailable" };
+  | { kind: "unavailable" }
+  | { kind: "stale" };
 
 // Exchange the stored refresh token for a fresh access + refresh pair. Single-flighted:
 // concurrent callers (e.g. several requests that all 401 at once) share one in-flight
 // /refresh call.
-let refreshInflight: Promise<RefreshOutcome> | null = null;
+type RefreshFlight = { session: SessionSnapshot; promise: Promise<RefreshOutcome> };
+let refreshInflight: RefreshFlight[] = [];
 
-function refresh(): Promise<RefreshOutcome> {
-  if (refreshInflight === null) {
-    refreshInflight = doRefresh().finally(() => {
-      refreshInflight = null;
-    });
-  }
-  return refreshInflight;
+function refresh(session: SessionSnapshot): Promise<RefreshOutcome> {
+  const existing = refreshInflight.find((flight) => isSameSession(flight.session, session));
+  if (existing) return existing.promise;
+
+  const flight: RefreshFlight = {
+    session,
+    promise: doRefresh(session).finally(() => {
+      refreshInflight = refreshInflight.filter((candidate) => candidate !== flight);
+    }),
+  };
+  refreshInflight.push(flight);
+  return flight.promise;
 }
 
-async function doRefresh(): Promise<RefreshOutcome> {
-  const refreshToken = getRefreshToken();
+async function doRefresh(session: SessionSnapshot): Promise<RefreshOutcome> {
+  const refreshToken = session.refreshToken;
   if (!refreshToken) return { kind: "rejected" };
   let res: Response;
   try {
@@ -75,19 +90,29 @@ async function doRefresh(): Promise<RefreshOutcome> {
   } catch {
     return { kind: "unavailable" };
   }
-  if (typeof data.token !== "string") return { kind: "unavailable" };
-  persistSession(data);
-  return { kind: "ok", token: data.token };
+  if (typeof data.token !== "string" || typeof data.refreshToken !== "string") {
+    return { kind: "unavailable" };
+  }
+  const refreshed = persistRefreshedSession(data, session);
+  return refreshed ? { kind: "ok", session: refreshed } : { kind: "stale" };
 }
 
 export async function authedFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  let res = await sendWithToken(path, init, getToken());
-  if (res.status === 401) {
+  const requestSession = getSessionSnapshot();
+  let res = await sendWithToken(path, init, requestSession.token);
+  if (res.status === 401 && requestSession.token) {
+    const currentSession = getSessionSnapshot();
+    if (!isSameSessionIdentity(requestSession, currentSession)) return res;
+    if (!isSameSession(requestSession, currentSession)) {
+      // Another request already rotated this logical session's credentials while this request
+      // was pending. Retry once with that published token instead of starting another refresh.
+      return sendWithToken(path, init, currentSession.token);
+    }
     // The access token is likely expired. Try one silent refresh (single-flighted), then retry once.
-    const outcome = await refresh();
-    if (outcome.kind === "ok") {
-      res = await sendWithToken(path, init, outcome.token);
-    } else if (outcome.kind === "rejected") {
+    const outcome = await refresh(requestSession);
+    if (outcome.kind === "ok" && isSessionCurrent(outcome.session)) {
+      res = await sendWithToken(path, init, outcome.session.token);
+    } else if (outcome.kind === "rejected" && isSessionCurrent(requestSession)) {
       // No refresh token, or the server rejected it — the session is over.
       clearSession();
       flagSignedOut();

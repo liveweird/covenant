@@ -55,6 +55,7 @@ class UserService(private val database: R2dbcDatabase) {
         val role = varchar("role", length = 20).default(UserRole.USER.name)
         override val markedAsDeleted = bool("marked_as_deleted").default(false)
         val passwordChangedAt = long("password_changed_at").default(0)
+        val credentialRevision = long("credential_revision").default(0)
         // Per-user language (V18): sign-in UI language + the language of every email sent
         // to the user. No CHECK — SUPPORTED_LANGUAGES is the whitelist.
         val language = varchar("language", length = 10).default("en")
@@ -113,8 +114,10 @@ class UserService(private val database: R2dbcDatabase) {
     suspend fun updatePassword(id: UInt, passwordHash: String): Int = suspendTransaction(database) {
         Users.update({ (Users.id eq id) and Users.active() }) {
             it[this.passwordHash] = passwordHash
-            // Invalidates outstanding refresh tokens: /refresh rejects iat < passwordChangedAt.
+            // The revision increment shares the hash update, so no token can observe a new
+            // password with the old credential generation (or vice versa).
             it[passwordChangedAt] = System.currentTimeMillis()
+            it[credentialRevision] = Users.credentialRevision + 1
         }
     }
 
@@ -256,6 +259,7 @@ class UserService(private val database: R2dbcDatabase) {
             Users.update({ (Users.email eq email) and (Users.passwordHash eq expectedHash) and Users.active() }) {
                 it[passwordHash] = newHash
                 it[passwordChangedAt] = System.currentTimeMillis()
+                it[credentialRevision] = Users.credentialRevision + 1
             }
         }
 
@@ -285,6 +289,7 @@ class UserService(private val database: R2dbcDatabase) {
         role = UserRole.valueOf(this[Users.role]),
         disabledFeatures = disabledFeatures,
         passwordChangedAt = this[Users.passwordChangedAt],
+        credentialRevision = this[Users.credentialRevision],
         language = this[Users.language],
     )
 }
