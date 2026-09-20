@@ -10,6 +10,12 @@ const ROW = { id: 41, recipientId: 1, timestamp: Date.now() - 60_000, type: "VER
 const SEEN = { ...ROW, id: 40, type: "VERSION_TRANSITIONED", params: { contractName: "orders-api", actor: "Ada", version: "1.1.0", from: "PROPOSED", to: "ACTIVE" }, wasSeen: true, link: null };
 const UNKNOWN = { ...ROW, id: 39, type: "SOMETHING_NEW", params: {}, wasSeen: true };
 const RELEASE_LINE = { ...ROW, id: 38, type: "RELEASE_LINE_UPDATED", params: { contractName: "orders-api", actor: "Ada", major: "1", supportStatus: "MAINTENANCE" }, wasSeen: true, link: "/contracts/5" };
+const REVIEW_ROWS = [
+  { ...ROW, id: 34, type: "VERSION_REVIEW_REQUESTED", params: { contractName: "orders-api", actor: "Ada", version: "1.2.0" } },
+  { ...ROW, id: 35, type: "VERSION_REVIEW_COMMENTED", params: { contractName: "orders-api", actor: "Ada", version: "1.2.0" } },
+  { ...ROW, id: 36, type: "VERSION_REVIEW_APPROVED", params: { contractName: "orders-api", actor: "Ada", version: "1.2.0" } },
+  { ...ROW, id: 37, type: "VERSION_REVIEW_CHANGES_REQUESTED", params: { contractName: "orders-api", actor: "Ada", version: "1.2.0" } },
+];
 
 /** Routes `wasSeen=false` to the badge envelope and everything else to the list. */
 function serveNotifications(mockFetch: FetchMock, items: unknown[], unread: number, statuses: Record<string, number> = {}) {
@@ -47,7 +53,7 @@ describe("NotificationsButton", () => {
   }
 
   test("the badge shows the unread total; the drawer lists localized sentences newest first with a raw fallback", async () => {
-    serveNotifications(mockFetch, [ROW, SEEN, RELEASE_LINE, UNKNOWN], 2);
+    serveNotifications(mockFetch, [ROW, SEEN, RELEASE_LINE, ...REVIEW_ROWS, UNKNOWN], 2);
     render();
     const bell = await screen.findByRole("button", { name: "Notifications (2 unread)" });
     expect(screen.getByText("2")).toBeInTheDocument();
@@ -56,8 +62,12 @@ describe("NotificationsButton", () => {
     expect(within(dialog).getByText("Ada created version 1.2.0 of orders-api.")).toBeInTheDocument();
     expect(within(dialog).getByText("Ada moved orders-api 1.1.0 from Proposed to Active.")).toBeInTheDocument();
     expect(within(dialog).getByText("Ada updated the support policy for orders-api 1.x (Maintenance).")).toBeInTheDocument();
+    expect(within(dialog).getByText("Ada requested a review of orders-api 1.2.0.")).toBeInTheDocument();
+    expect(within(dialog).getByText("Ada commented on the review of orders-api 1.2.0.")).toBeInTheDocument();
+    expect(within(dialog).getByText("Ada approved the review of orders-api 1.2.0.")).toBeInTheDocument();
+    expect(within(dialog).getByText("Ada requested changes in the review of orders-api 1.2.0.")).toBeInTheDocument();
     expect(within(dialog).getByText("SOMETHING_NEW")).toBeInTheDocument();
-    expect(within(dialog).getAllByRole("listitem")).toHaveLength(4);
+    expect(within(dialog).getAllByRole("listitem")).toHaveLength(8);
     expect(within(dialog).getByRole("button", { name: "Mark all as seen" })).toBeInTheDocument();
   });
 

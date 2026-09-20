@@ -43,6 +43,7 @@ ktor:
       - ch.nokillswit.contracts.ContractRoutesKt.configureContractRoutes
       - ch.nokillswit.contracts.LifecycleOverviewRoutesKt.configureLifecycleOverviewRoutes
       - ch.nokillswit.contracts.ContractVersionRoutesKt.configureContractVersionRoutes
+      - ch.nokillswit.contracts.VersionReviewRoutesKt.configureVersionReviewRoutes
       - ch.nokillswit.notifications.NotificationRoutesKt.configureNotificationRoutes
       - ch.nokillswit.auth.AuthRoutesKt.configureAuthRoutes
       - ch.nokillswit.contracts.tryit.TryRoutesKt.configureTryRoutes

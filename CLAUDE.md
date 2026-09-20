@@ -255,6 +255,8 @@ See `web/CLAUDE.md` for the frontend conventions (flat directories, co-located t
 
 @.claude/docs/toadie-integration.md
 
+@.claude/docs/version-reviews.md
+
 ### Planned lifecycle changes (0.11.0)
 
 Release-line policy includes advisory deprecation/support dates, a replacement contract/major,

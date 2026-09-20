@@ -203,6 +203,49 @@
     "invalid": "Only https:// URLs without credentials can be linked",
     "save": "Save link"
   },
+  "reviews": {
+    "title": "Reviews",
+    "intro": "Discuss this document and record advisory decisions tied to the exact content reviewed.",
+    "request": "Request review",
+    "requestFailed": "Could not request a review",
+    "loadFailed": "Could not load the reviews",
+    "empty": "No review history for this version.",
+    "emptyProposed": "No review has been requested. Publishing remains available without one.",
+    "round": "Review #{{id}}",
+    "requestedBy": "Requested by {{name}} {{deleted}} · {{date}}",
+    "deletedIdentity": "(deleted)",
+    "approvalCount_one": "{{count}} approval",
+    "approvalCount_other": "{{count}} approvals",
+    "changesCount_one": "{{count}} change request",
+    "changesCount_other": "{{count}} change requests",
+    "status": {
+      "OPEN": "Open",
+      "OUTDATED": "Outdated",
+      "CLOSED": "Closed"
+    },
+    "closeReason": {
+      "CONTENT_CHANGED": "Closed because the document changed.",
+      "WITHDRAWN": "Closed when the proposal returned to draft.",
+      "PUBLISHED": "Closed when this version was published."
+    },
+    "outdated": "Outdated — the document changed after this review was requested.",
+    "staleTitle": "Review changed",
+    "staleBody": "The document shown and the review state no longer match. Refresh both, then read the current document before trying again.",
+    "refresh": "Refresh document and reviews",
+    "refreshFailed": "Could not refresh the document and reviews",
+    "noEntries": "No discussion yet.",
+    "newestFirst": "Newest first",
+    "comment": "Review comment",
+    "addComment": "Add comment",
+    "requestChanges": "Request changes",
+    "approve": "Approve",
+    "actionFailed": "Could not update the review",
+    "entry": {
+      "COMMENT": "Comment",
+      "APPROVED": "Approved",
+      "CHANGES_REQUESTED": "Changes requested"
+    }
+  },
   "readAria": "Read version {{version}} of {{name}}",
   "toggleAside": "Show or hide the side panel"
 }

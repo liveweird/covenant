@@ -18,6 +18,7 @@ import VersionAsidePanel from "../components/VersionAsidePanel";
 import VersionAsideToggle from "../components/VersionAsideToggle";
 import VersionHeaderActions from "../components/VersionHeaderActions";
 import VersionMetaStrip from "../components/VersionMetaStrip";
+import VersionReviews from "../components/VersionReviews";
 import VersionViewToggle from "../components/VersionViewToggle";
 import { useDeleteConfirm } from "../hooks/useDeleteConfirm";
 import { useDocumentCheck } from "../hooks/useDocumentCheck";
@@ -229,6 +230,14 @@ export default function VersionPage() {
           </Grid.Col>
         )}
       </Grid>
+      <VersionReviews
+        key={`${id}:${vid}`}
+        contractId={id}
+        versionId={vid}
+        lifecycle={stored.lifecycle}
+        contentRevision={stored.contentRevision}
+        disabled={editing}
+      />
       {editing && (
         <>
           {save.error && (

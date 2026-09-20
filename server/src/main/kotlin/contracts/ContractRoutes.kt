@@ -127,6 +127,10 @@ class ContractsRoute {
             @Resource("{vid}")
             class Vid(val parent: Versions, val vid: UInt) {
                 @Serializable
+                @Resource("reviews")
+                class Reviews(val parent: Vid)
+
+                @Serializable
                 @Resource("content")
                 class Content(val parent: Vid)
 
@@ -190,6 +194,18 @@ class ContractsRoute {
             @Resource("{major}")
             class Major(val parent: ReleaseLines, val major: Int)
         }
+    }
+}
+
+@Serializable
+@Resource("/api/v1/version-reviews/{rid}")
+class VersionReviewsRoute(val rid: UInt) {
+    @Serializable
+    @Resource("entries")
+    class Entries(val parent: VersionReviewsRoute) {
+        @Serializable
+        @Resource("{entryId}")
+        class Id(val parent: Entries, val entryId: UInt)
     }
 }
 

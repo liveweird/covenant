@@ -1400,6 +1400,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contracts/{id}/versions/{vid}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List review rounds for a version
+         * @description Any authenticated user. Newest requested round first by default; sortable by id, requestedAt and closedAt.
+         */
+        get: operations["listVersionReviews"];
+        put?: never;
+        /**
+         * Request review of the current PROPOSED content
+         * @description Writers only. Binds the round to the exact content revision and hash. A stale revision, non-PROPOSED version or existing open round returns 409.
+         */
+        post: operations["createVersionReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/version-reviews/{rid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rid: components["parameters"]["VersionReviewId"];
+            };
+            cookie?: never;
+        };
+        /** Get one version review round */
+        get: operations["getVersionReview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/version-reviews/{rid}/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rid: components["parameters"]["VersionReviewId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List a review round's append-only discussion and decisions
+         * @description Any authenticated user. Oldest first by default; sortable by id and createdAt.
+         */
+        get: operations["listVersionReviewEntries"];
+        put?: never;
+        /**
+         * Comment or record a review decision
+         * @description Any active authenticated user may comment on an open current round. The requester cannot approve or request changes, including when an administrator. Latest decision per author determines counts. Stale or closed rounds return 409.
+         */
+        post: operations["createVersionReviewEntry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/version-reviews/{rid}/entries/{entryId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rid: components["parameters"]["VersionReviewId"];
+                entryId: components["parameters"]["VersionReviewEntryId"];
+            };
+            cookie?: never;
+        };
+        /** Get one immutable review entry */
+        get: operations["getVersionReviewEntry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contracts/{id}/subscription": {
         parameters: {
             query?: never;
@@ -2639,7 +2731,7 @@ export interface components {
             versions: components["schemas"]["ExportedVersion"][];
         };
         /** @enum {string} */
-        ContractEventType: "CREATED" | "UPDATED" | "OWNER_CHANGED" | "DELETED" | "VERSION_CREATED" | "VERSION_CONTENT_UPDATED" | "VERSION_TRANSITIONED" | "VERSION_DELETED" | "VERSION_RECHECKED" | "VERSION_SOURCE_CHANGED" | "VERSION_SYNCED" | "IMPORTED" | "RELEASE_LINE_UPDATED" | "TOADIE_LINKS_UPDATED";
+        ContractEventType: "CREATED" | "UPDATED" | "OWNER_CHANGED" | "DELETED" | "VERSION_CREATED" | "VERSION_CONTENT_UPDATED" | "VERSION_TRANSITIONED" | "VERSION_DELETED" | "VERSION_RECHECKED" | "VERSION_SOURCE_CHANGED" | "VERSION_SYNCED" | "IMPORTED" | "RELEASE_LINE_UPDATED" | "TOADIE_LINKS_UPDATED" | "VERSION_REVIEW_REQUESTED" | "VERSION_REVIEW_COMMENTED" | "VERSION_REVIEW_APPROVED" | "VERSION_REVIEW_CHANGES_REQUESTED";
         ContractEventResponse: {
             /** Format: int32 */
             id: number;
@@ -2666,7 +2758,7 @@ export interface components {
          * @description The notification kind; the SPA renders it in the viewer's language. A kind a client build does not know renders as its raw name.
          * @enum {string}
          */
-        NotificationType: "CONTRACT_UPDATED" | "CONTRACT_OWNER_CHANGED" | "CONTRACT_DELETED" | "VERSION_CREATED" | "VERSION_CONTENT_UPDATED" | "VERSION_TRANSITIONED" | "VERSION_DELETED" | "VERSION_SYNCED" | "VERSION_SOURCE_CHANGED" | "VERSION_IMPORTED" | "VERSION_BREAKING_STORED" | "RELEASE_LINE_UPDATED" | "RELEASE_LINE_DEPRECATION_DUE" | "RELEASE_LINE_SUPPORT_END_DUE" | "TOADIE_LINKS_UPDATED";
+        NotificationType: "CONTRACT_UPDATED" | "CONTRACT_OWNER_CHANGED" | "CONTRACT_DELETED" | "VERSION_CREATED" | "VERSION_CONTENT_UPDATED" | "VERSION_TRANSITIONED" | "VERSION_DELETED" | "VERSION_SYNCED" | "VERSION_SOURCE_CHANGED" | "VERSION_IMPORTED" | "VERSION_BREAKING_STORED" | "RELEASE_LINE_UPDATED" | "RELEASE_LINE_DEPRECATION_DUE" | "RELEASE_LINE_SUPPORT_END_DUE" | "TOADIE_LINKS_UPDATED" | "VERSION_REVIEW_REQUESTED" | "VERSION_REVIEW_COMMENTED" | "VERSION_REVIEW_APPROVED" | "VERSION_REVIEW_CHANGES_REQUESTED";
         NotificationResponse: {
             /** Format: int32 */
             id: number;
@@ -3506,6 +3598,11 @@ export interface components {
             format: components["schemas"]["DocumentFormat"];
             content: string;
             contentSha256: string;
+            /**
+             * Format: int64
+             * @description Monotonic byte-content revision; increments only when a successful content PUT or sync changes the stored text.
+             */
+            contentRevision: number;
             docTitle?: string | null;
             docDescription?: string | null;
             specVersion?: string | null;
@@ -3552,6 +3649,89 @@ export interface components {
         };
         VersionPage: {
             items: components["schemas"]["VersionListItem"][];
+            page: number;
+            pageSize: number;
+            /** Format: int64 */
+            total: number;
+        };
+        /** @enum {string} */
+        VersionReviewCloseReason: "CONTENT_CHANGED" | "WITHDRAWN" | "PUBLISHED";
+        /** @enum {string} */
+        VersionReviewStatus: "OPEN" | "OUTDATED" | "CLOSED";
+        /** @enum {string} */
+        VersionReviewEntryKind: "COMMENT" | "APPROVED" | "CHANGES_REQUESTED";
+        /** @enum {string} */
+        VersionReviewDecision: "APPROVED" | "CHANGES_REQUESTED";
+        ReviewUserResponse: {
+            /** Format: int32 */
+            id: number;
+            name: string;
+            deleted: boolean;
+        };
+        CreateVersionReviewRequest: {
+            /** Format: int64 */
+            expectedContentRevision: number;
+        };
+        CreateVersionReviewEntryRequest: {
+            /** Format: int64 */
+            expectedContentRevision: number;
+            kind: components["schemas"]["VersionReviewEntryKind"];
+            /** @description Trimmed plain text. Required and nonblank for COMMENT and CHANGES_REQUESTED; optional for APPROVED. */
+            body?: string | null;
+        };
+        VersionReviewResponse: {
+            /** Format: int32 */
+            id: number;
+            /** Format: int32 */
+            contractId: number;
+            /** Format: int32 */
+            versionId: number;
+            /** Format: int64 */
+            contentRevision: number;
+            contentSha256: string;
+            requestedBy: components["schemas"]["ReviewUserResponse"];
+            /** Format: int64 */
+            requestedAt: number;
+            /** Format: int64 */
+            closedAt?: number | null;
+            /** @enum {string|null} */
+            closeReason?: "CONTENT_CHANGED" | "WITHDRAWN" | "PUBLISHED" | null;
+            status: components["schemas"]["VersionReviewStatus"];
+            isCurrentContent: boolean;
+            /** Format: int64 */
+            approvalCount: number;
+            /** Format: int64 */
+            changesRequestedCount: number;
+            /** Format: int64 */
+            entryCount: number;
+            /** @enum {string|null} */
+            myDecision?: "APPROVED" | "CHANGES_REQUESTED" | null;
+            canComment: boolean;
+            canDecide: boolean;
+        };
+        VersionReviewPage: {
+            items: components["schemas"]["VersionReviewResponse"][];
+            page: number;
+            pageSize: number;
+            /** Format: int64 */
+            total: number;
+            canRequest: boolean;
+            /** Format: int64 */
+            currentContentRevision: number;
+        };
+        VersionReviewEntryResponse: {
+            /** Format: int32 */
+            id: number;
+            /** Format: int32 */
+            reviewId: number;
+            kind: components["schemas"]["VersionReviewEntryKind"];
+            body?: string | null;
+            author: components["schemas"]["ReviewUserResponse"];
+            /** Format: int64 */
+            createdAt: number;
+        };
+        VersionReviewEntryPage: {
+            items: components["schemas"]["VersionReviewEntryResponse"][];
             page: number;
             pageSize: number;
             /** Format: int64 */
@@ -3844,6 +4024,8 @@ export interface components {
          */
         Sort: string;
         VersionId: number;
+        VersionReviewId: number;
+        VersionReviewEntryId: number;
         ReleaseLineMajor: number;
         /** @description Repeatable any-of release-line support statuses; omitted means all. */
         OverviewSupportStatus: components["schemas"]["SupportStatus"][];
@@ -6439,6 +6621,205 @@ export interface operations {
             409: components["responses"]["Conflict"];
             413: components["responses"]["PayloadTooLarge"];
             415: components["responses"]["UnsupportedMediaType"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listVersionReviews: {
+        parameters: {
+            query?: {
+                /** @description 1-based page index. Defaults to 1. */
+                page?: components["parameters"]["Page"];
+                /** @description Rows per page. Defaults to 20, maximum 100. */
+                pageSize?: components["parameters"]["PageSize"];
+                /**
+                 * @description Sort spec. Format: `field` (ascending) or `-field` (descending). Multiple fields are
+                 *     comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
+                 *     sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
+                 *     always appended as a deterministic tiebreaker.
+                 */
+                sort?: components["parameters"]["Sort"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Review rounds, request permission and the current content revision */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionReviewPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    createVersionReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                vid: components["parameters"]["VersionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateVersionReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Review requested */
+            201: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionReviewResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["UnsupportedMediaType"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getVersionReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rid: components["parameters"]["VersionReviewId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The review round */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionReviewResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listVersionReviewEntries: {
+        parameters: {
+            query?: {
+                /** @description 1-based page index. Defaults to 1. */
+                page?: components["parameters"]["Page"];
+                /** @description Rows per page. Defaults to 20, maximum 100. */
+                pageSize?: components["parameters"]["PageSize"];
+                /**
+                 * @description Sort spec. Format: `field` (ascending) or `-field` (descending). Multiple fields are
+                 *     comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
+                 *     sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
+                 *     always appended as a deterministic tiebreaker.
+                 */
+                sort?: components["parameters"]["Sort"];
+            };
+            header?: never;
+            path: {
+                rid: components["parameters"]["VersionReviewId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Review entries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionReviewEntryPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    createVersionReviewEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rid: components["parameters"]["VersionReviewId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateVersionReviewEntryRequest"];
+            };
+        };
+        responses: {
+            /** @description Entry appended */
+            201: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionReviewEntryResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["UnsupportedMediaType"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getVersionReviewEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rid: components["parameters"]["VersionReviewId"];
+                entryId: components["parameters"]["VersionReviewEntryId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The review entry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionReviewEntryResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];
         };
     };

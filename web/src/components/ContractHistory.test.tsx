@@ -36,6 +36,10 @@ describe("ContractHistory", () => {
       at(13, "VERSION_SYNCED", { version: "1.2.0" }),
       at(14, "RELEASE_LINE_UPDATED", { major: "1", supportStatus: "MAINTENANCE" }),
       at(15, "RELEASE_LINE_UPDATED", { major: "9", supportStatus: "FUTURE_SUPPORT" }),
+      at(16, "VERSION_REVIEW_REQUESTED", { version: "1.2.0" }),
+      at(17, "VERSION_REVIEW_COMMENTED", { version: "1.2.0" }),
+      at(18, "VERSION_REVIEW_APPROVED", { version: "1.2.0" }),
+      at(19, "VERSION_REVIEW_CHANGES_REQUESTED", { version: "1.2.0" }),
     ];
     serve(mockFetch, { "GET /api/v1/contracts/5/events?": { status: 200, body: { items, page: 1, pageSize: 20, total: 15 } } });
     renderWithProviders(<ContractHistory contractId={5} />);
@@ -60,10 +64,14 @@ describe("ContractHistory", () => {
       "Version 1.2.0 synced from its source",
       "Release line 1.x support policy updated (Maintenance)",
       "Release line 9.x support policy updated (FUTURE_SUPPORT)",
+      "Version 1.2.0: review requested",
+      "Version 1.2.0: review comment added",
+      "Version 1.2.0: review approved",
+      "Version 1.2.0: changes requested in review",
     ]) {
       expect(within(region).getByText(text)).toBeInTheDocument();
     }
-    expect(within(region).getAllByText(/Ada Admin ·/)).toHaveLength(15);
+    expect(within(region).getAllByText(/Ada Admin ·/)).toHaveLength(19);
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
   });
 

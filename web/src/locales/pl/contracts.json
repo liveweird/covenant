@@ -191,6 +191,10 @@
       "versionSourceSet": "Wersja {{version}}: powiązano ze źródłem",
       "versionSourceCleared": "Wersja {{version}}: usunięto powiązanie ze źródłem",
       "versionSynced": "Wersja {{version}} zsynchronizowana ze źródłem",
+      "versionReviewRequested": "Wersja {{version}}: poproszono o recenzję",
+      "versionReviewCommented": "Wersja {{version}}: dodano komentarz do recenzji",
+      "versionReviewApproved": "Wersja {{version}}: zatwierdzono recenzję",
+      "versionReviewChangesRequested": "Wersja {{version}}: poproszono o zmiany w recenzji",
       "releaseLineUpdated": "Zaktualizowano zasady wsparcia linii {{major}}.x ({{status}})",
       "toadieLinksUpdated": "Zaktualizowano powiązania API w Toadie"
     },

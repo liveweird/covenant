@@ -13,6 +13,8 @@ import ch.nokillswit.contracts.ContractImporter
 import ch.nokillswit.contracts.ContractServiceKey
 import ch.nokillswit.contracts.ContractVersionService
 import ch.nokillswit.contracts.ContractVersionServiceKey
+import ch.nokillswit.contracts.VersionReviewService
+import ch.nokillswit.contracts.VersionReviewServiceKey
 import ch.nokillswit.contracts.ReleaseLineService
 import ch.nokillswit.contracts.ReleaseLineServiceKey
 import ch.nokillswit.contracts.checks.ChecksServiceKey
@@ -78,6 +80,7 @@ suspend fun Application.configureDatabase() {
     )
     val versionService = ContractVersionService(database, attributes[ChecksServiceKey], contractService, releaseLineService)
     attributes.put(ContractVersionServiceKey, versionService)
+    attributes.put(VersionReviewServiceKey, VersionReviewService(database, contractService))
     // The import pipeline and the SSRF-guarded fetcher: stateless collaborators, built here rather than
     // in a route file so every service has ONE home (a test pre-puts ContractUrlFetcherKey to aim the
     // fetch at a fixture — the routes read the key per request).

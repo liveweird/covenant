@@ -17,6 +17,20 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.13.0",
+    date: "2026-09-20",
+    en: `**Review proposed contract versions together.**
+
+- Request review from the version page, discuss the proposal, and record approval or changes requested.
+- Decisions belong to the content that was reviewed. Editing the document makes earlier reviews outdated, while preserving their discussion and decisions.
+- Reviews are optional and never block publication. Existing ownership and lifecycle rules still govern changes to a contract.`,
+    pl: `**Wspólnie recenzujcie proponowane wersje kontraktów.**
+
+- Poproś o recenzję na stronie wersji, omów propozycję i zapisz akceptację lub prośbę o zmiany.
+- Decyzje dotyczą recenzowanej treści. Edycja dokumentu dezaktualizuje wcześniejsze recenzje, zachowując dyskusję i decyzje.
+- Recenzje są opcjonalne i nigdy nie blokują publikacji. Dotychczasowe zasady własności i cyklu życia nadal określają możliwość zmiany kontraktu.`,
+  },
+  {
     version: "0.12.0",
     date: "2026-09-20",
     en: `**See lifecycle plans across the catalog.**
