@@ -17,6 +17,22 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.8.1",
+    date: "2026-09-20",
+    en: `**Maintenance and reliability fixes.**
+
+- Contract saves reject stale edits and recheck write permissions; imports create each contract and its first version together.
+- Contract checks are better protected against recursive and resource-intensive documents.
+- Fixed source synchronization, inferred drafts, links to findings and error states in the editor.
+- Updated dependencies and runtime images, including security fixes in development tooling.`,
+    pl: `**Poprawki utrzymaniowe i większa niezawodność.**
+
+- Zapis kontraktu odrzuca nieaktualne zmiany i ponownie sprawdza uprawnienia do edycji; import tworzy kontrakt i jego pierwszą wersję razem.
+- Sprawdzanie kontraktów jest lepiej chronione przed dokumentami rekurencyjnymi i nadmiernie obciążającymi zasoby.
+- Poprawiono synchronizację ze źródłem, szkice tworzone przez wnioskowanie, odnośniki do ustaleń i obsługę błędów w edytorze.
+- Zaktualizowano zależności i obrazy środowiska uruchomieniowego, w tym poprawki bezpieczeństwa narzędzi deweloperskich.`,
+  },
+  {
     version: "0.8.0",
     date: "2026-09-08",
     en: `**Contracts from what actually flows.**
