@@ -24,9 +24,9 @@ spec:
         runAsGroup: 1000
       containers:
         - name: covenant-checker
-          # Built locally with `docker build -t covenant-checker:latest -f checker/Dockerfile .`;
-          # OrbStack's Kubernetes shares the Docker image store (see app-deployment.yaml).
-          image: covenant-checker:latest
+          # Local render placeholder. apply-local.sh substitutes the same immutable per-build
+          # tag used by `docker build` before kubectl sees this manifest.
+          image: covenant-checker:local-build
           imagePullPolicy: IfNotPresent
           env:
             - name: PORT

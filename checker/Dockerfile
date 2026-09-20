@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
 # The checker sidecar image — build context is the REPO ROOT (docker-compose.yaml sets it), so
-# .dockerignore applies: `docker build -t covenant-checker:latest -f checker/Dockerfile .`
+# .dockerignore applies: `docker build -t covenant-checker:<build-tag> -f checker/Dockerfile .`
 
 # ── Stage 1: install + compile ────────────────────────────────────────────────
-FROM node:24-alpine AS build
+FROM node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS build
 # Spectral's @scarf/scarf postinstall phones home; opt out everywhere the deps install.
 ENV SCARF_ANALYTICS=false
 WORKDIR /checker
@@ -14,7 +14,7 @@ COPY checker/src ./src
 RUN npm run build && npm prune --omit=dev
 
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
-FROM node:24-alpine AS runtime
+FROM node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS runtime
 ENV NODE_ENV=production SCARF_ANALYTICS=false PORT=9090
 WORKDIR /checker
 COPY --from=build /checker/node_modules ./node_modules

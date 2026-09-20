@@ -1,10 +1,15 @@
 package ch.nokillswit
 
 import org.testcontainers.postgresql.PostgreSQLContainer
+import org.testcontainers.utility.DockerImageName
 
 object PostgresTestSupport {
     private val container: PostgreSQLContainer by lazy {
-        PostgreSQLContainer("postgres:18-alpine").apply {
+        PostgreSQLContainer(
+            DockerImageName
+                .parse("postgres:18.6-alpine@sha256:6c538e7206ea40ff740ef27883529390a690b6ead6ba96b44c67a9f7c638e8fd")
+                .asCompatibleSubstituteFor("postgres"),
+        ).apply {
             withDatabaseName("covenant_test")
             withUsername("covenant")
             withPassword("covenant")

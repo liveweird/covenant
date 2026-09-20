@@ -112,12 +112,17 @@ findings and how to reload after editing or deleting samples.
 With a local cluster that shares the Docker image store (e.g. OrbStack):
 
 ```bash
-docker build -t covenant-app:latest .
-docker build -t covenant-checker:latest -f checker/Dockerfile .
+COVENANT_IMAGE_TAG="dev-$(git rev-parse --short=12 HEAD)-$(date +%s)"
+docker build -t "covenant-app:${COVENANT_IMAGE_TAG}" .
+docker build -t "covenant-checker:${COVENANT_IMAGE_TAG}" -f checker/Dockerfile .
 kubectl create namespace covenant
 # create the covenant-secrets Secret — see the header comment in k8s/secret.yaml
-kubectl apply -f k8s/
+./k8s/apply-local.sh "$COVENANT_IMAGE_TAG"
 ```
+
+The helper renders both deployment images with the selected build tag and excludes the Secret
+template. Use a new tag for each rebuild; do not apply `k8s/` directly, since the checked-in
+image names are placeholders. Existing installations already have the namespace and Secret.
 
 ## Local development
 
@@ -134,7 +139,10 @@ The Compose checker is isolated and has no host port; a host-run JVM uses the so
 above. If CHECKER_URL is omitted, the server runs with incomplete checks marked
 `CHECKER_UNAVAILABLE`. The full Compose app reaches its own checker internally.
 
-The local JDK is managed by [mise](https://mise.jdx.dev) (`mise.toml`, Temurin 21).
+The local JDK and Node runtime are pinned in `mise.toml` (Temurin 21 and Node 24 LTS).
+Run `mise install` and use `mise exec -- <command>` or activate mise in your shell.
+See [dependency maintenance](.claude/docs/dependencies.md) for compatibility pins,
+automated updates, and runtime verification.
 
 ## Configuration (environment variables)
 

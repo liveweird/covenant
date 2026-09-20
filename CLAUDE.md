@@ -19,7 +19,7 @@ Gradle wrapper is at `./gradlew` (use `gradlew.bat` on Windows). JDK 21 toolchai
 - Frontend: `cd web && npm install --legacy-peer-deps`, then `npm run dev|build|lint|test|test:coverage|knip|gen:api` (details in `web/CLAUDE.md`).
 - Checker sidecar: `cd checker && npm ci`, then `npm run dev|build|lint|knip|typecheck|test|test:coverage` (details in `.claude/docs/checker.md`).
 - E2E: `cd e2e && npm ci && npx playwright install chromium && npm test` (plus `npm run lint`, `npm run knip`, `npm run typecheck` and `npm run check:scenarios`).
-- CI: `.github/workflows/ci.yml` re-runs every gate above on push/PR (server — incl. the OpenAPI coverage gate, web — incl. the spec → `schema.ts` drift check, checker, e2e statics, image builds on `main`); the blackbox Playwright suite (`e2e.yml`) runs nightly and on demand. Dependabot (`.github/dependabot.yml`) files weekly grouped bumps for every workspace and the actions.
+- CI: `.github/workflows/ci.yml` re-runs every gate above on push/PR (server — incl. the OpenAPI coverage gate, web — incl. the spec → `schema.ts` drift check, checker, e2e statics, image builds on `main`); the blackbox Playwright suite (`e2e.yml`) runs nightly and on demand. Dependabot (`.github/dependabot.yml`) checks every workspace, Actions and container manifests weekly; `.claude/docs/dependencies.md` describes grouping, compatibility pins and runtime verification.
 
 ## Running the full stack
 
@@ -224,6 +224,7 @@ ch.nokillswit
 @.claude/docs/authorization.md
 @.claude/docs/observability.md
 @.claude/docs/testing.md
+@.claude/docs/dependencies.md
 @.claude/docs/contract-standards.md
 @.claude/docs/checker.md
 
