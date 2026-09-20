@@ -38,6 +38,7 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Users = lazy(() => import("./pages/Users"));
 const UserFeatures = lazy(() => import("./pages/UserFeatures"));
 const FeatureFlags = lazy(() => import("./pages/FeatureFlags"));
+const ToadieConnections = lazy(() => import("./pages/ToadieConnections"));
 const CreateUser = lazy(() => import("./pages/CreateUser"));
 const EditUser = lazy(() => import("./pages/EditUser"));
 const ChangePassword = lazy(() => import("./pages/ChangePassword"));
@@ -230,6 +231,7 @@ export default function App() {
               <Route path="users/:id/edit" element={<EditUser />} />
               <Route path="users/:id/features" element={<UserFeatures />} />
               <Route path="feature-flags" element={<FeatureFlags />} />
+              <Route path="toadie-connections" element={<ToadieConnections />} />
             </Route>
             <Route path="change-password" element={<ChangePassword />} />
             <Route path="changelog" element={<Changelog />} />

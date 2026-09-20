@@ -1,0 +1,73 @@
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Accordion, Alert, Button, Group, Modal, NumberInput, PasswordInput, Stack, Switch, TextInput } from "@mantine/core";
+import { useForm } from "@mantine/form";
+import { createToadieConnection, updateToadieConnection, type ToadieConnection } from "../api/toadie";
+import { EMPTY_TOADIE_FORM, fromToadieConnection, MAX_TOADIE_NAME_LENGTH, toadieFormValidation, toadieSaveErrorMessage, toToadieRequest, type ToadieFormValues } from "../utils/toadieForm";
+import { showSuccessToast } from "../utils/toast";
+
+export default function ToadieConnectionEditorModal({ target, onClose, onSaved }: {
+  target: ToadieConnection | null;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const form = useForm<ToadieFormValues>({
+    initialValues: target ? fromToadieConnection(target) : EMPTY_TOADIE_FORM,
+    validate: toadieFormValidation(t, target),
+  });
+
+  async function save(values: ToadieFormValues) {
+    setSubmitting(true);
+    setError(null);
+    try {
+      if (target) {
+        await updateToadieConnection(target.id, toToadieRequest(values));
+        showSuccessToast(t("toadie.toast.saved"));
+      } else {
+        await createToadieConnection({ ...toToadieRequest(values), apiKey: values.apiKey.trim() });
+        showSuccessToast(t("toadie.toast.created"));
+      }
+      await onSaved();
+    } catch (caught) {
+      setError(toadieSaveErrorMessage(caught, t));
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Modal opened onClose={onClose} closeButtonProps={{ "aria-label": t("common.action.close") }} title={target ? t("toadie.editTitle") : t("toadie.createTitle")} size="lg" centered>
+      <form onSubmit={form.onSubmit(save)} noValidate>
+        <Stack>
+          <TextInput label={t("common.field.name")} maxLength={MAX_TOADIE_NAME_LENGTH} data-autofocus {...form.getInputProps("name")} />
+          <TextInput label={t("toadie.field.backendUrl")} description={t("toadie.field.backendUrlHint")} placeholder="https://toadie.internal" disabled={target != null} {...form.getInputProps("baseUrl")} />
+          <TextInput label={t("toadie.field.browserUrl")} description={t("toadie.field.browserUrlHint")} placeholder="https://toadie.example.com" {...form.getInputProps("browserUrl")} />
+          <PasswordInput label={t("toadie.field.apiKey")} description={target?.hasApiKey ? t("toadie.field.apiKeyKeep") : undefined} autoComplete="new-password" {...form.getInputProps("apiKey")} />
+          <Switch label={t("toadie.field.enabled")} {...form.getInputProps("enabled", { type: "checkbox" })} />
+          <NumberInput label={t("toadie.field.refreshInterval")} min={1} max={10_080} allowDecimal={false} {...form.getInputProps("refreshIntervalMinutes")} />
+          <Accordion variant="contained">
+            <Accordion.Item value="mapping">
+              <Accordion.Control>{t("toadie.field.advanced")}</Accordion.Control>
+              <Accordion.Panel>
+                <Stack gap="sm">
+                  <TextInput label={t("toadie.field.serviceBlueprint")} {...form.getInputProps("serviceBlueprint")} />
+                  <TextInput label={t("toadie.field.apiBlueprint")} {...form.getInputProps("apiBlueprint")} />
+                  <TextInput label={t("toadie.field.providesRelation")} {...form.getInputProps("providesRelation")} />
+                  <TextInput label={t("toadie.field.consumesRelation")} {...form.getInputProps("consumesRelation")} />
+                  <TextInput label={t("toadie.field.systemRelation")} {...form.getInputProps("systemRelation")} />
+                </Stack>
+              </Accordion.Panel>
+            </Accordion.Item>
+          </Accordion>
+          {error && <Alert color="red" variant="light">{error}</Alert>}
+          <Group justify="flex-end">
+            <Button variant="default" onClick={onClose} disabled={submitting}>{t("common.action.cancel")}</Button>
+            <Button type="submit" loading={submitting}>{target ? t("common.action.save") : t("common.action.create")}</Button>
+          </Group>
+        </Stack>
+      </form>
+    </Modal>
+  );
+}

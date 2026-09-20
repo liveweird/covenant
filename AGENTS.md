@@ -22,7 +22,8 @@ and password reset, admin-managed users and per-user feature flags, the synced u
 shared paging, and the React shell (nav model, command palette, theme, changelog). The catalog
 and its SPA are implemented: flat teams with rosters; the Domain → System → Contract → Version
 hierarchy; team/user ownership; SemVer and lifecycle rules; parallel major release lines with
-independent support policies and stable recommendations; validation, lint, and breaking-change
+independent support policies and stable recommendations; read-only provider/consumer usage from
+Toadie's Port ontology; validation, lint, and breaking-change
 detection; import with dry run, guarded URL fetch, source references and sync, diff, download,
 and export; history, followers and in-app notifications; and catalog facets. ADMIN-curated
 Environments hold HTTP, Kafka, and PostgreSQL targets with passwords encrypted at rest. Try-it
@@ -68,6 +69,9 @@ This is a Kotlin/Gradle backend plus three standalone npm workspaces:
   see `CLAUDE.md` "Package layout" for the detailed map. Cross-cutting wiring and policy live
   in `plugins/`, `audit/`, and `authz/`; database, mail, encryption at rest (`infra/crypto`),
   paging, and shared validation infrastructure live in `infra/`.
+- `toadie/` under the server feature packages owns ADMIN-curated encrypted connections,
+  contract-to-Port API links, bounded GraphQL reads and refresh, and cached provider/consumer
+  projections. Read `.claude/docs/toadie-integration.md` before changing this boundary.
 - `server/src/main/resources/application.yaml` declaratively registers application modules.
   `main.kt` only starts `EngineMain`; do not wire features from it. Module order matters because
   modules publish and consume Ktor application attributes.

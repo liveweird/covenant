@@ -31,6 +31,7 @@ tags:
   - name: domains
   - name: systems
   - name: environments
+  - name: toadie
   - name: contracts
   - name: contract-versions
   - name: try-it
@@ -1018,6 +1019,196 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/toadie-connections:
+    get:
+      tags: [toadie]
+      operationId: listToadieConnections
+      summary: List configured Toadie connections
+      description: "Any authenticated user. Sortable: `id`, `name`, `createdAt`, `updatedAt`; default `id` ascending."
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+      responses:
+        '200':
+          description: A page of sanitized connections
+          content: { application/json: { schema: { $ref: '#/components/schemas/ToadieConnectionPage' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    post:
+      tags: [toadie]
+      operationId: createToadieConnection
+      summary: Create a Toadie connection
+      description: ADMIN only. The API key is encrypted at rest and never returned. Development accepts HTTP targets; production requires HTTPS.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ToadieConnectionCreateRequest' } } }
+      responses:
+        '201':
+          description: Created; Location points to the connection
+          headers: { Location: { schema: { type: string } } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/ToadieConnectionResponse' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/toadie-connections/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [toadie]
+      operationId: getToadieConnection
+      summary: Get a sanitized Toadie connection
+      responses:
+        '200': { description: Connection, content: { application/json: { schema: { $ref: '#/components/schemas/ToadieConnectionResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    put:
+      tags: [toadie]
+      operationId: updateToadieConnection
+      summary: Replace a Toadie connection
+      description: ADMIN only. Omitted API key retains the encrypted value. The base URL is immutable; mapping changes invalidate the snapshot.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ToadieConnectionRequest' } } }
+      responses:
+        '204': { description: Updated }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    delete:
+      tags: [toadie]
+      operationId: deleteToadieConnection
+      summary: Soft-delete a Toadie connection
+      description: ADMIN only. Existing contract links remain visible as disconnected.
+      responses:
+        '204': { description: Deleted }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/toadie-connections/{id}/refresh:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    post:
+      tags: [toadie]
+      operationId: refreshToadieConnection
+      summary: Queue a complete Toadie snapshot refresh
+      description: ADMIN only. Concurrent requests coalesce; another request inside 30 seconds returns 429.
+      responses:
+        '202': { description: Refresh accepted or already in progress }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/toadie-connections/{id}/apis:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [toadie]
+      operationId: listToadieApis
+      summary: List cached API entities for a connection
+      description: "Any authenticated user. `q` searches identifier and title case- and accent-insensitively. Sortable: `id`, `title`; default `id` ascending."
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Q'
+      responses:
+        '200': { description: Cached API page, content: { application/json: { schema: { $ref: '#/components/schemas/ToadieEntityPage' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/{contractId}/toadie-links:
+    parameters:
+      - name: contractId
+        in: path
+        required: true
+        schema: { type: integer, format: int32, minimum: 0 }
+    get:
+      tags: [toadie]
+      operationId: getContractToadieLinks
+      summary: Get a contract's explicit Toadie API links
+      responses:
+        '200': { description: Link state, content: { application/json: { schema: { $ref: '#/components/schemas/ToadieLinksResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    put:
+      tags: [toadie]
+      operationId: replaceContractToadieLinks
+      summary: Replace a contract's explicit Toadie API links
+      description: Contract writer only. At most 100 unique API entity IDs, all present in the current snapshot. A null connection with an empty list clears links.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ToadieLinksRequest' } } }
+      responses:
+        '204': { description: Replaced }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/{contractId}/toadie-usage:
+    parameters:
+      - name: contractId
+        in: path
+        required: true
+        schema: { type: integer, format: int32, minimum: 0 }
+    get:
+      tags: [toadie]
+      operationId: getContractToadieUsage
+      summary: Get cached providers and consumers for a contract's linked APIs
+      description: "Any authenticated user. `q` searches service identifier and title case- and accent-insensitively; `role` is exact. Sortable: `id`, `title`; default `id` ascending."
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Q'
+        - name: role
+          in: query
+          schema: { $ref: '#/components/schemas/ToadieUsageRole' }
+      responses:
+        '200': { description: Cached usage projection, content: { application/json: { schema: { $ref: '#/components/schemas/ToadieUsageResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/{contractId}/toadie-usage/refresh:
+    parameters:
+      - name: contractId
+        in: path
+        required: true
+        schema: { type: integer, format: int32, minimum: 0 }
+    post:
+      tags: [toadie]
+      operationId: refreshContractToadieUsage
+      summary: Queue refresh of the linked Toadie connection
+      description: Contract writer only. Refresh changes only the cache; it never changes contract lifecycle or authorization.
+      responses:
+        '202': { description: Refresh accepted or already in progress }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
   /api/v1/contracts:
     get:
       tags: [contracts]
@@ -1042,7 +1233,7 @@ paths:
         - $ref: '#/components/parameters/ContractOwnerTeamId'
         - $ref: '#/components/parameters/ContractOwnerUserId'
         - $ref: '#/components/parameters/ContractLifecycle'
-        - $ref: '#/components/parameters/ContractQuery'
+        - $ref: '#/components/parameters/Q'
         - $ref: '#/components/parameters/ContractHasErrors'
       responses:
         '200':
@@ -1100,7 +1291,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/ContractType'
         - $ref: '#/components/parameters/ContractLifecycle'
-        - $ref: '#/components/parameters/ContractQuery'
+        - $ref: '#/components/parameters/Q'
         - $ref: '#/components/parameters/ContractOwnerTeamId'
         - $ref: '#/components/parameters/ContractOwnerUserId'
       responses:
@@ -1125,7 +1316,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/ContractType'
         - $ref: '#/components/parameters/ContractLifecycle'
-        - $ref: '#/components/parameters/ContractQuery'
+        - $ref: '#/components/parameters/Q'
         - $ref: '#/components/parameters/ContractOwnerTeamId'
         - $ref: '#/components/parameters/ContractOwnerUserId'
       responses:
@@ -1169,7 +1360,7 @@ paths:
         - $ref: '#/components/parameters/VersionLifecycle'
         - $ref: '#/components/parameters/ErrorSeverity'
         - $ref: '#/components/parameters/ErrorSource'
-        - $ref: '#/components/parameters/ContractQuery'
+        - $ref: '#/components/parameters/Q'
       responses:
         '200':
           description: A page of version rows carrying findings
@@ -1201,7 +1392,7 @@ paths:
         - $ref: '#/components/parameters/VersionLifecycle'
         - $ref: '#/components/parameters/ErrorSeverity'
         - $ref: '#/components/parameters/ErrorSource'
-        - $ref: '#/components/parameters/ContractQuery'
+        - $ref: '#/components/parameters/Q'
       responses:
         '200':
           description: The facet counts
@@ -2379,6 +2570,12 @@ components:
       required: true
       # int32: ids are 32-bit server-side; a non-numeric or out-of-range id is a 400.
       schema: { type: integer, format: int32, minimum: 0 }
+    Q:
+      name: q
+      in: query
+      required: false
+      schema: { type: string }
+      description: Case- and accent-insensitive free-text search; each endpoint documents the fields searched.
     Page:
       name: page
       in: query
@@ -2463,12 +2660,6 @@ components:
         items: { $ref: '#/components/schemas/Lifecycle' }
       style: form
       explode: true
-    ContractQuery:
-      name: q
-      in: query
-      required: false
-      schema: { type: string }
-      description: Case- and accent-insensitive substring over name OR description.
     ContractHasErrors:
       name: hasErrors
       in: query
@@ -2966,6 +3157,155 @@ components:
         page: { type: integer, minimum: 1 }
         pageSize: { type: integer, minimum: 1, maximum: 100 }
         total: { type: integer, format: int64, minimum: 0 }
+    ToadieMapping:
+      type: object
+      required: [serviceBlueprint, apiBlueprint, providesRelation, consumesRelation, systemRelation]
+      properties:
+        serviceBlueprint: { type: string, default: service, maxLength: 100 }
+        apiBlueprint: { type: string, default: api, maxLength: 100 }
+        providesRelation: { type: string, default: provides_apis, maxLength: 100 }
+        consumesRelation: { type: string, default: consumes_apis, maxLength: 100 }
+        systemRelation: { type: string, default: system, maxLength: 100 }
+    ToadieConnectionRequest:
+      type: object
+      required: [name, baseUrl, browserUrl, enabled, refreshIntervalMinutes, mapping]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        baseUrl: { type: string, maxLength: 2048 }
+        browserUrl: { type: string, maxLength: 2048 }
+        apiKey: { type: string, nullable: true, maxLength: 1000, description: Write-only; required on create and omitted/null on replace to retain the stored key. }
+        enabled: { type: boolean }
+        refreshIntervalMinutes: { type: integer, minimum: 1, maximum: 10080 }
+        mapping: { $ref: '#/components/schemas/ToadieMapping' }
+    ToadieConnectionCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/ToadieConnectionRequest'
+        - type: object
+          required: [apiKey]
+          properties:
+            apiKey: { type: string, minLength: 1, maxLength: 1000, description: "Write-only API key, required on create." }
+    ToadieConnectionResponse:
+      type: object
+      required: [id, name, baseUrl, browserUrl, enabled, refreshIntervalMinutes, mapping, hasApiKey, createdAt, updatedAt, lastAttemptAt, lastSuccessAt, refreshing, lastErrorCode, stale]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        name: { type: string }
+        baseUrl: { type: string }
+        browserUrl: { type: string }
+        enabled: { type: boolean }
+        refreshIntervalMinutes: { type: integer }
+        mapping: { $ref: '#/components/schemas/ToadieMapping' }
+        hasApiKey: { type: boolean }
+        createdAt: { type: integer, format: int64 }
+        updatedAt: { type: integer, format: int64 }
+        lastAttemptAt: { type: integer, format: int64, nullable: true }
+        lastSuccessAt: { type: integer, format: int64, nullable: true }
+        refreshing: { type: boolean }
+        lastErrorCode: { type: string, nullable: true }
+        stale: { type: boolean }
+    ToadieConnectionPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ToadieConnectionResponse' } }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, format: int64, minimum: 0 }
+    ToadieCacheState:
+      type: string
+      enum: [UNLINKED, NEVER_SYNCED, CURRENT, STALE, DISABLED, DISCONNECTED]
+    ToadieCacheStatus:
+      type: object
+      required: [state, lastAttemptAt, lastSuccessAt, refreshing, lastErrorCode]
+      properties:
+        state: { $ref: '#/components/schemas/ToadieCacheState' }
+        lastAttemptAt: { type: integer, format: int64, nullable: true }
+        lastSuccessAt: { type: integer, format: int64, nullable: true }
+        refreshing: { type: boolean }
+        lastErrorCode: { type: string, nullable: true }
+    ToadieConnectionRef:
+      type: object
+      required: [id, name, browserUrl]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        name: { type: string }
+        browserUrl: { type: string }
+    ToadieEntityRef:
+      type: object
+      required: [entityId, identifier, title, url]
+      properties:
+        entityId: { type: string }
+        identifier: { type: string }
+        title: { type: string }
+        url: { type: string, nullable: true }
+    ToadieEntityPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ToadieEntityRef' } }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, format: int64, minimum: 0 }
+    ToadieLinksRequest:
+      type: object
+      required: [connectionId, apiEntityIds]
+      properties:
+        connectionId: { type: integer, format: int32, minimum: 0, nullable: true }
+        apiEntityIds: { type: array, maxItems: 100, uniqueItems: true, items: { type: string } }
+    ToadieLinkStatus:
+      type: string
+      enum: [AVAILABLE, MISSING, DISCONNECTED]
+    ToadieLinkResponse:
+      type: object
+      required: [id, connectionId, apiEntityId, identifier, title, url, status]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        connectionId: { type: integer, format: int32, minimum: 0 }
+        apiEntityId: { type: string }
+        identifier: { type: string }
+        title: { type: string }
+        url: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/ToadieLinkStatus' }
+    ToadieLinksResponse:
+      type: object
+      required: [contractId, connection, cache, items]
+      properties:
+        contractId: { type: integer, format: int32, minimum: 0 }
+        connection:
+          allOf: [{ $ref: '#/components/schemas/ToadieConnectionRef' }]
+          nullable: true
+        cache: { $ref: '#/components/schemas/ToadieCacheStatus' }
+        items: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/ToadieLinkResponse' } }
+    ToadieUsageRole:
+      type: string
+      enum: [PROVIDER, CONSUMER]
+    ToadieUsageRow:
+      type: object
+      required: [id, identifier, title, url, roles, providedApiEntityIds, consumedApiEntityIds, systems, teams, version, releaseLine]
+      properties:
+        id: { type: string }
+        identifier: { type: string }
+        title: { type: string }
+        url: { type: string, nullable: true }
+        roles: { type: array, items: { $ref: '#/components/schemas/ToadieUsageRole' } }
+        providedApiEntityIds: { type: array, items: { type: string } }
+        consumedApiEntityIds: { type: array, items: { type: string } }
+        systems: { type: array, items: { $ref: '#/components/schemas/ToadieEntityRef' } }
+        teams: { type: array, items: { $ref: '#/components/schemas/ToadieEntityRef' } }
+        version: { type: string, nullable: true, description: Unknown in Toadie's current model; always null. }
+        releaseLine: { type: string, nullable: true, description: Unknown in Toadie's current model; always null. }
+    ToadieUsageResponse:
+      type: object
+      required: [items, page, pageSize, total, connection, cache]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ToadieUsageRow' } }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, format: int64, minimum: 0 }
+        connection:
+          allOf: [{ $ref: '#/components/schemas/ToadieConnectionRef' }]
+          nullable: true
+        cache: { $ref: '#/components/schemas/ToadieCacheStatus' }
     SystemResponse:
       type: object
       required: [id, domainId, domainName, name, contractCount, createdAt, updatedAt]
@@ -3233,7 +3573,7 @@ components:
           items: { $ref: '#/components/schemas/ExportedVersion' }
     ContractEventType:
       type: string
-      enum: [CREATED, UPDATED, OWNER_CHANGED, DELETED, VERSION_CREATED, VERSION_CONTENT_UPDATED, VERSION_TRANSITIONED, VERSION_DELETED, VERSION_RECHECKED, VERSION_SOURCE_CHANGED, VERSION_SYNCED, IMPORTED, RELEASE_LINE_UPDATED]
+      enum: [CREATED, UPDATED, OWNER_CHANGED, DELETED, VERSION_CREATED, VERSION_CONTENT_UPDATED, VERSION_TRANSITIONED, VERSION_DELETED, VERSION_RECHECKED, VERSION_SOURCE_CHANGED, VERSION_SYNCED, IMPORTED, RELEASE_LINE_UPDATED, TOADIE_LINKS_UPDATED]
     ContractEventResponse:
       type: object
       required: [id, contractId, userId, userName, timestamp, type, params]
@@ -3260,7 +3600,7 @@ components:
         total: { type: integer, format: int64, minimum: 0 }
     NotificationType:
       type: string
-      enum: [CONTRACT_UPDATED, CONTRACT_OWNER_CHANGED, CONTRACT_DELETED, VERSION_CREATED, VERSION_CONTENT_UPDATED, VERSION_TRANSITIONED, VERSION_DELETED, VERSION_SYNCED, VERSION_SOURCE_CHANGED, VERSION_IMPORTED, VERSION_BREAKING_STORED, RELEASE_LINE_UPDATED]
+      enum: [CONTRACT_UPDATED, CONTRACT_OWNER_CHANGED, CONTRACT_DELETED, VERSION_CREATED, VERSION_CONTENT_UPDATED, VERSION_TRANSITIONED, VERSION_DELETED, VERSION_SYNCED, VERSION_SOURCE_CHANGED, VERSION_IMPORTED, VERSION_BREAKING_STORED, RELEASE_LINE_UPDATED, TOADIE_LINKS_UPDATED]
       description: The notification kind; the SPA renders it in the viewer's language. A kind a client build does not know renders as its raw name.
     NotificationResponse:
       type: object

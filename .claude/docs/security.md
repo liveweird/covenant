@@ -54,3 +54,13 @@ CSRF install is gated behind `security.csrf.enabled` (default **`false`** in `ap
 ### Not yet ported from Lettuce
 
 Nothing remains on Lettuce's security list; new subsystems arrive with their own section here.
+
+### Toadie integration (0.10.0)
+
+The connector uses the ADMIN-curated private-target trust boundary, not public document fetch.
+Machine keys use FieldCipher and the bootstrap rotation registry; DTOs expose hasApiKey only.
+Fixed GraphQL operations, disabled redirects, HTTPS in production, bounded streaming reads,
+page/row/deadline limits and sanitized errors constrain outbound work. Only selected ontology
+metadata enters the cache. Toadie's integration key grants whole-ontology read access, so the
+connection is an explicit administrator decision to expose selected architecture data to the
+shared authenticated Covenant workspace. See `toadie-integration.md` for the full boundary.

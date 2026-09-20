@@ -50,6 +50,12 @@ fun ApplicationTestBuilder.configureApp(vararg overrides: Pair<String, String>) 
         if (!attributes.contains(ch.nokillswit.contracts.checks.CheckerClientKey)) {
             attributes.put(ch.nokillswit.contracts.checks.CheckerClientKey, TestChecker.silent)
         }
+        if (!attributes.contains(ch.nokillswit.toadie.ToadieGraphqlClientKey)) {
+            attributes.put(ch.nokillswit.toadie.ToadieGraphqlClientKey, object : ch.nokillswit.toadie.ToadieGraphqlClient {
+                override suspend fun fetch(config: ch.nokillswit.toadie.ToadieFetchConfig) =
+                    ch.nokillswit.toadie.ToadieSnapshot(emptyList(), null, System.currentTimeMillis())
+            })
+        }
     }
     environment {
         config = ApplicationConfig("application.yaml").mergeWith(

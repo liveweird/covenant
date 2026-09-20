@@ -18,7 +18,8 @@
      the findings panel carries an `INFER_PATH_TEMPLATED` note.
 4. They click Open in editor.
    - *Expected*: `/contracts/import` opens with the generated text in the editor, OpenAPI as the
-     type, and the Name/Version fields prefilled from the document's own title and version.
+     type, and wait for the Name/Version fields to be prefilled from the document's own
+     title (`api.example.test`) and version (`1.0.0`).
 5. They pick the seeded system and team as owner and click Import.
    - *Expected*: the import succeeds; opening the version shows it as a Draft.
 6. They open inference for the saved contract, set Version to `2.0.0`, add another HTTP

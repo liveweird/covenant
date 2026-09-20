@@ -37,6 +37,8 @@ import ch.nokillswit.contracts.ContractActivity
 import ch.nokillswit.infra.crypto.FieldCipherKey
 import ch.nokillswit.environments.EnvironmentServiceKey
 import ch.nokillswit.environments.EnvironmentService
+import ch.nokillswit.toadie.ToadieService
+import ch.nokillswit.toadie.ToadieServiceKey
 
 /** The connected database itself — read by the readiness probe (plugins/Health.kt); services get it injected. */
 val R2dbcDatabaseKey = AttributeKey<R2dbcDatabase>("R2dbcDatabase")
@@ -67,6 +69,7 @@ suspend fun Application.configureDatabase() {
     // application.yaml therefore lists BEFORE this module).
     val contractService = ContractService(database, teamService)
     attributes.put(ContractServiceKey, contractService)
+    attributes.put(ToadieServiceKey, ToadieService(database, attributes[FieldCipherKey], contractService))
     val releaseLineService = ReleaseLineService(database, contractService)
     attributes.put(ReleaseLineServiceKey, releaseLineService)
     val versionService = ContractVersionService(database, attributes[ChecksServiceKey], contractService, releaseLineService)

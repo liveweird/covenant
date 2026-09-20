@@ -210,6 +210,20 @@ Frontend: `cd web && npm run build | lint | test | test:coverage | knip | gen:ap
 Checker: `cd checker && npm run build | lint | knip | typecheck | test | test:coverage`.
 E2E: `cd e2e && npm ci && npx playwright install chromium && npm test`.
 
+## Contract usage from Toadie
+
+Covenant can read the existing Port ontology from Toadie: link a contract to one or more API
+entities and see provider/consumer services, systems and teams. Administrators configure the
+connection under **Toadie connections**; contract writers manage links and request refresh.
+Toadie's GraphQL integration must be enabled and have a dedicated integration client key. Its
+local Compose demo enables it already; no Toadie code change is required.
+
+For local Compose, use `http://host.docker.internal:8081` as the server URL and
+`http://localhost:8081` as the browser URL. Keep the key in the encrypted connection setting,
+never in Git. Production connections require HTTPS. Failed refreshes retain the last known
+usage and show it as stale; architecture usage does not establish an exact version or release
+line. See [the integration reference](.claude/docs/toadie-integration.md) for details.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

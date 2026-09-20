@@ -59,6 +59,8 @@ function describeEvent(event: ContractEvent, t: TFunction): string {
       return t("contracts.history.event.imported", { version });
     case "RELEASE_LINE_UPDATED":
       return t("contracts.history.event.releaseLineUpdated", { major: event.params.major, status: supportStatusLabel(event.params.supportStatus, t) });
+    case "TOADIE_LINKS_UPDATED":
+      return t("contracts.history.event.toadieLinksUpdated");
     default:
       // Forward-compat: an event kind this client build doesn't know yet — show the raw type.
       return event.type;

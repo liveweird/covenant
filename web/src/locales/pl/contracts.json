@@ -169,7 +169,8 @@
       "versionSourceSet": "Wersja {{version}}: powiązano ze źródłem",
       "versionSourceCleared": "Wersja {{version}}: usunięto powiązanie ze źródłem",
       "versionSynced": "Wersja {{version}} zsynchronizowana ze źródłem",
-      "releaseLineUpdated": "Zaktualizowano zasady wsparcia linii {{major}}.x ({{status}})"
+      "releaseLineUpdated": "Zaktualizowano zasady wsparcia linii {{major}}.x ({{status}})",
+      "toadieLinksUpdated": "Zaktualizowano powiązania API w Toadie"
     },
     "detail": {
       "name": "Nazwa: {{name}}",

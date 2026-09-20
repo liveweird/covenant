@@ -38,6 +38,11 @@ carve-out in [`scenarios/README.md`](scenarios/README.md).
 
 ## Parallel execution
 
+The `toadie-usage` journey owns a separate connection and a host-run GraphQL fixture; it never
+edits the live Toadie catalog or existing integration configuration. Compose reaches that fixture
+through `host.docker.internal` (the Compose host-gateway mapping also supports Linux). For a
+host-run Covenant server, set `E2E_UPSTREAM_HOST=127.0.0.1`. The fixture is closed after cleanup.
+
 The suite runs on **4 workers by default** (`E2E_WORKERS` overrides; `E2E_WORKERS=1` restores
 fully-serial behavior). The serial unit is the **spec file** (`fullyParallel: false` — a file's
 tests may be order-dependent); different files run concurrently. That is only sound because
@@ -106,6 +111,7 @@ the same commit** — this list is the coverage map, the scenario file is the de
   the live check until the Major bump → the History section read; (3) teardown through the delete
   rules (draft deletes, an active version blocks the contract, deprecate → retire, then delete);
   plus a regular user's read-only tree, page and list.
+- [`toadie-usage.spec.ts`](scenarios/toadie-usage.md) — configure an encrypted connection, link multiple APIs, display declared provider/consumer usage and preserve stale observations after refresh failure.
 - [`release-lines.spec.ts`](scenarios/release-lines.md) — older-minor maintenance backports while
   a newer major stays active, deprecated-version baselines, independent support policies and
   pinned recommendations, line filtering, accessibility, and ending support without retiring versions.

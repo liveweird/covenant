@@ -52,4 +52,5 @@ private fun notificationTypeOf(type: ContractEventType): NotificationType? = whe
     ContractEventType.VERSION_SYNCED -> NotificationType.VERSION_SYNCED
     ContractEventType.IMPORTED -> NotificationType.VERSION_IMPORTED
     ContractEventType.RELEASE_LINE_UPDATED -> NotificationType.RELEASE_LINE_UPDATED
+    ContractEventType.TOADIE_LINKS_UPDATED -> NotificationType.TOADIE_LINKS_UPDATED
 }

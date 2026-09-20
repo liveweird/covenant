@@ -39,3 +39,9 @@ the bounded external send, with transaction retries disabled so a database retry
 existing contract writer guard before decoding the body and `requireCurrentWriter` in the
 committing transaction. The recommended version must belong to that contract and major and be
 ACTIVE and stable. Support status/date never grants permissions or changes version lifecycle.
+
+**Toadie usage (0.10.0).** Authenticated users read sanitized connections, cached API choices,
+contract mappings and usage. Connection create/update/delete/manual refresh requires ADMIN.
+Contract mapping PUT and contract usage refresh require the contract writer before body decoding;
+link writes recheck current ownership/membership in the committing transaction. Imported Port
+teams are informational and never grant Covenant permissions. Toadie keys remain server-side.

@@ -17,6 +17,20 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.10.0",
+    date: "2026-09-20",
+    en: `**See contract usage from Toadie's Port ontology.**
+
+- Link contracts to existing Toadie APIs and see the services that provide or consume them, with their systems, teams and links back to Toadie.
+- Administrators can configure Toadie connections and ontology mappings. Usage refreshes periodically and on demand; failed refreshes retain the last successful observation and mark it stale.
+- Contract versions and release lines remain managed in Covenant. Usage does not infer which version a service uses or change anyone's permissions.`,
+    pl: `**Sprawdzaj wykorzystanie kontraktów na podstawie ontologii Port w Toadie.**
+
+- Łącz kontrakty z istniejącymi API w Toadie i sprawdzaj, które usługi je udostępniają lub wykorzystują, wraz z ich systemami, zespołami i odnośnikami do Toadie.
+- Administratorzy/administratorki mogą konfigurować połączenia z Toadie i mapowanie ontologii. Dane odświeżają się okresowo i na żądanie; nieudane odświeżenie zachowuje ostatnią udaną obserwację i oznacza ją jako nieaktualną.
+- Wersje kontraktów i linie wydań nadal są zarządzane w Covenant. Informacje o wykorzystaniu nie określają automatycznie używanej wersji ani nie zmieniają uprawnień.`,
+  },
+  {
     version: "0.9.0",
     date: "2026-09-20",
     en: `**Maintain several release lines in parallel.**

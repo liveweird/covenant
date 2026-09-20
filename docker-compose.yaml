@@ -56,6 +56,9 @@ services:
     container_name: covenant-app
     restart: unless-stopped
     networks: [default, checker-net]
+    # Resolve host-run integrations (including Toadie) on Linux as well as Docker Desktop/OrbStack.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy

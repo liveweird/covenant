@@ -84,3 +84,14 @@ line creation commit together. Policy changes, version transitions that clear a 
 pin, and parent deletion use the same contract lock; deleting the last draft retains its line.
 The line's effective recommendation is computed from ACTIVE stable versions, independently of
 the global highest-version pointer. See `release-lines.md` for the complete rules.
+
+### Toadie usage persistence (0.10.0)
+
+V17 adds soft-deleted encrypted connection configuration and refresh metadata, replaceable
+sanitized snapshot rows, and contract-to-remote-API mappings. Snapshot rows are a derived cache;
+links are hard-deleted membership rows like contract subscriptions, with explicit changes retained
+in ContractActivity history. These are deliberate exceptions to business-entity soft deletion. Remote numeric IDs are strings scoped
+to an immutable connection identity. Link writes use the contract writer lock; refresh performs
+I/O outside transactions and publishes only for the claimed configuration revision. Failure
+retains the last complete observation. Explicit link changes use ContractActivity; automatic
+refresh is an observation, not a contract mutation. See `toadie-integration.md`.

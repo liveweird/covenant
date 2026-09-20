@@ -10,7 +10,7 @@ describe("visibleSections", () => {
 
   test("an admin session gets the Administration section with both leaves", () => {
     const admin = visibleSections(true).find((s) => s.label === "appShell.section.administration");
-    expect(admin?.items.map((l) => l.to)).toEqual(["/users", "/feature-flags"]);
+    expect(admin?.items.map((l) => l.to)).toEqual(["/users", "/feature-flags", "/toadie-connections"]);
   });
 
   test("the account leaves never sit in a section", () => {

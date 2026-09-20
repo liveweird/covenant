@@ -78,8 +78,7 @@ test("user infers an OpenAPI draft from a pasted exchange and saves it as the co
   await expect(page.getByRole("textbox", { name: "Contract document" })).toContainText("/orders/{orderId}");
   await expect(page.getByRole("combobox", { name: "Type" })).toHaveValue("OpenAPI");
   // The document's own title/version prefill the Name/Version fields — the import page's existing rule.
-  const contractName = await page.getByLabel("Name", { exact: true }).inputValue();
-  expect(contractName.length).toBeGreaterThan(0);
+  await expect(page.getByLabel("Name", { exact: true })).toHaveValue("api.example.test");
   await expect(page.getByLabel("Version", { exact: true })).toHaveValue("1.0.0");
 
   await pickOption(page, "System", systemName);
