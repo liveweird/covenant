@@ -286,6 +286,7 @@ object TestSeedState {
                 it[UserService.Users.passwordHash] = SEED_PASSWORD_HASH
                 it[UserService.Users.markedAsDeleted] = false
                 it[UserService.Users.passwordChangedAt] = 0
+                it[UserService.Users.credentialRevision] = 0
                 // A test flipping the seed admin's language must not leak into other tests.
                 it[UserService.Users.language] = "en"
             }

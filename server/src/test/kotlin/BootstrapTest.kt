@@ -26,6 +26,11 @@ class BootstrapTest {
         withSeedRestored {
             startApplication()
             val client = jsonClient()
+            assertEquals(
+                1L,
+                TestUsers.service.findWithIdByEmail(SEED_ADMIN_EMAIL)?.second?.credentialRevision,
+                "bootstrap rotation must use the shared credential-generation increment",
+            )
 
             val withOld = client.login(SEED_ADMIN_EMAIL, "changeme")
             assertEquals(HttpStatusCode.Unauthorized, withOld.status)

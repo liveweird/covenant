@@ -16,6 +16,7 @@ import ch.nokillswit.users.canonicalEmail
 import ch.nokillswit.users.validateEmail
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
+import com.auth0.jwt.interfaces.DecodedJWT
 import com.auth0.jwt.exceptions.JWTVerificationException
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.*
@@ -35,6 +36,12 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import java.nio.charset.StandardCharsets
+import java.util.Base64
 
 @Serializable
 data class LoginRequest(val email: String, val password: String)
@@ -92,13 +99,31 @@ private val REFRESH_REJECT_MESSAGES = mapOf(
     "revoked" to "Refresh token revoked",
     "malformed" to "Malformed refresh token",
     "user_gone" to "User no longer exists",
-    "predates_password_change" to "Refresh token predates a password change",
+    "credential_changed" to "Refresh token predates a password change",
 )
+
+/** Numeric security claims are accepted only as integral JSON numbers. Auth0's generic claim
+ * coercion accepts some malformed representations, so inspect the signed payload directly. */
+private fun DecodedJWT.strictLongClaim(name: String): Long? = try {
+    val payloadJson = String(Base64.getUrlDecoder().decode(payload), StandardCharsets.UTF_8)
+    val primitive = Json.parseToJsonElement(payloadJson).jsonObject[name] as? JsonPrimitive
+    if (primitive == null || primitive.isString) null else primitive.content.toLongOrNull()
+} catch (_: SerializationException) {
+    null
+} catch (_: IllegalArgumentException) {
+    null
+}
 
 private fun JwtConfig.authResponse(userId: UInt, user: User): LoginResponse {
     val roles = user.additionalRoles
     val access = issueAccessToken(userId, user.email, roles, user.disabledFeatures)
-    val refresh = issueRefreshToken(userId, user.email, roles, user.disabledFeatures)
+    val refresh = issueRefreshToken(
+        userId,
+        user.email,
+        roles,
+        user.disabledFeatures,
+        user.credentialRevision,
+    )
     return LoginResponse(
         token = access.token,
         expiresAt = access.expiresAt,
@@ -250,6 +275,14 @@ private fun Route.mfa(deps: AuthDeps) {
                     audit("login.mfa_failure", "reason" to "user_gone", "userId" to userId.toLong())
                     throw UnauthorizedException("Invalid or expired sign-in code")
                 }
+                if (outcome.credentialRevision != user.credentialRevision) {
+                    audit(
+                        "login.mfa_failure",
+                        "reason" to "credential_changed",
+                        "userId" to userId.toLong(),
+                    )
+                    throw UnauthorizedException("Invalid or expired sign-in code")
+                }
                 audit("login.mfa_success", "email" to user.email, "userId" to userId.toLong())
                 call.respond(
                     HttpStatusCode.OK,
@@ -282,25 +315,28 @@ private fun Route.refresh(deps: AuthDeps) {
         if (decoded.getClaim("typ").asString() != TOKEN_TYPE_REFRESH) {
             reject("wrong_token_type")
         }
-        val rawUserId = decoded.getClaim("userId").asLong()
+        val rawUserId = decoded.strictLongClaim("userId")
         // A jti-less token could never be blocklisted, so it is malformed by definition
         // (every server-minted token carries one).
         val jti = decoded.id ?: reject("malformed", rawUserId)
         if (blocklist.isRevoked(jti)) {
             reject("revoked", rawUserId)
         }
-        val userId = rawUserId?.toUInt() ?: reject("malformed")
+        val userId = rawUserId
+            ?.takeIf { it in 1..UInt.MAX_VALUE.toLong() }
+            ?.toUInt()
+            ?: reject("malformed")
         // One read: confirm the user still exists and isn't soft-deleted, and pick up their
         // current role/email so changes take effect on the next refresh.
         val user = userService.read(userId)
             ?: reject("user_gone", rawUserId)
-        // A password change invalidates all refresh tokens minted before it (tokens
-        // without an iat claim predate this scheme and count as minted at epoch 0).
-        // JWT iat has SECOND precision, so compare both sides truncated to seconds —
-        // otherwise a token minted in the same second as the change is falsely rejected.
-        val issuedAtSec = (decoded.issuedAt?.time ?: 0) / 1000
-        if (issuedAtSec < user.passwordChangedAt / 1000) {
-            reject("predates_password_change", rawUserId)
+        // Exact credential generation: legacy tokens without the claim and malformed numeric
+        // representations are rejected rather than falling back to timestamp ordering.
+        val credentialRevision = decoded.strictLongClaim("credentialRevision")
+            ?.takeIf { it >= 0 }
+            ?: reject("malformed", rawUserId)
+        if (credentialRevision != user.credentialRevision) {
+            reject("credential_changed", rawUserId)
         }
         call.respond(HttpStatusCode.OK, jwtConfig.authResponse(userId, user))
     }

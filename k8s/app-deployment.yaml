@@ -7,6 +7,10 @@ metadata:
   namespace: covenant
 spec:
   replicas: 1
+  # Never overlap old password writers with the credential-revision-aware server (V20).
+  # This single-instance deployment accepts brief downtime during application upgrades.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       io.kompose.service: app

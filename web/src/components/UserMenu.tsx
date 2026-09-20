@@ -73,11 +73,12 @@ export default function UserMenu() {
   }
 
   async function handleSignOut() {
-    await logout();
+    const revocation = logout();
     queryClient.clear();
     flagSignedOut();
     navigate("/login", { replace: true });
     notifyAuthChange();
+    await revocation;
   }
 
   return (

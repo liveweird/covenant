@@ -177,6 +177,37 @@ class MfaLoginTest {
     }
 
     @Test
+    fun `a password change invalidates an already issued MFA challenge`() = testApplication {
+        usePostgresTestcontainer()
+        val email = uniqueEmail("mfa-credential-change")
+        val userId = seedMfaUser(email, "pw-123456789")
+        val mail = LogCapture("ch.nokillswit.mail")
+        val auditEvents = LogCapture("ch.nokillswit.audit")
+        try {
+            val client = jsonClient()
+            val challenge = client.login(email, "pw-123456789").body<MfaChallengeResponse>()
+            val code = mail.codeFor(email)
+
+            // The challenge captured revision 0. The shared password chokepoint advances it
+            // atomically, so the old challenge cannot mint tokens for revision 1.
+            TestUsers.service.updatePassword(
+                userId,
+                ch.nokillswit.auth.hashPassword("changed-password", cost = 4),
+            )
+
+            assertEquals(HttpStatusCode.Unauthorized, client.verify(challenge.challengeId, code).status)
+            assertNotNull(
+                auditEvents.awaitEvent {
+                    it.message == "login.mfa_failure" && it.hasKeyValue("reason", "credential_changed")
+                },
+            )
+        } finally {
+            mail.detach()
+            auditEvents.detach()
+        }
+    }
+
+    @Test
     fun `a malformed body is 400 and the exhausted per-IP bucket is 429`() = testApplication {
         usePostgresTestcontainer()
         val client = jsonClient()

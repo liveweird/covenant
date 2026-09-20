@@ -6,11 +6,38 @@ import type { components } from "./schema";
 
 type LoginSuccess = components["schemas"]["LoginResponse"];
 
+export type SessionSnapshot = Readonly<{
+  generation: number;
+  identity: string | null;
+  token: string | null;
+  refreshToken: string | null;
+}>;
+
 export const TOKEN_KEY = "covenant.auth.token";
 const REFRESH_TOKEN_KEY = "covenant.auth.refreshToken";
 const ROLES_KEY = "covenant.auth.roles";
 const USER_ID_KEY = "covenant.auth.userId";
 const DISABLED_FEATURES_KEY = "covenant.auth.disabledFeatures";
+const SESSION_IDENTITY_KEY = "covenant.auth.sessionIdentity";
+
+// Changes made through this module advance the generation. The persisted identity additionally
+// catches another tab replacing localStorage, while the token-pair comparison protects refresh
+// publication within one logical session.
+let sessionGeneration = 0;
+
+function newSessionIdentity(): string {
+  return crypto.randomUUID();
+}
+
+function getSessionIdentity(): string | null {
+  const stored = localStorage.getItem(SESSION_IDENTITY_KEY);
+  if (stored || !getToken()) return stored;
+  // Sessions created before this key existed receive an identity on first use. If another tab
+  // races this migration, the different stored value makes pending work fail closed as stale.
+  const identity = newSessionIdentity();
+  localStorage.setItem(SESSION_IDENTITY_KEY, identity);
+  return identity;
+}
 
 /** Additional roles — every user is implicitly a regular user; an empty set means no extra privileges. */
 const USER_ROLES = ["ADMIN"] as const;
@@ -25,8 +52,14 @@ export function getToken(): string | null {
 }
 
 export function setToken(token: string | null): void {
-  if (token === null) localStorage.removeItem(TOKEN_KEY);
-  else localStorage.setItem(TOKEN_KEY, token);
+  if (token === null) {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(SESSION_IDENTITY_KEY);
+  } else {
+    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(SESSION_IDENTITY_KEY, newSessionIdentity());
+  }
+  sessionGeneration += 1;
 }
 
 export function getRefreshToken(): string | null {
@@ -71,12 +104,45 @@ export function isAdmin(): boolean {
   return getRoles().includes("ADMIN");
 }
 
+export function getSessionSnapshot(): SessionSnapshot {
+  return {
+    generation: sessionGeneration,
+    identity: getSessionIdentity(),
+    token: getToken(),
+    refreshToken: getRefreshToken(),
+  };
+}
+
+export function isSameSessionIdentity(left: SessionSnapshot, right: SessionSnapshot): boolean {
+  return left.generation === right.generation && left.identity === right.identity;
+}
+
+export function isSameSession(left: SessionSnapshot, right: SessionSnapshot): boolean {
+  return isSameSessionIdentity(left, right)
+    && left.token === right.token
+    && left.refreshToken === right.refreshToken;
+}
+
+export function isSessionCurrent(snapshot: SessionSnapshot): boolean {
+  return isSameSession(snapshot, getSessionSnapshot());
+}
+
 export function clearSession(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(ROLES_KEY);
   localStorage.removeItem(USER_ID_KEY);
   localStorage.removeItem(DISABLED_FEATURES_KEY);
+  localStorage.removeItem(SESSION_IDENTITY_KEY);
+  sessionGeneration += 1;
+}
+
+function storeSession(data: LoginSuccess): void {
+  localStorage.setItem(TOKEN_KEY, data.token);
+  setRefreshToken(data.refreshToken);
+  localStorage.setItem(ROLES_KEY, JSON.stringify(data.roles));
+  localStorage.setItem(USER_ID_KEY, String(data.userId));
+  localStorage.setItem(DISABLED_FEATURES_KEY, JSON.stringify(data.disabledFeatures ?? []));
 }
 
 /**
@@ -84,11 +150,24 @@ export function clearSession(): void {
  * /login or /refresh. `?? []` keeps a mid-deploy older server (no disabledFeatures yet) harmless.
  */
 export function persistSession(data: LoginSuccess): void {
-  setToken(data.token);
-  setRefreshToken(data.refreshToken);
-  localStorage.setItem(ROLES_KEY, JSON.stringify(data.roles));
-  localStorage.setItem(USER_ID_KEY, String(data.userId));
-  localStorage.setItem(DISABLED_FEATURES_KEY, JSON.stringify(data.disabledFeatures ?? []));
+  storeSession(data);
+  localStorage.setItem(SESSION_IDENTITY_KEY, newSessionIdentity());
+  sessionGeneration += 1;
+  applySessionLanguage(data);
+}
+
+/** Publish a rotated token pair only if the exact credentials sent to /refresh still own storage. */
+export function persistRefreshedSession(
+  data: LoginSuccess,
+  expected: SessionSnapshot,
+): SessionSnapshot | null {
+  if (!isSessionCurrent(expected)) return null;
+  storeSession(data);
+  applySessionLanguage(data);
+  return getSessionSnapshot();
+}
+
+function applySessionLanguage(data: LoginSuccess): void {
   // Apply the user's stored language (V18) — one chokepoint covers login, the MFA step, and
   // the silent refresh (so an admin change propagates within the refresh window). The
   // inequality guard avoids re-firing languageChanged app-wide on every refresh; the

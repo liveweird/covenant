@@ -94,7 +94,7 @@ export interface paths {
          *     response, the 6-digit `code` from the email. Challenges are single-use, expire after
          *     a short TTL (default 5 min, `MFA_CODE_TTL_SECONDS`), and allow a few attempts
          *     (default 5, `MFA_MAX_ATTEMPTS`); every failure mode — unknown challenge, expired,
-         *     wrong code, attempts exhausted, user gone — answers the uniform `401`. Rate-limited
+         *     wrong code, attempts exhausted, user gone, password changed — answers the uniform `401`. Rate-limited
          *     per client IP.
          */
         post: operations["verifyMfa"];
@@ -120,7 +120,9 @@ export interface paths {
          *     refresh token is left valid until its own expiry — it is not rotated out. Requires no
          *     `Authorization` header (the access token may already be expired). Returns `401` for a
          *     missing/invalid/expired/revoked refresh token, if the user no longer exists, or if the
-         *     token was minted before the user's most recent password change.
+         *     token's credential revision no longer matches the user's current credentials. Password
+         *     changes invalidate earlier refresh tokens even within the same clock second. Legacy
+         *     tokens without a credential revision require a fresh sign-in after upgrading to 0.14.1.
          */
         post: operations["refresh"];
         delete?: never;
@@ -328,6 +330,7 @@ export interface paths {
          *     or to be ADMIN. When the caller changes their OWN password (even an admin),
          *     `currentPassword` is required and must match; an admin resetting another user's
          *     password omits it. A successful change invalidates all outstanding refresh tokens
+         *     and pending MFA challenges, including changes within the same clock second
          *     (already-issued access tokens expire naturally within their TTL).
          */
         put: operations["changeUserPassword"];

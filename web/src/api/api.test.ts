@@ -37,6 +37,12 @@ const SESSION = {
   language: "en" as const,
 };
 
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+};
+
 describe("session", () => {
   test("persistSession applies the stored language to the UI and skips a language-less payload", async () => {
     persistSession({ ...SESSION, language: "pl" });
@@ -232,6 +238,18 @@ describe("auth flows", () => {
     expect(isAdmin()).toBe(true);
   });
 
+  test("a late login response cannot replace a newer session", async () => {
+    const loginResponse = deferred<Response>();
+    fetchMock().mockReturnValueOnce(loginResponse.promise);
+    const pendingLogin = login({ email: "a@test", password: "pw" });
+    persistSession({ ...SESSION, token: "access-b", refreshToken: "refresh-b" });
+
+    loginResponse.resolve(jsonResponse(200, SESSION));
+    await expect(pendingLogin).resolves.toEqual(SESSION);
+    expect(getToken()).toBe("access-b");
+    expect(getRefreshToken()).toBe("refresh-b");
+  });
+
   test("an MFA challenge starts no session; verifyMfa persists the pair", async () => {
     fetchMock().mockResolvedValueOnce(
       jsonResponse(200, { mfaRequired: true, challengeId: "ch-1", expiresAt: 99 }),
@@ -249,6 +267,18 @@ describe("auth flows", () => {
     expect(JSON.parse((init as { body: string }).body)).toEqual({ challengeId: "ch-1", code: "123456" });
   });
 
+  test("a late MFA verification response cannot replace a newer session", async () => {
+    const verifyResponse = deferred<Response>();
+    fetchMock().mockReturnValueOnce(verifyResponse.promise);
+    const pendingVerify = verifyMfa("ch-1", "123456");
+    persistSession({ ...SESSION, token: "access-b", refreshToken: "refresh-b" });
+
+    verifyResponse.resolve(jsonResponse(200, SESSION));
+    await expect(pendingVerify).resolves.toEqual(SESSION);
+    expect(getToken()).toBe("access-b");
+    expect(getRefreshToken()).toBe("refresh-b");
+  });
+
   test("login throws ApiError with the response body on 401", async () => {
     fetchMock().mockResolvedValueOnce(jsonResponse(401, { title: "Unauthorized", status: 401 }));
     await expect(login({ email: "a@test", password: "bad" })).rejects.toBeInstanceOf(ApiError);
@@ -261,6 +291,26 @@ describe("auth flows", () => {
     await logout();
     expect(getToken()).toBeNull();
     expect(getRefreshToken()).toBeNull();
+  });
+
+  test("logout invalidates locally before revocation and its delayed completion cannot clear a new login", async () => {
+    const revokeResponse = deferred<Response>();
+    persistSession(SESSION);
+    fetchMock().mockReturnValueOnce(revokeResponse.promise);
+
+    const pendingLogout = logout();
+    expect(getToken()).toBeNull();
+    expect(getRefreshToken()).toBeNull();
+    const [, init] = fetchMock().mock.calls[0];
+    expect(new Headers(init.headers).get("Authorization")).toBe("Bearer access-1");
+    expect(JSON.parse(String(init.body))).toEqual({ refreshToken: "refresh-1" });
+
+    persistSession({ ...SESSION, token: "access-b", refreshToken: "refresh-b" });
+    revokeResponse.resolve(new Response(null, { status: 204 }));
+    await pendingLogout;
+
+    expect(getToken()).toBe("access-b");
+    expect(getRefreshToken()).toBe("refresh-b");
   });
 
   test("logout without a stored token is a no-op fetch-wise", async () => {

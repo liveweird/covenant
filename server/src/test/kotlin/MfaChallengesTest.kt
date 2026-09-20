@@ -17,7 +17,7 @@ class MfaChallengesTest {
     @Test
     fun `a correct code succeeds exactly once - the challenge is single-use`() {
         val s = store()
-        val issued = s.issue(42u)
+        val issued = s.issue(42u, credentialRevision = 7)
         assertEquals(6, issued.code.length)
         assertTrue(issued.code.all { it.isDigit() })
         assertEquals(now + 300_000, issued.expiresAt)
@@ -25,6 +25,7 @@ class MfaChallengesTest {
         val outcome = s.verify(issued.challengeId, issued.code)
         assertIs<MfaChallenges.Outcome.Success>(outcome)
         assertEquals(42u, outcome.userId)
+        assertEquals(7L, outcome.credentialRevision)
 
         // Replay of the consumed challenge is indistinguishable from an unknown one.
         val replay = s.verify(issued.challengeId, issued.code)
@@ -35,7 +36,7 @@ class MfaChallengesTest {
     @Test
     fun `an expired challenge fails and is dropped`() {
         val s = store(ttlMillis = 60_000)
-        val issued = s.issue(7u)
+        val issued = s.issue(7u, credentialRevision = 0)
         now += 60_000
         val outcome = s.verify(issued.challengeId, issued.code)
         assertIs<MfaChallenges.Outcome.Failure>(outcome)
@@ -50,7 +51,7 @@ class MfaChallengesTest {
     @Test
     fun `wrong codes count toward the attempt cap and exhausting it kills the challenge`() {
         val s = store(maxAttempts = 3)
-        val issued = s.issue(7u)
+        val issued = s.issue(7u, credentialRevision = 0)
         assertEquals("wrong_code", (s.verify(issued.challengeId, "x") as MfaChallenges.Outcome.Failure).reason)
         assertEquals("wrong_code", (s.verify(issued.challengeId, "x") as MfaChallenges.Outcome.Failure).reason)
         assertEquals(
@@ -75,8 +76,8 @@ class MfaChallengesTest {
     @Test
     fun `challenge ids are unique and opaque`() {
         val s = store()
-        val a = s.issue(1u)
-        val b = s.issue(1u)
+        val a = s.issue(1u, credentialRevision = 0)
+        val b = s.issue(1u, credentialRevision = 0)
         assertNotEquals(a.challengeId, b.challengeId)
         assertEquals(32, a.challengeId.length)
         // Both stay independently verifiable (repeated logins may coexist within the TTL).
@@ -87,10 +88,10 @@ class MfaChallengesTest {
     @Test
     fun `the store prunes expired entries once oversized instead of growing without bound`() {
         val s = store(ttlMillis = 1_000)
-        val stale = (1..10_001).map { s.issue(it.toUInt()) }
+        val stale = (1..10_001).map { s.issue(it.toUInt(), credentialRevision = 0) }
         now += 2_000
         // The next issue triggers the prune; every stale entry is now unknown.
-        val fresh = s.issue(99u)
+        val fresh = s.issue(99u, credentialRevision = 0)
         assertEquals(
             "unknown_challenge",
             (s.verify(stale.first().challengeId, stale.first().code) as MfaChallenges.Outcome.Failure).reason,
