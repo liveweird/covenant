@@ -72,6 +72,10 @@ suspend fun Application.configureDatabase() {
     attributes.put(ToadieServiceKey, ToadieService(database, attributes[FieldCipherKey], contractService))
     val releaseLineService = ReleaseLineService(database, contractService)
     attributes.put(ReleaseLineServiceKey, releaseLineService)
+    attributes.put(
+        ch.nokillswit.contracts.LifecycleOverviewServiceKey,
+        ch.nokillswit.contracts.LifecycleOverviewService(database, teamService),
+    )
     val versionService = ContractVersionService(database, attributes[ChecksServiceKey], contractService, releaseLineService)
     attributes.put(ContractVersionServiceKey, versionService)
     // The import pipeline and the SSRF-guarded fetcher: stateless collaborators, built here rather than

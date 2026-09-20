@@ -17,6 +17,22 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.12.0",
+    date: "2026-09-20",
+    en: `**See lifecycle plans across the catalog.**
+
+- Browse major release lines together and filter by owner, domain, system, contract type, support status and deadline window.
+- Focus on approaching deadlines, support-end dates already reached, incomplete migration plans and unavailable usage information.
+- Open a line's migration plan and declared consumer impact, or edit its policy with existing owner permissions.
+- Dates remain advisory. Cached Toadie usage describes the whole contract and does not establish which version or release line a service uses.`,
+    pl: `**Przeglądaj plany cyklu życia w całym katalogu.**
+
+- Przeglądaj razem linie wydań major i filtruj je według właściciela, domeny, systemu, typu kontraktu, statusu wsparcia i przedziału terminów.
+- Sprawdzaj zbliżające się terminy, osiągnięte daty zakończenia wsparcia, niepełne plany migracji i niedostępne informacje o wykorzystaniu.
+- Otwieraj plan migracji i informacje o deklarowanych odbiorcach albo edytuj zasady zgodnie z dotychczasowymi uprawnieniami właściciela.
+- Daty pozostają informacyjne. Dane z pamięci podręcznej Toadie dotyczą całego kontraktu i nie określają, której wersji lub linii wydań używa usługa.`,
+  },
+  {
     version: "0.11.0",
     date: "2026-09-20",
     en: `**Plan deprecation and review retirement impact.**

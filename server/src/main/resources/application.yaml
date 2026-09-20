@@ -41,6 +41,7 @@ ktor:
       - ch.nokillswit.environments.EnvironmentRoutesKt.configureEnvironmentRoutes
       - ch.nokillswit.toadie.ToadieRoutesKt.configureToadieRoutes
       - ch.nokillswit.contracts.ContractRoutesKt.configureContractRoutes
+      - ch.nokillswit.contracts.LifecycleOverviewRoutesKt.configureLifecycleOverviewRoutes
       - ch.nokillswit.contracts.ContractVersionRoutesKt.configureContractVersionRoutes
       - ch.nokillswit.notifications.NotificationRoutesKt.configureNotificationRoutes
       - ch.nokillswit.auth.AuthRoutesKt.configureAuthRoutes

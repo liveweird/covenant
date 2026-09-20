@@ -17,7 +17,12 @@ export async function listDomains(q: DomainListQuery): Promise<DomainPage> {
 
 /** Every domain, name-ordered — the pickers' source (the registry is admin-curated and small). */
 export async function listAllDomains(): Promise<DomainResponse[]> {
-  return (await listDomains({ page: 1, pageSize: 100, sort: "name" })).items;
+  const items: DomainResponse[] = [];
+  for (let page = 1; ; page += 1) {
+    const result = await listDomains({ page, pageSize: 100, sort: "name" });
+    items.push(...result.items);
+    if (items.length >= result.total || result.items.length === 0) return items;
+  }
 }
 
 export async function createDomain(body: DomainBody): Promise<DomainResponse> {

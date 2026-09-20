@@ -15,6 +15,16 @@ export async function listSystems(q: SystemListQuery): Promise<SystemPage> {
   return jsonRequest<SystemPage>(`/api/v1/systems?${params}`);
 }
 
+/** Every active system in name order, optionally inside one domain, without a first-page cap. */
+export async function listAllSystems(domainId?: number): Promise<SystemResponse[]> {
+  const items: SystemResponse[] = [];
+  for (let page = 1; ; page += 1) {
+    const result = await listSystems({ page, pageSize: 100, sort: "name", domainId });
+    items.push(...result.items);
+    if (items.length >= result.total || result.items.length === 0) return items;
+  }
+}
+
 export async function createSystem(body: SystemBody): Promise<SystemResponse> {
   return jsonRequest<SystemResponse>("/api/v1/systems", { method: "POST", body: JSON.stringify(body) });
 }

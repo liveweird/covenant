@@ -1,0 +1,65 @@
+{
+  "title": "Lifecycle",
+  "intro": "Review support deadlines, migration readiness, and consumer impact across release lines.",
+  "loadFailed": "Could not load the lifecycle overview",
+  "summaryLoadFailed": "Could not load lifecycle counts",
+  "empty": "No release lines found",
+  "emptyFiltered": "No release lines match these filters",
+  "tableAria": "Lifecycle overview",
+  "summary": {
+    "deadlines30": "Deadlines in next 30 days",
+    "supportEnded": "Support-end date reached",
+    "incompletePlan": "Incomplete migration plan",
+    "usageUnavailable": "Usage unavailable or stale"
+  },
+  "column": {
+    "contract": "Contract",
+    "line": "Release line",
+    "owner": "Owner",
+    "support": "Support",
+    "deadline": "Lifecycle dates",
+    "plan": "Migration plan",
+    "consumers": "Consumers"
+  },
+  "filter": {
+    "owner": "Owner",
+    "support": "Support status",
+    "deadline": "Deadline",
+    "attention": "Needs attention",
+    "noDates": "No dates set",
+    "deadlineReached": "Reached",
+    "deadlineNext30": "Next 30 days",
+    "attentionDeadlineSoon": "Deadline soon",
+    "attentionSupportEnded": "Support-end date reached",
+    "attentionMigrationIncomplete": "Migration plan incomplete",
+    "attentionUsageUncertain": "Usage unavailable or stale",
+    "clearOwner": "Clear owner filter",
+    "clearSupport": "Clear support status filter",
+    "clearDeadline": "Clear deadline filter",
+    "clearAttention": "Clear attention filter"
+  },
+  "deadline": {
+    "deprecation": "Deprecation {{date}}",
+    "supportEnd": "Support ends {{date}}",
+    "supportReached": "Support-end date reached",
+    "noDates": "No dates set"
+  },
+  "plan": {
+    "complete": "Complete",
+    "incomplete": "Incomplete",
+    "none": "No migration plan",
+    "recorded": "Plan recorded",
+    "replacement": "Replacement selected",
+    "guide": "Migration guide added"
+  },
+  "usage": {
+    "count_one": "{{count}} consumer service",
+    "count_other": "{{count}} consumer services",
+    "unknown": "Unknown",
+    "unavailable": "Unavailable",
+    "freshness": "Refreshed {{date}}",
+    "scope": "Counts are contract-level; release-line adoption is not inferred."
+  },
+  "reviewImpact": "Review impact for {{contract}} {{line}}",
+  "editPolicy": "Edit policy for {{contract}} {{line}}"
+}

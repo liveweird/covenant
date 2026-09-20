@@ -1,0 +1,67 @@
+{
+  "title": "Cykl życia",
+  "intro": "Przeglądaj terminy wsparcia, gotowość migracji i wpływ na konsumentów we wszystkich liniach wydań.",
+  "loadFailed": "Nie udało się wczytać przeglądu cyklu życia",
+  "summaryLoadFailed": "Nie udało się wczytać liczników cyklu życia",
+  "empty": "Nie znaleziono linii wydań",
+  "emptyFiltered": "Żadna linia wydań nie pasuje do filtrów",
+  "tableAria": "Przegląd cyklu życia",
+  "summary": {
+    "deadlines30": "Terminy w ciągu 30 dni",
+    "supportEnded": "Osiągnięto datę końca wsparcia",
+    "incompletePlan": "Niepełny plan migracji",
+    "usageUnavailable": "Dane użycia niedostępne lub nieaktualne"
+  },
+  "column": {
+    "contract": "Kontrakt",
+    "line": "Linia wydania",
+    "owner": "Właściciel/ka",
+    "support": "Wsparcie",
+    "deadline": "Daty cyklu życia",
+    "plan": "Plan migracji",
+    "consumers": "Konsumenci"
+  },
+  "filter": {
+    "owner": "Właściciel/ka",
+    "support": "Status wsparcia",
+    "deadline": "Termin",
+    "attention": "Wymaga uwagi",
+    "noDates": "Bez ustawionych dat",
+    "deadlineReached": "Osiągnięty",
+    "deadlineNext30": "Najbliższe 30 dni",
+    "attentionDeadlineSoon": "Bliski termin",
+    "attentionSupportEnded": "Osiągnięto datę końca wsparcia",
+    "attentionMigrationIncomplete": "Niepełny plan migracji",
+    "attentionUsageUncertain": "Dane użycia niedostępne lub nieaktualne",
+    "clearOwner": "Wyczyść filtr właściciela/ki",
+    "clearSupport": "Wyczyść filtr statusu wsparcia",
+    "clearDeadline": "Wyczyść filtr terminu",
+    "clearAttention": "Wyczyść filtr wymaganej uwagi"
+  },
+  "deadline": {
+    "deprecation": "Wycofanie {{date}}",
+    "supportEnd": "Koniec wsparcia {{date}}",
+    "supportReached": "Osiągnięto datę końca wsparcia",
+    "noDates": "Bez ustawionych dat"
+  },
+  "plan": {
+    "complete": "Pełny",
+    "incomplete": "Niepełny",
+    "none": "Brak planu migracji",
+    "recorded": "Plan zapisany",
+    "replacement": "Wybrano zamiennik",
+    "guide": "Dodano instrukcję migracji"
+  },
+  "usage": {
+    "count_one": "{{count}} usługa konsumująca",
+    "count_few": "{{count}} usługi konsumujące",
+    "count_many": "{{count}} usług konsumujących",
+    "count_other": "{{count}} usługi konsumującej",
+    "unknown": "Nieznane",
+    "unavailable": "Niedostępne",
+    "freshness": "Odświeżono {{date}}",
+    "scope": "Liczniki dotyczą kontraktu; użycie linii wydania nie jest wnioskowane."
+  },
+  "reviewImpact": "Przejrzyj wpływ dla {{contract}} {{line}}",
+  "editPolicy": "Edytuj zasady dla {{contract}} {{line}}"
+}

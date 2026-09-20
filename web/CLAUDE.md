@@ -10,6 +10,13 @@ Vite + React 19 + TypeScript SPA: the shell + auth, user/feature management, MFA
 
 ## Layout conventions
 
+The Lifecycle page (`/lifecycle`, `pages/LifecycleOverview.tsx`) lists major lines across the
+catalog. Its API/query keys stay under `contracts`; policy saves invalidate both table and
+summary. Reuse `RetirementImpactModal` and `ReleaseLinePolicyModal`; load the full line only on
+an action. Consumer counts are contract-level observations, and unknown is distinct from zero.
+The owner-user filter uses catalog-visible names from the lifecycle summary, never the
+ADMIN-only users registry. See `.claude/docs/release-lines.md` for attention semantics.
+
 - **Flat directories**: `pages/`, `components/`, `hooks/`, `utils/`, `api/`, `changelog/`, `locales/{en,pl}/`, `test/` — no deeper nesting, no per-feature folders (a feature contributes files into these).
 - **Default exports for components/pages**, named exports for everything else; **no path aliases** — relative imports only.
 - **Co-located tests**: `Foo.test.tsx` sits beside `Foo.tsx`; shared test scaffolding lives in `src/test/` (`setup.ts` forces `en`, `render.tsx` is the provider wrapper — it and every file-local `MantineProvider` must pass `env="test"`, or Select/Popover interaction silently fails under happy-dom; `http.ts` holds the fetch stubs).
