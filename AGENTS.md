@@ -21,7 +21,8 @@ authentication/session handling (JWT pair, revocation blocklist, lockout, rate l
 and password reset, admin-managed users and per-user feature flags, the synced user language,
 shared paging, and the React shell (nav model, command palette, theme, changelog). The catalog
 and its SPA are implemented: flat teams with rosters; the Domain → System → Contract → Version
-hierarchy; team/user ownership; SemVer and lifecycle rules; validation, lint, and breaking-change
+hierarchy; team/user ownership; SemVer and lifecycle rules; parallel major release lines with
+independent support policies and stable recommendations; validation, lint, and breaking-change
 detection; import with dry run, guarded URL fetch, source references and sync, diff, download,
 and export; history, followers and in-app notifications; and catalog facets. ADMIN-curated
 Environments hold HTTP, Kafka, and PostgreSQL targets with passwords encrypted at rest. Try-it
@@ -169,7 +170,9 @@ Extend these trails through that shared entry point; see `.claude/docs/observabi
 
 Contract content is readable by every authenticated user; writes are scoped to the owning team's
 members, the owning user, or ADMIN; ownership transfer is ADMIN-only. Versions must be unique
-per contract and a new version must exceed the highest existing one. Content is editable only
+per contract by SemVer precedence (build metadata does not create a distinct version). Versions may
+be added out of order for backports. Major-derived release lines carry independent support policies
+and recommendations; see `.claude/docs/release-lines.md`. Content is editable only
 in DRAFT/PROPOSED, and only DRAFT versions can be deleted; published versions follow the
 lifecycle transition matrix in `contracts/Lifecycle.kt`.
 
@@ -182,7 +185,9 @@ storing anything. Findings merge the JVM's verdicts with the checker sidecar's s
 lint, and breaking-change verdicts; an unreachable checker degrades to a report-only
 `CHECKER_UNAVAILABLE` finding. The document text is stored byte-exact and never rewritten.
 
-Breaking changes are compared against the highest ACTIVE version strictly below the candidate.
+Breaking changes use the highest ACTIVE or DEPRECATED predecessor strictly below the candidate
+in its major line; absent one, they use the highest eligible lower-major version. RETIRED versions
+are excluded. A recommendation is separate from this comparison baseline and from deployment state.
 Writes revalidate current ownership and the prepared check context under the parent contract
 lock; stale baselines, recheck content or sync references return `409`. Each import item commits
 its contract/version pair atomically after one check pass. See `.claude/docs/persistence.md`.

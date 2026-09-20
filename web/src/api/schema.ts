@@ -762,7 +762,7 @@ export interface paths {
          *     cross-checks — returned as findings-so-far: a broken document is a `200` whose report
          *     carries the HARD finding, never a `400`. Pass `version` to get the declared-version
          *     cross-check; pass `contractId` too and the document is compared against that contract's
-         *     highest ACTIVE version below `version` (the report's `baselineVersion`): each breaking
+         *     highest ACTIVE or DEPRECATED version below `version` (the report's `baselineVersion`): each breaking
          *     change is a `BREAKING` finding — INFO once `version` carries the MAJOR bump, otherwise
          *     WARN plus one soft ERROR `BREAKING_WITHOUT_MAJOR_BUMP`. Nothing stored, no audit.
          */
@@ -940,6 +940,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contracts/{id}/release-lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List a contract's major release lines
+         * @description Any authenticated user. Default sort `-major`; sortable by `major` and `updatedAt`.
+         */
+        get: operations["listContractReleaseLines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/{id}/release-lines/{major}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                major: components["parameters"]["ReleaseLineMajor"];
+            };
+            cookie?: never;
+        };
+        /** Get one major release line */
+        get: operations["getContractReleaseLine"];
+        /**
+         * Replace a major release line's support policy
+         * @description Writers only. A pinned recommendation must be an ACTIVE stable version in this contract and major. END_OF_LIFE rejects a pin and has no effective recommendation.
+         */
+        put: operations["replaceContractReleaseLine"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contracts/{id}/versions": {
         parameters: {
             query?: never;
@@ -953,14 +999,14 @@ export interface paths {
          * List a contract's versions (no content)
          * @description Any authenticated user. Default sort `-version` (highest SemVer first — `version` sorts by
          *     the parsed triple, a release above its prereleases); also `id`, `lifecycle`, `createdAt`,
-         *     `updatedAt`. `lifecycle` is a repeatable any-of filter.
+         *     `updatedAt`. `lifecycle` is a repeatable any-of filter; `major` is a scalar major-line filter.
          */
         get: operations["listContractVersions"];
         put?: never;
         /**
          * Add a DRAFT version
-         * @description Writers only. `version` must be SemVer 2.0, unique on the contract (`409`) and greater
-         *     than every existing version (`400`). The document must pass the HARD gate — parseable,
+         * @description Writers only. `version` must be SemVer 2.0 and unique by SemVer precedence on the contract
+         *     (`409`; build metadata does not distinguish versions). The document must pass the HARD gate — parseable,
          *     the contract's standard (`400`, never waivable); a SOFT `ERROR` finding blocks unless
          *     `allowInvalid=true` (the editor's Save-anyway; the findings are re-obtainable through
          *     `POST /contracts/versions/check`). The check report is stored with the text; the
@@ -1312,7 +1358,7 @@ export interface paths {
             query?: {
                 /**
                  * @description The OLDER/reference version's id (`vid` is the newer/candidate side); omitted, the
-                 *     contract's highest ACTIVE version below `vid` is used. `against == vid` is legal (→
+                 *     contract's highest ACTIVE or DEPRECATED version below `vid` is used. `against == vid` is legal (→
                  *     `FULL`, identical). Must be a version of the SAME contract.
                  */
                 against?: number;
@@ -1330,7 +1376,7 @@ export interface paths {
          *     Computes BOTH directions between the pair: backward (do `from`'s consumers still work
          *     against `to`?) and forward (do `to`'s consumers already work against `from`?), the same raw
          *     breaking-change facts the check pipeline draws on, and names the two-way `verdict` plus the
-         *     SemVer `bump` between them. With no ACTIVE predecessor and no `against`, the report answers
+         *     SemVer `bump` between them. With no published predecessor and no `against`, the report answers
          *     `200` with `from: null` and `verdict: UNKNOWN`.
          */
         get: operations["getVersionCompatibility"];
@@ -2159,7 +2205,7 @@ export interface components {
             versions: components["schemas"]["ExportedVersion"][];
         };
         /** @enum {string} */
-        ContractEventType: "CREATED" | "UPDATED" | "OWNER_CHANGED" | "DELETED" | "VERSION_CREATED" | "VERSION_CONTENT_UPDATED" | "VERSION_TRANSITIONED" | "VERSION_DELETED" | "VERSION_RECHECKED" | "VERSION_SOURCE_CHANGED" | "VERSION_SYNCED" | "IMPORTED";
+        ContractEventType: "CREATED" | "UPDATED" | "OWNER_CHANGED" | "DELETED" | "VERSION_CREATED" | "VERSION_CONTENT_UPDATED" | "VERSION_TRANSITIONED" | "VERSION_DELETED" | "VERSION_RECHECKED" | "VERSION_SOURCE_CHANGED" | "VERSION_SYNCED" | "IMPORTED" | "RELEASE_LINE_UPDATED";
         ContractEventResponse: {
             /** Format: int32 */
             id: number;
@@ -2186,7 +2232,7 @@ export interface components {
          * @description The notification kind; the SPA renders it in the viewer's language. A kind a client build does not know renders as its raw name.
          * @enum {string}
          */
-        NotificationType: "CONTRACT_UPDATED" | "CONTRACT_OWNER_CHANGED" | "CONTRACT_DELETED" | "VERSION_CREATED" | "VERSION_CONTENT_UPDATED" | "VERSION_TRANSITIONED" | "VERSION_DELETED" | "VERSION_SYNCED" | "VERSION_SOURCE_CHANGED" | "VERSION_IMPORTED" | "VERSION_BREAKING_STORED";
+        NotificationType: "CONTRACT_UPDATED" | "CONTRACT_OWNER_CHANGED" | "CONTRACT_DELETED" | "VERSION_CREATED" | "VERSION_CONTENT_UPDATED" | "VERSION_TRANSITIONED" | "VERSION_DELETED" | "VERSION_SYNCED" | "VERSION_SOURCE_CHANGED" | "VERSION_IMPORTED" | "VERSION_BREAKING_STORED" | "RELEASE_LINE_UPDATED";
         NotificationResponse: {
             /** Format: int32 */
             id: number;
@@ -2849,13 +2895,13 @@ export interface components {
             infos: number;
             /** @description False when the checker sidecar could not be reached — its LINT/SEMANTIC verdicts are missing. */
             checkerAvailable: boolean;
-            /** @description The ACTIVE version the document was compared against for breaking changes; null when none applied. */
+            /** @description The ACTIVE or DEPRECATED version the document was compared against for breaking changes; null when none applied. */
             baselineVersion?: string | null;
         };
         /**
          * @description `FULL` (both directions compatible), `BACKWARD` (consumers of `from` still work against
          *     `to`), `FORWARD` (consumers of `to` already worked against `from`), `NONE` (neither), or
-         *     `UNKNOWN` (a direction could not be computed — no ACTIVE predecessor, an unparseable side,
+         *     `UNKNOWN` (a direction could not be computed — no published predecessor, an unparseable side,
          *     a differ skip, the checker down for AsyncAPI).
          * @enum {string}
          */
@@ -2879,7 +2925,7 @@ export interface components {
             findings: components["schemas"]["Finding"][];
         };
         CompatibilityReport: {
-            /** @description The older/reference side; null when no ACTIVE predecessor exists and `against` was omitted. */
+            /** @description The older/reference side; null when no published predecessor exists and `against` was omitted. */
             from?: components["schemas"]["VersionRef"] | null;
             to: components["schemas"]["VersionRef"];
             verdict: components["schemas"]["CompatibilityVerdict"];
@@ -2895,8 +2941,51 @@ export interface components {
             content: string;
             /** @description The SemVer the document is (to be) stored as — drives the version cross-check. */
             version?: string | null;
-            /** @description The contract the document belongs to — its highest ACTIVE version below `version` becomes the breaking-change baseline. */
+            /** @description The contract the document belongs to — its highest ACTIVE or DEPRECATED version below `version` becomes the breaking-change baseline. */
             contractId?: number | null;
+        };
+        /** @enum {string} */
+        SupportStatus: "UNSPECIFIED" | "SUPPORTED" | "MAINTENANCE" | "END_OF_LIFE";
+        ReleaseLineVersionSummary: {
+            /** Format: int32 */
+            id: number;
+            version: string;
+            lifecycle: components["schemas"]["Lifecycle"];
+        };
+        ReleaseLineUpdateRequest: {
+            supportStatus: components["schemas"]["SupportStatus"];
+            /** Format: date */
+            supportEndsOn?: string | null;
+            supportPolicy?: string | null;
+            /** Format: int32 */
+            recommendedVersionId?: number | null;
+        };
+        ReleaseLineResponse: {
+            /** Format: int32 */
+            id: number;
+            /** Format: int32 */
+            contractId: number;
+            /** Format: int32 */
+            major: number;
+            supportStatus: components["schemas"]["SupportStatus"];
+            /** Format: date */
+            supportEndsOn: string | null;
+            supportPolicy: string | null;
+            /** Format: int32 */
+            recommendedVersionId: number | null;
+            latestVersion: components["schemas"]["ReleaseLineVersionSummary"] | null;
+            recommendedVersion: components["schemas"]["ReleaseLineVersionSummary"] | null;
+            /** Format: int64 */
+            versionCount: number;
+            /** Format: int64 */
+            updatedAt: number;
+        };
+        ReleaseLinePage: {
+            items: components["schemas"]["ReleaseLineResponse"][];
+            page: number;
+            pageSize: number;
+            /** Format: int64 */
+            total: number;
         };
         VersionCreateRequest: {
             /** @description SemVer 2.0 */
@@ -3289,6 +3378,9 @@ export interface components {
          */
         Sort: string;
         VersionId: number;
+        ReleaseLineMajor: number;
+        /** @description Filter versions to one SemVer major release line. Repetition is invalid. */
+        VersionMajor: number;
         /** @description Store despite SOFT `ERROR` findings (the Save-anyway waiver). HARD findings are never waivable. */
         AllowInvalid: boolean;
         ContractDomainId: number;
@@ -5001,6 +5093,102 @@ export interface operations {
             500: components["responses"]["InternalServerError"];
         };
     };
+    listContractReleaseLines: {
+        parameters: {
+            query?: {
+                /** @description 1-based page index. Defaults to 1. */
+                page?: components["parameters"]["Page"];
+                /** @description Rows per page. Defaults to 20, maximum 100. */
+                pageSize?: components["parameters"]["PageSize"];
+                /**
+                 * @description Sort spec. Format: `field` (ascending) or `-field` (descending). Multiple fields are
+                 *     comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
+                 *     sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
+                 *     always appended as a deterministic tiebreaker.
+                 */
+                sort?: components["parameters"]["Sort"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of release lines */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseLinePage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getContractReleaseLine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                major: components["parameters"]["ReleaseLineMajor"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The release line and its effective recommendation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseLineResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    replaceContractReleaseLine: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                major: components["parameters"]["ReleaseLineMajor"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReleaseLineUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Replaced, or already equal */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            415: components["responses"]["UnsupportedMediaType"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
     listContractVersions: {
         parameters: {
             query?: {
@@ -5017,6 +5205,8 @@ export interface operations {
                 sort?: components["parameters"]["Sort"];
                 /** @description Repeatable — any-of over lifecycles (the LATEST version's on the contracts list/tree). */
                 lifecycle?: components["parameters"]["ContractLifecycle"];
+                /** @description Filter versions to one SemVer major release line. Repetition is invalid. */
+                major?: components["parameters"]["VersionMajor"];
             };
             header?: never;
             path: {
@@ -5628,7 +5818,7 @@ export interface operations {
             query?: {
                 /**
                  * @description The OLDER/reference version's id (`vid` is the newer/candidate side); omitted, the
-                 *     contract's highest ACTIVE version below `vid` is used. `against == vid` is legal (→
+                 *     contract's highest ACTIVE or DEPRECATED version below `vid` is used. `against == vid` is legal (→
                  *     `FULL`, identical). Must be a version of the SAME contract.
                  */
                 against?: number;

@@ -24,6 +24,7 @@ enum class NotificationType {
     VERSION_SOURCE_CHANGED,
     VERSION_IMPORTED,
     VERSION_BREAKING_STORED,
+    RELEASE_LINE_UPDATED,
 }
 
 /**

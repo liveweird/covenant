@@ -9,6 +9,7 @@ import { CONTRACT_TYPE_LABEL } from "../utils/contractForm";
 import { LIFECYCLES } from "../utils/lifecycle";
 import { formatDateTime } from "../utils/relativeTime";
 import { loadErrorMessage } from "../utils/saveError";
+import { supportStatusLabel } from "../utils/releaseLines";
 
 const PAGE_SIZE = 10;
 
@@ -56,6 +57,8 @@ function describeEvent(event: ContractEvent, t: TFunction): string {
       return t("contracts.history.event.versionSynced", { version });
     case "IMPORTED":
       return t("contracts.history.event.imported", { version });
+    case "RELEASE_LINE_UPDATED":
+      return t("contracts.history.event.releaseLineUpdated", { major: event.params.major, status: supportStatusLabel(event.params.supportStatus, t) });
     default:
       // Forward-compat: an event kind this client build doesn't know yet — show the raw type.
       return event.type;

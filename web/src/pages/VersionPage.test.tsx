@@ -64,11 +64,11 @@ describe("VersionPage", () => {
     const user = userEvent.setup();
     renderPage();
     await screen.findByRole("heading", { level: 2, name: "orders-api 1.1.0" });
-    expect(await screen.findByText("Compatibility with 1.0.0 (active):")).toBeInTheDocument();
+    expect(await screen.findByText("Compatibility with 1.0.0 (published):")).toBeInTheDocument();
     expect(screen.getByText("Backward compatible")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Details" })).toHaveAttribute("href", "/contracts/5/diff?from=10&to=11");
     await user.click(screen.getByRole("button", { name: "Edit document" }));
-    expect(screen.queryByText("Compatibility with 1.0.0 (active):")).not.toBeInTheDocument();
+    expect(screen.queryByText("Compatibility with 1.0.0 (published):")).not.toBeInTheDocument();
   });
 
   test("a compact compatibility failure renders inline beside the stored document", async () => {
@@ -83,7 +83,7 @@ describe("VersionPage", () => {
     serve(mockFetch, base);
     renderPage("/contracts/5/versions/10");
     await screen.findByRole("heading", { level: 2, name: "orders-api 1.0.0" });
-    expect(await screen.findByText("No active version to compare with")).toBeInTheDocument();
+    expect(await screen.findByText("No published version to compare with")).toBeInTheDocument();
   });
 
   test("a reader sees no moves, no Edit, and a More menu with Download and Compare only", async () => {

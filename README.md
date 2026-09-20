@@ -17,7 +17,7 @@ byte-exact. Around it Covenant adds what the standards leave to the team — **S
 a **lifecycle** (draft → proposed → active → deprecated → retired), **ownership** (a team, or an
 individual user), a searchable **Domain → System → Contract** hierarchy, and **validation**:
 syntax, schema, semantic and lint checks on every document, and **breaking-change detection**
-against the active version (a non-major bump that breaks clients is a waivable blocking finding). Contracts live and are edited in Git; Covenant works like a catalog —
+against the relevant published predecessor (a non-major bump that breaks clients is a waivable blocking finding). Contracts live and are edited in Git; Covenant works like a catalog —
 import (paste, file, or a Git blob URL), view and edit in a code editor, validate, diff versions,
 export for the commit back.
 
@@ -28,9 +28,13 @@ export for the commit back.
   **OpenAPI**, **AsyncAPI** or **ODCS** owned by a team or a person, with the write rule enforced
   server-side (owning team's members, the owning user, administrators) and ownership transfer
   reserved to administrators.
-- **Versions** — the standard document itself, stored byte-exact; strict **SemVer** (a new number
-  must be above the highest), the lifecycle DRAFT → PROPOSED → ACTIVE → DEPRECATED → RETIRED
+- **Versions** — the standard document itself, stored byte-exact; strict **SemVer** with unique
+  precedence and backports permitted after higher versions, the lifecycle DRAFT → PROPOSED → ACTIVE → DEPRECATED → RETIRED
   (PROPOSED may step back; the text locks from ACTIVE on; only a DRAFT deletes).
+- **Parallel release lines** — maintain `1.x` alongside `2.x`, including older-minor backports.
+  Each major line has its own support status, optional support-end date and policy notes, and
+  an automatic or explicitly pinned stable recommendation. Support metadata does not change
+  version lifecycle or claim deployment; see [the release-line rules](.claude/docs/release-lines.md).
 - **Checks** — on every save and live while typing: parse + type gate (hard, never waivable),
   swagger-parser for OpenAPI, offline JSON Schema validation for AsyncAPI 2.6/3.x and ODCS
   3.0–3.1 with the payload walk (JSON Schema 2020-12 meta-validation, Avro), then the **checker**
@@ -46,7 +50,7 @@ export for the commit back.
   flags,
 - a bilingual (English/Polish) UI with light/dark themes and a ⌘K / Ctrl K command palette (pages,
   actions, and a server-side contract search),
-- breaking-change detection against the active version (openapi-diff, `@asyncapi/diff`, a
+- breaking-change detection against the relevant published predecessor (openapi-diff, `@asyncapi/diff`, a
   hand-written ODCS comparer) — a non-major bump that breaks clients is a waivable blocking finding,
 - an **Environments** registry (per system: an HTTP base URL, a Kafka cluster, a read-only PostgreSQL database — passwords encrypted at rest, admin-curated) — the targets the **try-it** feature reaches: send a request to an OpenAPI operation through an environment and see the response measured against the contract (status, media type, headers, body against the response schema), publish a record onto an AsyncAPI channel's topic (contract writers only) or read its newest records, or read a bounded sample of an ODCS dataset over a read-only connection and see its columns measured against the declared properties — every observation measured against the contract as conformance findings; rate-limited (`TRY_RATE_LIMIT_PER_MINUTE`), redirects never followed, credentials typed per call and never stored,
 - facet counts on the catalog filters — every option says how many contracts picking it would yield,

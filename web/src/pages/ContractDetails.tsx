@@ -1,10 +1,12 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
-import { Alert, Button, Group, Menu, Paper, Stack, Table, Text, Tooltip } from "@mantine/core";
+import { Alert, Button, Group, Menu, Paper, Select, Stack, Table, Text, Tooltip } from "@mantine/core";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconArrowsDiff, IconDots, IconDownload, IconFileText, IconPencil, IconPlus, IconTrash, IconWand } from "@tabler/icons-react";
 import { deleteContract, exportContract, getContract } from "../api/contracts";
 import { ApiError } from "../api/http";
+import { listAllReleaseLines } from "../api/releaseLines";
 import { deleteVersion, listVersions, type VersionListItem } from "../api/versions";
 import CheckSummaryBadges from "../components/CheckSummaryBadges";
 import ContractHistory from "../components/ContractHistory";
@@ -17,6 +19,7 @@ import OwnerChip from "../components/OwnerChip";
 import PageHeader from "../components/PageHeader";
 import PaginationBar from "../components/PaginationBar";
 import RowActionsMenu from "../components/RowActionsMenu";
+import ReleaseLinesPanel from "../components/ReleaseLinesPanel";
 import SortHeader from "../components/SortHeader";
 import TableLoadingRow from "../components/TableLoadingRow";
 import TypeBadge from "../components/TypeBadge";
@@ -44,6 +47,7 @@ export default function ContractDetails() {
   const queryClient = useQueryClient();
   const { id: idParam } = useParams();
   const id = Number(idParam);
+  const [versionMajor, setVersionMajor] = useState<number | null>(null);
   const contract = useQuery({ queryKey: ["contracts", "detail", id], queryFn: () => getContract(id), enabled: Number.isFinite(id) });
   const { page, setPage, pageSize, setPageSize, sortField, sortDir, sortParam, toggleSort } = usePagedSort<SortField>("version", [id], {
     key: "versions",
@@ -52,10 +56,15 @@ export default function ContractDetails() {
   // The versions table opens highest-first; usePagedSort starts ascending, so the default is flipped here.
   const effectiveSort = sortField === "version" && sortDir === "asc" && sortParam === "version" ? "-version" : sortParam;
   const versions = useQuery({
-    queryKey: ["contracts", "versions", id, page, pageSize, effectiveSort],
-    queryFn: () => listVersions(id, { page, pageSize, sort: effectiveSort }),
+    queryKey: ["contracts", "versions", id, page, pageSize, effectiveSort, versionMajor],
+    queryFn: () => listVersions(id, { page, pageSize, sort: effectiveSort, major: versionMajor ?? undefined }),
     enabled: Number.isFinite(id),
     placeholderData: keepPreviousData,
+  });
+  const releaseLines = useQuery({
+    queryKey: ["contracts", "release-lines", id],
+    queryFn: () => listAllReleaseLines(id),
+    enabled: Number.isFinite(id),
   });
   const downloads = useVersionDownload();
 
@@ -191,6 +200,31 @@ export default function ContractDetails() {
           </Stack>
         </Group>
       </Paper>
+      <ReleaseLinesPanel
+        contractId={id}
+        canWrite={data.canWrite}
+        onFilter={(major) => {
+          setVersionMajor(major);
+          setPage(1);
+        }}
+      />
+      <Group justify="space-between" align="flex-end">
+        <Text fw={600} size="lg">
+          {t("versions.tableAria", { name: data.name })}
+        </Text>
+        <Select
+          label={t("versions.field.releaseLine")}
+          data={(releaseLines.data ?? []).map((line) => ({ value: String(line.major), label: `${line.major}.x` }))}
+          value={versionMajor == null ? null : String(versionMajor)}
+          onChange={(value) => {
+            setVersionMajor(value == null ? null : Number(value));
+            setPage(1);
+          }}
+          placeholder={t("versions.field.allReleaseLines")}
+          clearable
+          w={220}
+        />
+      </Group>
       {downloads.error != null && (
         <Alert color="red" variant="light" withCloseButton onClose={downloads.dismissError} title={t("versions.downloadFailed")}>
           {loadErrorMessage(downloads.error, t)}

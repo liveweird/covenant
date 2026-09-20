@@ -46,26 +46,45 @@ describe("NewVersion page", () => {
     expect(await screen.findByRole("textbox", { name: "Contract document" })).toHaveValue(CONTENT);
   });
 
-  test("defaults to the next patch, bumps off the highest, validates the number, and copies ?from=", async () => {
+  test("defaults to the selected line's next patch, allows a chronological backport, validates SemVer, and copies ?from=", async () => {
     serve(mockFetch, base);
     const user = userEvent.setup();
     renderPage("/contracts/5/versions/new?from=11");
     expect(await screen.findByRole("heading", { level: 2, name: "New version of orders-api" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText("Version")).toHaveValue("1.1.1"));
-    expect(screen.getByText(/highest version so far is 1.1.0/)).toBeInTheDocument();
+    expect(screen.getByText(/selected release line currently ends at 1.1.0/)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("textbox", { name: "Contract document" })).toHaveValue(CONTENT));
     await user.click(screen.getByRole("button", { name: "Major" }));
     expect(screen.getByLabelText("Version")).toHaveValue("2.0.0");
     await user.clear(screen.getByLabelText("Version"));
     await user.type(screen.getByLabelText("Version"), "1.0.5");
-    expect(screen.getByText("The version must be greater than 1.1.0")).toBeInTheDocument();
+    expect(screen.queryByText(/must be greater/)).not.toBeInTheDocument();
     await user.clear(screen.getByLabelText("Version"));
     await user.type(screen.getByLabelText("Version"), "v2");
     expect(screen.getByText("Use strict SemVer, e.g. 1.2.0 or 2.0.0-rc.1")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save draft" })).toBeDisabled();
     await waitFor(() => expect(calledUrl(mockFetch, "POST", (u) => u === "/api/v1/contracts/versions/check")).toBeDefined());
-    // The contract is named so the server compares against its ACTIVE version for breaking changes.
+    // The contract is named so the server compares against its published predecessor for breaking changes.
     expect(bodyOf(findCall(mockFetch, "POST", "/api/v1/contracts/versions/check"))).toMatchObject({ contractId: 5 });
+  });
+
+  test("fetches an explicitly selected old-line source and every major-filtered page without losing the source document", async () => {
+    const backportContent = CONTENT.replace("version: 1.1.0", "version: 1.9.1");
+    const backport = { ...VERSION, id: 200, version: "1.9.1", content: backportContent };
+    serve(mockFetch, {
+      ...base,
+      "GET /api/v1/contracts/5/versions/200": { status: 200, body: backport },
+      "GET /api/v1/contracts/5/versions?": (url) => {
+        const page = new URL(url, "http://covenant.local").searchParams.get("page");
+        return page === "1"
+          ? { status: 200, body: { ...VERSION_PAGE, items: Array.from({ length: 100 }, (_, index) => ({ ...VERSION_PAGE.items[0], id: 300 + index, version: `1.10.${100 - index}` })), page: 1, pageSize: 100, total: 101 } }
+          : { status: 200, body: { ...VERSION_PAGE, items: [backport], page: 2, pageSize: 100, total: 101 } };
+      },
+    });
+    renderPage("/contracts/5/versions/new?from=200&major=1");
+    await waitFor(() => expect(screen.getByLabelText("Version")).toHaveValue("1.9.2"));
+    expect(screen.getByRole("textbox", { name: "Contract document" })).toHaveValue(backportContent);
+    expect(calledUrl(mockFetch, "GET", (url) => url.includes("page=2") && url.includes("major=1"))).toBeDefined();
   });
 
   test("a blank start renders the type's template; the strict save posts and lands on the version", async () => {
@@ -80,6 +99,25 @@ describe("NewVersion page", () => {
     expect(body.version).toBe("1.1.1");
     expect(body.content).toContain("openapi: 3.1.0");
     expect(await screen.findByRole("heading", { level: 2, name: "Version page" })).toBeInTheDocument();
+  });
+
+  test("an explicitly selected empty line starts at that major and a missing source is shown inline", async () => {
+    serve(mockFetch, {
+      ...base,
+      "GET /api/v1/contracts/5/versions?": { status: 200, body: { ...VERSION_PAGE, items: [], total: 0 } },
+    });
+    const first = renderPage("/contracts/5/versions/new?major=2");
+    await waitFor(() => expect(screen.getByLabelText("Version")).toHaveValue("2.0.0"));
+    expect(editorValue()).toContain("version: 2.0.0");
+    first.unmount();
+
+    serve(mockFetch, {
+      ...base,
+      "GET /api/v1/contracts/5/versions/999": { status: 404, body: { title: "Not Found", status: 404 } },
+    });
+    renderPage("/contracts/5/versions/new?from=999");
+    expect(await screen.findByText("Could not load the selected starting version")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save draft" })).toBeDisabled();
   });
 
   test("a soft rejection opens Save-anyway and retries with the waiver; a HARD finding blocks the button", async () => {

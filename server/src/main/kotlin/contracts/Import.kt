@@ -86,7 +86,8 @@ class ContractImporter(
     suspend fun run(request: ImportRequest, caller: CallerPrincipal, store: Boolean): List<ImportItemResult> {
         // The dry run must predict intra-batch duplicates the way the real run would hit them.
         val seen = mutableSetOf<Pair<UInt, String>>()
-        return request.items.mapIndexed { index, raw -> one(index, raw, caller, store, seen) }
+        val seenVersions = mutableSetOf<Pair<Pair<UInt, String>, SemVer>>()
+        return request.items.mapIndexed { index, raw -> one(index, raw, caller, store, seen, seenVersions) }
     }
 
     private suspend fun one(
@@ -95,6 +96,7 @@ class ContractImporter(
         caller: CallerPrincipal,
         store: Boolean,
         seen: MutableSet<Pair<UInt, String>>,
+        seenVersions: MutableSet<Pair<Pair<UInt, String>, SemVer>>,
     ): ImportItemResult {
         val base = ImportItemResult(index = index, name = raw.name.trim(), version = raw.version.trim(), status = ImportStatus.ERROR)
         return try {
@@ -103,9 +105,11 @@ class ContractImporter(
             val semver = SemVer.parse(item.version)
             val existingId = contracts.findActiveId(item.systemId, item.name)
             val key = item.systemId to item.name.lowercase()
+            val precedenceKey = key to semver.copy(build = null)
             val seenBefore = key in seen
+            if (precedenceKey in seenVersions) return base.copy(status = ImportStatus.CONFLICT, message = ALREADY_EXISTS)
             val rejection =
-                if (existingId != null) rejectExisting(base, item, semver, existingId, caller) else rejectNew(item, caller, seenBefore)
+                if (existingId != null) rejectExisting(base, item, existingId, caller) else rejectNew(item, caller, seenBefore)
             if (rejection != null) return rejection
             sanitizedSourceUrl(item.sourceUrl)
             if (existingId == null && !seenBefore) {
@@ -117,7 +121,7 @@ class ContractImporter(
                 )
             }
             // The check runs in both modes: the dry run reports the findings it WOULD store — the
-            // breaking-change baseline included, when the contract already has an ACTIVE version.
+            // breaking-change baseline included, when the contract already has an eligible published version.
             val prepared = versions.prepare(
                 existingId,
                 item.type,
@@ -149,6 +153,7 @@ class ContractImporter(
                 message = report.softErrors.takeIf { it.isNotEmpty() }?.joinToString("; ") { "${it.code}: ${it.message}" },
             )
             seen.add(key)
+            seenVersions.add(precedenceKey)
             if (store) store(predicted, item, existingId, caller, prepared) else predicted
         } catch (e: CancellationException) {
             throw e
@@ -170,7 +175,6 @@ class ContractImporter(
     private suspend fun rejectExisting(
         base: ImportItemResult,
         item: ImportItem,
-        semver: SemVer,
         existingId: UInt,
         caller: CallerPrincipal,
     ): ImportItemResult? {
@@ -180,13 +184,6 @@ class ContractImporter(
             return base.copy(status = ImportStatus.INVALID, message = "The existing contract is $type, not ${item.type}")
         }
         if (versions.exists(existingId, item.version)) return base.copy(status = ImportStatus.CONFLICT, message = ALREADY_EXISTS)
-        val top = versions.highestOf(existingId)
-        if (top != null && semver <= top) {
-            return base.copy(
-                status = ImportStatus.INVALID,
-                message = "Version ${item.version} must be greater than the highest existing version $top",
-            )
-        }
         return null
     }
 

@@ -48,7 +48,10 @@ const NUMERIC = /^\d+$/;
 function compareIdentifiers(a: string, b: string): number {
   const an = NUMERIC.test(a);
   const bn = NUMERIC.test(b);
-  if (an && bn) return Number(a) - Number(b);
+  // Numeric identifiers are unbounded by SemVer. Comparing their Number values would collapse
+  // distinct identifiers above MAX_SAFE_INTEGER; valid identifiers have no leading zeroes, so
+  // length followed by lexical order is the exact integer comparison.
+  if (an && bn) return a.length === b.length ? (a < b ? -1 : a > b ? 1 : 0) : a.length - b.length;
   // Numeric identifiers always have lower precedence than alphanumeric ones.
   if (an) return -1;
   if (bn) return 1;

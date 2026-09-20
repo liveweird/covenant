@@ -31,6 +31,8 @@ skips the rest (the leftover `e2e-*` rows are cleaned up by hand or by the next 
 
 ## Scenario: admin publishes the version, reads it in the reader, downloads it and sees the breaking-change gate
 
+The comparison caption identifies a published predecessor (ACTIVE or DEPRECATED); this scenario uses an ACTIVE one.
+
 7. The admin signs in again, opens the contract page, opens 1.0.0, clicks Propose then Activate.
    - *Expected*: Deprecate becomes the only move and the Edit document button is gone (the text is
      locked).

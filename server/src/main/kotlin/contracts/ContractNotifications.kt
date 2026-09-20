@@ -28,6 +28,8 @@ fun contractNotifications(
         params["from"]?.let { put("from", it) }
         params["to"]?.let { put("to", it) }
         params["name"]?.let { put("name", it) }
+        params["major"]?.let { put("major", it) }
+        params["supportStatus"]?.let { put("supportStatus", it) }
     }
     return recipients.sorted().flatMap { recipient ->
         buildList {
@@ -49,4 +51,5 @@ private fun notificationTypeOf(type: ContractEventType): NotificationType? = whe
     ContractEventType.VERSION_SOURCE_CHANGED -> NotificationType.VERSION_SOURCE_CHANGED
     ContractEventType.VERSION_SYNCED -> NotificationType.VERSION_SYNCED
     ContractEventType.IMPORTED -> NotificationType.VERSION_IMPORTED
+    ContractEventType.RELEASE_LINE_UPDATED -> NotificationType.RELEASE_LINE_UPDATED
 }

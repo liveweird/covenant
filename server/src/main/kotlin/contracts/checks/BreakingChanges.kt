@@ -4,7 +4,7 @@ import ch.nokillswit.contracts.ContractType
 import ch.nokillswit.contracts.SemVer
 import com.fasterxml.jackson.databind.JsonNode
 
-/** The version a candidate is compared against: the contract's highest ACTIVE version below it. */
+/** The version a candidate is compared against: its highest eligible published predecessor. */
 data class Baseline(val version: SemVer, val content: String)
 
 /**
@@ -45,13 +45,13 @@ object BreakingChanges {
         val noun = if (facts.size == 1) "change" else "changes"
         return settled + Finding(
             Severity.ERROR, FindingSource.BREAKING, CODE_WITHOUT_MAJOR_BUMP,
-            "${facts.size} breaking $noun against active version ${baseline.version} — " +
+            "${facts.size} breaking $noun against published version ${baseline.version} — " +
                 "$version needs a MAJOR bump (${baseline.version.major + 1}.0.0 or above)",
         )
     }
 
     private fun skipped(baseline: Baseline) = Finding(
         Severity.INFO, FindingSource.BREAKING, CODE_SKIPPED,
-        "Breaking changes against active version ${baseline.version} could not be computed — that document does not compare",
+        "Breaking changes against published version ${baseline.version} could not be computed — that document does not compare",
     )
 }

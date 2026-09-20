@@ -72,6 +72,7 @@ class ContractVersionService(
     internal val database: R2dbcDatabase,
     private val checks: ChecksService,
     private val contracts: ContractService,
+    private val releaseLines: ReleaseLineService = ReleaseLineService(database, contracts),
 ) {
     object ContractVersions : UIntIdTable("contract_versions"), SoftDeletable {
         val contractId = reference("contract_id", ContractService.Contracts)
@@ -108,6 +109,7 @@ class ContractVersionService(
     suspend fun list(contractId: UInt, filter: VersionListFilter, paging: PageRequest): VersionListResult = suspendTransaction(database) {
         var predicate: Op<Boolean> = (ContractVersions.contractId eq contractId) and ContractVersions.active()
         if (filter.lifecycles.isNotEmpty()) predicate = predicate and (ContractVersions.lifecycle inList filter.lifecycles.map { it.name })
+        filter.major?.let { predicate = predicate and (ContractVersions.semverMajor eq it) }
         val total = ContractVersions.selectAll().where { predicate }.count()
         val rows = ContractVersions.selectAll().where { predicate }.applySemverPaging(paging, SORTABLE_COLUMNS).toList()
         VersionListResult(items = rows.map { it.toListItem() }, total = total)
@@ -166,13 +168,8 @@ class ContractVersionService(
         allowInvalid: Boolean,
     ): VersionSaveResult {
         if (baselineRowFor(contractId, prepared.semver) != prepared.baseline) staleContext()
-        if (versionExists(contractId, prepared.request.version)) {
+        if (versionExists(contractId, prepared.semver)) {
             throw ConflictException("Version ${prepared.request.version} already exists")
-        }
-        highest(contractId)?.let { top ->
-            if (prepared.semver <= top) throw BadRequestException(
-                "Version ${prepared.request.version} must be greater than the highest existing version $top",
-            )
         }
         val waived = requireOrWaive(prepared.report, allowInvalid)
         val stamp = nowMillis()
@@ -205,6 +202,7 @@ class ContractVersionService(
             it[lastSyncedAt] = if (prepared.source != null) stamp else 0
             it[syncedContent] = if (prepared.source != null) request.content else null
         }[ContractVersions.id].value
+        releaseLines.ensure(contractId, prepared.semver.major, stamp)
         recomputeLatest(contractId)
         return VersionSaveResult(rowOf(contractId, id)!!.toResponse(), waived)
     }
@@ -386,6 +384,7 @@ class ContractVersionService(
             it[updatedAt] = nowMillis()
         }
         if (rows == 0) throw ConflictException("The version changed underneath you — reload and retry")
+        if (from == Lifecycle.ACTIVE && to != Lifecycle.ACTIVE) releaseLines.clearRecommendation(versionId)
         val refreshed = rowOf(contractId, versionId)!!
         val refreshedFindings = checks.refreshLifecycleFinding(
             ContractType.valueOf(
@@ -430,9 +429,10 @@ class ContractVersionService(
     suspend fun highestOf(contractId: UInt): SemVer? = suspendTransaction(database) { highest(contractId) }
 
     /**
-     * The breaking-change baseline for a candidate: the contract's highest ACTIVE version strictly
-     * BELOW it (a recheck of an older version compares against ITS predecessor, never a successor);
-     * no `below` = the highest ACTIVE version. Null when nothing is published yet.
+     * The breaking-change baseline for a candidate: the highest ACTIVE or DEPRECATED version
+     * strictly below it. Same-major predecessors win naturally over lower release lines; versions
+     * from higher lines and RETIRED versions never participate. With no candidate, the highest
+     * eligible published version is used.
      */
     suspend fun baselineFor(contractId: UInt, below: SemVer?): Baseline? = baselineRowFor(contractId, below)?.baseline
 
@@ -443,13 +443,16 @@ class ContractVersionService(
      */
     suspend fun baselineRowFor(contractId: UInt, below: SemVer?): BaselineRow? = suspendTransaction(database) {
         val v = ContractVersions
-        v.select(v.id, v.version, v.content)
-            .where { (v.contractId eq contractId) and (v.lifecycle eq Lifecycle.ACTIVE.name) and ContractVersions.active() }
-            .map { Triple(it[v.id].value, SemVer.parse(it[v.version]), it[v.content]) }
+        v.select(v.id, v.version, v.content, v.lifecycle)
+            .where {
+                (v.contractId eq contractId) and
+                    (v.lifecycle inList listOf(Lifecycle.ACTIVE.name, Lifecycle.DEPRECATED.name)) and ContractVersions.active()
+            }
+            .map { BaselineCandidate(it[v.id].value, SemVer.parse(it[v.version]), it[v.content], Lifecycle.valueOf(it[v.lifecycle])) }
             .toList()
-            .filter { (_, semver, _) -> below == null || semver < below }
-            .maxByOrNull { it.second }
-            ?.let { (id, semver, content) -> BaselineRow(id, Baseline(semver, content)) }
+            .filter { below == null || it.semver < below }
+            .maxByOrNull { it.semver }
+            ?.let { BaselineRow(it.id, Baseline(it.semver, it.content), it.lifecycle) }
     }
 
     // ---- internals -----------------------------------------------------------------------
@@ -469,11 +472,20 @@ class ContractVersionService(
 
     /** Loads the contract's active versions (a small set) and compares in Kotlin — full SemVer precedence. */
     /** Whether an active row carries exactly this version string (the importer's CONFLICT prediction). */
-    suspend fun exists(contractId: UInt, version: String): Boolean = suspendTransaction(database) { versionExists(contractId, version) }
+    suspend fun exists(contractId: UInt, version: String): Boolean = suspendTransaction(database) {
+        versionExists(contractId, SemVer.parse(version))
+    }
 
-    private suspend fun versionExists(contractId: UInt, version: String): Boolean =
+    private suspend fun versionExists(contractId: UInt, version: SemVer): Boolean =
         ContractVersions.select(ContractVersions.id)
-            .where { (ContractVersions.contractId eq contractId) and (ContractVersions.version eq version) and ContractVersions.active() }
+            .where {
+                (ContractVersions.contractId eq contractId) and
+                    (ContractVersions.semverMajor eq version.major) and
+                    (ContractVersions.semverMinor eq version.minor) and
+                    (ContractVersions.semverPatch eq version.patch) and
+                    (if (version.prerelease == null) ContractVersions.semverPrerelease.isNull()
+                    else ContractVersions.semverPrerelease eq version.prerelease) and ContractVersions.active()
+            }
             .count() > 0
 
     private suspend fun highest(contractId: UInt): SemVer? =
@@ -567,4 +579,5 @@ internal fun sha256(text: String): String =
     MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") { "%02x".format(it) }
 
 /** [ContractVersionService.baselineRowFor]'s answer: the baseline plus the row it came from, read together. */
-data class BaselineRow(val id: UInt, val baseline: Baseline)
+data class BaselineRow(val id: UInt, val baseline: Baseline, val lifecycle: Lifecycle)
+private data class BaselineCandidate(val id: UInt, val semver: SemVer, val content: String, val lifecycle: Lifecycle)

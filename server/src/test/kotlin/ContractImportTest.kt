@@ -148,7 +148,7 @@ class ContractImportTest {
                 version = "2.0.0",
                 content = ContractFixtures.asyncApi3,
             ),
-            // INVALID: below highest (after row 1 lands)
+            // VERSION_ADDED: backport on the same major line (ordering is no longer global)
             ImportItem(
                 systemId,
                 ContractType.OPENAPI,
@@ -189,9 +189,9 @@ class ContractImportTest {
         val dry = admin.postJson("/api/v1/contracts/import/check", ImportRequest(items)).body<ImportResponse>().results
         val expectedDry = listOf(
             ImportStatus.CREATED, ImportStatus.VERSION_ADDED, ImportStatus.CREATED_WITH_FINDINGS, ImportStatus.INVALID,
-            ImportStatus.VERSION_ADDED, ImportStatus.INVALID, ImportStatus.INVALID, ImportStatus.VERSION_ADDED,
+            ImportStatus.VERSION_ADDED, ImportStatus.INVALID, ImportStatus.INVALID, ImportStatus.CONFLICT,
         )
-        assertEquals(expectedDry, dry.map { it.status }, "the dry run cannot see rows the real run stores first: rows 5 and 8 read as adds")
+        assertEquals(expectedDry, dry.map { it.status }, "the dry run tracks batch-local SemVer precedence duplicates")
         assertTrue(dry.all { it.versionId == null }, "predictions store nothing")
         assertEquals(
             0,
@@ -202,7 +202,7 @@ class ContractImportTest {
         assertEquals(
             listOf(
                 ImportStatus.CREATED, ImportStatus.VERSION_ADDED, ImportStatus.CREATED_WITH_FINDINGS, ImportStatus.INVALID,
-                ImportStatus.INVALID, ImportStatus.INVALID, ImportStatus.INVALID, ImportStatus.CONFLICT,
+                ImportStatus.VERSION_ADDED, ImportStatus.INVALID, ImportStatus.INVALID, ImportStatus.CONFLICT,
             ),
             real.map { it.status },
         )
@@ -210,9 +210,9 @@ class ContractImportTest {
         assertEquals(existing.id, real[1].contractId)
         assertTrue(real[2].errors > 0); assertTrue(real[2].message!!.contains("ODCS_SCHEMA"))
         assertTrue(real[3].message!!.contains("OPENAPI"))
-        assertTrue(real[4].message!!.contains("greater than"))
+        assertNotNull(real[4].versionId)
         assertNull(real[7].versionId)
-        assertEquals(1, admin.get("/api/v1/contracts/${existing.id}/versions").body<VersionPageResponse>().total)
+        assertEquals(2, admin.get("/api/v1/contracts/${existing.id}/versions").body<VersionPageResponse>().total)
     }
 
     @Test

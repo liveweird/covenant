@@ -13,6 +13,8 @@ import ch.nokillswit.contracts.ContractImporter
 import ch.nokillswit.contracts.ContractServiceKey
 import ch.nokillswit.contracts.ContractVersionService
 import ch.nokillswit.contracts.ContractVersionServiceKey
+import ch.nokillswit.contracts.ReleaseLineService
+import ch.nokillswit.contracts.ReleaseLineServiceKey
 import ch.nokillswit.contracts.checks.ChecksServiceKey
 import ch.nokillswit.auth.TokenBlocklistServiceKey
 import ch.nokillswit.domains.DomainService
@@ -65,7 +67,9 @@ suspend fun Application.configureDatabase() {
     // application.yaml therefore lists BEFORE this module).
     val contractService = ContractService(database, teamService)
     attributes.put(ContractServiceKey, contractService)
-    val versionService = ContractVersionService(database, attributes[ChecksServiceKey], contractService)
+    val releaseLineService = ReleaseLineService(database, contractService)
+    attributes.put(ReleaseLineServiceKey, releaseLineService)
+    val versionService = ContractVersionService(database, attributes[ChecksServiceKey], contractService, releaseLineService)
     attributes.put(ContractVersionServiceKey, versionService)
     // The import pipeline and the SSRF-guarded fetcher: stateless collaborators, built here rather than
     // in a route file so every service has ONE home (a test pre-puts ContractUrlFetcherKey to aim the

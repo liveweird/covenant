@@ -4,10 +4,12 @@ import { Route, Routes } from "react-router-dom";
 import { renderWithProviders, screen, waitFor, within } from "../test/render";
 import NotificationsButton from "./NotificationsButton";
 import { findCall, signIn, type FetchMock } from "../test/contractsFixtures";
+import i18n from "../i18n";
 
 const ROW = { id: 41, recipientId: 1, timestamp: Date.now() - 60_000, type: "VERSION_CREATED", params: { contractName: "orders-api", actor: "Ada", version: "1.2.0" }, link: "/contracts/5/versions/12", wasSeen: false };
 const SEEN = { ...ROW, id: 40, type: "VERSION_TRANSITIONED", params: { contractName: "orders-api", actor: "Ada", version: "1.1.0", from: "PROPOSED", to: "ACTIVE" }, wasSeen: true, link: null };
 const UNKNOWN = { ...ROW, id: 39, type: "SOMETHING_NEW", params: {}, wasSeen: true };
+const RELEASE_LINE = { ...ROW, id: 38, type: "RELEASE_LINE_UPDATED", params: { contractName: "orders-api", actor: "Ada", major: "1", supportStatus: "MAINTENANCE" }, wasSeen: true, link: "/contracts/5" };
 
 /** Routes `wasSeen=false` to the badge envelope and everything else to the list. */
 function serveNotifications(mockFetch: FetchMock, items: unknown[], unread: number, statuses: Record<string, number> = {}) {
@@ -45,7 +47,7 @@ describe("NotificationsButton", () => {
   }
 
   test("the badge shows the unread total; the drawer lists localized sentences newest first with a raw fallback", async () => {
-    serveNotifications(mockFetch, [ROW, SEEN, UNKNOWN], 2);
+    serveNotifications(mockFetch, [ROW, SEEN, RELEASE_LINE, UNKNOWN], 2);
     render();
     const bell = await screen.findByRole("button", { name: "Notifications (2 unread)" });
     expect(screen.getByText("2")).toBeInTheDocument();
@@ -53,9 +55,19 @@ describe("NotificationsButton", () => {
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("Ada created version 1.2.0 of orders-api.")).toBeInTheDocument();
     expect(within(dialog).getByText("Ada moved orders-api 1.1.0 from Proposed to Active.")).toBeInTheDocument();
+    expect(within(dialog).getByText("Ada updated the support policy for orders-api 1.x (Maintenance).")).toBeInTheDocument();
     expect(within(dialog).getByText("SOMETHING_NEW")).toBeInTheDocument();
-    expect(within(dialog).getAllByRole("listitem")).toHaveLength(3);
+    expect(within(dialog).getAllByRole("listitem")).toHaveLength(4);
     expect(within(dialog).getByRole("button", { name: "Mark all as seen" })).toBeInTheDocument();
+  });
+
+  test("localizes a release-line notification status in Polish", async () => {
+    await i18n.changeLanguage("pl");
+    serveNotifications(mockFetch, [RELEASE_LINE], 1);
+    render();
+    await userEvent.setup().click(await screen.findByRole("button", { name: /^Powiadomienia/ }));
+    expect(await screen.findByText("Ada zaktualizował/a zasady wsparcia dla orders-api 1.x (Utrzymanie).")).toBeInTheDocument();
+    await i18n.changeLanguage("en");
   });
 
   test("Open marks the row seen and navigates; seen/unseen and delete post to their endpoints", async () => {

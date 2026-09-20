@@ -689,13 +689,13 @@ Per API-CACHE-003, each concurrency-sensitive write documents its defense (updat
 for the implemented catalog):
 
 - **Accepted last-write-wins** — full replacements of users, feature flags, language,
-  teams, domains, systems, environments, contract metadata and editable version content.
+  teams, domains, systems, environments, contract metadata, release-line policies and editable version content.
   Permissions limit writers but do not prevent one authorized editor from overwriting
   another. Version-content saves do not compare the previous document hash; conditional
   writes remain a registered gap.
 - **Domain guards** — contract mutations serialize on the active parent contract. Version
-  writes revalidate ownership, lifecycle, uniqueness, ordering and the applicable ACTIVE
-  baseline before committing. Checks run outside the transaction; a changed baseline or
+  writes revalidate ownership, lifecycle, unique SemVer precedence and the applicable
+  published baseline (ACTIVE or DEPRECATED) before committing. Checks run outside the transaction; a changed baseline or
   lifecycle causes `409`. Recheck additionally compares the checked document before storing
   its report. Lifecycle transitions and deletion re-read their guards under the same lock.
 - **Source synchronization** — sync compares the source reference during the write; the SPA

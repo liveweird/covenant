@@ -16,6 +16,7 @@ import ch.nokillswit.infra.paging.optionalUInt
 import ch.nokillswit.infra.paging.parsePaging
 import ch.nokillswit.infra.paging.repeatedEnum
 import ch.nokillswit.infra.paging.toPage
+import ch.nokillswit.infra.paging.SortField
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.resources.Resource
@@ -150,7 +151,7 @@ class ContractsRoute {
                 @Resource("model")
                 class Model(val parent: Vid)
 
-                /** The two-way compatibility report against `against` (default: the ACTIVE baseline below this version). */
+                /** The two-way compatibility report against `against` (default: the published baseline below this version). */
                 @Serializable
                 @Resource("compatibility")
                 class Compatibility(val parent: Vid, val against: UInt? = null)
@@ -180,6 +181,14 @@ class ContractsRoute {
                     class Sql(val parent: Try)
                 }
             }
+        }
+
+        @Serializable
+        @Resource("release-lines")
+        class ReleaseLines(val parent: Id) {
+            @Serializable
+            @Resource("{major}")
+            class Major(val parent: ReleaseLines, val major: Int)
         }
     }
 }
@@ -223,12 +232,68 @@ fun Application.configureContractRoutes() {
     val eventService = attributes[ContractEventServiceKey]
     val subscriptions = attributes[ContractSubscriptionServiceKey]
     val errorService = attributes[ContractErrorServiceKey]
+    val releaseLines = attributes[ReleaseLineServiceKey]
     routing {
         authenticate {
             contractCollection(contractService, activity)
             contractItem(contractService, activity, eventService, subscriptions)
             contractErrors(errorService)
+            releaseLines(contractService, releaseLines, activity)
         }
+    }
+}
+
+private fun Route.releaseLines(
+    contractService: ContractService,
+    releaseLines: ReleaseLineService,
+    activity: ContractActivity,
+) {
+    get<ContractsRoute.Id.ReleaseLines> { route ->
+        call.caller()
+        val contractId = route.parent.id
+        val paging = call.parsePaging(
+            sortable = RELEASE_LINE_SORT_FIELDS,
+            defaultSort = listOf(SortField("major", descending = true)),
+        )
+        val result = releaseLines.list(contractId, paging)
+        call.respond(HttpStatusCode.OK, paging.toPage(result.items, result.total))
+    }
+    get<ContractsRoute.Id.ReleaseLines.Major> { route ->
+        call.caller()
+        if (route.major < 0) throw io.ktor.server.plugins.BadRequestException("major must be non-negative")
+        call.respond(HttpStatusCode.OK, releaseLines.read(route.parent.parent.id, route.major).orNotFound("Release line"))
+    }
+    put<ContractsRoute.Id.ReleaseLines.Major> { route ->
+        val caller = call.caller()
+        val contractId = route.parent.parent.id
+        if (route.major < 0) throw io.ktor.server.plugins.BadRequestException("major must be non-negative")
+        contractService.authorizeWrite(caller, contractId)
+        val request = call.receive<ReleaseLineUpdateRequest>()
+        val change = releaseLines.update(contractId, route.major, request, caller)
+        if (change.changed) {
+            val response = change.response
+            audit(
+                "contract.release_line_updated",
+                "byUserId" to caller.userId.toLong(),
+                "contractId" to contractId.toLong(),
+                "major" to route.major,
+                "supportStatus" to response.supportStatus.name,
+                "recommendedVersionId" to response.recommendedVersionId?.toLong(),
+            )
+            activity.record(
+                contractId,
+                caller.userId,
+                ContractEventType.RELEASE_LINE_UPDATED,
+                mapOf(
+                    "major" to route.major.toString(),
+                    "supportStatus" to response.supportStatus.name,
+                    "supportEndsOn" to (response.supportEndsOn ?: ""),
+                    "supportPolicy" to (response.supportPolicy ?: ""),
+                    "recommendedVersionId" to (response.recommendedVersionId?.toString() ?: ""),
+                ),
+            )
+        }
+        call.respond(HttpStatusCode.NoContent)
     }
 }
 

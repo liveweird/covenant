@@ -1,8 +1,8 @@
 {
   "newVersion": "New version",
   "newTitle": "New version of {{name}}",
-  "newIntroHighest": "The highest version so far is {{highest}} — the new one must be greater.",
-  "newIntroFirst": "The contract has no version yet — this will be the first.",
+  "newIntroHighest": "The selected release line currently ends at {{highest}}.",
+  "newIntroFirst": "The selected release line has no versions yet.",
   "newFromThis": "New version from this",
   "compare": "Compare versions",
   "compareWithLatest": "Compare with latest",
@@ -17,6 +17,7 @@
   "empty": "No versions yet",
   "emptyWriter": "No versions yet — add the first document",
   "loadFailed": "Could not load the versions",
+  "sourceVersionLoadFailed": "Could not load the selected starting version",
   "notFound": "This version does not exist (or was deleted).",
   "gone": "This version no longer exists — reload the page",
   "editorAria": "Contract document",
@@ -37,7 +38,9 @@
     "title": "Document title",
     "specVersion": "Spec",
     "startFrom": "Start from",
-    "startFromHint": "Copy a stored version's document as the starting point"
+    "startFromHint": "Copy a stored version's document as the starting point",
+    "releaseLine": "Release line",
+    "allReleaseLines": "All release lines"
   },
   "bump": {
     "major": "Major",
@@ -149,8 +152,8 @@
     },
     "breaksTitle": "What breaks consumers of {{version}}",
     "nothing": "Nothing.",
-    "noBaseline": "No active version to compare with",
-    "compact": "Compatibility with {{from}} (active):",
+    "noBaseline": "No published version to compare with",
+    "compact": "Compatibility with {{from}} (published):",
     "details": "Details",
     "checkerUnavailable": "The AsyncAPI checker could not be reached — this direction could not be verified."
   },

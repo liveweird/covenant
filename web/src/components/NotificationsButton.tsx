@@ -16,6 +16,7 @@ import {
   IconFilePlus,
   IconLink,
   IconPencil,
+  IconSettings,
   IconTrash,
   IconTransfer,
   IconUsers,
@@ -28,6 +29,7 @@ import LoadingBlock from "./LoadingBlock";
 import { LIFECYCLES } from "../utils/lifecycle";
 import { relativeTimeAgo } from "../utils/relativeTime";
 import { loadErrorMessage } from "../utils/saveError";
+import { supportStatusLabel } from "../utils/releaseLines";
 
 type Kind = NotificationItem["type"];
 
@@ -44,6 +46,7 @@ const TYPE_META: Record<Kind, { icon: typeof IconBell; color: string }> = {
   VERSION_SOURCE_CHANGED: { icon: IconLink, color: "gray" },
   VERSION_IMPORTED: { icon: IconFileImport, color: "covenant" },
   VERSION_BREAKING_STORED: { icon: IconAlertTriangle, color: "orange" },
+  RELEASE_LINE_UPDATED: { icon: IconSettings, color: "gray" },
 };
 
 const KNOWN_KINDS = new Set<string>(Object.keys(TYPE_META));
@@ -57,7 +60,12 @@ function lifecycleWord(value: string | undefined, t: TFunction): string | undefi
 /** One localized sentence per notification, interpolating the structural params the server stored. */
 function describeNotification(n: NotificationItem, t: TFunction): string {
   if (!KNOWN_KINDS.has(n.type)) return n.type; // forward-compat: an unknown kind shows its raw name
-  const params = { ...n.params, from: lifecycleWord(n.params.from, t), to: lifecycleWord(n.params.to, t) };
+  const params = {
+    ...n.params,
+    from: lifecycleWord(n.params.from, t),
+    to: lifecycleWord(n.params.to, t),
+    supportStatus: supportStatusLabel(n.params.supportStatus, t),
+  };
   return t(`notifications.event.${n.type}`, params);
 }
 

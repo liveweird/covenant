@@ -101,7 +101,7 @@ test("a follower's bell announces a new version, opens it, and mark-all clears t
   await signOut(page);
   await login(page);
   await page.goto(contractUrl);
-  await page.getByRole("link", { name: "New version" }).click();
+  await page.getByRole("link", { name: "New version", exact: true }).click();
   const editor = page.getByRole("textbox", { name: "Contract document" });
   await editor.click();
   await page.keyboard.press("ControlOrMeta+a");

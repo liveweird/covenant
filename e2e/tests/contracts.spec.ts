@@ -109,7 +109,7 @@ test.describe.serial("the contract core loop", () => {
   await page.getByRole("link", { name: "Back to the contract" }).click();
   await expect(page.getByRole("heading", { name: contractName })).toBeVisible();
   contractPath = new URL(page.url()).pathname;
-  await page.getByRole("link", { name: "New version" }).click();
+  await page.getByRole("link", { name: "New version", exact: true }).click();
   await expect(page.getByLabel("Version", { exact: true })).toHaveValue("1.0.1");
   await page.getByRole("button", { name: "Minor" }).click();
   await expect(page.getByLabel("Version", { exact: true })).toHaveValue("1.1.0");
@@ -175,12 +175,12 @@ test.describe.serial("the contract core loop", () => {
   // A breaking change against the ACTIVE 1.0.0: the live check compares against it and blocks
   // the minor bump with BREAKING_WITHOUT_MAJOR_BUMP; the Major bump turns the facts into notes.
   await page.getByRole("link", { name: "Back to the contract" }).click();
-  await page.getByRole("link", { name: "New version" }).click();
+  await page.getByRole("link", { name: "New version", exact: true }).click();
   await fillEditor(page, NARROWED(contractName, "1.2.0"));
   await page.getByRole("button", { name: "Minor" }).click();
   await expect(page.getByLabel("Version", { exact: true })).toHaveValue("1.2.0");
   const findings = page.getByRole("region", { name: "Findings" });
-  await expect(findings).toContainText("Compared against active version 1.0.0 for breaking changes");
+  await expect(findings).toContainText("Compared against published version 1.0.0 for breaking changes");
   await expect(findings).toContainText("BREAKING_WITHOUT_MAJOR_BUMP");
   await expect(findings).toContainText("CHANGED_RESPONSE");
   await page.getByRole("button", { name: "Major" }).click();
@@ -247,7 +247,7 @@ test("a regular user reads a contract in the hierarchy and the list but gets no 
     page.getByRole("button", { name: "Create", exact: true }).click(),
   ]);
   await expect(page.getByRole("heading", { name: contractName })).toBeVisible();
-  await expect(page.getByRole("link", { name: "New version" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "New version", exact: true })).toBeVisible();
 
   await signOut(page);
   await login(page, reader.email, reader.password);
@@ -257,7 +257,7 @@ test("a regular user reads a contract in the hierarchy and the list but gets no 
   await expect(page.getByRole("link", { name: `Open contract ${contractName}` })).toBeVisible();
   await page.getByRole("link", { name: `Open contract ${contractName}` }).click();
   await expect(page.getByRole("heading", { name: contractName })).toBeVisible();
-  await expect(page.getByRole("link", { name: "New version" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "New version", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "More actions" }).click();
   await expect(page.getByRole("menuitem", { name: "Export (JSON)" })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Delete" })).toHaveCount(0);
