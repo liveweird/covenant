@@ -209,6 +209,53 @@
     "invalid": "Można powiązać tylko adresy https:// bez danych logowania",
     "save": "Zapisz powiązanie"
   },
+  "reviews": {
+    "title": "Recenzje",
+    "intro": "Omów dokument i zapisz niewiążące decyzje dotyczące dokładnie tej treści, która została sprawdzona.",
+    "request": "Poproś o recenzję",
+    "requestFailed": "Nie udało się poprosić o recenzję",
+    "loadFailed": "Nie udało się wczytać recenzji",
+    "empty": "Brak historii recenzji tej wersji.",
+    "emptyProposed": "Nie poproszono o recenzję. Publikacja jest dostępna również bez niej.",
+    "round": "Recenzja #{{id}}",
+    "requestedBy": "Prośbę wysłał/a {{name}} {{deleted}} · {{date}}",
+    "deletedIdentity": "(usunięto)",
+    "approvalCount_one": "{{count}} zatwierdzenie",
+    "approvalCount_few": "{{count}} zatwierdzenia",
+    "approvalCount_many": "{{count}} zatwierdzeń",
+    "approvalCount_other": "{{count}} zatwierdzeń",
+    "changesCount_one": "{{count}} prośba o zmiany",
+    "changesCount_few": "{{count}} prośby o zmiany",
+    "changesCount_many": "{{count}} próśb o zmiany",
+    "changesCount_other": "{{count}} próśb o zmiany",
+    "status": {
+      "OPEN": "Otwarta",
+      "OUTDATED": "Nieaktualna",
+      "CLOSED": "Zamknięta"
+    },
+    "closeReason": {
+      "CONTENT_CHANGED": "Zamknięto, ponieważ dokument się zmienił.",
+      "WITHDRAWN": "Zamknięto po przywróceniu propozycji do szkicu.",
+      "PUBLISHED": "Zamknięto po opublikowaniu tej wersji."
+    },
+    "outdated": "Nieaktualna — dokument zmienił się po wysłaniu prośby o recenzję.",
+    "staleTitle": "Recenzja się zmieniła",
+    "staleBody": "Wyświetlany dokument i stan recenzji nie są już zgodne. Odśwież oba elementy, a następnie przeczytaj bieżący dokument przed ponowną próbą.",
+    "refresh": "Odśwież dokument i recenzje",
+    "refreshFailed": "Nie udało się odświeżyć dokumentu i recenzji",
+    "noEntries": "Brak dyskusji.",
+    "newestFirst": "Najnowsze najpierw",
+    "comment": "Komentarz do recenzji",
+    "addComment": "Dodaj komentarz",
+    "requestChanges": "Poproś o zmiany",
+    "approve": "Zatwierdź",
+    "actionFailed": "Nie udało się zaktualizować recenzji",
+    "entry": {
+      "COMMENT": "Komentarz",
+      "APPROVED": "Zatwierdzono",
+      "CHANGES_REQUESTED": "Poproszono o zmiany"
+    }
+  },
   "readAria": "Czytaj wersję {{version}} kontraktu {{name}}",
   "toggleAside": "Pokaż lub ukryj panel boczny"
 }

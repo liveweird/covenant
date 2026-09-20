@@ -42,8 +42,8 @@ const OLD_VERSION_ITEM = { ...VERSION_ITEM, id: 10, version: "1.0.0", lifecycle:
 export const VERSION_PAGE = { items: [VERSION_ITEM, OLD_VERSION_ITEM], page: 1, pageSize: 20, total: 2 };
 export const FINDING = { severity: "WARN" as const, source: "LINT" as const, code: "info-contact", message: "Info object must have contact", path: "/info", line: 2, column: 1 };
 export const SOFT_ERROR = { severity: "ERROR" as const, source: "SCHEMA" as const, code: "OAS_PARSE", message: "paths is required", path: "/", line: 1, column: 1 };
-export const VERSION = { ...VERSION_ITEM, content: CONTENT, contentSha256: "a".repeat(64), docDescription: null, findings: [FINDING], checkedAt: 2 };
-export const OLD_VERSION = { ...OLD_VERSION_ITEM, content: OLD_CONTENT, contentSha256: "b".repeat(64), docDescription: null, findings: [], checkedAt: 2 };
+export const VERSION = { ...VERSION_ITEM, content: CONTENT, contentRevision: 1, contentSha256: "a".repeat(64), docDescription: null, findings: [FINDING], checkedAt: 2 };
+export const OLD_VERSION = { ...OLD_VERSION_ITEM, content: OLD_CONTENT, contentRevision: 1, contentSha256: "b".repeat(64), docDescription: null, findings: [], checkedAt: 2 };
 /** `to`=VERSION (1.1.0) against `from`=OLD_VERSION (1.0.0, active): backward holds, forward doesn't. */
 export const COMPATIBILITY = {
   from: { id: 10, version: "1.0.0", lifecycle: "ACTIVE" as const },

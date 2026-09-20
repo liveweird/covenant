@@ -85,6 +85,7 @@ class ContractVersionService(
         val format = varchar("format", length = 4)
         val content = text("content")
         val contentSha256 = char("content_sha256", length = 64)
+        val contentRevision = long("content_revision").default(1)
         val docTitle = varchar("doc_title", length = 200).nullable()
         val docDescription = varchar("doc_description", length = 2000).nullable()
         val specVersion = varchar("spec_version", length = 20).nullable()
@@ -305,6 +306,8 @@ class ContractVersionService(
             }
             val waived = requireOrWaive(report, allowInvalid)
             val stamp = nowMillis()
+            val contentChanged = fresh[ContractVersions.content] != content
+            if (contentChanged) closeOpenVersionReview(versionId, VersionReviewCloseReason.CONTENT_CHANGED, stamp)
             val rows = ContractVersions.update(
                 {
                     (ContractVersions.id eq versionId) and (ContractVersions.contractId eq contractId) and ContractVersions.active() and
@@ -314,6 +317,7 @@ class ContractVersionService(
                 it[format] = report.format!!.name
                 it[ContractVersions.content] = content
                 it[contentSha256] = sha256(content)
+                if (contentChanged) it[contentRevision] = fresh[contentRevision] + 1
                 it[docTitle] = report.title
                 it[docDescription] = report.description
                 it[specVersion] = report.specVersion
@@ -384,6 +388,11 @@ class ContractVersionService(
             it[updatedAt] = nowMillis()
         }
         if (rows == 0) throw ConflictException("The version changed underneath you — reload and retry")
+        if (from == Lifecycle.PROPOSED && to == Lifecycle.DRAFT) {
+            closeOpenVersionReview(versionId, VersionReviewCloseReason.WITHDRAWN)
+        } else if (from == Lifecycle.PROPOSED && to == Lifecycle.ACTIVE) {
+            closeOpenVersionReview(versionId, VersionReviewCloseReason.PUBLISHED)
+        }
         if (from == Lifecycle.ACTIVE && to != Lifecycle.ACTIVE) releaseLines.clearRecommendation(versionId)
         val refreshed = rowOf(contractId, versionId)!!
         val refreshedFindings = checks.refreshLifecycleFinding(
@@ -519,6 +528,7 @@ class ContractVersionService(
         format = DocumentFormat.valueOf(this[ContractVersions.format]),
         content = this[ContractVersions.content],
         contentSha256 = this[ContractVersions.contentSha256],
+        contentRevision = this[ContractVersions.contentRevision],
         docTitle = this[ContractVersions.docTitle],
         docDescription = this[ContractVersions.docDescription],
         specVersion = this[ContractVersions.specVersion],

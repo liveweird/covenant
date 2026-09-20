@@ -30,6 +30,9 @@ fun contractNotifications(
         params["name"]?.let { put("name", it) }
         params["major"]?.let { put("major", it) }
         params["supportStatus"]?.let { put("supportStatus", it) }
+        params["reviewId"]?.let { put("reviewId", it) }
+        params["contentRevision"]?.let { put("contentRevision", it) }
+        params["decision"]?.let { put("decision", it) }
     }
     return recipients.sorted().flatMap { recipient ->
         buildList {
@@ -53,4 +56,8 @@ private fun notificationTypeOf(type: ContractEventType): NotificationType? = whe
     ContractEventType.IMPORTED -> NotificationType.VERSION_IMPORTED
     ContractEventType.RELEASE_LINE_UPDATED -> NotificationType.RELEASE_LINE_UPDATED
     ContractEventType.TOADIE_LINKS_UPDATED -> NotificationType.TOADIE_LINKS_UPDATED
+    ContractEventType.VERSION_REVIEW_REQUESTED -> NotificationType.VERSION_REVIEW_REQUESTED
+    ContractEventType.VERSION_REVIEW_COMMENTED -> NotificationType.VERSION_REVIEW_COMMENTED
+    ContractEventType.VERSION_REVIEW_APPROVED -> NotificationType.VERSION_REVIEW_APPROVED
+    ContractEventType.VERSION_REVIEW_CHANGES_REQUESTED -> NotificationType.VERSION_REVIEW_CHANGES_REQUESTED
 }

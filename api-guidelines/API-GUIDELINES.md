@@ -685,6 +685,12 @@ prioritized. Reviewers cite these as "registered gap"; the Spectral ruleset carr
 
 ### Lost-update inventory (the API-CACHE-003 row's per-write record)
 
+Version-review requests and entries carry `expectedContentRevision` from the displayed
+document. The service compares that monotonic revision under the parent contract lock and
+returns `409` for stale content or closed rounds. Content edits and lifecycle transitions close
+open rounds atomically; each user's latest immutable decision counts within its round. Reviews
+do not add conditional-write requirements to existing document-save endpoints.
+
 Toadie connection PUT and contract-link PUT are full replacements with serialized writes and
 last-write-wins semantics. Connection refresh publication additionally compares a unique claim
 token and configuration revision while holding the connection lock; stale work cannot publish.

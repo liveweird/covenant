@@ -55,6 +55,14 @@ function describeEvent(event: ContractEvent, t: TFunction): string {
       return event.params.sourceUrl ? t("contracts.history.event.versionSourceSet", { version }) : t("contracts.history.event.versionSourceCleared", { version });
     case "VERSION_SYNCED":
       return t("contracts.history.event.versionSynced", { version });
+    case "VERSION_REVIEW_REQUESTED":
+      return t("contracts.history.event.versionReviewRequested", { version });
+    case "VERSION_REVIEW_COMMENTED":
+      return t("contracts.history.event.versionReviewCommented", { version });
+    case "VERSION_REVIEW_APPROVED":
+      return t("contracts.history.event.versionReviewApproved", { version });
+    case "VERSION_REVIEW_CHANGES_REQUESTED":
+      return t("contracts.history.event.versionReviewChangesRequested", { version });
     case "IMPORTED":
       return t("contracts.history.event.imported", { version });
     case "RELEASE_LINE_UPDATED":

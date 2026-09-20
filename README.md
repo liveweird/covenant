@@ -243,6 +243,21 @@ plans and uncertain usage. Open the existing impact review or edit a policy with
 permissions. Consumer counts describe the whole contract; stale or missing data is explicit.
 Dates remain advisory, and this overview needs no changes to Toadie.
 
+## Version review and discussion
+
+Open **Reviews** on a contract version to request feedback before publication. A contract
+writer can request review while the version is PROPOSED. Other signed-in collaborators can
+approve or request changes, and everyone can discuss the open review. The requester can
+comment but cannot decide on their own request.
+
+Decisions refer to a specific content revision. Editing or synchronizing changed text makes
+the open review outdated, preserves its discussion, and allows a fresh request. Restoring old
+text does not restore its approvals. Leaving PROPOSED closes the review; publication remains
+an explicit owner action and is never blocked by missing reviews or requested changes.
+
+Reviews are optional, with no assigned reviewers or approval quota. See
+[the review reference](.claude/docs/version-reviews.md) for permissions and history semantics.
+
 ## Product backlog
 
 See [the backlog](BACKLOG.md) for proposed next steps and deferred work, including CI/CD integration.

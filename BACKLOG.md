@@ -5,11 +5,7 @@ documented in [README.md](README.md) and the release changelog.
 
 ## Proposed next steps
 
-1. **Version review and discussion.** Let teams request review of a PROPOSED version, discuss
-   findings, and record approval or requested changes against the reviewed content. Content
-   edits make prior approvals outdated. Start with optional review; enforcement and reviewer
-   permissions need an explicit design decision. Keep this in Covenant's UI.
-2. **Shareable migration and impact reports.** Export a release line's dates, replacement,
+1. **Shareable migration and impact reports.** Export a release line's dates, replacement,
    migration guidance and declared affected services/teams for planning discussions. Include
    observation timestamps, missing/stale usage warnings, and the limit that exact version
    adoption is unknown. Reuse the existing Toadie integration; no Toadie changes are expected.
@@ -28,6 +24,8 @@ to the existing integration and have their own implementation scope.
   integration; Covenant's own build, test and deployment workflows remain in use.
 
 ## Recently completed
+
+- Optional version review and discussion, content-bound decisions and preserved review history (0.13.0).
 
 - Catalog-wide lifecycle overview, deadline/plan attention and cached contract-level usage (0.12.0).
 

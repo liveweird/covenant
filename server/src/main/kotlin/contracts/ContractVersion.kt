@@ -72,6 +72,8 @@ data class VersionResponse(
     val format: DocumentFormat,
     val content: String,
     val contentSha256: String,
+    /** Monotonic text revision; increments only when the stored document bytes change. */
+    val contentRevision: Long = 1,
     val docTitle: String?,
     val docDescription: String?,
     val specVersion: String?,

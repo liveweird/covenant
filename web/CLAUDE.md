@@ -128,6 +128,17 @@ The SPA is **N-language by architecture** via react-i18next (`src/i18n.ts`); the
 - **Overlay accessibility rules (pinned by the e2e axe sweep over dialogs):** every `Modal` and `Drawer` passes `closeButtonProps={{ "aria-label": t("common.action.close") }}` — Mantine's close X has no default name — or hides the X with `withCloseButton={false}` when a footer button is the one deliberate exit (`OneTimePasswordModal`); the theme wraps `Code` (`overflow: visible`, `pre-wrap`, `overflowWrap: anywhere`) because Mantine's default `overflow: auto` turns any long code in a narrow flex item into a scroll region without keyboard access; a read-only `CodeEditor` keeps `tabindex="0"` on its content for the same reason.
 - The logo SVGs (`public/logo-*.svg` — a violet seal bearing a triskele — three curling paths meeting at a gold centre, rendered by `components/BrandLogo.tsx`) are the brand mark. Restyle rule: keep aria-labels, roles, and real semantic elements stable — e2e and unit tests locate by role/name.
 
+## Version reviews (0.13.0)
+
+The version page includes optional Reviews beside its stored-document workflow. Use the
+server's `canRequest`, `canComment` and `canDecide`; do not infer reviewer access from contract
+ownership. Keep round and entry collections paged, and query keys under `contracts` so content,
+sync and lifecycle mutations invalidate review state. Submit the revision of the displayed
+document, never silently adopt a newer review-list revision. Closed/outdated rounds retain
+their discussion and decision counts, clearly distinguished from current feedback. The current
+requester can comment but cannot approve/request changes; other authenticated collaborators
+can. No review state disables publication. Shared rules: `.claude/docs/version-reviews.md`.
+
 ## Changelog & app versioning
 
 The user-facing changelog is a **build-time artifact** — no DB, no API, changes only with a deploy. `src/changelog/entries.ts` holds `ChangelogEntry` rows (`version`, `date` `YYYY-MM-DD`, `en`/`pl` **markdown** bodies), newest first; the app's only human-readable version is `APP_VERSION` in **`src/changelog/version.ts`** — its own tiny module so the shell's eager imports (VersionStamp, the what's-new dot) never pull the bilingual entries into the main bundle (the entries ride the lazy Changelog chunk only). **A release = the new entry at the top of entries.ts + the bump of that one literal** (the Gradle `1.0.0-SNAPSHOT` is unrelated); `entries.test.ts` pins `CHANGELOG[0].version === APP_VERSION`, so forgetting either half fails the suite. Release convention:

@@ -37,6 +37,8 @@ describe("VersionPage", () => {
     "POST /api/v1/contracts/versions/check": { status: 200, body: CLEAN_REPORT },
     "GET /api/v1/contracts/5/versions/10/model": { status: 200, body: MODEL_OPENAPI },
     "GET /api/v1/contracts/5/versions/11/model": { status: 200, body: MODEL_OPENAPI },
+    "GET /api/v1/contracts/5/versions/11/reviews?": { status: 200, body: { items: [], page: 1, pageSize: 5, total: 0, canRequest: false, currentContentRevision: 1 } },
+    "GET /api/v1/contracts/5/versions/10/reviews?": { status: 200, body: { items: [], page: 1, pageSize: 5, total: 0, canRequest: false, currentContentRevision: 1 } },
     "GET /api/v1/contracts/5/versions/11/compatibility?": { status: 200, body: COMPATIBILITY },
     "GET /api/v1/contracts/5/versions/10/compatibility?": { status: 200, body: COMPATIBILITY_NO_BASELINE },
   };

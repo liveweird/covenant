@@ -183,6 +183,12 @@ Its filters and summary share SQL predicates, with batched usage counts. Content
 in DRAFT/PROPOSED, and only DRAFT versions can be deleted; published versions follow the
 lifecycle transition matrix in `contracts/Lifecycle.kt`.
 
+Optional version reviews live on the version page: writers request a round on PROPOSED content;
+other authenticated collaborators approve/request changes, and all can discuss the open round.
+The requester cannot decide on their own request. Content revisions prevent outdated approvals
+from reviving; content edits and lifecycle changes close rounds atomically. Reviews never block
+publication. Read `.claude/docs/version-reviews.md` before changing this behavior.
+
 Validation has two classes. Unparseable documents and type mismatches are hard `400`s that
 cannot be waived. Schema, semantic, and lint findings are
 soft: an `ERROR` blocks a strict save, `WARN`/`INFO` never block, and create/replace may

@@ -189,6 +189,10 @@
       "versionSourceSet": "Version {{version}}: source linked",
       "versionSourceCleared": "Version {{version}}: source unlinked",
       "versionSynced": "Version {{version}} synced from its source",
+      "versionReviewRequested": "Version {{version}}: review requested",
+      "versionReviewCommented": "Version {{version}}: review comment added",
+      "versionReviewApproved": "Version {{version}}: review approved",
+      "versionReviewChangesRequested": "Version {{version}}: changes requested in review",
       "releaseLineUpdated": "Release line {{major}}.x support policy updated ({{status}})",
       "toadieLinksUpdated": "Toadie API links updated"
     },

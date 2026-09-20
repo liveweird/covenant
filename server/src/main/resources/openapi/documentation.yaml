@@ -2070,6 +2070,136 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/{id}/versions/{vid}/reviews:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+      - $ref: '#/components/parameters/VersionId'
+    get:
+      tags: [version-reviews]
+      operationId: listVersionReviews
+      summary: List review rounds for a version
+      description: Any authenticated user. Newest requested round first by default; sortable by id, requestedAt and closedAt.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+      responses:
+        '200':
+          description: Review rounds, request permission and the current content revision
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VersionReviewPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    post:
+      tags: [version-reviews]
+      operationId: createVersionReview
+      summary: Request review of the current PROPOSED content
+      description: Writers only. Binds the round to the exact content revision and hash. A stale revision, non-PROPOSED version or existing open round returns 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateVersionReviewRequest' }
+      responses:
+        '201':
+          description: Review requested
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VersionReviewResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/version-reviews/{rid}:
+    parameters:
+      - $ref: '#/components/parameters/VersionReviewId'
+    get:
+      tags: [version-reviews]
+      operationId: getVersionReview
+      summary: Get one version review round
+      responses:
+        '200':
+          description: The review round
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VersionReviewResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/version-reviews/{rid}/entries:
+    parameters:
+      - $ref: '#/components/parameters/VersionReviewId'
+    get:
+      tags: [version-reviews]
+      operationId: listVersionReviewEntries
+      summary: List a review round's append-only discussion and decisions
+      description: Any authenticated user. Oldest first by default; sortable by id and createdAt.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+      responses:
+        '200':
+          description: Review entries
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VersionReviewEntryPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    post:
+      tags: [version-reviews]
+      operationId: createVersionReviewEntry
+      summary: Comment or record a review decision
+      description: Any active authenticated user may comment on an open current round. The requester cannot approve or request changes, including when an administrator. Latest decision per author determines counts. Stale or closed rounds return 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateVersionReviewEntryRequest' }
+      responses:
+        '201':
+          description: Entry appended
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VersionReviewEntryResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/version-reviews/{rid}/entries/{entryId}:
+    parameters:
+      - $ref: '#/components/parameters/VersionReviewId'
+      - $ref: '#/components/parameters/VersionReviewEntryId'
+    get:
+      tags: [version-reviews]
+      operationId: getVersionReviewEntry
+      summary: Get one immutable review entry
+      responses:
+        '200':
+          description: The review entry
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VersionReviewEntryResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
   /api/v1/contracts/{id}/subscription:
     parameters:
       - $ref: '#/components/parameters/ResourceId'
@@ -2682,6 +2812,16 @@ components:
         always appended as a deterministic tiebreaker.
     VersionId:
       name: vid
+      in: path
+      required: true
+      schema: { type: integer, format: int32, minimum: 0 }
+    VersionReviewId:
+      name: rid
+      in: path
+      required: true
+      schema: { type: integer, format: int32, minimum: 0 }
+    VersionReviewEntryId:
+      name: entryId
       in: path
       required: true
       schema: { type: integer, format: int32, minimum: 0 }
@@ -3758,7 +3898,7 @@ components:
           items: { $ref: '#/components/schemas/ExportedVersion' }
     ContractEventType:
       type: string
-      enum: [CREATED, UPDATED, OWNER_CHANGED, DELETED, VERSION_CREATED, VERSION_CONTENT_UPDATED, VERSION_TRANSITIONED, VERSION_DELETED, VERSION_RECHECKED, VERSION_SOURCE_CHANGED, VERSION_SYNCED, IMPORTED, RELEASE_LINE_UPDATED, TOADIE_LINKS_UPDATED]
+      enum: [CREATED, UPDATED, OWNER_CHANGED, DELETED, VERSION_CREATED, VERSION_CONTENT_UPDATED, VERSION_TRANSITIONED, VERSION_DELETED, VERSION_RECHECKED, VERSION_SOURCE_CHANGED, VERSION_SYNCED, IMPORTED, RELEASE_LINE_UPDATED, TOADIE_LINKS_UPDATED, VERSION_REVIEW_REQUESTED, VERSION_REVIEW_COMMENTED, VERSION_REVIEW_APPROVED, VERSION_REVIEW_CHANGES_REQUESTED]
     ContractEventResponse:
       type: object
       required: [id, contractId, userId, userName, timestamp, type, params]
@@ -3785,7 +3925,7 @@ components:
         total: { type: integer, format: int64, minimum: 0 }
     NotificationType:
       type: string
-      enum: [CONTRACT_UPDATED, CONTRACT_OWNER_CHANGED, CONTRACT_DELETED, VERSION_CREATED, VERSION_CONTENT_UPDATED, VERSION_TRANSITIONED, VERSION_DELETED, VERSION_SYNCED, VERSION_SOURCE_CHANGED, VERSION_IMPORTED, VERSION_BREAKING_STORED, RELEASE_LINE_UPDATED, RELEASE_LINE_DEPRECATION_DUE, RELEASE_LINE_SUPPORT_END_DUE, TOADIE_LINKS_UPDATED]
+      enum: [CONTRACT_UPDATED, CONTRACT_OWNER_CHANGED, CONTRACT_DELETED, VERSION_CREATED, VERSION_CONTENT_UPDATED, VERSION_TRANSITIONED, VERSION_DELETED, VERSION_SYNCED, VERSION_SOURCE_CHANGED, VERSION_IMPORTED, VERSION_BREAKING_STORED, RELEASE_LINE_UPDATED, RELEASE_LINE_DEPRECATION_DUE, RELEASE_LINE_SUPPORT_END_DUE, TOADIE_LINKS_UPDATED, VERSION_REVIEW_REQUESTED, VERSION_REVIEW_COMMENTED, VERSION_REVIEW_APPROVED, VERSION_REVIEW_CHANGES_REQUESTED]
       description: The notification kind; the SPA renders it in the viewer's language. A kind a client build does not know renders as its raw name.
     NotificationResponse:
       type: object
@@ -4755,7 +4895,7 @@ components:
         to: { $ref: '#/components/schemas/Lifecycle' }
     VersionResponse:
       type: object
-      required: [id, contractId, version, lifecycle, format, content, contentSha256, findings, checkErrors, checkWarnings, checkInfos, checkComplete, checkedAt, createdBy, createdAt, updatedAt, lastSyncedAt]
+      required: [id, contractId, version, lifecycle, format, content, contentSha256, contentRevision, findings, checkErrors, checkWarnings, checkInfos, checkComplete, checkedAt, createdBy, createdAt, updatedAt, lastSyncedAt]
       properties:
         sourceUrl:
           type: string
@@ -4774,6 +4914,7 @@ components:
         format: { $ref: '#/components/schemas/DocumentFormat' }
         content: { type: string }
         contentSha256: { type: string }
+        contentRevision: { type: integer, format: int64, minimum: 1, description: "Monotonic byte-content revision; increments only when a successful content PUT or sync changes the stored text." }
         docTitle: { type: string, nullable: true }
         docDescription: { type: string, nullable: true }
         specVersion: { type: string, nullable: true }
@@ -4816,6 +4957,100 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/VersionListItem'
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, format: int64, minimum: 0 }
+    VersionReviewCloseReason:
+      type: string
+      enum: [CONTENT_CHANGED, WITHDRAWN, PUBLISHED]
+    VersionReviewStatus:
+      type: string
+      enum: [OPEN, OUTDATED, CLOSED]
+    VersionReviewEntryKind:
+      type: string
+      enum: [COMMENT, APPROVED, CHANGES_REQUESTED]
+    VersionReviewDecision:
+      type: string
+      enum: [APPROVED, CHANGES_REQUESTED]
+    ReviewUserResponse:
+      type: object
+      required: [id, name, deleted]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        name: { type: string }
+        deleted: { type: boolean }
+    CreateVersionReviewRequest:
+      type: object
+      required: [expectedContentRevision]
+      properties:
+        expectedContentRevision: { type: integer, format: int64, minimum: 1 }
+    CreateVersionReviewEntryRequest:
+      type: object
+      required: [expectedContentRevision, kind]
+      properties:
+        expectedContentRevision: { type: integer, format: int64, minimum: 1 }
+        kind: { $ref: '#/components/schemas/VersionReviewEntryKind' }
+        body:
+          type: string
+          nullable: true
+          maxLength: 4000
+          description: Trimmed plain text. Required and nonblank for COMMENT and CHANGES_REQUESTED; optional for APPROVED.
+    VersionReviewResponse:
+      type: object
+      required: [id, contractId, versionId, contentRevision, contentSha256, requestedBy, requestedAt, status, isCurrentContent, approvalCount, changesRequestedCount, entryCount, canComment, canDecide]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        contractId: { type: integer, format: int32, minimum: 0 }
+        versionId: { type: integer, format: int32, minimum: 0 }
+        contentRevision: { type: integer, format: int64, minimum: 1 }
+        contentSha256: { type: string }
+        requestedBy: { $ref: '#/components/schemas/ReviewUserResponse' }
+        requestedAt: { type: integer, format: int64 }
+        closedAt: { type: integer, format: int64, nullable: true }
+        closeReason:
+          type: string
+          enum: [CONTENT_CHANGED, WITHDRAWN, PUBLISHED]
+          nullable: true
+        status: { $ref: '#/components/schemas/VersionReviewStatus' }
+        isCurrentContent: { type: boolean }
+        approvalCount: { type: integer, format: int64, minimum: 0 }
+        changesRequestedCount: { type: integer, format: int64, minimum: 0 }
+        entryCount: { type: integer, format: int64, minimum: 0 }
+        myDecision:
+          type: string
+          enum: [APPROVED, CHANGES_REQUESTED]
+          nullable: true
+        canComment: { type: boolean }
+        canDecide: { type: boolean }
+    VersionReviewPage:
+      type: object
+      required: [items, page, pageSize, total, canRequest, currentContentRevision]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/VersionReviewResponse' }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, format: int64, minimum: 0 }
+        canRequest: { type: boolean }
+        currentContentRevision: { type: integer, format: int64, minimum: 1 }
+    VersionReviewEntryResponse:
+      type: object
+      required: [id, reviewId, kind, author, createdAt]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        reviewId: { type: integer, format: int32, minimum: 0 }
+        kind: { $ref: '#/components/schemas/VersionReviewEntryKind' }
+        body: { type: string, nullable: true, maxLength: 4000 }
+        author: { $ref: '#/components/schemas/ReviewUserResponse' }
+        createdAt: { type: integer, format: int64 }
+    VersionReviewEntryPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/VersionReviewEntryResponse' }
         page: { type: integer, minimum: 1 }
         pageSize: { type: integer, minimum: 1, maximum: 100 }
         total: { type: integer, format: int64, minimum: 0 }

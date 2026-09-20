@@ -1,5 +1,11 @@
 ### Authorization model
 
+Optional version reviews extend collaboration without granting document write access:
+current contract writers request reviews of PROPOSED versions; active authenticated users
+comment, and anyone except the requester may decide. ADMIN does not bypass that self-review
+restriction. Closed rounds are read-only. Every review read verifies active contract/version
+parents. See [version reviews](version-reviews.md) for transactional and lifecycle rules.
+
 Layered RBAC. Implemented in the `server/src/main/kotlin/authz/` package.
 
 - **Global roles are an additive set**: every user is implicitly a regular user (USER is the baseline — never transmitted), and additional roles — currently only `ADMIN` (`UserRole` in `users/User.kt`; a future role is just a new enum value) — only ever ADD privileges. The API carries them as a `roles` array (`[]` = regular user); `isAdmin()` (`authz/Guards.kt`) = `ADMIN ∈ roles`. Storage is a single `users.role` column with a CHECK (V1) — the **wire shape is already the set** (`roles` claim + `LoginResponse.roles`), so moving to a Lettuce-style `user_roles` join table when a second additional role arrives never breaks issued tokens or clients. **ADMIN is the management role**: it owns the whole user-management surface (the `/users` CRUD below) and may reset any user's password (`requireSelfOrAdmin`'s admin branch); the management surfaces attach to it (users, and — with the contract catalog — teams and their membership, the Domain and System registries, contract ownership transfer). Contract CONTENT is different: every authenticated user reads everything, and writes are scoped by OWNERSHIP (the owning team's members or the owning user) — where ADMIN also writes, as the operational override (a deliberate departure from Lettuce's "ADMIN gets no special content access" rule, chosen because contracts are shared company assets, not personal records).
