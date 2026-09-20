@@ -107,10 +107,9 @@ spec:
                   name: covenant-secrets
                   key: SMTP_PASSWORD
                   optional: true
-          # Built locally with `docker build -t covenant-app:latest .`; OrbStack's
-          # Kubernetes shares the Docker image store, so IfNotPresent uses it
-          # directly (`:latest` would otherwise default to Always → registry pull).
-          image: covenant-app:latest
+          # Local render placeholder. apply-local.sh substitutes an immutable per-build tag
+          # before kubectl sees the manifest; OrbStack shares Docker's image store.
+          image: covenant-app:local-build
           imagePullPolicy: IfNotPresent
           name: covenant-app
           ports:

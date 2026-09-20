@@ -183,7 +183,7 @@ tasks.test {
 // OpenTelemetry incubator drifting from the SDK, kotlin-reflect lagging the stdlib, or a Jackson 2
 // module drifting from the BOM (the catalog notes explain each pin). Docker-free, rides `check`
 // like detekt.
-val checkDependencyAlignment by tasks.registering {
+val checkDependencyAlignment = tasks.register("checkDependencyAlignment") {
     group = "verification"
     description = "Asserts one version per aligned dependency family on the server runtime classpath."
     val runtimeClasspath = configurations.runtimeClasspath

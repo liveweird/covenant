@@ -127,6 +127,9 @@ For a clean frontend install, use `cd web && npm install --legacy-peer-deps`;
 `openapi-typescript` declares a TypeScript 5 peer while the project uses TypeScript 6. Keep the
 Gradle and npm toolchains disjoint.
 
+For dependency updates, read `.claude/docs/dependencies.md`: it covers automated update scopes,
+compatibility pairs, image/JDK verification, and the maintenance checks for pins outside Dependabot.
+
 Package deployments with `./gradlew :server:installDist`. Never use `buildFatJar`: merging Flyway
 service descriptors breaks plugin discovery at runtime. JVM runtime flags are intentionally set in
 `server/build.gradle.kts`; consult `.claude/skills/run-stack/SKILL.md` before changing them.

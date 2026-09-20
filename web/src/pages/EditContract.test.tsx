@@ -27,7 +27,19 @@ describe("EditContract page", () => {
     localStorage.clear();
   });
 
-  test("prefills, locks system and type, PUTs the record and — for an admin's owner change — the transfer", async () => {
+  test("prefills the form and locks the immutable system and type", async () => {
+    serve(mockFetch, {
+      "GET /api/v1/contracts/5": { status: 200, body: CONTRACT },
+    });
+    renderPage();
+    expect(await screen.findByRole("heading", { level: 2, name: "Edit orders-api" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Name")).toHaveValue("orders-api");
+    expect(screen.getByLabelText("System", { selector: "input" })).toBeDisabled();
+    expect(screen.getByLabelText("Type", { selector: "input" })).toBeDisabled();
+    expect(screen.getByText("Picking another owner transfers the contract")).toBeInTheDocument();
+  });
+
+  test("PUTs the record and then transfers an admin's changed owner", async () => {
     serve(mockFetch, {
       "GET /api/v1/contracts/5": { status: 200, body: CONTRACT },
       "PUT /api/v1/contracts/5": { status: 204 },
@@ -35,22 +47,15 @@ describe("EditContract page", () => {
     });
     const user = userEvent.setup();
     renderPage();
-    expect(await screen.findByRole("heading", { level: 2, name: "Edit orders-api" })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByLabelText("Name")).toHaveValue("orders-api"));
-    expect(screen.getByLabelText("System", { selector: "input" })).toBeDisabled();
-    expect(screen.getByLabelText("Type", { selector: "input" })).toBeDisabled();
-    expect(screen.getByText("Picking another owner transfers the contract")).toBeInTheDocument();
-    await user.type(screen.getByLabelText("Name"), "-v2");
+    const name = await screen.findByLabelText("Name");
+    expect(name).toHaveValue("orders-api");
+    await user.type(name, "-v2");
     await user.click(screen.getByLabelText("Owner", { selector: "input" }));
     await user.click(await screen.findByRole("option", { name: "Admin User (admin@covenant.local)" }));
     await user.click(screen.getByRole("button", { name: /^save$/i }));
-    // The save PUTs the record, then the owner transfer, then navigates — two round trips through the
-    // fetch mock. On a cold CI runner they overran waitFor's default second (a flaky failure at the
-    // 0.5.1 release); the bound stays finite, just wider than the runner is slow.
-    await waitFor(() => expect(findCall(mockFetch, "PUT", "/api/v1/contracts/5/owner")).toBeDefined(), { timeout: 5_000 });
+    expect(await screen.findByRole("heading", { level: 2, name: "Contract page" })).toBeInTheDocument();
     expect(bodyOf(findCall(mockFetch, "PUT", "/api/v1/contracts/5"))).toEqual({ name: "orders-api-v2", description: "Orders" });
     expect(bodyOf(findCall(mockFetch, "PUT", "/api/v1/contracts/5/owner"))).toEqual({ ownerTeamId: null, ownerUserId: 1 });
-    expect(await screen.findByRole("heading", { level: 2, name: "Contract page" })).toBeInTheDocument();
   });
 
   test("a non-admin writer cannot touch the owner and sends no transfer", async () => {
