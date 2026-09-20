@@ -1,6 +1,8 @@
 /** The ONE place the contracts route family is spelled out — never hand-assemble a contract URL. */
 export const hierarchyPath = "/";
 export const contractsPath = "/contracts";
+/** Catalog-wide release-line lifecycle overview. */
+export const lifecycleOverviewPath = "/lifecycle";
 /** The catalog-wide Errors report — a read over the stored check findings, not a sub-route of a contract. */
 export const errorsPath = "/errors";
 export const newContractPath = `${contractsPath}/new`;

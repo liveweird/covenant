@@ -851,6 +851,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contracts/lifecycle-overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List release lines across the catalog
+         * @description Any authenticated user. Read-only, one row per nondeleted release line of an active
+         *     contract/system/domain with at least one nondeleted version (any lifecycle).
+         *     No live upstream requests or automatic lifecycle changes. Dates are evaluated in UTC.
+         *     End-of-life lines remain visible but have no deadline or migration attention flags.
+         *     Contract scope filters match the catalog; q searches contract name and description.
+         *     Types and support statuses are repeatable any-of; other filters are scalar and reject repetition.
+         *     Sortable fields: id, name, major, nextDeadline, supportStatus. Default nextDeadline
+         *     ascending then id ascending; null deadlines last in both sort directions. nextDeadline
+         *     is the earlier configured date for non-END_OF_LIFE lines, including past dates.
+         *     Cached provider/consumer counts describe the whole contract, never adoption of this major.
+         */
+        get: operations["listLifecycleOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/lifecycle-overview/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Summarize release-line attention across the catalog
+         * @description Any authenticated user. Read-only, one row per nondeleted release line of an active
+         *     contract/system/domain with at least one nondeleted version (any lifecycle).
+         *     No live upstream requests or automatic lifecycle changes. Dates are evaluated in UTC.
+         *     End-of-life lines remain visible but have no deadline or migration attention flags.
+         *     Contract scope filters match the catalog; q searches contract name and description.
+         *     Types and support statuses are repeatable any-of; other filters are scalar and reject repetition.
+         *     Counts represent release lines, not contracts, and a line counts once per category.
+         *     All filters except attention apply to totals and counters so attention buttons can switch
+         *     categories. ownerUser contains catalog-visible owner names and line counts with BOTH
+         *     owner filters and attention lifted. These options do not expose user account details.
+         *     Each request captures one asOfDate; separate page and summary calls may observe later edits.
+         */
+        get: operations["getLifecycleOverviewSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contracts/errors": {
         parameters: {
             query?: never;
@@ -2407,6 +2466,83 @@ export interface components {
             ownerTeam: components["schemas"]["NamedFacetCount"][];
             hasErrors: components["schemas"]["ErrorFacets"];
         };
+        /** @enum {string} */
+        LifecycleDeadline: "REACHED" | "NEXT_30_DAYS" | "NONE";
+        /** @enum {string} */
+        LifecycleAttention: "DEADLINE_SOON" | "SUPPORT_ENDED" | "MIGRATION_INCOMPLETE" | "USAGE_UNCERTAIN";
+        LifecycleContractRef: {
+            /** Format: int32 */
+            id: number;
+            name: string;
+            type: components["schemas"]["ContractType"];
+            system: components["schemas"]["RefSummary"];
+            domain: components["schemas"]["RefSummary"];
+            owner: components["schemas"]["OwnerRef"];
+            /** @description Current Covenant writer permission; Toadie ownership never grants access. */
+            canWrite: boolean;
+        };
+        /** @description Distinct services across linked APIs for the WHOLE contract, repeated on each major. Counts are null for unlinked, never-synced, disconnected or incomplete mappings. Stale/disabled observations may retain last-known counts; zero never proves safe retirement. */
+        ToadieUsageSummary: {
+            /** Format: int64 */
+            consumerCount: number | null;
+            /** Format: int64 */
+            providerCount: number | null;
+            cache: components["schemas"]["ToadieCacheStatus"];
+            unavailableLinkCount: number;
+        };
+        LifecycleOverviewRow: {
+            /**
+             * Format: int32
+             * @description Release-line identity.
+             */
+            id: number;
+            contract: components["schemas"]["LifecycleContractRef"];
+            major: number;
+            supportStatus: components["schemas"]["SupportStatus"];
+            /** Format: date */
+            deprecatesOn: string | null;
+            /** Format: date */
+            supportEndsOn: string | null;
+            replacement: components["schemas"]["ReleaseLineReplacement"] | null;
+            hasMigrationGuide: boolean;
+            /** Format: date */
+            nextDeadline: string | null;
+            /** @description Non-END_OF_LIFE line with either date strictly after today and at most 30 days away. */
+            deadlineSoon: boolean;
+            /** @description Non-END_OF_LIFE line with supportEndsOn today or earlier; does not change support status. */
+            supportEnded: boolean;
+            /** @description Non-END_OF_LIFE line with a date, replacement or guide, but without guidance or an available replacement. Advisory only; a replacement is not mandatory for saving a policy. */
+            migrationIncomplete: boolean;
+            /** @description Cache is not CURRENT or at least one selected API mapping is unavailable. */
+            usageUncertain: boolean;
+            usage: components["schemas"]["ToadieUsageSummary"];
+        };
+        LifecycleOverviewPage: {
+            items: components["schemas"]["LifecycleOverviewRow"][];
+            page: number;
+            pageSize: number;
+            /** Format: int64 */
+            total: number;
+        };
+        LifecycleOverviewSummary: {
+            /**
+             * Format: date
+             * @description UTC calendar date captured for this request.
+             */
+            asOfDate: string;
+            /** Format: int64 */
+            total: number;
+            /** Format: int64 */
+            deadlineSoon: number;
+            /** Format: int64 */
+            supportEnded: number;
+            /** Format: int64 */
+            migrationIncomplete: number;
+            /** Format: int64 */
+            usageUncertain: number;
+            /** @description Owner-user choices; both owner filters and attention lifted, other filters retained. */
+            ownerUser: components["schemas"]["NamedFacetCount"][];
+        };
         ErrorContractRef: {
             /** Format: int32 */
             id: number;
@@ -3709,6 +3845,12 @@ export interface components {
         Sort: string;
         VersionId: number;
         ReleaseLineMajor: number;
+        /** @description Repeatable any-of release-line support statuses; omitted means all. */
+        OverviewSupportStatus: components["schemas"]["SupportStatus"][];
+        /** @description Scalar. REACHED means either date is today or earlier; NEXT_30_DAYS means either date is after today and at most 30 days away. Both exclude END_OF_LIFE lines. NONE means both dates absent and can include END_OF_LIFE lines. Omit for all lines. */
+        OverviewDeadline: components["schemas"]["LifecycleDeadline"];
+        /** @description Scalar attention category; omitted means all. Validated but lifted for summary counts. */
+        OverviewAttention: components["schemas"]["LifecycleAttention"];
         /** @description Filter versions to one SemVer major release line. Repetition is invalid. */
         VersionMajor: number;
         /** @description Store despite SOFT `ERROR` findings (the Save-anyway waiver). HARD findings are never waivable. */
@@ -5372,6 +5514,93 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TreeResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listLifecycleOverview: {
+        parameters: {
+            query?: {
+                /** @description 1-based page index. Defaults to 1. */
+                page?: components["parameters"]["Page"];
+                /** @description Rows per page. Defaults to 20, maximum 100. */
+                pageSize?: components["parameters"]["PageSize"];
+                /**
+                 * @description Sort spec. Format: `field` (ascending) or `-field` (descending). Multiple fields are
+                 *     comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
+                 *     sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
+                 *     always appended as a deterministic tiebreaker.
+                 */
+                sort?: components["parameters"]["Sort"];
+                domainId?: components["parameters"]["ContractDomainId"];
+                systemId?: components["parameters"]["ContractSystemId"];
+                /** @description Repeatable — any-of over the contract types. */
+                type?: components["parameters"]["ContractType"];
+                ownerTeamId?: components["parameters"]["ContractOwnerTeamId"];
+                ownerUserId?: components["parameters"]["ContractOwnerUserId"];
+                /** @description Case- and accent-insensitive free-text search; each endpoint documents the fields searched. */
+                q?: components["parameters"]["Q"];
+                /** @description Repeatable any-of release-line support statuses; omitted means all. */
+                supportStatus?: components["parameters"]["OverviewSupportStatus"];
+                /** @description Scalar. REACHED means either date is today or earlier; NEXT_30_DAYS means either date is after today and at most 30 days away. Both exclude END_OF_LIFE lines. NONE means both dates absent and can include END_OF_LIFE lines. Omit for all lines. */
+                deadline?: components["parameters"]["OverviewDeadline"];
+                /** @description Scalar attention category; omitted means all. Validated but lifted for summary counts. */
+                attention?: components["parameters"]["OverviewAttention"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of release lines */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LifecycleOverviewPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getLifecycleOverviewSummary: {
+        parameters: {
+            query?: {
+                domainId?: components["parameters"]["ContractDomainId"];
+                systemId?: components["parameters"]["ContractSystemId"];
+                /** @description Repeatable — any-of over the contract types. */
+                type?: components["parameters"]["ContractType"];
+                ownerTeamId?: components["parameters"]["ContractOwnerTeamId"];
+                ownerUserId?: components["parameters"]["ContractOwnerUserId"];
+                /** @description Case- and accent-insensitive free-text search; each endpoint documents the fields searched. */
+                q?: components["parameters"]["Q"];
+                /** @description Repeatable any-of release-line support statuses; omitted means all. */
+                supportStatus?: components["parameters"]["OverviewSupportStatus"];
+                /** @description Scalar. REACHED means either date is today or earlier; NEXT_30_DAYS means either date is after today and at most 30 days away. Both exclude END_OF_LIFE lines. NONE means both dates absent and can include END_OF_LIFE lines. Omit for all lines. */
+                deadline?: components["parameters"]["OverviewDeadline"];
+                /** @description Scalar attention category; omitted means all. Validated but lifted for summary counts. */
+                attention?: components["parameters"]["OverviewAttention"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Attention counts and owner-user choices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LifecycleOverviewSummary"];
                 };
             };
             400: components["responses"]["BadRequest"];

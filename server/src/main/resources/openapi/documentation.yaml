@@ -1329,6 +1329,80 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/lifecycle-overview:
+    get:
+      tags: [contracts]
+      operationId: listLifecycleOverview
+      summary: List release lines across the catalog
+      description: |
+        Any authenticated user. Read-only, one row per nondeleted release line of an active
+        contract/system/domain with at least one nondeleted version (any lifecycle).
+        No live upstream requests or automatic lifecycle changes. Dates are evaluated in UTC.
+        End-of-life lines remain visible but have no deadline or migration attention flags.
+        Contract scope filters match the catalog; q searches contract name and description.
+        Types and support statuses are repeatable any-of; other filters are scalar and reject repetition.
+        Sortable fields: id, name, major, nextDeadline, supportStatus. Default nextDeadline
+        ascending then id ascending; null deadlines last in both sort directions. nextDeadline
+        is the earlier configured date for non-END_OF_LIFE lines, including past dates.
+        Cached provider/consumer counts describe the whole contract, never adoption of this major.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/ContractDomainId'
+        - $ref: '#/components/parameters/ContractSystemId'
+        - $ref: '#/components/parameters/ContractType'
+        - $ref: '#/components/parameters/ContractOwnerTeamId'
+        - $ref: '#/components/parameters/ContractOwnerUserId'
+        - $ref: '#/components/parameters/Q'
+        - $ref: '#/components/parameters/OverviewSupportStatus'
+        - $ref: '#/components/parameters/OverviewDeadline'
+        - $ref: '#/components/parameters/OverviewAttention'
+      responses:
+        '200':
+          description: A page of release lines
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LifecycleOverviewPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/lifecycle-overview/summary:
+    get:
+      tags: [contracts]
+      operationId: getLifecycleOverviewSummary
+      summary: Summarize release-line attention across the catalog
+      description: |
+        Any authenticated user. Read-only, one row per nondeleted release line of an active
+        contract/system/domain with at least one nondeleted version (any lifecycle).
+        No live upstream requests or automatic lifecycle changes. Dates are evaluated in UTC.
+        End-of-life lines remain visible but have no deadline or migration attention flags.
+        Contract scope filters match the catalog; q searches contract name and description.
+        Types and support statuses are repeatable any-of; other filters are scalar and reject repetition.
+        Counts represent release lines, not contracts, and a line counts once per category.
+        All filters except attention apply to totals and counters so attention buttons can switch
+        categories. ownerUser contains catalog-visible owner names and line counts with BOTH
+        owner filters and attention lifted. These options do not expose user account details.
+        Each request captures one asOfDate; separate page and summary calls may observe later edits.
+      parameters:
+        - $ref: '#/components/parameters/ContractDomainId'
+        - $ref: '#/components/parameters/ContractSystemId'
+        - $ref: '#/components/parameters/ContractType'
+        - $ref: '#/components/parameters/ContractOwnerTeamId'
+        - $ref: '#/components/parameters/ContractOwnerUserId'
+        - $ref: '#/components/parameters/Q'
+        - $ref: '#/components/parameters/OverviewSupportStatus'
+        - $ref: '#/components/parameters/OverviewDeadline'
+        - $ref: '#/components/parameters/OverviewAttention'
+      responses:
+        '200':
+          description: Attention counts and owner-user choices
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LifecycleOverviewSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
   /api/v1/contracts/errors:
     get:
       tags: [contracts]
@@ -2616,6 +2690,28 @@ components:
       in: path
       required: true
       schema: { type: integer, format: int32, minimum: 0 }
+    OverviewSupportStatus:
+      name: supportStatus
+      in: query
+      description: Repeatable any-of release-line support statuses; omitted means all.
+      style: form
+      explode: true
+      schema:
+        type: array
+        items: { $ref: '#/components/schemas/SupportStatus' }
+    OverviewDeadline:
+      name: deadline
+      in: query
+      description: >-
+        Scalar. REACHED means either date is today or earlier; NEXT_30_DAYS means either
+        date is after today and at most 30 days away. Both exclude END_OF_LIFE lines.
+        NONE means both dates absent and can include END_OF_LIFE lines. Omit for all lines.
+      schema: { $ref: '#/components/schemas/LifecycleDeadline' }
+    OverviewAttention:
+      name: attention
+      in: query
+      description: Scalar attention category; omitted means all. Validated but lifted for summary counts.
+      schema: { $ref: '#/components/schemas/LifecycleAttention' }
     VersionMajor:
       name: major
       in: query
@@ -3461,6 +3557,87 @@ components:
         system: { type: array, items: { $ref: '#/components/schemas/NamedFacetCount' } }
         ownerTeam: { type: array, items: { $ref: '#/components/schemas/NamedFacetCount' } }
         hasErrors: { $ref: '#/components/schemas/ErrorFacets' }
+    LifecycleDeadline:
+      type: string
+      enum: [REACHED, NEXT_30_DAYS, NONE]
+    LifecycleAttention:
+      type: string
+      enum: [DEADLINE_SOON, SUPPORT_ENDED, MIGRATION_INCOMPLETE, USAGE_UNCERTAIN]
+    LifecycleContractRef:
+      type: object
+      required: [id, name, type, system, domain, owner, canWrite]
+      properties:
+        id: { type: integer, format: int32, minimum: 0 }
+        name: { type: string }
+        type: { $ref: '#/components/schemas/ContractType' }
+        system: { $ref: '#/components/schemas/RefSummary' }
+        domain: { $ref: '#/components/schemas/RefSummary' }
+        owner: { $ref: '#/components/schemas/OwnerRef' }
+        canWrite: { type: boolean, description: Current Covenant writer permission; Toadie ownership never grants access. }
+    ToadieUsageSummary:
+      type: object
+      required: [consumerCount, providerCount, cache, unavailableLinkCount]
+      description: >-
+        Distinct services across linked APIs for the WHOLE contract, repeated on each major.
+        Counts are null for unlinked, never-synced, disconnected or incomplete mappings.
+        Stale/disabled observations may retain last-known counts; zero never proves safe retirement.
+      properties:
+        consumerCount: { type: integer, format: int64, minimum: 0, nullable: true }
+        providerCount: { type: integer, format: int64, minimum: 0, nullable: true }
+        cache: { $ref: '#/components/schemas/ToadieCacheStatus' }
+        unavailableLinkCount: { type: integer, minimum: 0 }
+    LifecycleOverviewRow:
+      type: object
+      required: [id, contract, major, supportStatus, deprecatesOn, supportEndsOn, replacement, hasMigrationGuide, nextDeadline, deadlineSoon, supportEnded, migrationIncomplete, usageUncertain, usage]
+      properties:
+        id: { type: integer, format: int32, minimum: 0, description: Release-line identity. }
+        contract: { $ref: '#/components/schemas/LifecycleContractRef' }
+        major: { type: integer, minimum: 0 }
+        supportStatus: { $ref: '#/components/schemas/SupportStatus' }
+        deprecatesOn: { type: string, format: date, nullable: true }
+        supportEndsOn: { type: string, format: date, nullable: true }
+        replacement:
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/ReleaseLineReplacement' }]
+        hasMigrationGuide: { type: boolean }
+        nextDeadline: { type: string, format: date, nullable: true }
+        deadlineSoon:
+          type: boolean
+          description: Non-END_OF_LIFE line with either date strictly after today and at most 30 days away.
+        supportEnded:
+          type: boolean
+          description: Non-END_OF_LIFE line with supportEndsOn today or earlier; does not change support status.
+        migrationIncomplete:
+          type: boolean
+          description: >-
+            Non-END_OF_LIFE line with a date, replacement or guide, but without guidance or an
+            available replacement. Advisory only; a replacement is not mandatory for saving a policy.
+        usageUncertain:
+          type: boolean
+          description: Cache is not CURRENT or at least one selected API mapping is unavailable.
+        usage: { $ref: '#/components/schemas/ToadieUsageSummary' }
+    LifecycleOverviewPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/LifecycleOverviewRow' } }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, format: int64, minimum: 0 }
+    LifecycleOverviewSummary:
+      type: object
+      required: [asOfDate, total, deadlineSoon, supportEnded, migrationIncomplete, usageUncertain, ownerUser]
+      properties:
+        asOfDate: { type: string, format: date, description: UTC calendar date captured for this request. }
+        total: { type: integer, format: int64, minimum: 0 }
+        deadlineSoon: { type: integer, format: int64, minimum: 0 }
+        supportEnded: { type: integer, format: int64, minimum: 0 }
+        migrationIncomplete: { type: integer, format: int64, minimum: 0 }
+        usageUncertain: { type: integer, format: int64, minimum: 0 }
+        ownerUser:
+          type: array
+          items: { $ref: '#/components/schemas/NamedFacetCount' }
+          description: Owner-user choices; both owner filters and attention lifted, other filters retained.
     ErrorContractRef:
       type: object
       required: [id, name, type, system, domain, owner]

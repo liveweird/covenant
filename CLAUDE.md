@@ -262,3 +262,12 @@ and migration guidance. `ReleaseLineReminders.kt` provides the UTC hourly worker
 recipient-scoped deduplication; V18 adds the fields and notification key. No automatic retirement
 or Toadie mutation occurs. The SPA requires a consumer-impact review for retirement/end of
 support. Rules, failure semantics and rollout notes live in `.claude/docs/release-lines.md`.
+
+### Lifecycle overview (0.12.0)
+
+`contracts/LifecycleOverview*.kt` supplies the catalog-wide paged read and attention summary;
+`toadie/ToadieOverview.kt` batches cached usage counts and shares freshness classification with
+the existing detail view. `web/src/pages/LifecycleOverview.tsx` owns `/lifecycle`, reuses policy
+and impact dialogs, and uses the server's current writer permission. No migration or Toadie
+change is required. UTC windows, empty/EOL handling, completeness and filtering semantics are
+documented in `.claude/docs/release-lines.md`.

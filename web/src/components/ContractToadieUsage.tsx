@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Anchor, Badge, Button, Group, Select, Stack, Table, Text } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
@@ -27,6 +27,7 @@ export default function ContractToadieUsage({ contractId, canWrite, consumersOnl
   const [role, setRole] = useState<"PROVIDER" | "CONSUMER" | null>(consumersOnly ? "CONSUMER" : null);
   const [editing, setEditing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  const wasRefreshing = useRef(false);
   const paging = usePagedSort<SortField>("title", [contractId, debouncedSearch, role], { key: "contractToadieUsage", sortFields: SORT_FIELDS });
   const links = useQuery({
     queryKey: ["contracts", "toadie-links", contractId],
@@ -41,6 +42,15 @@ export default function ContractToadieUsage({ contractId, canWrite, consumersOnl
   });
   const cache = usage.data?.cache ?? links.data?.cache;
   useEffect(() => { onReviewReady?.(!links.isFetching && !usage.isFetching); }, [onReviewReady, links.isFetching, usage.isFetching]);
+  useEffect(() => {
+    if (wasRefreshing.current && !cache?.refreshing) {
+      // The modal's own queries poll a queued refresh to completion. Refresh the aggregate
+      // overview only at that boundary so its contract-level counts and attention total do
+      // not remain on the intermediate `refreshing` snapshot after this dialog closes.
+      void queryClient.invalidateQueries({ queryKey: ["contracts", "lifecycle-overview"] });
+    }
+    wasRefreshing.current = cache?.refreshing === true;
+  }, [cache?.refreshing, queryClient]);
 
   async function refresh() {
     setRefreshError(null);

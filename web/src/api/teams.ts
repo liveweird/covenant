@@ -26,6 +26,16 @@ export async function listTeams(q: TeamListQuery): Promise<TeamPage> {
   return jsonRequest<TeamPage>(`/api/v1/teams?${params}`);
 }
 
+/** Every active team in name order for catalog-wide owner filters. */
+export async function listAllTeams(): Promise<TeamListItem[]> {
+  const items: TeamListItem[] = [];
+  for (let page = 1; ; page += 1) {
+    const result = await listTeams({ page, pageSize: 100, sort: "name" });
+    items.push(...result.items);
+    if (items.length >= result.total || result.items.length === 0) return items;
+  }
+}
+
 export async function getTeam(id: number): Promise<TeamResponse> {
   return jsonRequest<TeamResponse>(`/api/v1/teams/${id}`);
 }

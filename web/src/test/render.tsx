@@ -11,11 +11,12 @@ interface Options extends Omit<RenderOptions, "wrapper"> {
   route?: string;
   /** `location.state` for the initial entry — the sync modal's / Infer page's hand-off. */
   state?: unknown;
+  queryClient?: QueryClient;
 }
 
 export function renderWithProviders(ui: ReactElement, options: Options = {}) {
-  const { route = "/", state, ...rest } = options;
-  const queryClient = new QueryClient({
+  const { route = "/", state, queryClient: suppliedQueryClient, ...rest } = options;
+  const queryClient = suppliedQueryClient ?? new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(ui, {

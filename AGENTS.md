@@ -176,7 +176,10 @@ Contract content is readable by every authenticated user; writes are scoped to t
 members, the owning user, or ADMIN; ownership transfer is ADMIN-only. Versions must be unique
 per contract by SemVer precedence (build metadata does not create a distinct version). Versions may
 be added out of order for backports. Major-derived release lines carry independent support policies
-and recommendations; see `.claude/docs/release-lines.md`. Content is editable only
+and recommendations; see `.claude/docs/release-lines.md`. The catalog-wide Lifecycle overview (`/lifecycle`, API
+`/api/v1/contracts/lifecycle-overview` and `/summary`) reads nonempty major lines, UTC deadline
+attention and cached contract-level usage; it never transitions lifecycle or refreshes Toadie.
+Its filters and summary share SQL predicates, with batched usage counts. Content is editable only
 in DRAFT/PROPOSED, and only DRAFT versions can be deleted; published versions follow the
 lifecycle transition matrix in `contracts/Lifecycle.kt`.
 

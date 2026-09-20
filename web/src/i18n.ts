@@ -17,6 +17,7 @@ import enContracts from "./locales/en/contracts.json";
 import enErrors from "./locales/en/errors.json";
 import enFindings from "./locales/en/findings.json";
 import enInfer from "./locales/en/infer.json";
+import enLifecycleOverview from "./locales/en/lifecycleOverview.json";
 import enNotifications from "./locales/en/notifications.json";
 import enReader from "./locales/en/reader.json";
 import enHierarchy from "./locales/en/hierarchy.json";
@@ -72,6 +73,7 @@ export const en = {
   errors: enErrors,
   findings: enFindings,
   infer: enInfer,
+  lifecycleOverview: enLifecycleOverview,
   notifications: enNotifications,
   reader: enReader,
   hierarchy: enHierarchy,

@@ -54,6 +54,7 @@ from Lettuce, that any new or edited spec must satisfy:
   localStorage only) are read-only; `accessibility` owns one API-seeded fixture contract with its
   domain/system/team (`e2e-axe-*`); `contracts` owns its throwaway domain/system/team/contract/user
   (`e2e-dom-*`/`e2e-sys-*`/`e2e-team-*`/`e2e-petstore-*`/`e2e-readonly-*`); `release-lines` owns its API-seeded `e2e-lines-*` contract, published versions and registries;
+  `lifecycle-overview` owns its API-seeded three-major `e2e-overview-*` DRAFT contract hierarchy;
   `lifecycle-plans` owns its API-seeded `e2e-lifecycle-*` contract hierarchy and a separate
   `e2e-lifecycle-toadie-*` connection to its own host-run fixture; `errors` owns its
   throwaway API-seeded domain/system/team/contract (`e2e-errors-*`); `environments` owns its
@@ -119,6 +120,9 @@ the same commit** — this list is the coverage map, the scenario file is the de
 - [`lifecycle-plans.spec.ts`](scenarios/lifecycle-plans.md) — lifecycle dates, migration instructions
   and a replacement release line persist without automatic transitions; retirement reviews an owned
   Toadie fixture's declared consumer/system/team and requires explicit acknowledgement.
+- [`lifecycle-overview.spec.ts`](scenarios/lifecycle-overview.md) — the catalog-wide release-line view:
+  name and deadline/attention filtering, summary-count drill-down, migration-plan completion through
+  the shared policy modal, no-date discovery, contract-level impact limits, accessibility and screenshot.
 - [`errors.spec.ts`](scenarios/errors.md) — the catalog-wide Errors report: a soft-error version
   stored via the `allowInvalid` waiver shows up with its `OAS_PARSE` finding badge, the "Error"
   severity chip narrows it away and back, and its version link opens the version page; teardown of

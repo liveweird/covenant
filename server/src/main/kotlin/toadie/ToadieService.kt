@@ -477,21 +477,7 @@ class ToadieService(
         this[Connections.systemRelation] = mapping.systemRelation
     }
 
-    private fun ResultRow.cacheStatus(): ToadieCacheStatus {
-        val success = this[Connections.lastSuccessAt]
-        val stale = this[Connections.lastErrorCode] != null || success?.let {
-            nowMillis() - it > this[Connections.refreshIntervalMinutes] * 60_000L * 2
-        } == true
-        val state = when {
-            !this[Connections.enabled] -> ToadieCacheState.DISABLED
-            success == null -> ToadieCacheState.NEVER_SYNCED
-            stale -> ToadieCacheState.STALE
-            else -> ToadieCacheState.CURRENT
-        }
-        return ToadieCacheStatus(
-            state, this[Connections.lastAttemptAt], success, this[Connections.refreshing], this[Connections.lastErrorCode],
-        )
-    }
+    private fun ResultRow.cacheStatus(): ToadieCacheStatus = toadieCacheStatus()
 
     private fun ResultRow.toRef() = ToadieConnectionRef(
         this[Connections.id].value, this[Connections.name], this[Connections.browserUrl],

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { screen, waitFor, within } from "@testing-library/react";
+import { QueryClient } from "@tanstack/react-query";
 import ContractToadieUsage from "./ContractToadieUsage";
 import { jsonResponse } from "../test/http";
 import { renderWithProviders } from "../test/render";
@@ -77,6 +78,33 @@ describe("Contract Toadie usage", () => {
     await user.click(await screen.findByRole("button", { name: "Refresh usage" }));
     await waitFor(() => expect(mockFetch.mock.calls.filter(([url]) => url === "/api/v1/contracts/5/toadie-links")).toHaveLength(2));
     expect(mockFetch.mock.calls.filter(([url]) => typeof url === "string" && url.startsWith("/api/v1/contracts/5/toadie-usage?")).length).toBeGreaterThanOrEqual(2);
+  });
+
+  test("refresh completion invalidates lifecycle overview aggregates", async () => {
+    const invalidate = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    let linksCalls = 0;
+    let usageCalls = 0;
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === "/api/v1/contracts/5/toadie-usage/refresh" && init?.method === "POST") return Promise.resolve(new Response(null, { status: 202 }));
+      if (url === "/api/v1/contracts/5/toadie-links") {
+        linksCalls += 1;
+        const refreshing = linksCalls === 2;
+        return Promise.resolve(jsonResponse(200, { ...LINKS, cache: { ...CACHE, state: refreshing ? "STALE" : "CURRENT", refreshing, lastErrorCode: null } }));
+      }
+      if (url.startsWith("/api/v1/contracts/5/toadie-usage?")) {
+        usageCalls += 1;
+        const refreshing = usageCalls === 2;
+        return Promise.resolve(jsonResponse(200, { ...USAGE, cache: { ...CACHE, state: refreshing ? "STALE" : "CURRENT", refreshing, lastErrorCode: null } }));
+      }
+      return Promise.resolve(jsonResponse(404, { title: "Not Found", status: 404 }));
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<ContractToadieUsage contractId={5} canWrite />);
+    await user.click(await screen.findByRole("button", { name: "Refresh usage" }));
+    await waitFor(() => expect(usageCalls).toBe(2));
+    await waitFor(() => expect(usageCalls).toBeGreaterThanOrEqual(3), { timeout: 3000 });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["contracts", "lifecycle-overview"] });
+    invalidate.mockRestore();
   });
 
   test("a disconnected link remains removable when no active connections exist and clears with a valid request", async () => {

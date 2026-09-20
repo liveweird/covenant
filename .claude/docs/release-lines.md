@@ -136,3 +136,40 @@ Per-line failures do not stop later reminders; failed transactions remain eligib
 `LIFECYCLE_REMINDERS_ENABLED=false` disables the worker; normal backend tests disable it and
 exercise `ReleaseLineReminderService` with a fixed UTC clock explicitly. No Toadie call or
 account/team mapping is needed to deliver reminders to Covenant followers.
+
+## Catalog-wide lifecycle overview (0.12.0)
+
+`GET /api/v1/contracts/lifecycle-overview` pages one row per nondeleted major line with at least
+one nondeleted version, regardless of version lifecycle. Deleted contracts, systems and domains
+are excluded. Empty retained lines remain accessible on the contract detail but do not appear
+in this planning view. END_OF_LIFE lines remain browsable, with deadline/migration attention
+suppressed. Dates never change support status or version lifecycle.
+
+Filters cover the shared contract scope (q, domain, system, type, owning team/user), support
+statuses, deadline window and one attention category. Default sort is the earlier configured
+date, including past dates, ascending; END_OF_LIFE/undated lines sort last, then line ID breaks
+ties. `NONE` means both dates absent; `REACHED` means either date is today or earlier;
+`NEXT_30_DAYS` means either date is after today and at most 30 days away. Reached/upcoming
+windows exclude END_OF_LIFE lines. One captured UTC time drives each request.
+
+The `/summary` companion applies all filters except attention, letting its buttons switch
+categories without zeroing other categories. Counters count lines, once per category, even if
+both dates match. Incomplete migration means a non-END_OF_LIFE line has some planning intent
+(a date, replacement or guide) but lacks guidance or an available replacement. This is advisory;
+a deliberate retirement without replacement is still allowed. New undated lines without plans
+are not flagged. Owner-user choices lift both owner filters and attention, expose only owner
+names already visible on contracts, and retain the remaining filters.
+
+The SQL projection uses indexed version existence checks and shared predicates for list/counts;
+it never loads version bodies or builds every line's recommendation. Usage reads batch page
+contract links and distinct connection snapshots, building per-API service indexes once per
+connection. Consumers/providers are distinct services across selected APIs for the WHOLE
+contract; the same counts repeat on its majors. Unlinked, never-synced, disconnected or missing
+API mappings produce unknown counts. Stale/disabled last-good observations can retain numeric
+counts, visibly labeled. Usage is uncertain when the cache is not CURRENT or a mapping is
+unavailable. No upstream request is made by the overview.
+
+The SPA reuses the existing impact and policy dialogs; full policy reads happen only on an
+action, and `canWrite` uses the existing Covenant ownership rule. Imported teams grant no
+permissions. Independent page and summary requests may observe intervening edits. No new
+schema or persisted lifecycle value is introduced.

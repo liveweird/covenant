@@ -236,6 +236,17 @@ Toadie, the observation's freshness, and the migration plan. Usage remains contr
 Covenant does not assume which release line those services use. This feature needs no Toadie
 changes. See [release-line rules](.claude/docs/release-lines.md) for details.
 
+The **Lifecycle** page (`/lifecycle`) brings major release lines together across the catalog.
+Filter by owner, domain, system, contract type, support status or deadline window, then use
+attention counts to find approaching deadlines, reached support-end dates, incomplete migration
+plans and uncertain usage. Open the existing impact review or edit a policy with the usual owner
+permissions. Consumer counts describe the whole contract; stale or missing data is explicit.
+Dates remain advisory, and this overview needs no changes to Toadie.
+
+## Product backlog
+
+See [the backlog](BACKLOG.md) for proposed next steps and deferred work, including CI/CD integration.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
