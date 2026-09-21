@@ -41,6 +41,7 @@ class MigrationChecksumTest {
         "V19__version_reviews.sql" to 1832065989,
         "V20__user_credential_revision.sql" to 289120118,
         "V21__semver_prerelease_order.sql" to 1326345492,
+        "V22__toadie_remote_revision.sql" to 534570132,
     )
 
     @Test

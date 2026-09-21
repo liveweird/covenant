@@ -17,6 +17,20 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.16.0",
+    date: "2026-09-21",
+    en: `**More reliable and efficient Toadie refreshes.**
+
+- Refreshes check that Toadie's ontology revision stays consistent across the complete read and retry once if it changes.
+- Scheduled refreshes confirm freshness without rereading an unchanged graph. Manual refresh still reads the full graph.
+- Failed checks preserve the last complete usage observation and show it as stale. Requires Toadie 2.12 or newer.`,
+    pl: `**Bardziej niezawodne i wydajne odświeżanie danych z Toadie.**
+
+- Odświeżanie sprawdza, czy rewizja ontologii Toadie pozostaje taka sama przez cały odczyt, i ponawia go raz w przypadku zmiany.
+- Zaplanowane odświeżanie potwierdza aktualność danych bez ponownego odczytu niezmienionego grafu. Ręczne odświeżanie nadal odczytuje cały graf.
+- Nieudane sprawdzenie zachowuje ostatnie kompletne dane o użyciu i oznacza je jako nieaktualne. Wymagane jest Toadie 2.12 lub nowsze.`,
+  },
+  {
     version: "0.15.0",
     date: "2026-09-21",
     en: `**Share migration plans and declared impact.**

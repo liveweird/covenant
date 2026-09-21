@@ -53,7 +53,7 @@ fun ApplicationTestBuilder.configureApp(vararg overrides: Pair<String, String>) 
         if (!attributes.contains(ch.nokillswit.toadie.ToadieGraphqlClientKey)) {
             attributes.put(ch.nokillswit.toadie.ToadieGraphqlClientKey, object : ch.nokillswit.toadie.ToadieGraphqlClient {
                 override suspend fun fetch(config: ch.nokillswit.toadie.ToadieFetchConfig) =
-                    ch.nokillswit.toadie.ToadieSnapshot(emptyList(), null, System.currentTimeMillis())
+                    ch.nokillswit.toadie.ToadieSnapshot(emptyList(), null, System.currentTimeMillis(), 1)
             })
         }
     }

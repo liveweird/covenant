@@ -61,6 +61,22 @@ Implementation and verification are complete: 453 backend tests, 614 frontend te
 real-browser lifecycle/report journeys, static/build/coverage gates, API conformance and
 independent review pass. Version and bilingual changelog are updated.
 
+## Revision-aware Toadie refreshes
+
+Implemented in **0.16.0**: requires Toadie 2.12+, compares revisions across every page
+and at scan completion, restarts once within shared budgets, and preserves the last complete
+cache on failure. Scheduled checks reconfirm unchanged revisions; manual refresh always scans,
+promoting an in-flight revision check when needed. V22 stores the verified remote revision.
+Verification passed: 460 backend tests with build/static/coverage gates, frontend build/static
+and 50 changelog/locale tests, eight browser journeys, an unchanged-revision integration probe,
+API conformance and independent review. Version and bilingual changelog are updated.
+No changes are required in Toadie.
+
+Remaining Toadie proposals: verify/document separate dataset mappings for ODCS, then design a
+reader for optional declared adoption entities. Toadie's narrower key scopes and incremental
+change feed were declined upstream; they are not pending Covenant prerequisites. Adoption
+blueprints are importable ontology definitions, so absence must remain valid.
+
 ## Deferred
 
 Related cross-project proposals are collected in the

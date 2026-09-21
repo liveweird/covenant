@@ -72,7 +72,9 @@ This is a Kotlin/Gradle backend plus three standalone npm workspaces:
   paging, and shared validation infrastructure live in `infra/`.
 - `toadie/` under the server feature packages owns ADMIN-curated encrypted connections,
   contract-to-Port API links, bounded GraphQL reads and refresh, and cached provider/consumer
-  projections. Read `.claude/docs/toadie-integration.md` before changing this boundary.
+  projections. Toadie 2.12+ revisions guard every scan with one bounded restart; scheduled
+  refreshes can reconfirm an unchanged graph, while manual refreshes always scan fully.
+  Read `.claude/docs/toadie-integration.md` before changing this boundary.
 - `server/src/main/resources/application.yaml` declaratively registers application modules.
   `main.kt` only starts `EngineMain`; do not wire features from it. Module order matters because
   modules publish and consume Ktor application attributes.

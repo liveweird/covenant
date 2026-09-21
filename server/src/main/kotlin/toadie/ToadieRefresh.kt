@@ -38,7 +38,10 @@ class ToadieRefreshCoordinator(
         try {
             slots.withPermit {
                 try {
-                    service.publish(claim, client.fetch(claim.config))
+                    when (val result = client.fetch(claim.config)) {
+                        is ToadieSnapshot -> service.publish(claim, result)
+                        is ToadieUnchanged -> service.publish(claim, result)
+                    }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (failure: ToadieFetchException) {

@@ -1,4 +1,4 @@
-# Toadie contract usage (0.10.0)
+# Toadie contract usage (0.10.0; revision-aware refresh in 0.16.0)
 
 Toadie owns architecture and declared provider/consumer relationships in its Port ontology.
 Covenant owns contract documents, versions, release lines and support policies. This connector
@@ -57,11 +57,30 @@ is retained and marked stale; never convert a failure into zero consumers. Ontol
 the previous observation and schedule another refresh when enabled. Disable/delete, never synced, stale, missing and disconnected states
 are distinct from a current successful empty observation.
 
-Toadie's numbered pagination has no cross-request snapshot token. Even a fully validated scan
-is an observation over an interval, not an atomic remote graph snapshot. It must not be used as
-an automatic retirement gate. There is no webhook/subscription/delta protocol in this first
-connector. A future precise adoption model can add a Port usage entity carrying the consumer,
-API and version or release line; no such precision is inferred today.
+Refresh requires **Toadie 2.12.0 or newer**, whose blueprint and entity pages carry a persistent
+ontology `revision`. Every page in a full scan must have the same canonical nonnegative decimal
+revision, including empty entity pages and scans of different blueprints. A final revision-only
+probe also confirms the graph has not changed during response materialization. A changed revision
+discards the attempt and restarts from blueprint discovery once. Both attempts share the whole
+refresh deadline and request, byte and row budgets. Persistent churn exhausts the bounded retry;
+the previous complete cache remains visible with a stale/error status. Missing/malformed revisions
+and GraphQL errors fail the refresh; there is no silent fallback to unverified older pagination.
+
+Scheduled refreshes first request `blueprints(page: 1, pageSize: 1) { revision }` when a prior
+verified revision is available. If unchanged, they reconfirm freshness without fetching entities
+or rewriting snapshot rows. `lastSuccessAt` means the latest successful full scan **or**
+same-revision verification. Failed probes never advance it. Manual refresh always performs a
+full scan and clears the saved revision while retaining the last observation. If a scheduled
+revision-aware job is already running, manual refresh promotes it to a new full-scan claim;
+the old job cannot publish, and repeated manual requests coalesce into the full-scan job.
+Each accepted claim has its own fixed budgets. Mapping changes invalidate the cache and saved revision; explicit API-key replacement
+clears the saved revision while preserving the previous observation. Display-only edits retain
+both. Existing configuration-revision and refresh-claim guards protect both publication paths.
+
+This is change detection, not a server-held historical snapshot or evidence of runtime adoption.
+The source can change after the final read. There is no webhook/subscription/delta protocol and
+no automatic retirement gate. Toadie's optional adoption blueprints are not read by this connector;
+exact version and release-line adoption remain unknown.
 
 ## Credentials and transport
 
@@ -81,11 +100,22 @@ properties, creator details, upstream error text and credentials do not.
 
 ## Deployment and verification
 
-V17 is additive. Connections are soft-deleted; snapshot rows are replaceable cache entries and
-contract links are hard-deleted membership rows, with explicit changes retained in contract history. Existing catalogs and samples need no changes. No Toadie code migration is
-required. Connection credentials and contract mappings are persistent configuration; don't
+V17 is additive; V22 adds nullable `toadie_connections.remote_revision` (BIGINT) cache metadata.
+Existing connections begin with no verified revision and perform a full scan on their next
+refresh. Connections are soft-deleted; snapshot rows are replaceable cache entries and contract
+links are hard-deleted membership rows, with explicit changes retained in contract history.
+Existing catalogs and samples need no changes. No Toadie code migration is required. Connection credentials and contract mappings are persistent configuration; don't
 overwrite them in tests. Browser verification owns a separate connection, contract and fixture
 GraphQL server, then removes only its own records through the APIs.
+
+The upstream revision has no database-epoch identifier. After restoring or replacing Toadie's
+database at the same URL, manually refresh each connection to rebuild its observation even if
+the counter happens to match. Before rolling Covenant back to a binary that ignores V22,
+invalidate the derived remote-revision metadata; otherwise invalidate it before returning to
+revision-aware code. Older binaries can replace cache rows without updating that metadata.
+With Covenant stopped, invalidate only the derived column using
+`UPDATE toadie_connections SET remote_revision = NULL;`. Keep connection credentials, contract
+links and snapshot rows intact.
 
 Application rollback must account for the new `TOADIE_LINKS_UPDATED` history/notification enum:
 after link changes exist, use a compatible binary or restore the pre-upgrade database snapshot.
@@ -102,4 +132,5 @@ local snapshot transaction, with all linked APIs and provider/consumer services 
 UI paging. They retain missing mappings and stale/disabled observation warnings, and do not
 refresh the connection. The selected Covenant major is planning context only: exact version
 and major adoption remain unknown. Generation time never replaces `lastSuccessAt` as the
-observation timestamp. See `release-lines.md` for the report API and sharing behavior.
+observation timestamp (which can be a same-revision reconfirmation). See `release-lines.md` for
+the report API and sharing behavior.

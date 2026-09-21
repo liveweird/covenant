@@ -17,6 +17,7 @@ import org.jetbrains.exposed.v1.r2dbc.selectAll
 import org.jetbrains.exposed.v1.r2dbc.transactions.suspendTransaction
 import org.jetbrains.exposed.v1.core.eq
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.flow.single
 import kotlinx.serialization.json.Json
 import kotlin.test.*
 
@@ -50,6 +51,38 @@ class ToadieUsageTest {
                 .toList().single()[ToadieService.Connections.apiKey]
         }
         assertTrue(stored.startsWith(FieldCipher.PREFIX))
+    }
+
+    @Test
+    fun `manual refresh promotes an in-flight revision probe to one forced full claim`() = testApplication {
+        usePostgresTestcontainer()
+        val service = ToadieService(
+            sharedDatabaseForTests(), FieldCipher(TestEnvironments.TEST_DATA_ENCRYPTION_KEY),
+            ContractService(sharedDatabaseForTests(), TestTeams.service),
+        )
+        val connectionId = service.create(request("promotion-${System.nanoTime()}"))
+        try {
+            val initialClaim = service.claimRefresh(connectionId, force = false).second!!
+            assertTrue(service.publish(initialClaim, ToadieSnapshot(emptyList(), "system", 100, 11)))
+
+            val scheduled = service.claimRefresh(connectionId, force = false).second!!
+            assertEquals(11, scheduled.config.knownRevision)
+            val (promotedResult, promoted) = service.claimRefresh(connectionId, force = true)
+            assertEquals(RefreshClaimResult.ACCEPTED, promotedResult)
+            assertNull(promoted!!.config.knownRevision)
+            assertNotEquals(scheduled.token, promoted.token)
+            assertEquals(RefreshClaimResult.COALESCED, service.claimRefresh(connectionId, force = true).first)
+            assertFalse(service.publish(scheduled, ToadieUnchanged(11, 200)))
+            service.fail(scheduled, "OBSOLETE")
+            service.release(scheduled)
+            assertTrue(service.publish(promoted, ToadieSnapshot(emptyList(), "system", 300, 12)))
+
+            val next = service.claimRefresh(connectionId, force = false).second!!
+            assertEquals(12, next.config.knownRevision)
+            service.release(next)
+        } finally {
+            service.delete(connectionId)
+        }
     }
 
     @Test
@@ -104,8 +137,34 @@ class ToadieUsageTest {
             ),
             systemBlueprint = "system",
             fetchedAt = System.currentTimeMillis(),
+            revision = 1,
         )
         assertTrue(service.publish(claim, snapshot))
+        suspend fun snapshotIdentity(): String? = suspendTransaction(sharedDatabaseForTests()) {
+            exec(
+                "SELECT string_agg(entity_id || ':' || xmin::text, ',' ORDER BY entity_id) " +
+                    "FROM toadie_snapshot_entities WHERE connection_id = ${connectionId.toLong()}",
+            ) { row -> row.get(0, String::class.java) }?.single()
+        }
+        val originalSnapshotIdentity = snapshotIdentity()
+        suspend fun storedState(): Triple<Long?, Long?, Long> = suspendTransaction(sharedDatabaseForTests()) {
+            val connection = ToadieService.Connections.selectAll().where { ToadieService.Connections.id eq connectionId }
+                .toList().single()
+            Triple(
+                connection[ToadieService.Connections.remoteRevision],
+                connection[ToadieService.Connections.lastSuccessAt],
+                ToadieService.SnapshotEntities.selectAll().where {
+                    ToadieService.SnapshotEntities.connectionId eq connectionId
+                }.count(),
+            )
+        }
+        assertEquals(Triple(1L, snapshot.fetchedAt, 4L), storedState())
+        val unchangedClaim = service.claimRefresh(connectionId, force = false).second!!
+        assertEquals(1, unchangedClaim.config.knownRevision)
+        val checkedAt = snapshot.fetchedAt + 100
+        assertTrue(service.publish(unchangedClaim, ToadieUnchanged(1, checkedAt)))
+        assertEquals(Triple(1L, checkedAt, 4L), storedState(), "unchanged verification never rewrites snapshot rows")
+        assertEquals(originalSnapshotIdentity, snapshotIdentity(), "unchanged verification preserves the physical cache rows")
         assertTrue(service.replaceLinks(contractId, ToadieLinksRequest(connectionId, listOf("10")), caller))
 
         val usage = assertNotNull(service.usage(contractId, null, null, PageRequest(1, 20, listOf(SortField("id", false)))))
@@ -116,7 +175,9 @@ class ToadieUsageTest {
         assertNull(usage.items.single().version)
 
         val failedClaim = assertNotNull(service.claimRefresh(connectionId, force = false).second)
+        assertEquals(1, failedClaim.config.knownRevision)
         service.fail(failedClaim, "graphql partial response: token")
+        assertEquals(1, storedState().first, "a failed refresh retains the last observed revision")
         val retained = assertNotNull(service.usage(contractId, null, null, PageRequest(1, 20, listOf(SortField("id", false)))))
         assertEquals(ToadieCacheState.STALE, retained.cache.state)
         assertEquals("Checkout", retained.items.single().title)
@@ -135,10 +196,20 @@ class ToadieUsageTest {
         )
         assertEquals(1, service.update(connectionId, replacement))
         assertFalse(service.publish(staleClaim, snapshot.copy(fetchedAt = System.currentTimeMillis())))
+        assertFalse(service.publish(staleClaim, ToadieUnchanged(1, System.currentTimeMillis())))
+        val displayClaim = service.claimRefresh(connectionId, force = false).second!!
+        assertEquals(1, displayClaim.config.knownRevision, "display-only changes retain the observed revision")
+        service.release(displayClaim)
         val afterStalePublish = service.usage(
             contractId, null, null, PageRequest(1, 20, listOf(SortField("id", false))),
         )
         assertEquals("Checkout", afterStalePublish!!.items.single().title)
+
+        assertEquals(1, service.update(connectionId, replacement.copy(apiKey = "rotated-secret")))
+        val rotatedKeyClaim = service.claimRefresh(connectionId, force = false).second!!
+        assertNull(rotatedKeyClaim.config.knownRevision)
+        service.release(rotatedKeyClaim)
+        assertEquals(4, storedState().third, "key replacement retains the last cache while forcing a full scan")
 
         val remapped = replacement.copy(mapping = replacement.mapping.copy(apiBlueprint = "different-api"))
         assertEquals(1, service.update(connectionId, remapped))

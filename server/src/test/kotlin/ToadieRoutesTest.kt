@@ -16,6 +16,7 @@ import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.delay
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ToadieRoutesTest {
@@ -65,7 +66,9 @@ class ToadieRoutesTest {
         assertEquals(HttpStatusCode.NotFound, admin.post("/api/v1/toadie-connections/2147483647/refresh").status)
         val connectionClaim = direct.claimRefresh(connection.id, force = false).second!!
         assertEquals(HttpStatusCode.Accepted, admin.post("/api/v1/toadie-connections/${connection.id}/refresh").status)
-        assertTrue(direct.publish(connectionClaim, routeSnapshot()))
+        assertFalse(direct.publish(connectionClaim, routeSnapshot()))
+        waitForIdle(admin, connection.id)
+        assertTrue(direct.publish(direct.claimRefresh(connection.id, force = false).second!!, routeSnapshot()))
         val api = waitForApi(admin, connection.id)
         assertEquals(HttpStatusCode.NotFound, admin.get("/api/v1/toadie-connections/2147483647/apis").status)
 
@@ -82,7 +85,9 @@ class ToadieRoutesTest {
         assertEquals(HttpStatusCode.NotFound, owner.post("/api/v1/contracts/2147483647/toadie-usage/refresh").status)
         val usageClaim = direct.claimRefresh(connection.id, force = false).second!!
         assertEquals(HttpStatusCode.Accepted, owner.post("/api/v1/contracts/$contractId/toadie-usage/refresh").status)
-        assertTrue(direct.publish(usageClaim, routeSnapshot()))
+        assertFalse(direct.publish(usageClaim, routeSnapshot()))
+        waitForIdle(admin, connection.id)
+        assertTrue(direct.publish(direct.claimRefresh(connection.id, force = false).second!!, routeSnapshot()))
         assertEquals(HttpStatusCode.TooManyRequests, admin.post("/api/v1/toadie-connections/${connection.id}/refresh").status)
 
         assertEquals(HttpStatusCode.Forbidden, stranger.delete("/api/v1/toadie-connections/${connection.id}").status)
@@ -133,4 +138,5 @@ private fun routeSnapshot() = ToadieSnapshot(
     ),
     systemBlueprint = "system",
     fetchedAt = System.currentTimeMillis(),
+    revision = 1,
 )

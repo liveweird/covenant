@@ -44,8 +44,16 @@ class HttpToadieGraphqlClient(
 
     override fun close() = client.close()
 
-    override suspend fun fetch(config: ToadieFetchConfig): ToadieSnapshot = try {
-        withTimeoutOrNull(timeoutMs) { readSnapshot(config) } ?: fail("TIMEOUT")
+    override suspend fun fetch(config: ToadieFetchConfig): ToadieFetchResult = try {
+        withTimeoutOrNull(timeoutMs) {
+            val budget = ReadBudget()
+            config.knownRevision?.let { known ->
+                if (revisionProbe(config, budget) == known) {
+                    return@withTimeoutOrNull ToadieUnchanged(known, System.currentTimeMillis())
+                }
+            }
+            readConsistentSnapshot(config, budget, restartAvailable = true)
+        } ?: fail("TIMEOUT")
     } catch (error: CancellationException) {
         throw error
     } catch (error: ToadieFetchException) {
@@ -54,9 +62,20 @@ class HttpToadieGraphqlClient(
         throw ToadieFetchException("UPSTREAM_UNAVAILABLE")
     }
 
-    private suspend fun readSnapshot(config: ToadieFetchConfig): ToadieSnapshot {
-        val budget = ReadBudget()
-        val blueprints = pages(config, "blueprints", BLUEPRINT_FIELDS, null, budget)
+    private suspend fun readConsistentSnapshot(
+        config: ToadieFetchConfig,
+        budget: ReadBudget,
+        restartAvailable: Boolean,
+    ): ToadieSnapshot = try {
+        readSnapshot(config, budget)
+    } catch (_: RevisionChanged) {
+        if (!restartAvailable) fail("SOURCE_CHANGED")
+        readConsistentSnapshot(config, budget, restartAvailable = false)
+    }
+
+    private suspend fun readSnapshot(config: ToadieFetchConfig, budget: ReadBudget): ToadieSnapshot {
+        val revision = RevisionTracker()
+        val blueprints = pages(config, "blueprints", BLUEPRINT_FIELDS, null, budget, revision)
         val mapping = config.mapping
         fun blueprint(identifier: String): JsonNode = blueprints.singleOrNull {
             text(it, "identifier").equals(identifier, ignoreCase = true)
@@ -74,13 +93,14 @@ class HttpToadieGraphqlClient(
         blueprint("_team")
         val relationKeys = setOf(mapping.providesRelation, mapping.consumesRelation, mapping.systemRelation)
         val entities = linkedSetOf(apiName, serviceName, systemName, "_team").flatMap { name ->
-            pages(config, "entities", ENTITY_FIELDS, name, budget).map {
+            pages(config, "entities", ENTITY_FIELDS, name, budget, revision).map {
                 parseEntity(it, name, if (name == serviceName) relationKeys else emptySet())
             }
         }
         if (entities.size > maxEntities || entities.map { it.id }.toSet().size != entities.size) fail("LIMIT_EXCEEDED")
+        revision.observe(revisionProbe(config, budget))
         validateReferences(entities, serviceName, apiName, systemName, mapping)
-        return ToadieSnapshot(entities, systemName, System.currentTimeMillis())
+        return ToadieSnapshot(entities, systemName, System.currentTimeMillis(), checkNotNull(revision.value))
     }
 
     private fun validateReferences(
@@ -138,21 +158,28 @@ class HttpToadieGraphqlClient(
         selection: String,
         blueprint: String?,
         budget: ReadBudget,
+        revision: RevisionTracker,
     ): List<JsonNode> {
         val rows = mutableListOf<JsonNode>()
         var expectedTotal: Int? = null
         var page = 1
         var previousId = 0u
         do {
-            val result = request(config, field, selection, blueprint, page, budget)
+            val result = request(
+                config, field, "items { $selection } page pageSize total revision", blueprint, page, pageSize, budget,
+            )
             val total = result.path("total")
             if (!total.isIntegralNumber || !total.canConvertToInt() || total.intValue() !in 0..maxEntities) fail("LIMIT_EXCEEDED")
-            if (expectedTotal != null && total.intValue() != expectedTotal) fail("SOURCE_CHANGED")
-            expectedTotal = total.intValue()
             if (result.path("page").asInt(-1) != page || result.path("pageSize").asInt(-1) != pageSize) fail("INVALID_RESPONSE")
             val items = result.path("items")
+            if (!items.isArray) fail("INVALID_RESPONSE")
+            budget.entities += items.size()
+            if (budget.entities > maxEntities) fail("LIMIT_EXCEEDED")
+            revision.observe(revision(result))
+            if (expectedTotal != null && total.intValue() != expectedTotal) fail("SOURCE_CHANGED")
+            expectedTotal = total.intValue()
             val expectedSize = minOf(pageSize, expectedTotal - rows.size)
-            if (!items.isArray || items.size() != expectedSize) fail("INVALID_RESPONSE")
+            if (items.size() != expectedSize) fail("INVALID_RESPONSE")
             items.forEach {
                 val nextId = id(it).toUInt()
                 if (nextId <= previousId) fail("SOURCE_CHANGED")
@@ -161,10 +188,12 @@ class HttpToadieGraphqlClient(
             }
             page++
         } while (rows.size < expectedTotal)
-        budget.entities += rows.size
-        if (budget.entities > maxEntities) fail("LIMIT_EXCEEDED")
         return rows
     }
+
+    private suspend fun revisionProbe(config: ToadieFetchConfig, budget: ReadBudget): Long = revision(
+        request(config, "blueprints", "revision", null, 1, 1, budget),
+    )
 
     private suspend fun request(
         config: ToadieFetchConfig,
@@ -172,14 +201,15 @@ class HttpToadieGraphqlClient(
         selection: String,
         blueprint: String?,
         page: Int,
+        requestedPageSize: Int,
         budget: ReadBudget,
     ): JsonNode {
         if (++budget.requests > 64) fail("LIMIT_EXCEEDED")
         val variableDefinition = if (blueprint == null) "" else ", \$blueprint: String!"
         val argument = if (blueprint == null) "" else ", blueprint: \$blueprint"
         val query = "query CovenantUsage(\$page: Int!, \$pageSize: Int!$variableDefinition) { " +
-            "$field(page: \$page, pageSize: \$pageSize$argument) { items { $selection } page pageSize total } }"
-        val variables = mapOf("page" to page, "pageSize" to pageSize) +
+            "$field(page: \$page, pageSize: \$pageSize$argument) { $selection } }"
+        val variables = mapOf("page" to page, "pageSize" to requestedPageSize) +
             (blueprint?.let { mapOf("blueprint" to it) } ?: emptyMap())
         val body = mapper.writeValueAsString(mapOf("query" to query, "operationName" to "CovenantUsage", "variables" to variables))
         return client.preparePost("${config.baseUrl.trimEnd('/')}/integration/graphql") {
@@ -223,7 +253,24 @@ class HttpToadieGraphqlClient(
         if (it.toUIntOrNull() == null || it.toUInt() == 0u || it != it.toUInt().toString()) fail("INVALID_RESPONSE")
     }
 
+    private fun revision(node: JsonNode): Long {
+        val raw = node.path("revision").takeIf { it.isTextual }?.textValue() ?: fail("INVALID_RESPONSE")
+        val value = raw.toLongOrNull()?.takeIf { it >= 0 } ?: fail("INVALID_RESPONSE")
+        if (raw != value.toString()) fail("INVALID_RESPONSE")
+        return value
+    }
+
     private class ReadBudget(var requests: Int = 0, var entities: Int = 0, var bytes: Int = 0)
+    private class RevisionChanged : RuntimeException()
+    private class RevisionTracker {
+        var value: Long? = null
+            private set
+
+        fun observe(next: Long) {
+            if (value != null && value != next) throw RevisionChanged()
+            value = next
+        }
+    }
 
     private companion object {
         const val BLUEPRINT_FIELDS = "id identifier relations"

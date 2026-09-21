@@ -61,6 +61,7 @@ class ToadieService(
         val consumesRelation = varchar("consumes_relation", 100)
         val systemRelation = varchar("system_relation", 100)
         val snapshotSystemBlueprint = varchar("snapshot_system_blueprint", 100).nullable()
+        val remoteRevision = long("remote_revision").nullable()
         val configRevision = long("config_revision")
         val lastAttemptAt = long("last_attempt_at").nullable()
         val lastSuccessAt = long("last_success_at").nullable()
@@ -147,6 +148,7 @@ class ToadieService(
             throw ConflictException("baseUrl is the connection identity; create a new connection to change it")
         }
         val mappingChanged = request.mapping != current.mapping()
+        val apiKeyChanged = request.apiKey != null
         val key = request.apiKey?.let(cipher::encrypt) ?: current[Connections.apiKey]
         val changed = Connections.update({ (Connections.id eq id) and Connections.active() }) {
             it[name] = request.name
@@ -163,7 +165,9 @@ class ToadieService(
                 it[lastSuccessAt] = null
                 it[lastErrorCode] = null
                 it[snapshotSystemBlueprint] = null
+                it[remoteRevision] = null
             }
+            if (apiKeyChanged) it[remoteRevision] = null
             it[updatedAt] = nowMillis()
         }
         if (mappingChanged) SnapshotEntities.deleteWhere { SnapshotEntities.connectionId eq id }
@@ -370,26 +374,38 @@ class ToadieService(
         val row = Connections.selectAll().where { (Connections.id eq id) and Connections.active() }.forUpdate().toList().singleOrNull()
             ?: return@suspendTransaction RefreshClaimResult.MISSING to null
         if (!row[Connections.enabled]) return@suspendTransaction RefreshClaimResult.DISABLED to null
-        if (row[Connections.refreshing] && (row[Connections.leaseUntil] ?: 0) > now) {
-            return@suspendTransaction RefreshClaimResult.COALESCED to null
+        val activeLease = row[Connections.refreshing] && (row[Connections.leaseUntil] ?: 0) > now
+        val promoting = activeLease && force && row[Connections.remoteRevision] != null
+        if (activeLease) {
+            if (!force || row[Connections.remoteRevision] == null) {
+                return@suspendTransaction RefreshClaimResult.COALESCED to null
+            }
         }
-        if (force && row[Connections.lastAttemptAt]?.let { now - it < 30_000 } == true) {
+        if (force && !promoting && row[Connections.lastAttemptAt]?.let { now - it < 30_000 } == true) {
             return@suspendTransaction RefreshClaimResult.COOLDOWN to null
         }
         val token = java.util.UUID.randomUUID().toString()
         Connections.update({ (Connections.id eq id) and (Connections.configRevision eq row[Connections.configRevision]) }) {
             it[refreshing] = true
-            // Ten active connections and two workers bound queueing to five fetch waves; the
-            // token below is still the actual stale-worker CAS if a lease is reclaimed.
+            // A force request may promote one scheduled probe per connection, leaving at most
+            // one obsolete job: twenty jobs still fit ten 30-second waves inside this lease.
             it[leaseUntil] = now + 600_000
             it[refreshToken] = token
             it[lastAttemptAt] = now
+            if (force) it[remoteRevision] = null
         }
         RefreshClaimResult.ACCEPTED to RefreshClaim(
             id,
             row[Connections.configRevision],
             token,
-            ToadieFetchConfig(row[Connections.baseUrl], cipher.decrypt(row[Connections.apiKey]), row.mapping()),
+            ToadieFetchConfig(
+                row[Connections.baseUrl],
+                cipher.decrypt(row[Connections.apiKey]),
+                row.mapping(),
+                row[Connections.remoteRevision].takeIf {
+                    !force && row[Connections.lastSuccessAt] != null && row[Connections.snapshotSystemBlueprint] != null
+                },
+            ),
         )
     }
 
@@ -402,6 +418,7 @@ class ToadieService(
     }
 
     suspend fun publish(claim: RefreshClaim, snapshot: ToadieSnapshot): Boolean = suspendTransaction(database) {
+        require(snapshot.revision >= 0) { "Remote revision must be non-negative" }
         val valid = Connections.selectAll().where {
                 (Connections.id eq claim.connectionId) and Connections.active() and
                 (Connections.configRevision eq claim.revision) and (Connections.refreshToken eq claim.token) and
@@ -426,6 +443,7 @@ class ToadieService(
         }) {
             it[lastSuccessAt] = snapshot.fetchedAt
             it[snapshotSystemBlueprint] = snapshot.systemBlueprint
+            it[remoteRevision] = snapshot.revision
             it[lastErrorCode] = null
             it[refreshing] = false
             it[leaseUntil] = null
@@ -433,6 +451,25 @@ class ToadieService(
         }
         check(valid[Connections.refreshToken] == claim.token)
         true
+    }
+
+    suspend fun publish(claim: RefreshClaim, unchanged: ToadieUnchanged): Boolean = suspendTransaction(database) {
+        check(claim.config.knownRevision == unchanged.revision) {
+            "An unchanged refresh must match the claimed remote revision"
+        }
+        val updated = Connections.update({
+            (Connections.id eq claim.connectionId) and Connections.active() and
+                (Connections.configRevision eq claim.revision) and (Connections.refreshToken eq claim.token) and
+                (Connections.refreshing eq true) and (Connections.remoteRevision eq unchanged.revision) and
+                Connections.lastSuccessAt.isNotNull() and Connections.snapshotSystemBlueprint.isNotNull()
+        }) {
+            it[lastSuccessAt] = unchanged.checkedAt
+            it[lastErrorCode] = null
+            it[refreshing] = false
+            it[leaseUntil] = null
+            it[refreshToken] = null
+        }
+        updated == 1
     }
 
     suspend fun fail(claim: RefreshClaim, code: String) = suspendTransaction(database) {
