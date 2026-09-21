@@ -8,7 +8,7 @@ import { IconPencil, IconPlus, IconServer2, IconTrash } from "@tabler/icons-reac
 import { listAllDomains } from "../api/domains";
 import { ApiError } from "../api/http";
 import { isAdmin } from "../api/session";
-import { createSystem, deleteSystem, listSystems, updateSystem, type SystemResponse } from "../api/systems";
+import { createSystem, deleteSystem, detachSystemToadieSource, listSystems, updateSystem, type SystemResponse } from "../api/systems";
 import ClearableTextInput from "../components/ClearableTextInput";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import EmptyState from "../components/EmptyState";
@@ -18,6 +18,7 @@ import PaginationBar from "../components/PaginationBar";
 import RowActionsMenu from "../components/RowActionsMenu";
 import SortHeader from "../components/SortHeader";
 import TableLoadingRow from "../components/TableLoadingRow";
+import ToadieRegistrySourceStatus from "../components/ToadieRegistrySourceStatus";
 import { useDeleteConfirm } from "../hooks/useDeleteConfirm";
 import { usePagedSort } from "../hooks/usePagedSort";
 import { isString, useStoredState } from "../hooks/useStoredState";
@@ -75,7 +76,7 @@ export default function Systems() {
     successMessage: t("systems.toast.deleted"),
   });
 
-  const columnCount = admin ? 5 : 4;
+  const columnCount = admin ? 6 : 5;
 
   return (
     <Stack gap="md">
@@ -115,6 +116,7 @@ export default function Systems() {
             <SortHeader field="domainId" label={t("systems.field.domain")} activeField={sortField} activeDir={sortDir} onToggle={toggleSort} />
             <Table.Th>{t("common.field.description")}</Table.Th>
             <Table.Th>{t("systems.column.contracts")}</Table.Th>
+            <Table.Th>{t("toadie.registry.source")}</Table.Th>
             {admin && <Table.Th aria-label={t("common.table.operations")} style={{ width: 1 }} />}
           </Table.Tr>
         </Table.Thead>
@@ -122,8 +124,9 @@ export default function Systems() {
           {isLoading && !data ? (
             <TableLoadingRow colSpan={columnCount} />
           ) : data && data.items.length > 0 ? (
-            data.items.map((system) => (
-              <Table.Tr key={system.id}>
+            data.items.map((system) => {
+              const source = system.source;
+              return <Table.Tr key={system.id}>
                 <Table.Td>
                   <Text size="sm" fw={500}>
                     {system.name}
@@ -140,6 +143,10 @@ export default function Systems() {
                 <Table.Td>
                   <Text size="sm">{system.contractCount}</Text>
                 </Table.Td>
+                <Table.Td><ToadieRegistrySourceStatus source={source} compact={!admin} onDetach={admin && source ? async () => {
+                  await detachSystemToadieSource(system.id);
+                  await Promise.all([queryClient.invalidateQueries({ queryKey: ["systems"] }), queryClient.invalidateQueries({ queryKey: ["toadie"] })]);
+                } : undefined} /></Table.Td>
                 {admin && (
                   <Table.Td style={{ width: 1 }} ta="right">
                     <RowActionsMenu label={t("common.table.operationsAria", { name: system.name })}>
@@ -153,8 +160,8 @@ export default function Systems() {
                     </RowActionsMenu>
                   </Table.Td>
                 )}
-              </Table.Tr>
-            ))
+              </Table.Tr>;
+            })
           ) : !isError ? (
             <Table.Tr>
               <Table.Td colSpan={columnCount}>
@@ -215,6 +222,7 @@ function SystemEditorModal({
       : { domainId: defaultDomainId, name: "", description: "" },
     validate: { ...rules, domainId: (v) => (v ? null : t("systems.validation.domainRequired")) },
   });
+  const source = target?.source;
 
   async function save(values: SystemFormValues) {
     setError(null);
@@ -240,15 +248,17 @@ function SystemEditorModal({
     <Modal closeButtonProps={{ "aria-label": t("common.action.close") }} opened onClose={onClose} title={target ? t("systems.editTitle") : t("systems.createTitle")} centered>
       <form onSubmit={form.onSubmit(save)} noValidate>
         <Stack>
+          {source && <Alert color="gray" variant="light">{t("toadie.registry.metadataLocked")}{!source.descriptionSynced && ` ${t("toadie.registry.descriptionLocal")}`}</Alert>}
           <Select
             label={t("systems.field.domain")}
             description={target ? t("systems.field.domainMoveHint") : undefined}
             data={domainOptions}
             searchable
+            disabled={Boolean(source)}
             allowDeselect={false}
             {...form.getInputProps("domainId")}
           />
-          <TextInput label={t("common.field.name")} maxLength={MAX_REGISTRY_NAME_LENGTH} data-autofocus {...form.getInputProps("name")} />
+          <TextInput label={t("common.field.name")} maxLength={MAX_REGISTRY_NAME_LENGTH} data-autofocus disabled={Boolean(source)} {...form.getInputProps("name")} />
           <Textarea
             label={t("common.field.description")}
             autosize
@@ -256,6 +266,7 @@ function SystemEditorModal({
             maxLength={MAX_REGISTRY_DESCRIPTION_LENGTH}
             description={charCountDescription(form.values.description.length, MAX_REGISTRY_DESCRIPTION_LENGTH)}
             inputWrapperOrder={["label", "input", "description", "error"]}
+            disabled={source?.descriptionSynced === true}
             {...form.getInputProps("description")}
           />
           {error && (

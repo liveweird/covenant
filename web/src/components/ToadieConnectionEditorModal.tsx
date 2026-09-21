@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Accordion, Alert, Button, Group, Modal, NumberInput, PasswordInput, Stack, Switch, TextInput } from "@mantine/core";
+import { Accordion, Alert, Button, Checkbox, Group, Modal, NumberInput, PasswordInput, Stack, Switch, Text, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { createToadieConnection, updateToadieConnection, type ToadieConnection } from "../api/toadie";
 import { EMPTY_TOADIE_FORM, fromToadieConnection, MAX_TOADIE_NAME_LENGTH, toadieFormValidation, toadieSaveErrorMessage, toToadieRequest, type ToadieFormValues } from "../utils/toadieForm";
@@ -57,6 +57,24 @@ export default function ToadieConnectionEditorModal({ target, onClose, onSaved }
                   <TextInput label={t("toadie.field.providesRelation")} {...form.getInputProps("providesRelation")} />
                   <TextInput label={t("toadie.field.consumesRelation")} {...form.getInputProps("consumesRelation")} />
                   <TextInput label={t("toadie.field.systemRelation")} {...form.getInputProps("systemRelation")} />
+                </Stack>
+              </Accordion.Panel>
+            </Accordion.Item>
+            <Accordion.Item value="registryMapping">
+              <Accordion.Control>{t("toadie.registry.configTitle")}</Accordion.Control>
+              <Accordion.Panel>
+                <Stack gap="sm">
+                  <Switch label={t("toadie.registry.enabled")} description={t("toadie.registry.enabledHint")} {...form.getInputProps("registryEnabled", { type: "checkbox" })} />
+                  {form.values.registryEnabled && <>
+                    <TextInput label={t("toadie.registry.domainBlueprint")} {...form.getInputProps("registryMapping.domainBlueprint")} />
+                    <TextInput label={t("toadie.registry.systemDomainRelation")} description={t("toadie.registry.optionalHint")} {...form.getInputProps("registryMapping.systemDomainRelation")} />
+                    <TextInput label={t("toadie.registry.domainParentRelation")} description={t("toadie.registry.parentRelationHint")} {...form.getInputProps("registryMapping.domainParentRelation")} />
+                    <TextInput label={t("toadie.registry.domainDescriptionProperty")} description={t("toadie.registry.optionalHint")} {...form.getInputProps("registryMapping.domainDescriptionProperty")} />
+                    <TextInput label={t("toadie.registry.systemDescriptionProperty")} description={t("toadie.registry.optionalHint")} {...form.getInputProps("registryMapping.systemDescriptionProperty")} />
+                    <TextInput label={t("toadie.registry.teamDescriptionProperty")} description={t("toadie.registry.optionalHint")} {...form.getInputProps("registryMapping.teamDescriptionProperty")} />
+                    <Alert color="orange" variant="light"><Text size="sm">{t("toadie.registry.flattenWarning")}</Text></Alert>
+                    <Checkbox label={t("toadie.registry.flattenAcknowledge")} {...form.getInputProps("registryMapping.flattenDomains", { type: "checkbox" })} />
+                  </>}
                 </Stack>
               </Accordion.Panel>
             </Accordion.Item>

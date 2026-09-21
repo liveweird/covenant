@@ -54,8 +54,23 @@ describe("Toadie connection form", () => {
       enabled: true,
       refreshIntervalMinutes: 60,
       mapping: CONNECTION.mapping,
+      registryMapping: null,
     });
     expect(toToadieRequest({ ...values, apiKey: " replacement " })).toHaveProperty("apiKey", "replacement");
+  });
+
+  test("requires explicit flattening acknowledgement and serializes optional registry mapping fields", () => {
+    const values = { ...EMPTY_TOADIE_FORM, registryEnabled: true, registryMapping: { ...EMPTY_TOADIE_FORM.registryMapping } };
+    expect(toadieFormValidation(i18n.t, null).registryMapping.flattenDomains(false, values)).toBe("Acknowledge that nested Toadie domains will be flattened");
+    expect(toToadieRequest({ ...values, registryMapping: { ...values.registryMapping, flattenDomains: true, systemDomainRelation: "", domainDescriptionProperty: "summary" } }).registryMapping).toEqual({
+      domainBlueprint: "domain",
+      systemDomainRelation: null,
+      domainParentRelation: "parent_domain",
+      flattenDomains: true,
+      domainDescriptionProperty: "summary",
+      systemDescriptionProperty: null,
+      teamDescriptionProperty: null,
+    });
   });
 
   test("shows a server validation detail inline", () => {

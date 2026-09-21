@@ -51,3 +51,11 @@ contract mappings and usage. Connection create/update/delete/manual refresh requ
 Contract mapping PUT and contract usage refresh require the contract writer before body decoding;
 link writes recheck current ownership/membership in the committing transaction. Imported Port
 teams are informational and never grant Covenant permissions. Toadie keys remain server-side.
+
+**Registry sources (1.0.0).** Optional Port domain/system/team metadata synchronization is
+ADMIN-only for mapping, candidates, preview, apply and source detach; the guard precedes
+body/parameter validation. Authenticated users may read source summaries on ordinary registry
+responses. Source-owned names/descriptions/system placement reject conflicting local PUTs with
+409; an ADMIN may detach and then edit locally. Roster membership, user accounts and contract
+ownership assignments are never synchronized. Imported teams start without members; linking
+an existing team preserves its roster and therefore its existing contract permissions.

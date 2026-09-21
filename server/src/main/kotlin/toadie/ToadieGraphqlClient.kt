@@ -20,7 +20,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.io.ByteArrayOutputStream
 
 /**
- * Read-only, fixed GraphQL operations against an ADMIN-curated endpoint. No result properties,
+ * Read-only, fixed GraphQL operations against an ADMIN-curated endpoint. No unmapped properties,
  * credentials, arbitrary query text, or upstream error messages escape into the local cache.
  * A refresh is all-or-nothing. Remote numbered pages are observations, not a transaction snapshot.
  */
@@ -75,7 +75,8 @@ class HttpToadieGraphqlClient(
 
     private suspend fun readSnapshot(config: ToadieFetchConfig, budget: ReadBudget): ToadieSnapshot {
         val revision = RevisionTracker()
-        val blueprints = pages(config, "blueprints", BLUEPRINT_FIELDS, null, budget, revision)
+        val blueprintFields = BLUEPRINT_FIELDS + if (config.registryMapping == null) "" else " schema"
+        val blueprints = pages(config, "blueprints", blueprintFields, null, budget, revision)
         val mapping = config.mapping
         fun blueprint(identifier: String): JsonNode = blueprints.singleOrNull {
             text(it, "identifier").equals(identifier, ignoreCase = true)
@@ -91,15 +92,23 @@ class HttpToadieGraphqlClient(
         val systemName = relationTarget(definitions, mapping.systemRelation, many = false)
         if (text(blueprint(systemName), "identifier") != systemName) fail("MAPPING_INVALID")
         blueprint("_team")
+        val registry = config.registryMapping?.let {
+            ToadieRegistryProjection(it, blueprints, systemName, setOf(apiName, serviceName, systemName, "_team"))
+        }
         val relationKeys = setOf(mapping.providesRelation, mapping.consumesRelation, mapping.systemRelation)
-        val entities = linkedSetOf(apiName, serviceName, systemName, "_team").flatMap { name ->
-            pages(config, "entities", ENTITY_FIELDS, name, budget, revision).map {
-                parseEntity(it, name, if (name == serviceName) relationKeys else emptySet())
+        val names = linkedSetOf(apiName, serviceName, systemName, "_team").apply { registry?.let { add(it.domainName) } }
+        val entities = names.flatMap { name ->
+            val keys = (if (name == serviceName) relationKeys else emptySet()) + registry?.relationKeys(name).orEmpty()
+            val fields = ENTITY_FIELDS + if (registry?.readsDescription(name) == true) " properties" else ""
+            pages(config, "entities", fields, name, budget, revision).map {
+                val entity = parseEntity(it, name, keys)
+                registry?.project(it, entity) ?: entity
             }
         }
         if (entities.size > maxEntities || entities.map { it.id }.toSet().size != entities.size) fail("LIMIT_EXCEEDED")
         revision.observe(revisionProbe(config, budget))
         validateReferences(entities, serviceName, apiName, systemName, mapping)
+        registry?.validateReferences(entities)
         return ToadieSnapshot(entities, systemName, System.currentTimeMillis(), checkNotNull(revision.value))
     }
 

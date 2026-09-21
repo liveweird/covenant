@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconPencil, IconUserMinus, IconUserPlus, IconUsersGroup } from "@tabler/icons-react";
 import { ApiError } from "../api/http";
 import { isAdmin } from "../api/session";
-import { addTeamMember, getTeam, removeTeamMember, type TeamMember } from "../api/teams";
+import { addTeamMember, detachTeamToadieSource, getTeam, removeTeamMember, type TeamMember } from "../api/teams";
 import { listUsers } from "../api/users";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import EditPageLoadState from "../components/EditPageLoadState";
@@ -15,6 +15,7 @@ import EmptyState from "../components/EmptyState";
 import PageHeader from "../components/PageHeader";
 import RowActionsMenu from "../components/RowActionsMenu";
 import TeamEditorModal from "../components/TeamEditorModal";
+import ToadieRegistrySourceStatus from "../components/ToadieRegistrySourceStatus";
 import { useDeleteConfirm } from "../hooks/useDeleteConfirm";
 import { CONTENT_MAX_WIDTH } from "../utils/layout";
 import { loadErrorMessage, saveErrorMessage } from "../utils/saveError";
@@ -60,6 +61,7 @@ export default function TeamDetails() {
     );
   }
   const data = team.data;
+  const source = data.source;
 
   return (
     <Stack gap="md">
@@ -75,6 +77,10 @@ export default function TeamDetails() {
           )
         }
       />
+      {source && <Box maw={CONTENT_MAX_WIDTH}><ToadieRegistrySourceStatus source={source} onDetach={admin ? async () => {
+        await detachTeamToadieSource(id);
+        await refresh();
+      } : undefined} /></Box>}
       <Box maw={CONTENT_MAX_WIDTH}>
         <Stack>
           {admin && <AddMemberPicker teamId={id} memberIds={memberIds} onAdded={refresh} />}

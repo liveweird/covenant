@@ -77,6 +77,20 @@ reader for optional declared adoption entities. Toadie's narrower key scopes and
 change feed were declined upstream; they are not pending Covenant prerequisites. Adoption
 blueprints are importable ontology definitions, so absence must remain valid.
 
+## Registry synchronization from Toadie
+
+Version **1.0.0** adds opt-in one-way metadata synchronization for selected Port domains,
+systems and teams: explicit import/link preview, stable local IDs, source-owned metadata,
+automatic refresh and visible missing/conflict states. System placement follows linked
+source domains with an explicit fallback for domainless systems. Local team rosters,
+permissions, contract assignments and local-only registries remain supported. No Toadie
+code changes are required. See [the design and operating rules](.claude/docs/toadie-registry-sync.md).
+
+Verification passed: 473 backend tests with build, static, coverage and API conformance gates;
+635 frontend tests with build/static/coverage gates; eight relevant browser journeys, including
+registry import/link, refresh, source disappearance and detach; and independent review.
+The app version and bilingual changelog are updated to 1.0.0.
+
 ## Deferred
 
 Related cross-project proposals are collected in the

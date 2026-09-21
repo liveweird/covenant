@@ -21,7 +21,27 @@ data class ToadieMapping(
 )
 
 @Serializable
+data class ToadieRegistryMapping(
+    val domainBlueprint: String = "domain",
+    val systemDomainRelation: String? = "domain",
+    val domainParentRelation: String? = "parent_domain",
+    val flattenDomains: Boolean,
+    val domainDescriptionProperty: String? = null,
+    val systemDescriptionProperty: String? = null,
+    val teamDescriptionProperty: String? = null,
+)
+
+@Serializable
 enum class ToadieCacheState { UNLINKED, NEVER_SYNCED, CURRENT, STALE, DISABLED, DISCONNECTED }
+
+@Serializable
+enum class ToadieRegistryKind { DOMAIN, SYSTEM, TEAM }
+
+@Serializable
+enum class ToadieRegistrySourceStatus { AVAILABLE, MISSING, CONFLICT, DISCONNECTED }
+
+@Serializable
+enum class ToadieRegistryAction { IMPORT, LINK, UPDATE }
 
 @Serializable
 data class ToadieCacheStatus(
@@ -33,6 +53,106 @@ data class ToadieCacheStatus(
 )
 
 @Serializable
+data class ToadieRegistrySource(
+    val connectionId: UInt,
+    val connectionName: String,
+    val entityId: String,
+    val identifier: String,
+    val title: String,
+    val url: String?,
+    val status: ToadieRegistrySourceStatus,
+    val lastSyncedAt: Long?,
+    val lastErrorCode: String?,
+    val descriptionSynced: Boolean,
+    val fallbackDomainId: UInt? = null,
+    val cache: ToadieCacheStatus,
+)
+
+@Serializable
+data class ToadieRegistryCandidate(
+    val entityId: String,
+    val identifier: String,
+    val title: String,
+    val description: String?,
+    val remoteUpdatedAt: Long,
+    val parentEntityId: String?,
+    val parentIdentifier: String?,
+    val parentTitle: String?,
+    val linkedLocalId: UInt?,
+    val linkedLocalName: String?,
+    val fallbackDomainId: UInt? = null,
+    val issues: List<String>,
+)
+
+@Serializable
+data class ToadieRegistryCandidatePageResponse(
+    val items: List<ToadieRegistryCandidate>,
+    val page: Int,
+    val pageSize: Int,
+    val total: Long,
+    val cache: ToadieCacheStatus,
+)
+
+@Serializable
+data class ToadieRegistrySelection(
+    val entityId: String,
+    val localId: UInt? = null,
+    val fallbackDomainId: UInt? = null,
+)
+
+@Serializable
+data class ToadieRegistryPreviewRequest(
+    val kind: ToadieRegistryKind,
+    val items: List<ToadieRegistrySelection>,
+)
+
+@Serializable
+data class ToadieRegistryApplyRequest(
+    val kind: ToadieRegistryKind,
+    val items: List<ToadieRegistrySelection>,
+    val expectedPlanToken: String,
+)
+
+@Serializable
+data class ToadieRegistryLocalState(
+    val name: String,
+    val description: String?,
+    val domainId: UInt?,
+)
+
+@Serializable
+data class ToadieRegistryPreviewItem(
+    val entityId: String,
+    val localId: UInt?,
+    val action: ToadieRegistryAction,
+    val before: ToadieRegistryLocalState?,
+    val after: ToadieRegistryLocalState,
+    val issues: List<String>,
+)
+
+@Serializable
+data class ToadieRegistryPreviewResponse(
+    val kind: ToadieRegistryKind,
+    val cache: ToadieCacheStatus,
+    val planToken: String,
+    val canApply: Boolean,
+    val items: List<ToadieRegistryPreviewItem>,
+)
+
+@Serializable
+data class ToadieRegistryApplyItem(
+    val entityId: String,
+    val localId: UInt,
+    val action: ToadieRegistryAction,
+)
+
+@Serializable
+data class ToadieRegistryApplyResponse(
+    val kind: ToadieRegistryKind,
+    val items: List<ToadieRegistryApplyItem>,
+)
+
+@Serializable
 data class ToadieConnectionRequest(
     val name: String,
     val baseUrl: String,
@@ -41,6 +161,7 @@ data class ToadieConnectionRequest(
     val enabled: Boolean,
     val refreshIntervalMinutes: Int,
     val mapping: ToadieMapping = ToadieMapping(),
+    val registryMapping: ToadieRegistryMapping? = null,
 )
 
 @Serializable
@@ -52,6 +173,7 @@ data class ToadieConnectionResponse(
     val enabled: Boolean,
     val refreshIntervalMinutes: Int,
     val mapping: ToadieMapping,
+    val registryMapping: ToadieRegistryMapping?,
     val hasApiKey: Boolean,
     val createdAt: Long,
     val updatedAt: Long,
@@ -127,6 +249,7 @@ data class ToadieFetchConfig(
     val baseUrl: String,
     val apiKey: String,
     val mapping: ToadieMapping,
+    val registryMapping: ToadieRegistryMapping? = null,
     val knownRevision: Long? = null,
 )
 
@@ -139,6 +262,8 @@ data class ToadieEntitySnapshot(
     val teamIdentifiers: List<String>,
     val relations: Map<String, List<String>>,
     val updatedAt: Long,
+    val registryDescription: String? = null,
+    val registryErrorCode: String? = null,
 )
 
 sealed interface ToadieFetchResult

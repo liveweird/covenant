@@ -38,6 +38,7 @@ export default function TeamEditorModal({
     initialValues: target ? toTeamFormValues(target) : EMPTY_TEAM_FORM,
     validate: teamFormValidation(t),
   });
+  const source = target?.source;
 
   async function save(values: TeamFormValues) {
     setError(null);
@@ -67,10 +68,12 @@ export default function TeamEditorModal({
     <Modal closeButtonProps={{ "aria-label": t("common.action.close") }} opened onClose={onClose} title={target ? t("teams.editTitle") : t("teams.createTitle")} centered>
       <form onSubmit={form.onSubmit(save)} noValidate>
         <Stack>
+          {source && <Alert color="gray" variant="light">{t("toadie.registry.metadataLocked")}{!source.descriptionSynced && ` ${t("toadie.registry.descriptionLocal")}`}</Alert>}
           <TextInput
             label={t("common.field.name")}
             maxLength={MAX_TEAM_NAME_LENGTH}
             data-autofocus
+            disabled={Boolean(source)}
             {...form.getInputProps("name")}
           />
           <Textarea
@@ -80,6 +83,7 @@ export default function TeamEditorModal({
             maxLength={MAX_TEAM_DESCRIPTION_LENGTH}
             description={charCountDescription(form.values.description.length, MAX_TEAM_DESCRIPTION_LENGTH)}
             inputWrapperOrder={["label", "input", "description", "error"]}
+            disabled={source?.descriptionSynced === true}
             {...form.getInputProps("description")}
           />
           {error && (

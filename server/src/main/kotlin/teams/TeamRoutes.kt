@@ -1,6 +1,8 @@
 package ch.nokillswit.teams
 
 import ch.nokillswit.audit.audit
+import ch.nokillswit.toadie.ToadieRegistryKind
+import ch.nokillswit.toadie.detachRegistrySource
 import ch.nokillswit.authz.caller
 import ch.nokillswit.authz.orNotFound
 import ch.nokillswit.authz.requireAdmin
@@ -31,6 +33,7 @@ class TeamsRoute {
     @Serializable
     @Resource("{id}")
     class Id(val parent: TeamsRoute = TeamsRoute(), val id: UInt) {
+        @Serializable @Resource("toadie-source") class ToadieSource(val parent: Id)
         @Serializable
         @Resource("members")
         class Members(val parent: Id) {
@@ -75,6 +78,9 @@ fun Application.configureTeamRoutes() {
                 )
                 call.response.header(HttpHeaders.Location, call.application.href(TeamsRoute.Id(id = id)))
                 call.respond(HttpStatusCode.Created, teamService.read(id).orVanished("Team", id))
+            }
+            delete<TeamsRoute.Id.ToadieSource> { route ->
+                call.detachRegistrySource(ToadieRegistryKind.TEAM, route.parent.id)
             }
             get<TeamsRoute.Id> { route ->
                 call.caller()

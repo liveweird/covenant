@@ -5,6 +5,7 @@ import ch.nokillswit.infra.validation.sanitizeSingleLine
 import ch.nokillswit.infra.validation.requireNameAndDescription
 import ch.nokillswit.infra.validation.sanitizedDescription
 import kotlinx.serialization.Serializable
+import ch.nokillswit.toadie.ToadieRegistrySource
 
 /**
  * Domains (V7): the top of the Domain → System → Contract hierarchy — an ADMIN-curated
@@ -29,6 +30,7 @@ data class DomainResponse(
     val systemCount: Int,
     val createdAt: Long,
     val updatedAt: Long,
+    val source: ToadieRegistrySource? = null,
 )
 
 typealias DomainPageResponse = PageResponse<DomainResponse>

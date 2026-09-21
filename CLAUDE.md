@@ -68,6 +68,16 @@ infers version adoption. See `.claude/docs/toadie-integration.md` for mapping, t
 concurrency, cache semantics and deployment. The SPA adds Toadie connection administration
 and a Usage from Toadie panel on contract details.
 
+### Registry synchronization from Toadie (1.0.0)
+
+An optional per-connection mapping lets ADMIN preview and import or explicitly link selected
+Port domains, systems and teams. Linked names and configured descriptions follow Toadie;
+system placement follows mapped domains with an explicit fallback for domainless systems.
+Refresh reconciles existing links and exposes conflicts or missing sources while preserving
+local records, contracts and Environments. Team rosters and all permissions remain local.
+V23 adds registry configuration, snapshot projections and source bindings. Read
+`.claude/docs/toadie-registry-sync.md` for projection, preview concurrency, locking and ownership.
+
 ### Shareable migration and impact reports (0.15.0)
 
 The release-line migration-report endpoint returns the saved plan and complete cached declared

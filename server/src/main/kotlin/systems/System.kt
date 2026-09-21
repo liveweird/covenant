@@ -5,6 +5,7 @@ import ch.nokillswit.infra.validation.sanitizeSingleLine
 import ch.nokillswit.infra.validation.requireNameAndDescription
 import ch.nokillswit.infra.validation.sanitizedDescription
 import kotlinx.serialization.Serializable
+import ch.nokillswit.toadie.ToadieRegistrySource
 
 /**
  * Systems (V8): the application exposing contracts, inside exactly one Domain — the middle of
@@ -33,6 +34,7 @@ data class SystemResponse(
     val contractCount: Int,
     val createdAt: Long,
     val updatedAt: Long,
+    val source: ToadieRegistrySource? = null,
 )
 
 typealias SystemPageResponse = PageResponse<SystemResponse>

@@ -1,6 +1,8 @@
 package ch.nokillswit.systems
 
 import ch.nokillswit.audit.audit
+import ch.nokillswit.toadie.ToadieRegistryKind
+import ch.nokillswit.toadie.detachRegistrySource
 import ch.nokillswit.authz.caller
 import ch.nokillswit.authz.orNotFound
 import ch.nokillswit.authz.requireAdmin
@@ -30,7 +32,9 @@ import kotlinx.serialization.Serializable
 class SystemsRoute {
     @Serializable
     @Resource("{id}")
-    class Id(val parent: SystemsRoute = SystemsRoute(), val id: UInt)
+    class Id(val parent: SystemsRoute = SystemsRoute(), val id: UInt) {
+        @Serializable @Resource("toadie-source") class ToadieSource(val parent: Id)
+    }
 }
 
 fun Application.configureSystemRoutes() {
@@ -61,6 +65,9 @@ fun Application.configureSystemRoutes() {
                 )
                 call.response.header(HttpHeaders.Location, call.application.href(SystemsRoute.Id(id = id)))
                 call.respond(HttpStatusCode.Created, systemService.read(id).orVanished("System", id))
+            }
+            delete<SystemsRoute.Id.ToadieSource> { route ->
+                call.detachRegistrySource(ToadieRegistryKind.SYSTEM, route.parent.id)
             }
             get<SystemsRoute.Id> { route ->
                 call.caller()

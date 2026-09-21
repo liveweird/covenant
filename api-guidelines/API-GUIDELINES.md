@@ -147,6 +147,11 @@ deleted resource behaves exactly like a missing one.
 **Check:** double-DELETE yields `204` then `404`; soft-deleted rows are invisible to every
 read and unmodifiable by every write.
 
+**Narrow optional-link exception (Covenant 1.0.0):** deleting a registry's `toadie-source`
+means ensuring its metadata is locally managed. An active, already-local domain/system/team
+therefore answers `204` on repeated detach; a missing or soft-deleted parent still answers
+`404`. This does not change deletion semantics for the registry itself.
+
 ---
 
 ## API-VER — Versioning & compatibility
@@ -694,6 +699,12 @@ do not add conditional-write requirements to existing document-save endpoints.
 Toadie connection PUT and contract-link PUT are full replacements with serialized writes and
 last-write-wins semantics. Connection refresh publication additionally compares a unique claim
 token and configuration revision while holding the connection lock; stale work cannot publish.
+
+Registry sync preview tokens bind the selected source IDs, configuration/source revision,
+bindings and relevant local metadata. Apply recomputes the plan while holding the connection
+lock and the shared registry writer lock, and rejects changed plans with `409`. The writer
+lock also serializes ordinary registry identity/placement edits and source detachment;
+rosters remain independent. Automatic reconciliation uses the existing refresh-claim guards.
 
 
 Per API-CACHE-003, each concurrency-sensitive write documents its defense (updated 2026-09-20

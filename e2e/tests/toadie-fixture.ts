@@ -16,8 +16,15 @@ export async function startToadieFixture() {
       provides_apis: { target: "api", many: true }, consumes_apis: { target: "api", many: true },
       system: { target: "system", many: false },
     } },
-    { id: "3", identifier: "system", relations: {} },
-    { id: "4", identifier: "_team", relations: {} },
+    { id: "3", identifier: "system", schema: { properties: { description: { type: "string" } } }, relations: {
+      domain: { target: "domain", many: false },
+    } },
+    { id: "4", identifier: "_team", schema: { properties: { description: { type: "string" } } }, relations: {
+      parent: { target: "_team", many: false },
+    } },
+    { id: "5", identifier: "domain", schema: { properties: { description: { type: "string" } } }, relations: {
+      parent_domain: { target: "domain", many: false },
+    } },
   ];
   const entities = [
     { id: "1", blueprint: "api", identifier: "orders", title: "Orders API", relations: {} },
@@ -26,9 +33,12 @@ export async function startToadieFixture() {
       relations: { provides_apis: ["orders", "events"], system: "commerce" } },
     { id: "4", blueprint: "service", identifier: "storefront", title: "Storefront website", team: "retail",
       relations: { consumes_apis: ["orders", "events"], system: "commerce" } },
-    { id: "5", blueprint: "system", identifier: "commerce", title: "Commerce system", relations: {} },
+    { id: "5", blueprint: "system", identifier: "commerce", title: "Commerce system", relations: { domain: "commerce" } },
     { id: "6", blueprint: "_team", identifier: "retail", title: "Retail team", relations: {} },
-  ].map((entity) => ({ team: null, updatedAt: 1, ...entity }));
+    { id: "7", blueprint: "domain", identifier: "commerce", title: "Commerce domain", relations: { parent_domain: "enterprise" } },
+    { id: "8", blueprint: "domain", identifier: "enterprise", title: "Enterprise domain", relations: {} },
+    { id: "9", blueprint: "system", identifier: "unassigned", title: "Unassigned system", relations: {} },
+  ].map((entity) => ({ team: null, updatedAt: 1, properties: { description: `Description of ${entity.title}` }, ...entity }));
   const server: Server = createServer(async (req, res) => {
     if (req.url !== "/integration/graphql" || req.method !== "POST" || req.headers.authorization !== `Bearer ${key}`) {
       res.writeHead(401).end();
@@ -79,6 +89,22 @@ export async function startToadieFixture() {
     },
     clearRequests: () => { requests.length = 0; },
     requests: () => [...requests],
+    renameEntity: (id: string, title: string) => {
+      const entity = entities.find((candidate) => candidate.id === id);
+      if (!entity) throw new Error(`Fixture entity ${id} is missing`);
+      entity.title = title;
+      entity.updatedAt += 1;
+      revisionNumber += 1;
+    },
+    removeEntity: (id: string) => {
+      const index = entities.findIndex((entity) => entity.id === id);
+      if (index < 0) throw new Error(`Fixture entity ${id} is missing`);
+      if (entities[index].blueprint === "_team") {
+        entities.forEach((entity) => { entity.team = null; });
+      }
+      entities.splice(index, 1);
+      revisionNumber += 1;
+    },
     close: () => new Promise<void>((resolve, reject) => {
       server.closeAllConnections();
       server.close((error) => error ? reject(error) : resolve());

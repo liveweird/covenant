@@ -6,7 +6,7 @@ import { useDebouncedValue } from "@mantine/hooks";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconPencil, IconPlus, IconTrash, IconUsersGroup } from "@tabler/icons-react";
 import { isAdmin } from "../api/session";
-import { deleteTeam, getTeam, listTeams, type TeamListItem, type TeamResponse } from "../api/teams";
+import { deleteTeam, detachTeamToadieSource, getTeam, listTeams, type TeamListItem, type TeamResponse } from "../api/teams";
 import ClearableTextInput from "../components/ClearableTextInput";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import EmptyState from "../components/EmptyState";
@@ -17,6 +17,7 @@ import RowActionsMenu from "../components/RowActionsMenu";
 import SortHeader from "../components/SortHeader";
 import TableLoadingRow from "../components/TableLoadingRow";
 import TeamEditorModal from "../components/TeamEditorModal";
+import ToadieRegistrySourceStatus from "../components/ToadieRegistrySourceStatus";
 import { useDeleteConfirm } from "../hooks/useDeleteConfirm";
 import { usePagedSort } from "../hooks/usePagedSort";
 import { isString, useStoredState } from "../hooks/useStoredState";
@@ -66,7 +67,7 @@ export default function Teams() {
   });
 
   const total = data?.total ?? 0;
-  const columnCount = admin ? 4 : 3;
+  const columnCount = admin ? 5 : 4;
 
   return (
     <Stack gap="md">
@@ -103,6 +104,7 @@ export default function Teams() {
             <SortHeader field="name" label={t("common.field.name")} activeField={sortField} activeDir={sortDir} onToggle={toggleSort} />
             <Table.Th>{t("common.field.description")}</Table.Th>
             <Table.Th>{t("teams.column.members")}</Table.Th>
+            <Table.Th>{t("toadie.registry.source")}</Table.Th>
             {admin && <Table.Th aria-label={t("common.table.operations")} style={{ width: 1 }} />}
           </Table.Tr>
         </Table.Thead>
@@ -110,8 +112,9 @@ export default function Teams() {
           {isLoading && !data ? (
             <TableLoadingRow colSpan={columnCount} />
           ) : data && data.items.length > 0 ? (
-            data.items.map((team) => (
-              <Table.Tr key={team.id}>
+            data.items.map((team) => {
+              const source = team.source;
+              return <Table.Tr key={team.id}>
                 <Table.Td>
                   {/* The name is the way into the roster — a real link (the detail-link rule). */}
                   <Anchor component={RouterLink} to={teamPath(team.id)} fw={500} size="sm" aria-label={t("teams.openAria", { name: team.name })}>
@@ -126,6 +129,10 @@ export default function Teams() {
                 <Table.Td>
                   <Text size="sm">{team.memberCount}</Text>
                 </Table.Td>
+                <Table.Td><ToadieRegistrySourceStatus source={source} compact={!admin} onDetach={admin && source ? async () => {
+                  await detachTeamToadieSource(team.id);
+                  await Promise.all([queryClient.invalidateQueries({ queryKey: ["teams"] }), queryClient.invalidateQueries({ queryKey: ["toadie"] })]);
+                } : undefined} /></Table.Td>
                 {admin && (
                   <Table.Td style={{ width: 1 }} ta="right">
                     <RowActionsMenu label={t("common.table.operationsAria", { name: team.name })}>
@@ -151,8 +158,8 @@ export default function Teams() {
                     </RowActionsMenu>
                   </Table.Td>
                 )}
-              </Table.Tr>
-            ))
+              </Table.Tr>;
+            })
           ) : !isError ? (
             <Table.Tr>
               <Table.Td colSpan={columnCount}>

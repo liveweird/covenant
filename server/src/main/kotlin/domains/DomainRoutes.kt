@@ -1,6 +1,8 @@
 package ch.nokillswit.domains
 
 import ch.nokillswit.audit.audit
+import ch.nokillswit.toadie.ToadieRegistryKind
+import ch.nokillswit.toadie.detachRegistrySource
 import ch.nokillswit.authz.caller
 import ch.nokillswit.authz.orNotFound
 import ch.nokillswit.authz.requireAdmin
@@ -29,7 +31,9 @@ import kotlinx.serialization.Serializable
 class DomainsRoute {
     @Serializable
     @Resource("{id}")
-    class Id(val parent: DomainsRoute = DomainsRoute(), val id: UInt)
+    class Id(val parent: DomainsRoute = DomainsRoute(), val id: UInt) {
+        @Serializable @Resource("toadie-source") class ToadieSource(val parent: Id)
+    }
 }
 
 fun Application.configureDomainRoutes() {
@@ -55,6 +59,9 @@ fun Application.configureDomainRoutes() {
                 audit("domain.created", "byUserId" to caller.userId.toLong(), "domainId" to id.toLong(), "name" to request.name)
                 call.response.header(HttpHeaders.Location, call.application.href(DomainsRoute.Id(id = id)))
                 call.respond(HttpStatusCode.Created, domainService.read(id).orVanished("Domain", id))
+            }
+            delete<DomainsRoute.Id.ToadieSource> { route ->
+                call.detachRegistrySource(ToadieRegistryKind.DOMAIN, route.parent.id)
             }
             get<DomainsRoute.Id> { route ->
                 call.caller()

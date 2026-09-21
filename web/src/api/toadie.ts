@@ -13,6 +13,14 @@ export type ToadieEntityRef = ToadieEntityPage["items"][number];
 export type ToadieLinks = paths["/api/v1/contracts/{contractId}/toadie-links"]["get"]["responses"]["200"]["content"]["application/json"];
 export type ToadieLinksBody = paths["/api/v1/contracts/{contractId}/toadie-links"]["put"]["requestBody"]["content"]["application/json"];
 export type ToadieUsage = paths["/api/v1/contracts/{contractId}/toadie-usage"]["get"]["responses"]["200"]["content"]["application/json"];
+export type ToadieRegistryKind = components["schemas"]["ToadieRegistryKind"];
+export type ToadieRegistrySource = components["schemas"]["ToadieRegistrySource"];
+export type ToadieRegistryCandidate = components["schemas"]["ToadieRegistryCandidate"];
+export type ToadieRegistryCandidatePage = components["schemas"]["ToadieRegistryCandidatePage"];
+export type ToadieRegistrySyncSelection = components["schemas"]["ToadieRegistrySelection"];
+export type ToadieRegistrySyncBody = components["schemas"]["ToadieRegistryPreviewRequest"];
+export type ToadieRegistrySyncPreview = components["schemas"]["ToadieRegistryPreviewResponse"];
+export type ToadieRegistrySyncResult = components["schemas"]["ToadieRegistryApplyResponse"];
 
 export async function listToadieConnections(q: { page: number; pageSize: number; sort?: string }): Promise<ToadieConnectionPage> {
   const params = buildQuery(q);
@@ -55,4 +63,17 @@ export async function getContractToadieUsage(contractId: number, q: { page: numb
 
 export async function refreshContractToadieUsage(contractId: number): Promise<void> {
   await voidRequest(`/api/v1/contracts/${contractId}/toadie-usage/refresh`, { method: "POST" });
+}
+
+export async function listToadieRegistryCandidates(id: number, q: { kind: ToadieRegistryKind; page: number; pageSize: number; q?: string }): Promise<ToadieRegistryCandidatePage> {
+  const params = buildQuery(q);
+  return jsonRequest<ToadieRegistryCandidatePage>(`/api/v1/toadie-connections/${id}/registry-candidates?${params}`);
+}
+
+export async function previewToadieRegistrySync(id: number, body: ToadieRegistrySyncBody): Promise<ToadieRegistrySyncPreview> {
+  return jsonRequest<ToadieRegistrySyncPreview>(`/api/v1/toadie-connections/${id}/registry-sync/preview`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function applyToadieRegistrySync(id: number, body: components["schemas"]["ToadieRegistryApplyRequest"]): Promise<ToadieRegistrySyncResult> {
+  return jsonRequest<ToadieRegistrySyncResult>(`/api/v1/toadie-connections/${id}/registry-sync`, { method: "POST", body: JSON.stringify(body) });
 }

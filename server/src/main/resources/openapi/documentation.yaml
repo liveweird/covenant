@@ -601,7 +601,7 @@ paths:
       tags: [teams]
       operationId: updateTeam
       summary: Rename / re-describe a team
-      description: ADMIN only, guard before the id lookup (uniform 403). The roster is managed per member below.
+      description: "ADMIN only, guard before the id lookup (uniform 403). The roster is managed per member below. Source-managed names, configured descriptions and system placement cannot change locally; detach the source first (409)."
       requestBody:
         required: true
         content:
@@ -750,6 +750,7 @@ paths:
       operationId: updateDomain
       summary: Replace a domain
       description: |
+        Source-managed names, configured descriptions and system placement cannot change locally; detach the source first (409).
         ADMIN only, guard before the id lookup (uniform 403). Full replace.
       requestBody:
         required: true
@@ -868,6 +869,7 @@ paths:
       operationId: updateSystem
       summary: Replace a system
       description: |
+        Source-managed names, configured descriptions and system placement cannot change locally; detach the source first (409).
         ADMIN only, guard before the id lookup (uniform 403). Full replace — a changed `domainId` MOVES the system to another domain.
       requestBody:
         required: true
@@ -1022,6 +1024,195 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/toadie-connections/{id}/registry-candidates:
+    parameters:
+    - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags:
+      - toadie
+      operationId: listToadieRegistryCandidates
+      summary: List cached Port registry candidates
+      description: ADMIN only. Requires registry mapping and a complete cached projection; stale cached candidates may be browsed.
+        q searches identifier and title case- and accent-insensitively. Sortable fields are id and title; default id ascending.
+        Parent refers to the domain parent, system domain, or team parent according to kind. No remote request or local mutation
+        occurs.
+      responses:
+        '200':
+          description: Result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToadieRegistryCandidatePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      parameters:
+      - name: kind
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/ToadieRegistryKind'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - $ref: '#/components/parameters/Sort'
+      - $ref: '#/components/parameters/Q'
+  /api/v1/toadie-connections/{id}/registry-sync/preview:
+    parameters:
+    - $ref: '#/components/parameters/ResourceId'
+    post:
+      tags:
+      - toadie
+      operationId: previewToadieRegistrySync
+      summary: Preview selected registry imports or links
+      description: ADMIN only. Read-only local snapshot; requires a current complete cache. Select 1-50 records of one kind;
+        duplicate source or local IDs are invalid. Domains must be linked before systems. Names never establish identity. The
+        opaque plan token binds configuration, source revision and relevant local state. Issues are returned per item; canApply
+        is false when any conflict exists.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToadieRegistryPreviewRequest'
+      responses:
+        '200':
+          description: Result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToadieRegistryPreviewResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/toadie-connections/{id}/registry-sync:
+    parameters:
+    - $ref: '#/components/parameters/ResourceId'
+    post:
+      tags:
+      - toadie
+      operationId: applyToadieRegistrySync
+      summary: Apply a previewed registry selection
+      description: ADMIN only. Atomically imports, links or updates the complete selection, retaining existing local IDs, contracts,
+        Environments, rosters and ownership. Requires a current complete cache and matching preview token; changed state or
+        conflicts return 409 with no partial writes. Names and configured descriptions follow the source; systems follow a linked
+        source domain or an explicit fallback when no remote domain is declared. Existing binding uniqueness prevents duplicate
+        imports. At most 5000 bindings per connection.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToadieRegistryApplyRequest'
+      responses:
+        '200':
+          description: Result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToadieRegistryApplyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/domains/{id}/toadie-source:
+    parameters:
+    - $ref: '#/components/parameters/ResourceId'
+    delete:
+      tags:
+      - domains
+      operationId: detachDomainToadieSource
+      summary: Detach a domain from its Port source
+      description: ADMIN only. Retains the local ID, current metadata and all dependents. Source-owned fields become locally
+        editable. An already-local active record also returns 204; missing or deleted records return 404.
+      responses:
+        '204':
+          description: Detached, or already locally managed
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/systems/{id}/toadie-source:
+    parameters:
+    - $ref: '#/components/parameters/ResourceId'
+    delete:
+      tags:
+      - systems
+      operationId: detachSystemToadieSource
+      summary: Detach a system from its Port source
+      description: ADMIN only. Retains the local ID, current metadata and all dependents. Source-owned fields become locally
+        editable. An already-local active record also returns 204; missing or deleted records return 404.
+      responses:
+        '204':
+          description: Detached, or already locally managed
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/teams/{id}/toadie-source:
+    parameters:
+    - $ref: '#/components/parameters/ResourceId'
+    delete:
+      tags:
+      - teams
+      operationId: detachTeamToadieSource
+      summary: Detach a team from its Port source
+      description: ADMIN only. Retains the local ID, current metadata and all dependents. Source-owned fields become locally
+        editable. An already-local active record also returns 204; missing or deleted records return 404.
+      responses:
+        '204':
+          description: Detached, or already locally managed
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/toadie-connections:
     get:
       tags: [toadie]
@@ -1076,7 +1267,7 @@ paths:
       tags: [toadie]
       operationId: updateToadieConnection
       summary: Replace a Toadie connection
-      description: ADMIN only. Omitted API key retains the encrypted value. The base URL is immutable; mapping changes invalidate the snapshot.
+      description: ADMIN only. Full replacement except an omitted API key retains the encrypted value. The base URL is immutable; usage or registry mapping changes invalidate the snapshot. Omitting registryMapping disables registry sync while retaining bindings and source-owned field protection until explicit detach.
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/ToadieConnectionRequest' } } }
@@ -1093,7 +1284,7 @@ paths:
       tags: [toadie]
       operationId: deleteToadieConnection
       summary: Soft-delete a Toadie connection
-      description: ADMIN only. Existing contract links remain visible as disconnected.
+      description: ADMIN only. Existing contract links and registry sources remain visible as disconnected; local registries and their dependents are preserved.
       responses:
         '204': { description: Deleted }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -3335,6 +3526,7 @@ components:
       type: object
       required: [id, name, members, createdAt, updatedAt]
       properties:
+        source: { allOf: [{ $ref: '#/components/schemas/ToadieRegistrySource' }], nullable: true, description: 'Linked Port source; null for a local registry record. Source ownership never grants permissions.' }
         id: { type: integer, format: int32, minimum: 0 }
         name: { type: string }
         description: { type: string, nullable: true }
@@ -3348,6 +3540,7 @@ components:
       type: object
       required: [id, name, memberCount, createdAt, updatedAt]
       properties:
+        source: { allOf: [{ $ref: '#/components/schemas/ToadieRegistrySource' }], nullable: true, description: 'Linked Port source; null for a local registry record. Source ownership never grants permissions.' }
         id: { type: integer, format: int32, minimum: 0 }
         name: { type: string }
         description: { type: string, nullable: true }
@@ -3383,6 +3576,7 @@ components:
       type: object
       required: [id, name, systemCount, createdAt, updatedAt]
       properties:
+        source: { allOf: [{ $ref: '#/components/schemas/ToadieRegistrySource' }], nullable: true, description: 'Linked Port source; null for a local registry record. Source ownership never grants permissions.' }
         id: { type: integer, format: int32, minimum: 0 }
         name: { type: string }
         description: { type: string, nullable: true }
@@ -3495,6 +3689,362 @@ components:
         page: { type: integer, minimum: 1 }
         pageSize: { type: integer, minimum: 1, maximum: 100 }
         total: { type: integer, format: int64, minimum: 0 }
+    ToadieRegistryMapping:
+      type: object
+      required:
+      - flattenDomains
+      properties:
+        domainBlueprint:
+          type: string
+          default: domain
+          minLength: 1
+          maxLength: 100
+        systemDomainRelation:
+          type: string
+          nullable: true
+          default: domain
+          maxLength: 100
+        domainParentRelation:
+          type: string
+          nullable: true
+          default: parent_domain
+          maxLength: 100
+        flattenDomains:
+          type: boolean
+          enum:
+          - true
+          description: Explicit acknowledgement that nested Port domains become flat Covenant domains.
+        domainDescriptionProperty:
+          type: string
+          nullable: true
+          maxLength: 100
+          description: Optional stored string property; omitted/null keeps descriptions locally managed.
+        systemDescriptionProperty:
+          type: string
+          nullable: true
+          maxLength: 100
+          description: Optional stored string property; omitted/null keeps descriptions locally managed.
+        teamDescriptionProperty:
+          type: string
+          nullable: true
+          maxLength: 100
+          description: Optional stored string property; omitted/null keeps descriptions locally managed.
+    ToadieRegistryKind:
+      type: string
+      enum:
+      - DOMAIN
+      - SYSTEM
+      - TEAM
+    ToadieRegistryAction:
+      type: string
+      enum:
+      - IMPORT
+      - LINK
+      - UPDATE
+    ToadieRegistrySourceStatus:
+      type: string
+      enum:
+      - AVAILABLE
+      - MISSING
+      - CONFLICT
+      - DISCONNECTED
+    ToadieRegistrySource:
+      type: object
+      required:
+      - connectionId
+      - connectionName
+      - entityId
+      - identifier
+      - title
+      - url
+      - status
+      - lastSyncedAt
+      - lastErrorCode
+      - descriptionSynced
+      - fallbackDomainId
+      - cache
+      properties:
+        connectionId:
+          type: integer
+          format: int32
+          minimum: 0
+        connectionName:
+          type: string
+        entityId:
+          type: string
+          pattern: ^[1-9][0-9]*$
+          maxLength: 100
+        identifier:
+          type: string
+          maxLength: 200
+        title:
+          type: string
+          maxLength: 200
+        url:
+          type: string
+          nullable: true
+          maxLength: 2048
+        status:
+          $ref: '#/components/schemas/ToadieRegistrySourceStatus'
+        lastSyncedAt:
+          type: integer
+          format: int64
+          description: Epoch milliseconds.
+          nullable: true
+        lastErrorCode:
+          type: string
+          nullable: true
+        descriptionSynced:
+          type: boolean
+        fallbackDomainId:
+          type: integer
+          format: int32
+          minimum: 0
+          nullable: true
+        cache:
+          $ref: '#/components/schemas/ToadieCacheStatus'
+    ToadieRegistryCandidate:
+      type: object
+      required:
+      - entityId
+      - identifier
+      - title
+      - description
+      - remoteUpdatedAt
+      - parentEntityId
+      - parentIdentifier
+      - parentTitle
+      - linkedLocalId
+      - linkedLocalName
+      - fallbackDomainId
+      - issues
+      properties:
+        entityId:
+          type: string
+          pattern: ^[1-9][0-9]*$
+          maxLength: 100
+        identifier:
+          type: string
+          maxLength: 200
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          nullable: true
+          maxLength: 2000
+        remoteUpdatedAt:
+          type: integer
+          format: int64
+          description: Epoch milliseconds.
+        parentEntityId:
+          type: string
+          nullable: true
+        parentIdentifier:
+          type: string
+          nullable: true
+        parentTitle:
+          type: string
+          nullable: true
+        linkedLocalId:
+          type: integer
+          format: int32
+          minimum: 0
+          nullable: true
+        linkedLocalName:
+          type: string
+          nullable: true
+        fallbackDomainId:
+          type: integer
+          format: int32
+          minimum: 0
+          nullable: true
+        issues:
+          description: Stable conflict codes, including SOURCE_LIMIT_EXCEEDED when a connection would exceed 5000 registry bindings.
+          type: array
+          items:
+            type: string
+    ToadieRegistryCandidatePage:
+      type: object
+      required:
+      - items
+      - page
+      - pageSize
+      - total
+      - cache
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ToadieRegistryCandidate'
+        page:
+          type: integer
+          format: int32
+          minimum: 1
+        pageSize:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          format: int64
+          minimum: 0
+        cache:
+          $ref: '#/components/schemas/ToadieCacheStatus'
+    ToadieRegistrySelection:
+      type: object
+      required:
+      - entityId
+      properties:
+        entityId:
+          type: string
+          pattern: ^[1-9][0-9]*$
+          maxLength: 100
+        localId:
+          type: integer
+          format: int32
+          minimum: 0
+          nullable: true
+          description: Omitted/null imports; an explicit local ID links that active registry record.
+        fallbackDomainId:
+          type: integer
+          format: int32
+          minimum: 0
+          nullable: true
+          description: SYSTEM only; used when the source has no domain relation. Never overrides an unmapped source domain.
+    ToadieRegistryPreviewRequest:
+      type: object
+      required:
+      - kind
+      - items
+      properties:
+        kind:
+          $ref: '#/components/schemas/ToadieRegistryKind'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ToadieRegistrySelection'
+          minItems: 1
+          maxItems: 50
+    ToadieRegistryApplyRequest:
+      type: object
+      required:
+      - kind
+      - items
+      - expectedPlanToken
+      properties:
+        kind:
+          $ref: '#/components/schemas/ToadieRegistryKind'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ToadieRegistrySelection'
+          minItems: 1
+          maxItems: 50
+        expectedPlanToken:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          minLength: 64
+          maxLength: 64
+    ToadieRegistryLocalState:
+      type: object
+      required:
+      - name
+      - description
+      - domainId
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+          maxLength: 2000
+        domainId:
+          type: integer
+          format: int32
+          minimum: 0
+          nullable: true
+    ToadieRegistryPreviewItem:
+      type: object
+      required:
+      - entityId
+      - localId
+      - action
+      - before
+      - after
+      - issues
+      properties:
+        entityId:
+          type: string
+        localId:
+          type: integer
+          format: int32
+          minimum: 0
+          nullable: true
+        action:
+          $ref: '#/components/schemas/ToadieRegistryAction'
+        before:
+          allOf:
+          - $ref: '#/components/schemas/ToadieRegistryLocalState'
+          nullable: true
+        after:
+          $ref: '#/components/schemas/ToadieRegistryLocalState'
+        issues:
+          description: Stable conflict codes, including SOURCE_LIMIT_EXCEEDED when a connection would exceed 5000 registry bindings.
+          type: array
+          items:
+            type: string
+    ToadieRegistryPreviewResponse:
+      type: object
+      required:
+      - kind
+      - cache
+      - planToken
+      - canApply
+      - items
+      properties:
+        kind:
+          $ref: '#/components/schemas/ToadieRegistryKind'
+        cache:
+          $ref: '#/components/schemas/ToadieCacheStatus'
+        planToken:
+          type: string
+        canApply:
+          type: boolean
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ToadieRegistryPreviewItem'
+          maxItems: 50
+    ToadieRegistryApplyItem:
+      type: object
+      required:
+      - entityId
+      - localId
+      - action
+      properties:
+        entityId:
+          type: string
+        localId:
+          type: integer
+          format: int32
+          minimum: 0
+        action:
+          $ref: '#/components/schemas/ToadieRegistryAction'
+    ToadieRegistryApplyResponse:
+      type: object
+      required:
+      - kind
+      - items
+      properties:
+        kind:
+          $ref: '#/components/schemas/ToadieRegistryKind'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ToadieRegistryApplyItem'
+          maxItems: 50
     ToadieMapping:
       type: object
       required: [serviceBlueprint, apiBlueprint, providesRelation, consumesRelation, systemRelation]
@@ -3508,6 +4058,7 @@ components:
       type: object
       required: [name, baseUrl, browserUrl, enabled, refreshIntervalMinutes, mapping]
       properties:
+        registryMapping: { allOf: [{ $ref: '#/components/schemas/ToadieRegistryMapping' }], nullable: true, description: 'Opt-in registry projection; omitted/null on replace disables sync while preserving bindings and managed fields until detach.' }
         name: { type: string, minLength: 1, maxLength: 100 }
         baseUrl: { type: string, maxLength: 2048 }
         browserUrl: { type: string, maxLength: 2048 }
@@ -3526,6 +4077,7 @@ components:
       type: object
       required: [id, name, baseUrl, browserUrl, enabled, refreshIntervalMinutes, mapping, hasApiKey, createdAt, updatedAt, lastAttemptAt, lastSuccessAt, refreshing, lastErrorCode, stale]
       properties:
+        registryMapping: { allOf: [{ $ref: '#/components/schemas/ToadieRegistryMapping' }], nullable: true, description: 'Opt-in registry projection; omitted/null on replace disables sync while preserving bindings and managed fields until detach.' }
         id: { type: integer, format: int32, minimum: 0 }
         name: { type: string }
         baseUrl: { type: string }
@@ -3648,6 +4200,7 @@ components:
       type: object
       required: [id, domainId, domainName, name, contractCount, createdAt, updatedAt]
       properties:
+        source: { allOf: [{ $ref: '#/components/schemas/ToadieRegistrySource' }], nullable: true, description: 'Linked Port source; null for a local registry record. Source ownership never grants permissions.' }
         id: { type: integer, format: int32, minimum: 0 }
         domainId: { type: integer, format: int32, minimum: 0 }
         domainName: { type: string }

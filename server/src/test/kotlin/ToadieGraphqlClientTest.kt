@@ -4,6 +4,7 @@ import ch.nokillswit.toadie.HttpToadieGraphqlClient
 import ch.nokillswit.toadie.ToadieFetchConfig
 import ch.nokillswit.toadie.ToadieFetchException
 import ch.nokillswit.toadie.ToadieMapping
+import ch.nokillswit.toadie.ToadieRegistryMapping
 import ch.nokillswit.toadie.ToadieSnapshot
 import ch.nokillswit.toadie.ToadieUnchanged
 import com.fasterxml.jackson.databind.JsonNode
@@ -49,6 +50,8 @@ class ToadieGraphqlClientTest {
         var status = 200
         var delayMs = 0L
         var rawBody: String? = null
+        var blueprintRows: List<JsonNode>? = null
+        var entityRows: List<JsonNode>? = null
         var edit: (JsonNode, ObjectNode) -> Unit = { _, _ -> }
         val url get() = "http://127.0.0.1:${server.address.port}"
     }
@@ -65,7 +68,7 @@ class ToadieGraphqlClientTest {
         val request = mapper.readTree(exchange.requestBody.readAllBytes())
         fixture.requests.add(request)
         fixture.auth.add(exchange.requestHeaders.getFirst("Authorization"))
-        val root = response(request)
+        val root = response(request, fixture)
         fixture.edit(request, root)
         if (fixture.delayMs > 0) Thread.sleep(fixture.delayMs)
         val bytes = (fixture.rawBody ?: root.toString()).toByteArray()
@@ -74,12 +77,12 @@ class ToadieGraphqlClientTest {
         exchange.responseBody.use { it.write(bytes) }
     }
 
-    private fun response(request: JsonNode): ObjectNode {
+    private fun response(request: JsonNode, fixture: Fixture): ObjectNode {
         val variables = request.path("variables")
         val blueprint = variables.path("blueprint").textValue()
         val field = if (blueprint == null) "blueprints" else "entities"
-        val all = if (blueprint == null) mapper.readTree(blueprints).toList()
-            else mapper.readTree(entities).filter { it.path("blueprint").textValue() == blueprint }
+        val all = if (blueprint == null) fixture.blueprintRows ?: mapper.readTree(blueprints).toList()
+            else (fixture.entityRows ?: mapper.readTree(entities).toList()).filter { it.path("blueprint").textValue() == blueprint }
         val page = variables.path("page").intValue()
         val pageSize = variables.path("pageSize").intValue()
         val rows = all.drop((page - 1) * pageSize).take(pageSize)
@@ -89,6 +92,125 @@ class ToadieGraphqlClientTest {
     }
 
     private fun config(f: Fixture) = ToadieFetchConfig(f.url, "private-fixture-key", ToadieMapping())
+
+    private fun registryFixture(f: Fixture) {
+        f.blueprintRows = mapper.readTree(blueprints).toList().map { it as ObjectNode }.onEach {
+            it.set<JsonNode>("schema", mapper.readTree("""{"properties":{"description":{"type":"string"}}}"""))
+            when (it.path("identifier").asText()) {
+                "system" -> it.set<JsonNode>("relations", mapper.readTree("""{"domain":{"target":"domain","many":false}}"""))
+                "_team" -> it.set<JsonNode>("relations", mapper.readTree("""{"parent":{"target":"_team","many":false}}"""))
+            }
+        } + listOf(mapper.readTree("""{"id":"5","identifier":"domain","schema":{"properties":{"description":{"type":"string"}}},
+            "relations":{"parent_domain":{"target":"domain","many":false}}}"""))
+        f.entityRows = mapper.readTree(entities).toList().map { it as ObjectNode }.onEach {
+            it.set<JsonNode>("properties", mapper.readTree("""{"description":"Selected description","secret":"never retained"}"""))
+            if (it.path("blueprint").asText() == "system") {
+                it.set<JsonNode>("relations", mapper.readTree("""{"domain":"commerce"}"""))
+            }
+        } + listOf(mapper.readTree("""{"id":"6","blueprint":"domain","identifier":"commerce","title":"Commerce domain",
+            "relations":{},"properties":{"description":"Domain description"},"updatedAt":1}"""))
+    }
+
+    private fun registryConfig(f: Fixture) = config(f).copy(registryMapping = ToadieRegistryMapping(
+        flattenDomains = true, domainDescriptionProperty = "description", teamDescriptionProperty = "description",
+    ))
+
+    @Test
+    fun `registry projection reads domain pages and only selected description properties`() = fixture { f ->
+        registryFixture(f)
+        HttpToadieGraphqlClient(pageSize = 1).use { client ->
+            val snapshot = runBlocking { client.fetch(registryConfig(f)) } as ToadieSnapshot
+            assertEquals(6, snapshot.entities.size)
+            val domain = snapshot.entities.single { it.blueprint == "domain" }
+            assertEquals("Domain description", domain.registryDescription)
+            val system = snapshot.entities.single { it.blueprint == "system" }
+            assertEquals(listOf("commerce"), system.relations["domain"])
+            assertEquals(null, system.registryDescription)
+            assertEquals("Selected description", snapshot.entities.single { it.blueprint == "_team" }.registryDescription)
+            assertFalse(snapshot.toString().contains("never retained"))
+            val propertyReads = f.requests.filter { it.path("query").asText().contains(" properties") }
+            assertEquals(setOf("domain", "_team"), propertyReads.map { it.path("variables").path("blueprint").asText() }.toSet())
+        }
+    }
+
+    @Test
+    fun `invalid selected descriptions become row conflicts without discarding usage`() = fixture { f ->
+        registryFixture(f)
+        val domain = f.entityRows!!.last() as ObjectNode
+        for (description in listOf(mapper.valueToTree<JsonNode>(42), mapper.valueToTree("x".repeat(2001)))) {
+            (domain.path("properties") as ObjectNode).set<JsonNode>("description", description)
+            HttpToadieGraphqlClient().use { client ->
+                val snapshot = runBlocking { client.fetch(registryConfig(f)) } as ToadieSnapshot
+                assertEquals(6, snapshot.entities.size)
+                assertEquals("INVALID_DESCRIPTION", snapshot.entities.last().registryErrorCode)
+                assertEquals(null, snapshot.entities.last().registryDescription)
+            }
+        }
+        (domain.path("properties") as ObjectNode).putNull("description")
+        HttpToadieGraphqlClient().use { client ->
+            val snapshot = runBlocking { client.fetch(registryConfig(f)) } as ToadieSnapshot
+            assertEquals(null, snapshot.entities.last().registryErrorCode)
+        }
+    }
+
+    @Test
+    fun `registry mappings reject undeclared properties ambiguous roles and invalid relations`() = fixture { f ->
+        registryFixture(f)
+        val valid = registryConfig(f).registryMapping!!
+        val invalid = listOf(
+            valid.copy(domainDescriptionProperty = "secret"), valid.copy(domainBlueprint = "api"),
+            valid.copy(systemDomainRelation = "unknown"), valid.copy(domainParentRelation = "unknown"),
+            valid.copy(flattenDomains = false),
+        )
+        HttpToadieGraphqlClient().use { client ->
+            invalid.forEach { mapping ->
+                val failure = assertFailsWith<ToadieFetchException> {
+                    runBlocking { client.fetch(config(f).copy(registryMapping = mapping)) }
+                }
+                assertEquals("MAPPING_INVALID", failure.code)
+            }
+        }
+    }
+
+    @Test
+    fun `malformed property containers cannot erase a mapped description`() = fixture { f ->
+        registryFixture(f)
+        val domain = f.entityRows!!.last() as ObjectNode
+        HttpToadieGraphqlClient().use { client ->
+            for (json in listOf("null", "[]", "42", "\"text\"")) {
+                domain.set<JsonNode>("properties", mapper.readTree(json))
+                val snapshot = runBlocking { client.fetch(registryConfig(f)) } as ToadieSnapshot
+                assertEquals("INVALID_DESCRIPTION", snapshot.entities.last().registryErrorCode)
+            }
+            domain.remove("properties")
+            val missing = runBlocking { client.fetch(registryConfig(f)) } as ToadieSnapshot
+            assertEquals("INVALID_DESCRIPTION", missing.entities.last().registryErrorCode)
+            domain.set<JsonNode>("properties", mapper.readTree("{}"))
+            val empty = runBlocking { client.fetch(registryConfig(f)) } as ToadieSnapshot
+            assertEquals(null, empty.entities.last().registryErrorCode)
+        }
+    }
+
+    @Test
+    fun `registry reference and revision validation covers added domain rows`() = fixture { f ->
+        registryFixture(f)
+        f.edit = { request, root ->
+            if (request.path("variables").path("blueprint").asText() == "domain") {
+                (root.path("data").path("entities") as ObjectNode).put("revision", "8")
+            }
+        }
+        HttpToadieGraphqlClient().use { client ->
+            val failure = assertFailsWith<ToadieFetchException> { runBlocking { client.fetch(registryConfig(f)) } }
+            assertEquals("SOURCE_CHANGED", failure.code)
+        }
+        f.edit = { _, _ -> }
+        val domain = f.entityRows!!.last() as ObjectNode
+        (domain.path("relations") as ObjectNode).put("parent_domain", "missing")
+        HttpToadieGraphqlClient().use { client ->
+            val failure = assertFailsWith<ToadieFetchException> { runBlocking { client.fetch(registryConfig(f)) } }
+            assertEquals("INVALID_RESPONSE", failure.code)
+        }
+    }
 
     private fun assertFailure(f: Fixture, code: String, client: HttpToadieGraphqlClient = HttpToadieGraphqlClient()) {
         client.use {

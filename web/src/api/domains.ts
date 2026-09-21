@@ -36,3 +36,7 @@ export async function updateDomain(id: number, body: DomainBody): Promise<void> 
 export async function deleteDomain(id: number): Promise<void> {
   await voidRequest(`/api/v1/domains/${id}`, { method: "DELETE" });
 }
+
+export async function detachDomainToadieSource(id: number): Promise<void> {
+  await voidRequest(`/api/v1/domains/${id}/toadie-source`, { method: "DELETE" });
+}

@@ -19,6 +19,7 @@ import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.dao.id.UIntIdTable
 import org.jetbrains.exposed.v1.r2dbc.*
 import org.jetbrains.exposed.v1.r2dbc.transactions.suspendTransaction
+import ch.nokillswit.toadie.*
 
 val TeamServiceKey = AttributeKey<TeamService>("TeamService")
 
@@ -54,6 +55,7 @@ class TeamService(private val database: R2dbcDatabase) {
         val predicate = buildPredicate(filter) and Teams.active()
         val total = Teams.selectAll().where { predicate }.count()
         val rows = Teams.selectAll().where { predicate }.applyPaging(paging, SORTABLE_COLUMNS).toList()
+        val sources = registrySources(ToadieRegistryKind.TEAM, rows.map { it[Teams.id].value })
         val counts = activeMemberCounts(rows.map { it[Teams.id].value })
         TeamListResult(
             items = rows.map { row ->
@@ -65,6 +67,7 @@ class TeamService(private val database: R2dbcDatabase) {
                     memberCount = counts[id] ?: 0,
                     createdAt = row[Teams.createdAt],
                     updatedAt = row[Teams.updatedAt],
+                    source = sources[id],
                 )
             },
             total = total,
@@ -82,6 +85,7 @@ class TeamService(private val database: R2dbcDatabase) {
             members = membersOf(id),
             createdAt = row[Teams.createdAt],
             updatedAt = row[Teams.updatedAt],
+            source = registrySources(ToadieRegistryKind.TEAM, listOf(id))[id],
         )
     }
 
@@ -91,6 +95,7 @@ class TeamService(private val database: R2dbcDatabase) {
      * with an active team rides the V6 partial index into the central 23505 → 409.
      */
     suspend fun create(request: TeamCreateRequest): UInt = suspendTransaction(database) {
+        acquireToadieRegistryLock()
         validateTeamCreate(request) // re-checked service-side so direct callers stay guarded
         val members = request.memberIds.orEmpty()
         requireActiveUsers(members)
@@ -112,7 +117,11 @@ class TeamService(private val database: R2dbcDatabase) {
 
     /** Name/description replace; the roster is managed per member. Returns the affected-row count (0 → 404). */
     suspend fun update(id: UInt, request: TeamUpdateRequest): Int = suspendTransaction(database) {
+        acquireToadieRegistryLock()
         validateTeamUpdate(request)
+        Teams.selectAll().where { (Teams.id eq id) and Teams.active() }
+            .forUpdate().toList().singleOrNull() ?: return@suspendTransaction 0
+        requireRegistryFieldsMutable(ToadieRegistryKind.TEAM, id, request.name, request.description)
         Teams.update({ (Teams.id eq id) and Teams.active() }) {
             it[name] = request.name
             it[description] = request.description
@@ -125,15 +134,18 @@ class TeamService(private val database: R2dbcDatabase) {
      * team). Refused (409) while the team still owns an active contract — transfer them first.
      */
     suspend fun delete(id: UInt): Int = suspendTransaction(database) {
+        acquireToadieRegistryLock()
         if (!Teams.lockActiveForUpdate(id)) return@suspendTransaction 0
         val contracts = ContractService.Contracts
         val owned = contracts.select(contracts.id)
             .where { (contracts.ownerTeamId eq id) and (contracts.markedAsDeleted eq false) }.count()
         if (owned > 0) throw ConflictException("The team still owns contracts — transfer them first")
-        Teams.update({ (Teams.id eq id) and Teams.active() }) {
+        val changed = Teams.update({ (Teams.id eq id) and Teams.active() }) {
             it[markedAsDeleted] = true
             it[updatedAt] = nowMillis()
         }
+        if (changed > 0) deleteRegistrySource(ToadieRegistryKind.TEAM, id)
+        changed
     }
 
     /** Adds one active user; missing team or user → 404, already a member → 409. */

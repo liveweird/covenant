@@ -133,6 +133,39 @@ describe("TeamDetails page", () => {
     expect(body).toEqual({ name: "Payments EU", description: "Money movers" });
   });
 
+  test("source-managed metadata is locked while the local roster remains editable and can be detached", async () => {
+    const sourced = {
+      ...TEAM,
+      source: {
+        connectionId: 3,
+        connectionName: "Architecture",
+        entityId: "team-7",
+        identifier: "payments",
+        title: "Payments in Toadie",
+        url: "https://toadie.example/teams/payments",
+        status: "AVAILABLE",
+        lastSyncedAt: 10,
+        lastErrorCode: null,
+        descriptionSynced: true,
+        fallbackDomainId: null,
+        cache: { state: "CURRENT", lastAttemptAt: 10, lastSuccessAt: 10, refreshing: false, lastErrorCode: null },
+      },
+    };
+    serve(mockFetch, { "DELETE /api/v1/teams/1/toadie-source": { status: 204 } }, sourced);
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByRole("combobox", { name: "Add a member" })).toBeInTheDocument();
+    expect(screen.getByText("Synchronized")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^edit$/i }));
+    const editor = await screen.findByRole("dialog");
+    expect(within(editor).getByLabelText("Name")).toBeDisabled();
+    expect(within(editor).getByLabelText("Description")).toBeDisabled();
+    await user.click(within(editor).getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: "Detach Toadie source" }));
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Detach Toadie source" }));
+    await waitFor(() => expect(findCall(mockFetch, "DELETE", "/api/v1/teams/1/toadie-source")).toBeDefined());
+  });
+
   test("an empty roster shows the empty state", async () => {
     serve(mockFetch, {}, { ...TEAM, members: [] });
     renderPage();
