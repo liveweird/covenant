@@ -17,6 +17,18 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "1.0.1",
+    date: "2026-09-22",
+    en: `**Clearer setup for Toadie registry synchronization.**
+
+- Opening registry sync on an unconfigured connection now explains the required setup and links directly to its settings.
+- Failed candidate requests stop loading and offer a retry instead of leaving a spinner visible.`,
+    pl: `**Czytelniejsza konfiguracja synchronizacji rejestrów z Toadie.**
+
+- Otwarcie synchronizacji rejestrów dla nieskonfigurowanego połączenia wyjaśnia wymagane ustawienia i prowadzi bezpośrednio do konfiguracji.
+- Nieudane pobieranie rekordów kończy stan ładowania i umożliwia ponowienie próby zamiast pozostawiać widoczny wskaźnik ładowania.`,
+  },
+  {
     version: "1.0.0",
     date: "2026-09-21",
     en: `**Covenant 1.0 — contract lifecycle management connected to your architecture.**

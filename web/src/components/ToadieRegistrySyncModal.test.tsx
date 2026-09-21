@@ -4,11 +4,11 @@ import userEvent from "@testing-library/user-event";
 import ToadieRegistrySyncModal from "./ToadieRegistrySyncModal";
 import { jsonResponse } from "../test/http";
 import { renderWithProviders } from "../test/render";
-import type { ToadieRegistryCandidate } from "../api/toadie";
+import type { ToadieConnection, ToadieRegistryCandidate } from "../api/toadie";
 
 type FetchMock = ReturnType<typeof vi.fn>;
 const CACHE = { state: "CURRENT", lastAttemptAt: 10, lastSuccessAt: 10, refreshing: false, lastErrorCode: null };
-const CONNECTION = {
+const CONNECTION: ToadieConnection = {
   id: 3,
   name: "Architecture",
   baseUrl: "https://toadie.internal",
@@ -16,6 +16,7 @@ const CONNECTION = {
   enabled: true,
   refreshIntervalMinutes: 60,
   mapping: { serviceBlueprint: "service", apiBlueprint: "api", providesRelation: "provides_apis", consumesRelation: "consumes_apis", systemRelation: "system" },
+  registryMapping: { domainBlueprint: "domain", systemDomainRelation: "domain", domainParentRelation: "parent_domain", flattenDomains: true, domainDescriptionProperty: null, systemDescriptionProperty: null, teamDescriptionProperty: null },
   hasApiKey: true,
   createdAt: 1,
   updatedAt: 2,
@@ -53,6 +54,37 @@ describe("Toadie registry sync modal", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
+  test("does not load registry data before the connection is configured", async () => {
+    const configure = vi.fn();
+    const user = userEvent.setup();
+    renderWithProviders(<ToadieRegistrySyncModal connection={{ ...CONNECTION, registryMapping: null }} onClose={vi.fn()} onConfigure={configure} onApplied={vi.fn()} />);
+    expect(screen.getByText("Configure registry metadata mapping on this connection before synchronizing.")).toBeInTheDocument();
+    expect(mockFetch).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Configure registry sync" }));
+    expect(configure).toHaveBeenCalledOnce();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  test("stops the loading state after a candidate failure and retries the current kind", async () => {
+    let attempts = 0;
+    mockFetch.mockImplementation((url: string) => {
+      if (url.startsWith("/api/v1/domains?")) return Promise.resolve(jsonResponse(200, DOMAINS));
+      if (url.includes("registry-candidates")) {
+        attempts += 1;
+        return Promise.resolve(attempts === 1 ? jsonResponse(500, { title: "failed", status: 500 }) : jsonResponse(200, candidatePage(DOMAIN)));
+      }
+      return Promise.resolve(jsonResponse(404, { title: "missing", status: 404 }));
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<ToadieRegistrySyncModal connection={CONNECTION} onClose={vi.fn()} onConfigure={vi.fn()} onApplied={vi.fn()} />);
+    expect(await screen.findByText("Load failed (500)")).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "Loading" })).not.toBeInTheDocument();
+    expect(screen.queryByText("No Toadie records match this view")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Retry loading records" }));
+    expect(await screen.findByText("Remote Payments")).toBeInTheDocument();
+    expect(attempts).toBe(2);
+  });
+
   test("previews an explicit domain link before applying the frozen plan", async () => {
     mockFetch.mockImplementation((url: string, init?: RequestInit) => {
       if (url.startsWith("/api/v1/domains?")) return Promise.resolve(jsonResponse(200, DOMAINS));
@@ -66,7 +98,7 @@ describe("Toadie registry sync modal", () => {
     });
     const applied = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
-    renderWithProviders(<ToadieRegistrySyncModal connection={CONNECTION} onClose={vi.fn()} onApplied={applied} />);
+    renderWithProviders(<ToadieRegistrySyncModal connection={CONNECTION} onClose={vi.fn()} onConfigure={vi.fn()} onApplied={applied} />);
     await user.click(await screen.findByRole("checkbox", { name: "Remote Payments" }));
     fireEvent.click(screen.getByRole("combobox", { name: "Covenant target Remote Payments" }));
     await user.click(await screen.findByRole("option", { name: "Payments" }));
@@ -91,7 +123,7 @@ describe("Toadie registry sync modal", () => {
       return Promise.resolve(jsonResponse(404, { title: "missing", status: 404 }));
     });
     const user = userEvent.setup();
-    renderWithProviders(<ToadieRegistrySyncModal connection={CONNECTION} onClose={vi.fn()} onApplied={vi.fn()} />);
+    renderWithProviders(<ToadieRegistrySyncModal connection={CONNECTION} onClose={vi.fn()} onConfigure={vi.fn()} onApplied={vi.fn()} />);
     fireEvent.click(screen.getByRole("combobox", { name: "Registry kind" }));
     await user.click(await screen.findByRole("option", { name: "Systems" }));
     await user.click(await screen.findByRole("checkbox", { name: "Remote Gateway" }));
@@ -120,7 +152,7 @@ describe("Toadie registry sync modal", () => {
       return Promise.resolve(jsonResponse(404, { title: "missing", status: 404 }));
     });
     const user = userEvent.setup();
-    renderWithProviders(<ToadieRegistrySyncModal connection={CONNECTION} onClose={vi.fn()} onApplied={vi.fn()} />);
+    renderWithProviders(<ToadieRegistrySyncModal connection={CONNECTION} onClose={vi.fn()} onConfigure={vi.fn()} onApplied={vi.fn()} />);
     fireEvent.click(screen.getByRole("combobox", { name: "Registry kind" }));
     await user.click(await screen.findByRole("option", { name: "Systems" }));
     await user.click(await screen.findByRole("checkbox", { name: "Remote Gateway" }));
@@ -143,7 +175,7 @@ describe("Toadie registry sync modal", () => {
       return Promise.resolve(jsonResponse(404, { title: "missing", status: 404 }));
     });
     const user = userEvent.setup();
-    renderWithProviders(<ToadieRegistrySyncModal connection={CONNECTION} onClose={vi.fn()} onApplied={vi.fn()} />);
+    renderWithProviders(<ToadieRegistrySyncModal connection={CONNECTION} onClose={vi.fn()} onConfigure={vi.fn()} onApplied={vi.fn()} />);
     expect(await screen.findByText("Remote Payments")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("combobox", { name: "Registry kind" }));
     await user.click(await screen.findByRole("option", { name: "Systems" }));
@@ -173,7 +205,7 @@ describe("Toadie registry sync modal", () => {
       return Promise.resolve(jsonResponse(404, { title: "missing", status: 404 }));
     });
     const user = userEvent.setup();
-    renderWithProviders(<ToadieRegistrySyncModal connection={CONNECTION} onClose={vi.fn()} onApplied={vi.fn()} />);
+    renderWithProviders(<ToadieRegistrySyncModal connection={CONNECTION} onClose={vi.fn()} onConfigure={vi.fn()} onApplied={vi.fn()} />);
     await user.click(await screen.findByRole("checkbox", { name: "Remote Payments" }));
     await user.click(screen.getByRole("button", { name: "Preview changes" }));
     expect(await screen.findAllByText("The source name conflicts with an existing record")).toHaveLength(2);
@@ -193,7 +225,7 @@ describe("Toadie registry sync modal", () => {
       return Promise.resolve(jsonResponse(404, { title: "missing", status: 404 }));
     });
     const user = userEvent.setup();
-    renderWithProviders(<ToadieRegistrySyncModal connection={CONNECTION} onClose={vi.fn()} onApplied={vi.fn()} />);
+    renderWithProviders(<ToadieRegistrySyncModal connection={CONNECTION} onClose={vi.fn()} onConfigure={vi.fn()} onApplied={vi.fn()} />);
     await user.click(await screen.findByRole("checkbox", { name: "Remote Payments" }));
     await user.click(screen.getByRole("button", { name: "Preview changes" }));
     expect(await screen.findByText("Action failed (500)")).toBeInTheDocument();
@@ -210,7 +242,7 @@ describe("Toadie registry sync modal", () => {
       return Promise.resolve(jsonResponse(404, { title: "missing", status: 404 }));
     });
     const user = userEvent.setup();
-    renderWithProviders(<ToadieRegistrySyncModal connection={CONNECTION} onClose={vi.fn()} onApplied={vi.fn()} />);
+    renderWithProviders(<ToadieRegistrySyncModal connection={CONNECTION} onClose={vi.fn()} onConfigure={vi.fn()} onApplied={vi.fn()} />);
     await user.click(await screen.findByRole("checkbox", { name: "Remote Payments" }));
     await user.click(screen.getByRole("button", { name: "Preview changes" }));
     await user.click(await screen.findByRole("button", { name: "Apply preview" }));

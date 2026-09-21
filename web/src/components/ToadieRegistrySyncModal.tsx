@@ -30,12 +30,14 @@ import { showSuccessToast } from "../utils/toast";
 const MAX_SELECTION = 50;
 type Selection = ToadieRegistrySyncSelection & { title: string };
 
-export default function ToadieRegistrySyncModal({ connection, onClose, onApplied }: {
+export default function ToadieRegistrySyncModal({ connection, onClose, onConfigure, onApplied }: {
   connection: ToadieConnection;
   onClose: () => void;
+  onConfigure: () => void;
   onApplied: () => Promise<void>;
 }) {
   const { t } = useTranslation();
+  const configured = connection.registryMapping != null;
   const [kind, setKind] = useState<ToadieRegistryKind>("DOMAIN");
   const [search, setSearch] = useState("");
   const [debouncedSearch] = useDebouncedValue(search, 300);
@@ -51,10 +53,11 @@ export default function ToadieRegistrySyncModal({ connection, onClose, onApplied
     queryKey: ["toadie", "registryCandidates", connection.id, kind, page, pageSize, debouncedSearch],
     queryFn: async () => ({ kind, page: await listToadieRegistryCandidates(connection.id, { kind, page, pageSize, q: debouncedSearch || undefined }) }),
     placeholderData: keepPreviousData,
+    enabled: configured,
   });
-  const localDomains = useQuery({ queryKey: ["domains", "all"], queryFn: listAllDomains, enabled: kind !== "TEAM" });
-  const localSystems = useQuery({ queryKey: ["systems", "all"], queryFn: () => listAllSystems(), enabled: kind === "SYSTEM" });
-  const localTeams = useQuery({ queryKey: ["teams", "all"], queryFn: () => listAllTeams(), enabled: kind === "TEAM" });
+  const localDomains = useQuery({ queryKey: ["domains", "all"], queryFn: listAllDomains, enabled: configured && kind !== "TEAM" });
+  const localSystems = useQuery({ queryKey: ["systems", "all"], queryFn: () => listAllSystems(), enabled: configured && kind === "SYSTEM" });
+  const localTeams = useQuery({ queryKey: ["teams", "all"], queryFn: () => listAllTeams(), enabled: configured && kind === "TEAM" });
   const targetOptions = useMemo(() => {
     const rows = kind === "DOMAIN"
       ? (localDomains.data ?? []).map((row) => ({ value: String(row.id), label: row.name }))
@@ -144,6 +147,24 @@ export default function ToadieRegistrySyncModal({ connection, onClose, onApplied
   const busy = previewing || applying;
   const localOptionsError = kind === "DOMAIN" ? localDomains.error : kind === "SYSTEM" ? (localSystems.error ?? localDomains.error) : localTeams.error;
   const localOptionsLoading = kind === "DOMAIN" ? localDomains.isLoading : kind === "SYSTEM" ? (localSystems.isLoading || localDomains.isLoading) : localTeams.isLoading;
+  function retryLocalOptions() {
+    if (kind === "DOMAIN") return localDomains.refetch();
+    if (kind === "SYSTEM") return Promise.all([localDomains.refetch(), localSystems.refetch()]);
+    return localTeams.refetch();
+  }
+
+  if (!configured) {
+    return <Modal opened onClose={onClose} closeButtonProps={{ "aria-label": t("common.action.close") }} title={t("toadie.registry.title", { name: connection.name })} size="lg" centered>
+      <Stack gap="md">
+        <Alert color="orange" variant="light" title={t("toadie.registry.setupRequired")}>{t("toadie.registry.notConfigured")}</Alert>
+        <Group justify="flex-end">
+          <Button variant="default" onClick={onClose}>{t("common.action.cancel")}</Button>
+          <Button onClick={onConfigure}>{t("toadie.registry.configure")}</Button>
+        </Group>
+      </Stack>
+    </Modal>;
+  }
+
   return <Modal opened onClose={() => { if (!busy) onClose(); }} closeButtonProps={{ "aria-label": t("common.action.close") }} title={t("toadie.registry.title", { name: connection.name })} size="xl" centered>
     <Stack gap="md">
       <Text size="sm">{t("toadie.registry.intro")}</Text>
@@ -156,14 +177,14 @@ export default function ToadieRegistrySyncModal({ connection, onClose, onApplied
         ]} />
         <ClearableTextInput label={t("toadie.registry.search")} value={search} disabled={busy} onChange={(value) => { setSearch(value); setPage(1); }} clearLabel={t("toadie.registry.clearSearch")} />
       </Group>
-      {candidates.isError && <Alert color="red" variant="light">{candidates.error instanceof ApiError && candidates.error.status === 409 ? t("toadie.registry.nonCurrent") : loadErrorMessage(candidates.error, t)}</Alert>}
-      {localOptionsError && <Alert color="red" variant="light">{loadErrorMessage(localOptionsError, t)}</Alert>}
+      {candidates.isError && <Alert color="red" variant="light"><Group justify="space-between" align="center"><Text size="sm">{candidates.error instanceof ApiError && candidates.error.status === 409 ? t("toadie.registry.nonCurrent") : loadErrorMessage(candidates.error, t)}</Text><Button variant="default" size="xs" onClick={() => void candidates.refetch()}>{t("toadie.registry.retryCandidates")}</Button></Group></Alert>}
+      {localOptionsError && <Alert color="red" variant="light"><Group justify="space-between" align="center"><Text size="sm">{loadErrorMessage(localOptionsError, t)}</Text><Button variant="default" size="xs" onClick={() => void retryLocalOptions()}>{t("toadie.registry.retryLocalOptions")}</Button></Group></Alert>}
       {cache && !cacheCurrent && <Alert color="orange" variant="light">{t("toadie.registry.nonCurrent")}</Alert>}
       <Text size="sm" fw={600}>{t("toadie.registry.selected", { count: selected.size })}</Text>
       <Table aria-label={t("toadie.registry.available")}>
         <Table.Thead><Table.Tr><Table.Th style={{ width: 1 }} /><Table.Th>{t("common.field.name")}</Table.Th><Table.Th>{t("toadie.registry.remoteParent")}</Table.Th><Table.Th>{t("toadie.registry.target")}</Table.Th>{kind === "SYSTEM" && <Table.Th>{t("toadie.registry.fallbackDomain")}</Table.Th>}</Table.Tr></Table.Thead>
         <Table.Tbody>
-          {candidates.isLoading || candidatePage == null ? <TableLoadingRow colSpan={kind === "SYSTEM" ? 5 : 4} /> : candidatePage.items.length ? candidatePage.items.map((candidate) => {
+          {!candidates.isError && (candidates.isLoading || candidatePage == null) ? <TableLoadingRow colSpan={kind === "SYSTEM" ? 5 : 4} /> : candidatePage?.items.length ? candidatePage.items.map((candidate) => {
             const choice = selected.get(candidate.entityId);
             const checked = choice != null;
             return <Table.Tr key={candidate.entityId}>

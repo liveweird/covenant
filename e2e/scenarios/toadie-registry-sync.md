@@ -7,8 +7,10 @@
 
 ## Scenario: an administrator previews and links Port registries while retaining local ownership
 
-1. Open the Toadie connection editor and explicitly enable registry synchronization with flat
-   domains and selected description properties.
+1. Create an ordinary Toadie connection with registry synchronization disabled. Open its sync
+   action and follow the setup prompt to the editor's expanded registry mapping section.
+   Explicitly enable synchronization with flat domains and selected description properties.
+   - Expected: no misleading snapshot error or endless loading state before setup.
 2. Browse domain candidates, link a selected source domain to an existing local domain, preview
    the before/after metadata and apply.
    - Expected: the local ID is preserved; the source parent remains informational.

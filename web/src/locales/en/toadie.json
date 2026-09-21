@@ -103,6 +103,10 @@
     "actionUpdate": "Update",
     "cannotApply": "Resolve the preview issues before applying these changes.",
     "notConfigured": "Configure registry metadata mapping on this connection before synchronizing.",
+    "setupRequired": "Registry sync setup required",
+    "configure": "Configure registry sync",
+    "retryCandidates": "Retry loading records",
+    "retryLocalOptions": "Retry loading Covenant options",
     "nonCurrent": "Registry synchronization requires a current complete Toadie snapshot.",
     "issue": {
       "INVALID_NAME": "The source name is invalid",

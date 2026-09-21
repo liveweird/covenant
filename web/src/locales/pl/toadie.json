@@ -103,6 +103,10 @@
     "actionUpdate": "Aktualizuj",
     "cannotApply": "Rozwiąż problemy z podglądu przed zastosowaniem zmian.",
     "notConfigured": "Skonfiguruj mapowanie metadanych rejestru w tym połączeniu przed synchronizacją.",
+    "setupRequired": "Wymagana konfiguracja synchronizacji rejestru",
+    "configure": "Skonfiguruj synchronizację rejestru",
+    "retryCandidates": "Ponów wczytywanie rekordów",
+    "retryLocalOptions": "Ponów wczytywanie opcji Covenant",
     "nonCurrent": "Synchronizacja rejestru wymaga aktualnej, kompletnej migawki Toadie.",
     "issue": {
       "INVALID_NAME": "Nazwa źródłowa jest nieprawidłowa",
