@@ -177,7 +177,7 @@ class LifecycleOverviewTest {
             val apis = listOf("a", "b").mapIndexed { i, id -> ToadieEntitySnapshot("${i + 1}", "api", id, id, emptyList(), emptyMap(), 1) }
             val consumer = ToadieEntitySnapshot("3", "service", "shop", "Shop", emptyList(), mapOf("consumes_apis" to listOf("a", "b")), 1)
             suspend fun publish(entities: List<ToadieEntitySnapshot>, time: Long = clock.millis()) {
-                assertTrue(toadie.publish(toadie.claimRefresh(connection, false).second!!, ToadieSnapshot(entities, "system", time)))
+                assertTrue(toadie.publish(toadie.claimRefresh(connection, false).second!!, ToadieSnapshot(entities, "system", time, 1)))
             }
             publish(apis + consumer)
             toadie.replaceLinks(source.id, ToadieLinksRequest(connection, listOf("1", "2")), caller)

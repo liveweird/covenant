@@ -115,7 +115,7 @@ the same commit** — this list is the coverage map, the scenario file is the de
   the live check until the Major bump → the History section read; (3) teardown through the delete
   rules (draft deletes, an active version blocks the contract, deprecate → retire, then delete);
   plus a regular user's read-only tree, page and list.
-- [`toadie-usage.spec.ts`](scenarios/toadie-usage.md) — configure an encrypted connection, link multiple APIs, display declared provider/consumer usage and preserve stale observations after refresh failure.
+- [`toadie-usage.spec.ts`](scenarios/toadie-usage.md) — configure an encrypted connection, link multiple APIs, display declared provider/consumer usage, restart a scan when the upstream revision changes, and preserve the last coherent observation when revisions keep changing or GraphQL fails.
 - [`release-lines.spec.ts`](scenarios/release-lines.md) — older-minor maintenance backports while
   a newer major stays active, deprecated-version baselines, independent support policies and
   pinned recommendations, line filtering, accessibility, and ending support without retiring versions.

@@ -676,7 +676,7 @@ export interface paths {
         put?: never;
         /**
          * Queue a complete Toadie snapshot refresh
-         * @description ADMIN only. Concurrent requests coalesce; another request inside 30 seconds returns 429.
+         * @description ADMIN only. Manual refresh always requests a full scan. An in-flight scheduled revision check is promoted to a new full-scan claim; other concurrent requests coalesce. Outside that promotion, a new manual request within 30 seconds of the last attempt returns 429.
          */
         post: operations["refreshToadieConnection"];
         delete?: never;
@@ -765,7 +765,7 @@ export interface paths {
         put?: never;
         /**
          * Queue refresh of the linked Toadie connection
-         * @description Contract writer only. Refresh changes only the cache; it never changes contract lifecycle or authorization.
+         * @description Contract writer only. Requests a full scan with the same promotion, coalescing and cooldown rules as connection refresh. Refresh changes only the cache; it never changes contract lifecycle or authorization.
          */
         post: operations["refreshContractToadieUsage"];
         delete?: never;
@@ -2404,7 +2404,10 @@ export interface components {
             updatedAt: number;
             /** Format: int64 */
             lastAttemptAt: number | null;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Epoch millis of the latest successful complete scan or unchanged-revision verification.
+             */
             lastSuccessAt: number | null;
             refreshing: boolean;
             lastErrorCode: string | null;
@@ -2423,7 +2426,10 @@ export interface components {
             state: components["schemas"]["ToadieCacheState"];
             /** Format: int64 */
             lastAttemptAt: number | null;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Epoch millis of the latest successful complete scan or unchanged-revision verification.
+             */
             lastSuccessAt: number | null;
             refreshing: boolean;
             lastErrorCode: string | null;
@@ -2484,9 +2490,9 @@ export interface components {
             consumedApiEntityIds: string[];
             systems: components["schemas"]["ToadieEntityRef"][];
             teams: components["schemas"]["ToadieEntityRef"][];
-            /** @description Unknown in Toadie's current model; always null. */
+            /** @description Not read by this connector; always null, even if Toadie has adoption declarations. */
             version: string | null;
-            /** @description Unknown in Toadie's current model; always null. */
+            /** @description Not read by this connector; always null, even if Toadie has adoption declarations. */
             releaseLine: string | null;
         };
         ToadieUsageResponse: {

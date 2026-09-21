@@ -6,6 +6,10 @@ import { randomUUID } from "node:crypto";
 export async function startToadieFixture() {
   const key = `e2e-${randomUUID()}`;
   let fail = false;
+  let revisionNumber = 1;
+  let renameAfterServicePage: string | null = null;
+  let continuousRevisionChanges = false;
+  const requests: { blueprint: string | null; page: number; revision: string }[] = [];
   const blueprints = [
     { id: "1", identifier: "api", relations: {} },
     { id: "2", identifier: "service", relations: {
@@ -42,9 +46,20 @@ export async function startToadieFixture() {
     const { blueprint, page, pageSize } = variables;
     const rows = blueprint ? entities.filter((entity) => entity.blueprint === blueprint) : blueprints;
     const items = rows.slice((page - 1) * pageSize, page * pageSize);
+    const revision = String(revisionNumber);
+    requests.push({ blueprint: blueprint ?? null, page, revision });
     res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({
-      data: { [blueprint ? "entities" : "blueprints"]: { items, page, pageSize, total: rows.length } },
+      data: { [blueprint ? "entities" : "blueprints"]: { items, page, pageSize, total: rows.length, revision } },
     }));
+    if (renameAfterServicePage && blueprint === "service" && page === 1) {
+      const service = entities.find((entity) => entity.blueprint === "service" && entity.identifier === "storefront");
+      if (!service) throw new Error("Fixture storefront service is missing");
+      service.title = renameAfterServicePage;
+      renameAfterServicePage = null;
+      revisionNumber += 1;
+    } else if (continuousRevisionChanges) {
+      revisionNumber += 1;
+    }
   });
   await new Promise<void>((resolve) => server.listen(0, "0.0.0.0", resolve));
   const address = server.address();
@@ -54,6 +69,16 @@ export async function startToadieFixture() {
     baseUrl: `http://${process.env.E2E_UPSTREAM_HOST ?? "host.docker.internal"}:${address.port}`,
     browserUrl: `http://localhost:${address.port}`,
     setFailure: () => { fail = true; },
+    renameServiceMidScan: (title: string) => {
+      revisionNumber += 1;
+      renameAfterServicePage = title;
+    },
+    setContinuousRevisionChanges: () => {
+      revisionNumber += 1;
+      continuousRevisionChanges = true;
+    },
+    clearRequests: () => { requests.length = 0; },
+    requests: () => [...requests],
     close: () => new Promise<void>((resolve, reject) => {
       server.closeAllConnections();
       server.close((error) => error ? reject(error) : resolve());

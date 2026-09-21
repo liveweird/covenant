@@ -251,7 +251,7 @@ class ReleaseLineMigrationReportTest {
                 1,
             )
         }
-        return ToadieSnapshot(apis + services, "system", System.currentTimeMillis())
+        return ToadieSnapshot(apis + services, "system", System.currentTimeMillis(), 1)
     }
 
     private fun amplifiedSnapshot(): ToadieSnapshot {
@@ -266,6 +266,6 @@ class ReleaseLineMigrationReportTest {
             )
         }
         val api = ToadieEntitySnapshot("1", "api", "api-one", "API One", emptyList(), emptyMap(), 1)
-        return ToadieSnapshot(listOf(api) + teams + services, "system", System.currentTimeMillis())
+        return ToadieSnapshot(listOf(api) + teams + services, "system", System.currentTimeMillis(), 1)
     }
 }

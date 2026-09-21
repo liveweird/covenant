@@ -192,6 +192,8 @@ release-line and usage semantics. One captured time drives generation and freshn
 consistent local read of a remote observation, not proof of an atomic remote graph snapshot.
 Generation time, saved plan update, last successful observation and last refresh attempt have
 different meanings; a later failed attempt must not be presented as an observation start.
+Since 0.16.0, `lastSuccessAt` can also be a successful same-revision verification of the
+retained Toadie observation; it does not necessarily mean the entity rows were fetched again.
 
 The impact dialog downloads localized Markdown from a fresh report read, independent of the
 visible usage table's search, role or page. It explicitly exports the saved policy even when

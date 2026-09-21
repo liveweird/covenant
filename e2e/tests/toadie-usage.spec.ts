@@ -3,6 +3,12 @@ import type { APIRequestContext } from "@playwright/test";
 import { apiAsAdmin, expect, login, PETSTORE, seedContractViaApi, teardownSeededContract, test, uniqueText, type SeededContract } from "./helpers";
 import { startToadieFixture } from "./toadie-fixture";
 
+async function waitForRefreshCooldown(api: APIRequestContext, connectionId: number) {
+  const state = await (await api.get(`/api/v1/toadie-connections/${connectionId}`)).json() as { lastAttemptAt: number };
+  // Exercise the public manual-refresh path without bypassing its real cooldown.
+  await expect.poll(() => Date.now() - state.lastAttemptAt, { timeout: 35_000, intervals: [1000] }).toBeGreaterThan(31_000);
+}
+
 test.describe.serial("Toadie contract usage", () => {
   let upstream: Awaited<ReturnType<typeof startToadieFixture>>;
   let api: APIRequestContext;
@@ -80,18 +86,61 @@ test.describe.serial("Toadie contract usage", () => {
     await testInfo.attach("Declared contract usage from Toadie", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
   });
 
-  test("a failed Toadie refresh keeps the last observed consumers visible and marks usage stale", async ({ page }) => {
-    upstream.setFailure();
-    const state = await (await api.get(`/api/v1/toadie-connections/${connectionId}`)).json() as { lastAttemptAt: number };
-    // Respect the real API cooldown; no test-only bypass of the outbound refresh guard.
-    await expect.poll(() => Date.now() - state.lastAttemptAt, { timeout: 35_000, intervals: [1000] }).toBeGreaterThan(31_000);
+  test("a changed upstream revision restarts the scan and publishes one coherent observation", async ({ page }) => {
+    await waitForRefreshCooldown(api, connectionId);
+    upstream.clearRequests();
+    upstream.renameServiceMidScan("Storefront application");
+    await login(page);
+    await page.goto(`/contracts/${seeded.contractId}`);
+    const usage = page.getByRole("region", { name: "Usage from Toadie", exact: true });
+    await usage.getByRole("button", { name: "Refresh usage", exact: true }).click();
+    const table = usage.getByRole("table", { name: "Usage from Toadie", exact: true });
+    await expect(table.getByRole("link", { name: "Open Storefront application in Toadie", exact: true })).toHaveAttribute("href", `${upstream.browserUrl}/entities/4/edit`);
+    await expect(table.getByRole("row")).toHaveCount(3);
+    await expect(table).not.toContainText("Storefront website");
+    await expect(usage.getByText("Current", { exact: true })).toBeVisible();
+
+    const requests = upstream.requests();
+    expect(new Set(requests.map(({ revision }) => revision)).size).toBeGreaterThanOrEqual(2);
+    expect(requests.filter(({ blueprint, page: requestPage }) => blueprint == null && requestPage === 1).length).toBeGreaterThanOrEqual(2);
+    const finalRevision = requests.at(-1)?.revision;
+    expect(new Set(requests.filter(({ revision }) => revision === finalRevision).map(({ blueprint }) => blueprint))).toEqual(
+      new Set([null, "api", "service", "system", "_team"]),
+    );
+  });
+
+  test("continuously changing upstream revisions fail refresh and retain the previous observation", async ({ page }) => {
+    await waitForRefreshCooldown(api, connectionId);
+    upstream.clearRequests();
+    upstream.setContinuousRevisionChanges();
     await login(page);
     await page.goto(`/contracts/${seeded.contractId}`);
     const usage = page.getByRole("region", { name: "Usage from Toadie", exact: true });
     await usage.getByRole("button", { name: "Refresh usage", exact: true }).click();
     await expect(usage.getByText("Stale", { exact: true })).toBeVisible();
     await expect(usage).toContainText("The last refresh failed");
-    await expect(usage.getByRole("link", { name: "Open Storefront website in Toadie", exact: true })).toBeVisible();
+    await expect(usage.getByRole("link", { name: "Open Storefront application in Toadie", exact: true })).toBeVisible();
+    await expect(usage.getByText("No declared usage observed", { exact: true })).toHaveCount(0);
+    const requests = upstream.requests();
+    expect(new Set(requests.map(({ revision }) => revision)).size).toBeGreaterThan(2);
+    expect(requests.filter(({ blueprint }) => blueprint == null).length).toBeGreaterThanOrEqual(2);
+  });
+
+  test("a failed Toadie refresh keeps the last observed consumers visible and marks usage stale", async ({ page }) => {
+    await waitForRefreshCooldown(api, connectionId);
+    upstream.setFailure();
+    await login(page);
+    await page.goto(`/contracts/${seeded.contractId}`);
+    const usage = page.getByRole("region", { name: "Usage from Toadie", exact: true });
+    await usage.getByRole("button", { name: "Refresh usage", exact: true }).click();
+    await expect.poll(async () => {
+      const response = await api.get(`/api/v1/toadie-connections/${connectionId}`);
+      const state = await response.json() as { refreshing: boolean; lastErrorCode: string | null };
+      return `${state.refreshing}:${state.lastErrorCode}`;
+    }, { timeout: 15_000 }).toBe("false:GRAPHQL_ERROR");
+    await expect(usage.getByText("Stale", { exact: true })).toBeVisible();
+    await expect(usage).toContainText("The last refresh failed");
+    await expect(usage.getByRole("link", { name: "Open Storefront application in Toadie", exact: true })).toBeVisible();
     await expect(usage.getByText("No declared usage observed", { exact: true })).toHaveCount(0);
   });
 });

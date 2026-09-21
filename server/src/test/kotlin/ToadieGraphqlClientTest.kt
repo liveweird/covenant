@@ -4,6 +4,8 @@ import ch.nokillswit.toadie.HttpToadieGraphqlClient
 import ch.nokillswit.toadie.ToadieFetchConfig
 import ch.nokillswit.toadie.ToadieFetchException
 import ch.nokillswit.toadie.ToadieMapping
+import ch.nokillswit.toadie.ToadieSnapshot
+import ch.nokillswit.toadie.ToadieUnchanged
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
@@ -14,6 +16,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.net.InetSocketAddress
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -81,7 +84,7 @@ class ToadieGraphqlClientTest {
         val pageSize = variables.path("pageSize").intValue()
         val rows = all.drop((page - 1) * pageSize).take(pageSize)
         return mapper.valueToTree(mapOf("data" to mapOf(field to mapOf(
-            "items" to rows, "page" to page, "pageSize" to pageSize, "total" to all.size,
+            "items" to rows, "page" to page, "pageSize" to pageSize, "total" to all.size, "revision" to "7",
         ))))
     }
 
@@ -98,7 +101,7 @@ class ToadieGraphqlClientTest {
     @Test
     fun `fetches every page with server-only credentials and retains only declared metadata`() = fixture { f ->
         HttpToadieGraphqlClient(pageSize = 1).use { client ->
-            val snapshot = runBlocking { client.fetch(config(f)) }
+            val snapshot = runBlocking { client.fetch(config(f)) } as ToadieSnapshot
             assertEquals(5, snapshot.entities.size)
             assertEquals("system", snapshot.systemBlueprint)
             val service = snapshot.entities.single { it.blueprint == "service" }
@@ -106,7 +109,7 @@ class ToadieGraphqlClientTest {
             assertEquals(listOf("events"), service.relations["consumes_apis"])
             assertEquals(listOf("retail"), service.teamIdentifiers)
             assertEquals(listOf("retail"), snapshot.entities.single { it.blueprint == "system" }.teamIdentifiers)
-            assertEquals(9, f.requests.size)
+            assertEquals(10, f.requests.size)
             assertTrue(f.auth.all { it == "Bearer private-fixture-key" })
             assertTrue(f.requests.all { it.path("operationName").asText() == "CovenantUsage" })
             assertTrue(f.requests.none { it.path("query").asText().contains("properties") })
@@ -114,9 +117,108 @@ class ToadieGraphqlClientTest {
     }
 
     @Test
+    fun `saved revision shortcut verifies remotely while forced full scan bypasses it`() = fixture { f ->
+        HttpToadieGraphqlClient().use { client ->
+            val unchanged = runBlocking { client.fetch(config(f).copy(knownRevision = 7)) }
+            assertTrue(unchanged is ToadieUnchanged)
+            assertEquals(7, unchanged.revision)
+            assertEquals(1, f.requests.size)
+
+            f.requests.clear()
+            val full = runBlocking { client.fetch(config(f)) } as ToadieSnapshot
+            assertEquals(7, full.revision)
+            assertTrue(f.requests.size > 1)
+        }
+    }
+
+    @Test
+    fun `restarts one full scan when revisions change between same-sized pages`() = fixture { f ->
+        f.edit = { _, root ->
+            if (f.requests.size >= 2) {
+                val page = root.path("data").elements().next() as ObjectNode
+                page.put("revision", "8")
+                if (f.requests.size == 2) page.put("total", 5)
+            }
+        }
+        HttpToadieGraphqlClient(pageSize = 1).use { client ->
+            val full = runBlocking { client.fetch(config(f)) } as ToadieSnapshot
+            assertEquals(8, full.revision)
+            assertTrue(f.requests.size > 10)
+        }
+    }
+
+    @Test
+    fun `detects a revision change at an entity type boundary including an empty page`() = fixture { f ->
+        val changed = AtomicBoolean(false)
+        f.edit = { request, root ->
+            val page = root.path("data").elements().next() as ObjectNode
+            val blueprint = request.path("variables").path("blueprint").textValue()
+            if (blueprint == "service") {
+                page.path("items").forEach { (it as ObjectNode).putNull("team") }
+            }
+            if (blueprint == "_team") {
+                page.putArray("items")
+                page.put("total", 0)
+                changed.set(true)
+            }
+            if (changed.get()) page.put("revision", "8")
+        }
+        HttpToadieGraphqlClient(pageSize = 1).use { client ->
+            val full = runBlocking { client.fetch(config(f)) } as ToadieSnapshot
+            assertEquals(8, full.revision)
+            assertTrue(full.entities.none { it.blueprint == "_team" })
+        }
+    }
+
+    @Test
+    fun `a restarted scan shares the original decoded-row budget`() = fixture { f ->
+        HttpToadieGraphqlClient(pageSize = 1, maxEntities = 9).use { client ->
+            assertTrue(runBlocking { client.fetch(config(f)) } is ToadieSnapshot)
+        }
+        f.requests.clear()
+        f.edit = { _, root ->
+            if (f.requests.size >= 2) (root.path("data").elements().next() as ObjectNode).put("revision", "8")
+        }
+        assertFailure(f, "LIMIT_EXCEEDED", HttpToadieGraphqlClient(pageSize = 1, maxEntities = 9))
+    }
+
+    @Test
+    fun `final revision probe restarts a scan changed after its last entity page`() = fixture { f ->
+        f.edit = { request, root ->
+            val revisionOnly = request.path("query").asText().contains("{ revision }")
+            if (revisionOnly || f.requests.size > 10) {
+                (root.path("data").elements().next() as ObjectNode).put("revision", "8")
+            }
+        }
+        HttpToadieGraphqlClient(pageSize = 1).use { client ->
+            val full = runBlocking { client.fetch(config(f)) } as ToadieSnapshot
+            assertEquals(8, full.revision)
+        }
+    }
+
+    @Test
+    fun `rejects sustained revision churn and malformed revision values`() = fixture { f ->
+        f.edit = { _, root ->
+            (root.path("data").elements().next() as ObjectNode).put("revision", if (f.requests.size % 2 == 0) "8" else "7")
+        }
+        assertFailure(f, "SOURCE_CHANGED", HttpToadieGraphqlClient(pageSize = 1))
+
+        f.requests.clear()
+        f.edit = { _, root -> (root.path("data").elements().next() as ObjectNode).remove("revision") }
+        assertFailure(f, "INVALID_RESPONSE")
+        for (revision in listOf("", "01", "-1", "9223372036854775808", "not-a-number")) {
+            f.requests.clear()
+            f.edit = { _, root -> (root.path("data").elements().next() as ObjectNode).put("revision", revision) }
+            assertFailure(f, "INVALID_RESPONSE")
+        }
+    }
+
+    @Test
     fun `canonicalizes blueprint configuration while preserving exact relation identities`() = fixture { f ->
         HttpToadieGraphqlClient().use { client ->
-            val result = runBlocking { client.fetch(config(f).copy(mapping = ToadieMapping(serviceBlueprint = "SERVICE"))) }
+            val result = runBlocking {
+                client.fetch(config(f).copy(mapping = ToadieMapping(serviceBlueprint = "SERVICE")))
+            } as ToadieSnapshot
             assertEquals("service", result.entities.single { it.identifier == "checkout" }.blueprint)
         }
         f.edit = { _, root -> root.at("/data/entities/items").firstOrNull { it.path("id").asText() == "3" }?.let {
@@ -137,7 +239,7 @@ class ToadieGraphqlClientTest {
             }
         } }
         HttpToadieGraphqlClient().use { client ->
-            val snapshot = runBlocking { client.fetch(config(f)) }
+            val snapshot = runBlocking { client.fetch(config(f)) } as ToadieSnapshot
             assertEquals(longIdentifier, snapshot.entities.single { it.id == "1" }.identifier)
         }
     }

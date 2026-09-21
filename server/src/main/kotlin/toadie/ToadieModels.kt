@@ -123,7 +123,12 @@ data class ToadieUsageResponse(
     val cache: ToadieCacheStatus,
 )
 
-data class ToadieFetchConfig(val baseUrl: String, val apiKey: String, val mapping: ToadieMapping)
+data class ToadieFetchConfig(
+    val baseUrl: String,
+    val apiKey: String,
+    val mapping: ToadieMapping,
+    val knownRevision: Long? = null,
+)
 
 @Serializable
 data class ToadieEntitySnapshot(
@@ -136,13 +141,22 @@ data class ToadieEntitySnapshot(
     val updatedAt: Long,
 )
 
+sealed interface ToadieFetchResult
+
 @Serializable
-data class ToadieSnapshot(val entities: List<ToadieEntitySnapshot>, val systemBlueprint: String?, val fetchedAt: Long)
+data class ToadieSnapshot(
+    val entities: List<ToadieEntitySnapshot>,
+    val systemBlueprint: String?,
+    val fetchedAt: Long,
+    val revision: Long,
+) : ToadieFetchResult
+
+data class ToadieUnchanged(val revision: Long, val checkedAt: Long) : ToadieFetchResult
 
 class ToadieFetchException(val code: String) : RuntimeException(code)
 
 interface ToadieGraphqlClient {
-    suspend fun fetch(config: ToadieFetchConfig): ToadieSnapshot
+    suspend fun fetch(config: ToadieFetchConfig): ToadieFetchResult
 }
 
 val ToadieGraphqlClientKey = AttributeKey<ToadieGraphqlClient>("ToadieGraphqlClient")

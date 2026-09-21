@@ -1108,7 +1108,7 @@ paths:
       tags: [toadie]
       operationId: refreshToadieConnection
       summary: Queue a complete Toadie snapshot refresh
-      description: ADMIN only. Concurrent requests coalesce; another request inside 30 seconds returns 429.
+      description: ADMIN only. Manual refresh always requests a full scan. An in-flight scheduled revision check is promoted to a new full-scan claim; other concurrent requests coalesce. Outside that promotion, a new manual request within 30 seconds of the last attempt returns 429.
       responses:
         '202': { description: Refresh accepted or already in progress }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -1203,7 +1203,7 @@ paths:
       tags: [toadie]
       operationId: refreshContractToadieUsage
       summary: Queue refresh of the linked Toadie connection
-      description: Contract writer only. Refresh changes only the cache; it never changes contract lifecycle or authorization.
+      description: Contract writer only. Requests a full scan with the same promotion, coalescing and cooldown rules as connection refresh. Refresh changes only the cache; it never changes contract lifecycle or authorization.
       responses:
         '202': { description: Refresh accepted or already in progress }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -3537,7 +3537,7 @@ components:
         createdAt: { type: integer, format: int64 }
         updatedAt: { type: integer, format: int64 }
         lastAttemptAt: { type: integer, format: int64, nullable: true }
-        lastSuccessAt: { type: integer, format: int64, nullable: true }
+        lastSuccessAt: { type: integer, format: int64, nullable: true, description: Epoch millis of the latest successful complete scan or unchanged-revision verification. }
         refreshing: { type: boolean }
         lastErrorCode: { type: string, nullable: true }
         stale: { type: boolean }
@@ -3558,7 +3558,7 @@ components:
       properties:
         state: { $ref: '#/components/schemas/ToadieCacheState' }
         lastAttemptAt: { type: integer, format: int64, nullable: true }
-        lastSuccessAt: { type: integer, format: int64, nullable: true }
+        lastSuccessAt: { type: integer, format: int64, nullable: true, description: Epoch millis of the latest successful complete scan or unchanged-revision verification. }
         refreshing: { type: boolean }
         lastErrorCode: { type: string, nullable: true }
     ToadieConnectionRef:
@@ -3630,8 +3630,8 @@ components:
         consumedApiEntityIds: { type: array, items: { type: string } }
         systems: { type: array, items: { $ref: '#/components/schemas/ToadieEntityRef' } }
         teams: { type: array, items: { $ref: '#/components/schemas/ToadieEntityRef' } }
-        version: { type: string, nullable: true, description: Unknown in Toadie's current model; always null. }
-        releaseLine: { type: string, nullable: true, description: Unknown in Toadie's current model; always null. }
+        version: { type: string, nullable: true, description: "Not read by this connector; always null, even if Toadie has adoption declarations." }
+        releaseLine: { type: string, nullable: true, description: "Not read by this connector; always null, even if Toadie has adoption declarations." }
     ToadieUsageResponse:
       type: object
       required: [items, page, pageSize, total, connection, cache]

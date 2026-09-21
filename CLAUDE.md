@@ -60,7 +60,10 @@ line-filtered versions and line-aware creation.
 The `toadie/` server package reads Toadie’s existing Port GraphQL API through ADMIN-curated
 connections with encrypted machine keys. Contract writers link one or more remote APIs;
 read-only usage shows provider/consumer services, systems and teams. Periodic/manual refresh
-preserves the last successful observation on failure. It never synchronizes authorization or
+preserves the last successful observation on failure. Since 0.16.0, Toadie 2.12+ is required:
+full scans compare revisions across every page with one bounded restart, scheduled refreshes
+reconfirm unchanged revisions without rescanning, and manual refreshes always scan fully.
+It never synchronizes authorization or
 infers version adoption. See `.claude/docs/toadie-integration.md` for mapping, transport,
 concurrency, cache semantics and deployment. The SPA adds Toadie connection administration
 and a Usage from Toadie panel on contract details.
