@@ -52,6 +52,28 @@ describe("OwnerSelect", () => {
     await waitFor(() => expect(calledUrl(mockFetch, "GET", (u) => u.includes("name=Admin"))).toBeDefined());
   });
 
+  test.each([{ roles: ["ADMIN"] }, { roles: [] }])("loads teams beyond page one with the caller membership scope: $roles", async ({ roles }) => {
+    signIn(roles, 2);
+    serve(mockFetch, {
+      "GET /api/v1/teams?": (url) => {
+        const page = Number(new URL(url, "http://localhost").searchParams.get("page"));
+        const items = page === 1
+          ? Array.from({ length: 100 }, (_, index) => ({ id: index + 1, name: `Team ${index + 1}` }))
+          : [{ id: 101, name: "Late team" }];
+        return { status: 200, body: { items, page, pageSize: 100, total: 101 } };
+      },
+    });
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    renderWithProviders(<OwnerSelect value={null} onChange={onChange} />);
+    await user.click(screen.getByLabelText("Owner", { selector: "input" }));
+    await user.click(await screen.findByRole("option", { name: "Late team" }));
+    expect(onChange).toHaveBeenCalledWith("TEAM:101");
+    const calls = mockFetch.mock.calls.filter(([url]) => url.startsWith("/api/v1/teams?"));
+    expect(calls).toHaveLength(2);
+    for (const [url] of calls) expect(url.includes("memberId=2")).toBe(!roles.includes("ADMIN"));
+  });
+
   test("a selected owner label does not become a server-side user search", async () => {
     signIn(["ADMIN"], 1);
     serve(mockFetch);

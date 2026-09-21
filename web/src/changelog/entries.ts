@@ -17,6 +17,24 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.14.3",
+    date: "2026-09-21",
+    en: `**Catalog integrity and reliable selections.**
+
+- Concurrent creation, moves and ownership changes now coordinate with parent deletion to keep the catalog consistent.
+- Prerelease versions follow SemVer order across pages, error reports and exports, including rc.2 and rc.10.
+- Switching Toadie connections clears stale API choices; syncing a published version retains its source major line.
+- System, team and comparison pickers include choices beyond the first 100 records.
+- Environment HTTP validation rejects equivalent link-local address literals while preserving internal targets.`,
+    pl: `**Spójność katalogu i poprawny wybór rekordów.**
+
+- Równoczesne tworzenie, przenoszenie i zmiana właściciela uwzględniają usuwanie rekordów nadrzędnych, zachowując spójność katalogu.
+- Wersje przedpremierowe są sortowane zgodnie z SemVer na wszystkich stronach list, w raporcie błędów i eksporcie, także dla rc.2 i rc.10.
+- Zmiana połączenia z Toadie usuwa nieaktualne opcje API, a synchronizacja opublikowanej wersji zachowuje jej główną linię wydań.
+- Pola wyboru systemu, zespołu i porównywanych wersji obejmują rekordy poza pierwszą setką.
+- Walidacja adresów HTTP środowisk odrzuca równoważne zapisy adresów link-local, nadal dopuszczając adresy wewnętrzne.`,
+  },
+  {
     version: "0.14.2",
     date: "2026-09-21",
     en: `**Reliable validation and breaking-change checks.**

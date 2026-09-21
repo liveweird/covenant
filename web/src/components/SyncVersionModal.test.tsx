@@ -3,8 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router-dom";
 import { renderWithProviders, screen, waitFor } from "../test/render";
 import SyncVersionModal from "./SyncVersionModal";
+import NewVersion from "../pages/NewVersion";
 import type { VersionResponse } from "../api/versions";
-import { bodyOf, CLEAN_REPORT, CONTENT, CONTRACT, findCall, serve, signIn, VERSION, type FetchMock } from "../test/contractsFixtures";
+import { bodyOf, calledUrl, CLEAN_REPORT, CONTENT, CONTRACT, findCall, serve, signIn, VERSION, VERSION_PAGE, type FetchMock } from "../test/contractsFixtures";
+
+vi.mock("./LazyCodeEditor", async () => (await import("../test/codeEditorStub")).codeEditorMock());
 
 const SOURCE = "https://github.com/acme/contracts/blob/main/orders.yaml";
 const LINKED: VersionResponse = { ...VERSION, sourceUrl: SOURCE, lastSyncedAt: 2 };
@@ -13,7 +16,7 @@ const REPO_COPY = CONTENT.replace("paths: {}", "paths:\n  /orders: {}");
 function renderModal(version: VersionResponse, onSynced = vi.fn(), onClose = vi.fn()) {
   renderWithProviders(
     <Routes>
-      <Route path="/contracts/:id/versions/new" element={<h2>New version page</h2>} />
+      <Route path="/contracts/:id/versions/new" element={<NewVersion />} />
       <Route path="*" element={<SyncVersionModal contract={CONTRACT} version={version} onClose={onClose} onSynced={onSynced} />} />
     </Routes>,
     { route: "/contracts/5/versions/11" },
@@ -85,14 +88,27 @@ describe("SyncVersionModal", () => {
     expect(screen.getByRole("button", { name: "Overwrite stored document" })).toBeDisabled();
   });
 
-  test("a published version offers a new version seeded with the repo copy instead of an overwrite", async () => {
-    serve(mockFetch, routes(REPO_COPY));
+  test("a published old-line sync opens a real new-version page in its source major with the repo copy", async () => {
+    const newerMajor = { ...VERSION_PAGE.items[0], id: 20, version: "2.0.0", lifecycle: "ACTIVE" as const };
+    serve(mockFetch, {
+      ...routes(REPO_COPY),
+      "GET /api/v1/contracts/5": { status: 200, body: { ...CONTRACT, latestVersion: newerMajor } },
+      "GET /api/v1/contracts/5/versions?": (url) => {
+        const major = new URL(url, "http://covenant.local").searchParams.get("major");
+        return major === "1"
+          ? { status: 200, body: VERSION_PAGE }
+          : { status: 200, body: { ...VERSION_PAGE, items: [newerMajor, ...VERSION_PAGE.items], total: 3 } };
+      },
+    });
     renderModal({ ...LINKED, lifecycle: "ACTIVE", updatedAt: 3 });
     expect(await screen.findByText("Edited in Covenant")).toBeInTheDocument();
     expect(screen.getByText(/This version is published/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Overwrite stored document" })).not.toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole("button", { name: "New version from the repository copy" }));
-    expect(await screen.findByRole("heading", { name: "New version page" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "New version of orders-api" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText("Version")).toHaveValue("1.1.1"));
+    expect(screen.getByRole("textbox", { name: "Contract document" })).toHaveValue(REPO_COPY);
+    expect(calledUrl(mockFetch, "GET", (url) => url.startsWith("/api/v1/contracts/5/versions?") && url.includes("major=1"))).toBeDefined();
   });
 
   test("a refused fetch and an unparseable repo copy are errors, never a sync", async () => {

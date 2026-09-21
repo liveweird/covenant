@@ -22,7 +22,7 @@ val ContractErrorServiceKey = AttributeKey<ContractErrorService>("ContractErrorS
 private val SORTABLE_COLUMNS: Map<String, Column<*>> = mapOf(
     "id" to ContractVersions.id, // the row identity IS the version
     "name" to ContractService.Contracts.name,
-    "version" to ContractVersions.semverMajor, // see applySemverPaging — "version" expands to the four SemVer columns
+    "version" to ContractVersions.semverMajor, // see applySemverPaging — "version" uses the shared SemVer SQL order
     "lifecycle" to ContractVersions.lifecycle,
     "checkedAt" to ContractVersions.checkedAt,
     "errors" to ContractVersions.checkErrors,

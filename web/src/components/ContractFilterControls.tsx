@@ -2,8 +2,8 @@ import { useTranslation } from "react-i18next";
 import { MultiSelect, Select, Switch } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { listAllDomains } from "../api/domains";
-import { listSystems } from "../api/systems";
-import { listTeams } from "../api/teams";
+import { listAllSystems } from "../api/systems";
+import { listAllTeams } from "../api/teams";
 import type { ContractFacets } from "../api/contracts";
 import type { ContractFilterState } from "../hooks/useContractFilterState";
 import { CONTRACT_TYPE_LABEL, CONTRACT_TYPES } from "../utils/contractForm";
@@ -29,9 +29,9 @@ export default function ContractFilterControls({ filters, facets = null }: { fil
   const teamCounts = countsByKey(facets?.ownerTeam, (f) => String(f.id), (f) => f.count);
   const named = (id: number, label: string, counts: ReadonlyMap<string, number> | null) => (counts ? `${label} (${counts.get(String(id)) ?? 0})` : label);
   const domains = useQuery({ queryKey: ["domains", "all"], queryFn: listAllDomains });
-  const systems = useQuery({ queryKey: ["systems", "all"], queryFn: () => listSystems({ page: 1, pageSize: 100, sort: "name" }) });
-  const teams = useQuery({ queryKey: ["teams", "picker", "all"], queryFn: () => listTeams({ page: 1, pageSize: 100, sort: "name" }) });
-  const systemOptions = (systems.data?.items ?? [])
+  const systems = useQuery({ queryKey: ["systems", "all-pages"], queryFn: () => listAllSystems() });
+  const teams = useQuery({ queryKey: ["teams", "picker", "all-pages"], queryFn: () => listAllTeams() });
+  const systemOptions = (systems.data ?? [])
     .filter((s) => !slots.domainId || String(s.domainId) === slots.domainId)
     .map((s) => ({ value: String(s.id), label: named(s.id, s.name, systemCounts) }));
   // The Errors report reuses this control set for its scope filters only — it owns the
@@ -48,7 +48,7 @@ export default function ContractFilterControls({ filters, facets = null }: { fil
         onChange={(v) => {
           slots.setDomainId(v ?? "");
           // A system belongs to one domain — a domain change drops a system that left the set.
-          if (v && slots.systemId && !(systems.data?.items ?? []).some((s) => String(s.id) === slots.systemId && String(s.domainId) === v)) slots.setSystemId("");
+          if (v && slots.systemId && !(systems.data ?? []).some((s) => String(s.id) === slots.systemId && String(s.domainId) === v)) slots.setSystemId("");
         }}
         clearable
         clearButtonProps={{ "aria-label": t("common.filter.clearDomain") }}
@@ -89,7 +89,7 @@ export default function ContractFilterControls({ filters, facets = null }: { fil
       <Select
         label={t("contracts.filter.ownerTeam")}
         placeholder={t("common.state.any")}
-        data={(teams.data?.items ?? []).map((team) => ({ value: String(team.id), label: named(team.id, team.name, teamCounts) }))}
+        data={(teams.data ?? []).map((team) => ({ value: String(team.id), label: named(team.id, team.name, teamCounts) }))}
         value={slots.ownerTeamId || null}
         onChange={(v) => slots.setOwnerTeamId(v ?? "")}
         clearable

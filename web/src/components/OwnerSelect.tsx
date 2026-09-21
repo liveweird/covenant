@@ -4,7 +4,7 @@ import { Select, type ComboboxItemGroup } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { getUserId, isAdmin } from "../api/session";
-import { listTeams } from "../api/teams";
+import { listAllTeams } from "../api/teams";
 import { getUser, listUsers } from "../api/users";
 
 /**
@@ -38,8 +38,8 @@ export default function OwnerSelect({
   const [debounced] = useDebouncedValue(userSearch.trim(), 300);
 
   const teams = useQuery({
-    queryKey: ["teams", "picker", admin ? "all" : me],
-    queryFn: () => listTeams({ page: 1, pageSize: 100, sort: "name", memberId: admin ? undefined : (me ?? undefined) }),
+    queryKey: ["teams", "picker", "all-pages", admin ? "all" : me],
+    queryFn: () => listAllTeams(admin ? undefined : (me ?? undefined)),
   });
   const users = useQuery({
     queryKey: ["users", "picker", debounced],
@@ -48,7 +48,7 @@ export default function OwnerSelect({
   });
   const self = useQuery({ queryKey: ["user", me], queryFn: () => getUser(me as number), enabled: !admin && me != null });
 
-  const teamItems = (teams.data?.items ?? []).map((team) => ({ value: `TEAM:${team.id}`, label: team.name }));
+  const teamItems = (teams.data ?? []).map((team) => ({ value: `TEAM:${team.id}`, label: team.name }));
   const userItems = admin
     ? (users.data?.items ?? []).map((user) => ({ value: `USER:${user.id}`, label: `${user.name} (${user.email})` }))
     : self.data

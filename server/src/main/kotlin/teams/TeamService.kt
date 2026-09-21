@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.toList
 import ch.nokillswit.infra.db.SoftDeletable
 import ch.nokillswit.infra.db.active
 import ch.nokillswit.infra.db.nowMillis
+import ch.nokillswit.infra.db.lockActiveForUpdate
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.dao.id.UIntIdTable
 import org.jetbrains.exposed.v1.r2dbc.*
@@ -124,6 +125,7 @@ class TeamService(private val database: R2dbcDatabase) {
      * team). Refused (409) while the team still owns an active contract — transfer them first.
      */
     suspend fun delete(id: UInt): Int = suspendTransaction(database) {
+        if (!Teams.lockActiveForUpdate(id)) return@suspendTransaction 0
         val contracts = ContractService.Contracts
         val owned = contracts.select(contracts.id)
             .where { (contracts.ownerTeamId eq id) and (contracts.markedAsDeleted eq false) }.count()

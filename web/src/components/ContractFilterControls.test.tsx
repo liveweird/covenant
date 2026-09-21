@@ -53,6 +53,35 @@ describe("ContractFilterControls", () => {
     expect(await screen.findByRole("option", { name: "Payments (13)" })).toBeInTheDocument();
   });
 
+  test("systems and owner teams beyond page one remain selectable", async () => {
+    serve(mockFetch, {
+      "GET /api/v1/systems?": (url) => {
+        const page = Number(new URL(url, "http://localhost").searchParams.get("page"));
+        const items = page === 1
+          ? Array.from({ length: 100 }, (_, index) => ({ ...SYSTEMS_PAGE.items[0], id: index + 1, name: `System ${index + 1}` }))
+          : [{ ...SYSTEMS_PAGE.items[0], id: 101, name: "Late system" }];
+        return { status: 200, body: { items, page, pageSize: 100, total: 101 } };
+      },
+      "GET /api/v1/teams?": (url) => {
+        const page = Number(new URL(url, "http://localhost").searchParams.get("page"));
+        const items = page === 1
+          ? Array.from({ length: 100 }, (_, index) => ({ id: index + 1, name: `Team ${index + 1}` }))
+          : [{ id: 101, name: "Late team" }];
+        return { status: 200, body: { items, page, pageSize: 100, total: 101 } };
+      },
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<Harness facets={null} />);
+    const system = screen.getByLabelText("System", { selector: "input" });
+    await user.click(system);
+    await user.click(await screen.findByRole("option", { name: "Late system" }));
+    expect(system).toHaveValue("Late system");
+    const team = screen.getByLabelText("Owning team", { selector: "input" });
+    await user.click(team);
+    await user.click(await screen.findByRole("option", { name: "Late team" }));
+    expect(team).toHaveValue("Late team");
+  });
+
   test("without facets the labels are plain", async () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness facets={null} />);

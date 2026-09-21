@@ -73,6 +73,25 @@ describe("VersionDiff page", () => {
     expect(await screen.findByText("The two documents are identical.")).toBeInTheDocument();
   });
 
+  test("offers a version beyond the first 100 and loads the selected comparison", async () => {
+    serve(mockFetch, {
+      ...base,
+      "GET /api/v1/contracts/5/versions?": (url) => {
+        const page = Number(new URL(url, "http://localhost").searchParams.get("page"));
+        const items = page === 1
+          ? Array.from({ length: 100 }, (_, index) => ({ ...VERSION_PAGE.items[0], id: 200 + index, version: `2.0.${100 - index}` }))
+          : [OLD_VERSION];
+        return { status: 200, body: { items, page, pageSize: 100, total: 101 } };
+      },
+    });
+    const user = userEvent.setup();
+    renderPage("/contracts/5/diff?from=11&to=11");
+    await user.click(await screen.findByLabelText("From", { selector: "input" }));
+    await user.click(await screen.findByRole("option", { name: "1.0.0 (Active)" }));
+    expect(await screen.findByText("- version: 1.0.0")).toBeInTheDocument();
+    expect(screen.getByLabelText("From", { selector: "input" })).toHaveValue("1.0.0 (Active)");
+  });
+
   test("a single-version contract explains that two are needed", async () => {
     serve(mockFetch, { ...base, "GET /api/v1/contracts/5/versions?": { status: 200, body: { ...VERSION_PAGE, items: [VERSION_PAGE.items[0]], total: 1 } } });
     renderPage();

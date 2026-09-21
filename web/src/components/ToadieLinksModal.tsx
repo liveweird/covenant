@@ -36,10 +36,17 @@ export default function ToadieLinksModal({ contractId, links, onClose, onSaved }
   const connections = useQuery({ queryKey: ["toadie", "connections", "picker"], queryFn: () => listToadieConnections({ page: 1, pageSize: 20, sort: "name" }) });
   const apis = useQuery({
     queryKey: ["toadie", "apis", connectionId, page, pageSize, debouncedSearch],
-    queryFn: () => listToadieApis(Number(connectionId), { page, pageSize, q: debouncedSearch || undefined }),
+    queryFn: async () => ({
+      connectionId,
+      page: await listToadieApis(Number(connectionId), { page, pageSize, q: debouncedSearch || undefined }),
+    }),
     enabled: connectionId != null,
     placeholderData: keepPreviousData,
   });
+  // `keepPreviousData` prevents table layout churn while paging/searching, but after a
+  // connection switch those rows belong to another ID namespace. Never render them as choices:
+  // two Toadie instances may legitimately use the same entity ID for different APIs.
+  const apiPage = apis.data?.connectionId === connectionId ? apis.data.page : null;
 
   function chooseConnection(value: string | null) {
     setConnectionId(value);
@@ -100,14 +107,14 @@ export default function ToadieLinksModal({ contractId, links, onClose, onSaved }
           <Table aria-label={t("toadie.usage.availableApis")}>
             <Table.Thead><Table.Tr><Table.Th style={{ width: 1 }} /><Table.Th>{t("common.field.name")}</Table.Th><Table.Th>{t("toadie.usage.identifier")}</Table.Th></Table.Tr></Table.Thead>
             <Table.Tbody>
-              {apis.isLoading && !apis.data ? <TableLoadingRow colSpan={3} /> : apis.data?.items.map((api) => <Table.Tr key={api.entityId}>
+              {apis.isLoading || apiPage == null ? <TableLoadingRow colSpan={3} /> : apiPage.items.map((api) => <Table.Tr key={api.entityId}>
                 <Table.Td><Checkbox aria-label={api.title} checked={selected.has(api.entityId)} onChange={(event) => toggle(api, event.currentTarget.checked)} /></Table.Td>
                 <Table.Td><Text size="sm">{api.title}</Text></Table.Td>
                 <Table.Td><Badge variant="light" color="gray">{api.identifier}</Badge></Table.Td>
               </Table.Tr>)}
             </Table.Tbody>
           </Table>
-          <PaginationBar total={apis.data?.total ?? 0} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />
+          <PaginationBar total={apiPage?.total ?? 0} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />
         </>}
         {error && <Alert color="red" variant="light" title={t("toadie.usage.saveFailed")}>{error}</Alert>}
         <Group justify="flex-end">

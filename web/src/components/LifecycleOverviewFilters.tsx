@@ -18,7 +18,7 @@ export default function LifecycleOverviewFilters({ filters, summary }: { filters
   const systems = useQuery({ queryKey: ["systems", "all", selectedDomainId], queryFn: () => listAllSystems(selectedDomainId) });
   // The contracts filter owns ["teams","picker","all"] with a paged response shape.
   // Keep the all-pages array on a distinct key so navigation cannot reuse the wrong shape.
-  const teams = useQuery({ queryKey: ["teams", "picker", "all-pages"], queryFn: listAllTeams });
+  const teams = useQuery({ queryKey: ["teams", "picker", "all-pages"], queryFn: () => listAllTeams() });
   const systemOptions = (systems.data ?? [])
     .map((system) => ({ value: String(system.id), label: system.name }));
   const ownerOptions = [

@@ -12,13 +12,18 @@ import ch.nokillswit.contracts.ContractService
 import ch.nokillswit.contracts.ContractVersionService
 import ch.nokillswit.contracts.VersionCreateRequest
 import ch.nokillswit.contracts.checks.ChecksService
+import ch.nokillswit.contracts.checks.CheckerClient
 import ch.nokillswit.contracts.checks.CheckerClientKey
+import ch.nokillswit.contracts.checks.CheckerResponse
 import ch.nokillswit.users.UserRole
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.testApplication
 import java.util.UUID
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -96,6 +101,52 @@ class ContractImportTest {
         }.exceptionOrNull()
         assertNotNull(failure, "the invalid createdBy FK must fail after the parent insert")
         assertNull(contracts.findActiveId(systemId, contractName), "the nested parent insert must roll back with the failed version")
+    }
+
+    @Test
+    fun `a parent deleted while import checks is rejected without an orphan contract`() = testApplication {
+        val enteredCheck = CompletableDeferred<Unit>()
+        val releaseCheck = CompletableDeferred<Unit>()
+        val checker = object : CheckerClient {
+            override suspend fun check(type: ContractType, content: String, previousContent: String?): CheckerResponse {
+                enteredCheck.complete(Unit)
+                releaseCheck.await()
+                return CheckerResponse(emptyList())
+            }
+        }
+        configureApp()
+        application { attributes.put(CheckerClientKey, checker) }
+        startApplication()
+        val admin = seededClient("imp-parent-race", UserRole.ADMIN)
+        val systemId = TestContracts.seedSystem("imp-parent-race")
+        val teamId = TestTeams.seed(name("parent-race-team"))
+        val contractName = name("parent-race-contract")
+
+        coroutineScope {
+            val import = async {
+                admin.postJson(
+                    "/api/v1/contracts/import",
+                    ImportRequest(
+                        listOf(
+                            ImportItem(
+                                systemId, ContractType.OPENAPI, contractName, ownerTeamId = teamId,
+                                version = "1.0.0", content = ContractFixtures.openApi,
+                            ),
+                        ),
+                    ),
+                ).body<ImportResponse>().results.single()
+            }
+            enteredCheck.await()
+            try {
+                assertEquals(1, TestSystems.service.delete(systemId))
+            } finally {
+                releaseCheck.complete(Unit)
+            }
+            val result = import.await()
+            assertEquals(ImportStatus.INVALID, result.status)
+            val contracts = ContractService(sharedDatabaseForTests(), ch.nokillswit.teams.TeamService(sharedDatabaseForTests()))
+            assertNull(contracts.findActiveId(systemId, contractName))
+        }
     }
 
     @Test

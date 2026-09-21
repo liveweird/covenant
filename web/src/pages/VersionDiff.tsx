@@ -5,7 +5,7 @@ import { Alert, Group, Select, Stack, Switch, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { getContract } from "../api/contracts";
 import { ApiError } from "../api/http";
-import { getVersion, getVersionCompatibility, listVersions } from "../api/versions";
+import { getVersion, getVersionCompatibility, listAllVersions } from "../api/versions";
 import CompatibilityCard from "../components/CompatibilityCard";
 import EditPageLoadState from "../components/EditPageLoadState";
 import LoadingBlock from "../components/LoadingBlock";
@@ -30,11 +30,11 @@ export default function VersionDiff() {
   const [hideUnchanged, setHideUnchanged] = useStoredState("versionDiff.hideUnchanged", true, isBoolean);
   const contract = useQuery({ queryKey: ["contracts", "detail", id], queryFn: () => getContract(id), enabled: Number.isFinite(id) });
   const versions = useQuery({
-    queryKey: ["contracts", "versions", id, "all"],
-    queryFn: () => listVersions(id, { page: 1, pageSize: 100, sort: "-version" }),
+    queryKey: ["contracts", "versions", id, "all-pages"],
+    queryFn: () => listAllVersions(id),
     enabled: Number.isFinite(id),
   });
-  const items = versions.data?.items ?? [];
+  const items = versions.data ?? [];
   const toId = Number(params.get("to")) || (items[0]?.id ?? null);
   const fromId = Number(params.get("from")) || (items.find((v) => v.id !== toId)?.id ?? null);
   const from = useQuery({ queryKey: ["contracts", "version", id, fromId], queryFn: () => getVersion(id, fromId as number), enabled: fromId != null });

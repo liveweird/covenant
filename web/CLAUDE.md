@@ -203,3 +203,5 @@ read-only from each line. It reuses `ContractToadieUsage` in consumer-only mode.
 usage is a visible warning, while a failed Covenant plan read must be retried. Keep version/line
 adoption explicitly unknown and never present empty usage as retirement approval. Deadline
 notifications translate structural stages; the server supplies no invented actor.
+
+Registry and version pickers must fetch all pages through the existing `listAllSystems`, `listAllTeams` and `listAllVersions` helpers or provide server-side search/paging. All-page arrays use distinct query keys from page envelopes; member-scoped owner teams retain `memberId` on every request. Toadie API placeholder rows may survive paging/search only within the same connection identity. Published-version sync passes the source major explicitly to the new-version route while retaining fetched document state.
