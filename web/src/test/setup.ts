@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach } from "vitest";
 import { cleanup } from "@testing-library/react";
+import { DEFAULT_THEME } from "@mantine/core";
 import i18n from "../i18n";
 
 // Deterministic English in tests (the global i18n instance is shared by every test, including the
@@ -37,10 +38,16 @@ if (typeof globalThis.localStorage === "undefined") {
   }
 }
 
-if (typeof window !== "undefined" && !window.matchMedia) {
-  window.matchMedia = (query: string) =>
+// Mantine's Transition calls useTransition before its env="test" render shortcut. Force the
+// reduced-motion path so the hook completes synchronously instead of leaving an rAF -> rAF ->
+// setTimeout chain that can race happy-dom teardown. Other media queries keep their normal
+// happy-dom behavior.
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+if (typeof window !== "undefined") {
+  const originalMatchMedia = window.matchMedia?.bind(window);
+  const mediaQueryList = (query: string, matches: boolean): MediaQueryList =>
     ({
-      matches: false,
+      matches,
       media: query,
       onchange: null,
       addListener: () => {},
@@ -49,7 +56,17 @@ if (typeof window !== "undefined" && !window.matchMedia) {
       removeEventListener: () => {},
       dispatchEvent: () => false,
     }) as MediaQueryList;
+  window.matchMedia = (query: string) =>
+    query === REDUCED_MOTION_QUERY
+      ? mediaQueryList(query, true)
+      : originalMatchMedia
+        ? originalMatchMedia(query)
+        : mediaQueryList(query, false);
 }
+
+// Tests use both the shared themed provider and a bare provider. Make both honor the reduced
+// motion preference without changing the application theme or runtime behavior.
+DEFAULT_THEME.respectReducedMotion = true;
 
 // happy-dom does not implement the FontFaceSet API. Mantine's autosize Textarea
 // subscribes to `document.fonts` "loadingdone" events on mount; without this shim
