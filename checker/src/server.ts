@@ -14,11 +14,21 @@ export interface CheckerConfig {
   maxQueuedChecks: number;
 }
 
+const MAX_DOCUMENT_BYTES = 2 * 1024 * 1024;
+const DOCUMENTS_PER_REQUEST = 2;
+const MAX_JSON_ESCAPE_EXPANSION = 2;
+const JSON_ENVELOPE_BYTES = 1024;
+const DEFAULT_MAX_BODY_BYTES =
+  MAX_DOCUMENT_BYTES * DOCUMENTS_PER_REQUEST * MAX_JSON_ESCAPE_EXPANSION + JSON_ENVELOPE_BYTES;
+
 export function configFromEnv(env: NodeJS.ProcessEnv = process.env): CheckerConfig {
   return {
     port: Number(env.PORT ?? 9090),
     token: env.CHECKER_TOKEN?.trim() || undefined,
-    maxBodyBytes: Number(env.CHECKER_MAX_BYTES ?? 2 * 1024 * 1024),
+    // The JVM can send a 2 MiB candidate plus a 2 MiB AsyncAPI baseline. JSON quoting can
+    // double every byte (quotes, backslashes and accepted whitespace), and the envelope needs
+    // a small fixed margin. Keep this a whole-request DoS bound, not a competing document cap.
+    maxBodyBytes: Number(env.CHECKER_MAX_BYTES ?? DEFAULT_MAX_BODY_BYTES),
     timeoutMs: Number(env.CHECKER_TIMEOUT_MS ?? 20_000),
     maxConcurrentChecks: Number(env.CHECKER_MAX_CONCURRENT ?? 1),
     maxQueuedChecks: Number(env.CHECKER_MAX_QUEUED ?? 8),

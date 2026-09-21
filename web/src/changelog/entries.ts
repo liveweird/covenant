@@ -17,6 +17,20 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.14.2",
+    date: "2026-09-21",
+    en: `**Reliable validation and breaking-change checks.**
+
+- OpenAPI breaking-change detection now handles compact JSON consistently with formatted JSON and YAML.
+- The checker accepts the full document size limit, including comparison baselines and JSON encoding overhead.
+- When a breaking change blocks a draft save or edit, Save anyway retains the contract baseline and shows the findings for your confirmation.`,
+    pl: `**Spójna walidacja i wykrywanie zmian niezgodnych wstecznie.**
+
+- Wykrywanie zmian niezgodnych wstecznie w OpenAPI obsługuje teraz zwarty JSON tak samo jak sformatowany JSON i YAML.
+- Usługa sprawdzająca przyjmuje dokumenty do pełnego limitu rozmiaru, z uwzględnieniem wersji porównawczej i narzutu kodowania JSON.
+- Gdy zmiana niezgodna wstecznie blokuje zapis lub edycję szkicu, opcja Zapisz mimo to zachowuje wersję porównawczą kontraktu i pokazuje wyniki sprawdzania do potwierdzenia.`,
+  },
+  {
     version: "0.14.1",
     date: "2026-09-21",
     en: `**Keep sign-in sessions consistent.**

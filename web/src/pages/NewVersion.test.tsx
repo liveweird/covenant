@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
-import { renderWithProviders, screen, waitFor } from "../test/render";
+import { renderWithProviders, screen, waitFor, within } from "../test/render";
 import { Route, Routes } from "react-router-dom";
 import NewVersion from "./NewVersion";
 import { bodyOf, calledUrl, CLEAN_REPORT, CONTENT, CONTRACT, findCall, serve, signIn, SOFT_ERROR, VERSION, VERSION_PAGE, type FetchMock } from "../test/contractsFixtures";
@@ -8,6 +8,8 @@ import { bodyOf, calledUrl, CLEAN_REPORT, CONTENT, CONTRACT, findCall, serve, si
 vi.mock("../components/LazyCodeEditor", async () => (await import("../test/codeEditorStub")).codeEditorMock());
 
 const editorValue = () => (screen.getByRole("textbox", { name: "Contract document" }) as HTMLTextAreaElement).value;
+const BREAKING_FACT = { severity: "WARN" as const, source: "BREAKING" as const, code: "REMOVED_OPERATION", message: "GET /orders was removed", path: "/paths/~1orders/get" };
+const BREAKING_ERROR = { severity: "ERROR" as const, source: "BREAKING" as const, code: "BREAKING_WITHOUT_MAJOR_BUMP", message: "Breaking changes require a major version bump" };
 
 function renderPage(route = "/contracts/5/versions/new", state?: unknown) {
   return renderWithProviders(
@@ -120,24 +122,33 @@ describe("NewVersion page", () => {
     expect(screen.getByRole("button", { name: "Save draft" })).toBeDisabled();
   });
 
-  test("a soft rejection opens Save-anyway and retries with the waiver; a HARD finding blocks the button", async () => {
-    let posts = 0;
+  test("a breaking-only strict rejection keeps its contract baseline and retries with the waiver", async () => {
     serve(mockFetch, {
       ...base,
-      "POST /api/v1/contracts/versions/check": { status: 200, body: { ...CLEAN_REPORT, findings: [SOFT_ERROR], errors: 1 } },
-      "POST /api/v1/contracts/5/versions": () => {
-        posts += 1;
-        return posts === 1 ? { status: 400, body: { title: "Bad Request", status: 400, detail: "The document has 1 blocking finding(s): OAS_PARSE: paths is required" } } : { status: 201, body: VERSION };
+      "POST /api/v1/contracts/versions/check": (_url, init) => {
+        const request = JSON.parse(String(init?.body)) as { contractId?: number };
+        return request.contractId === 5
+          ? { status: 200, body: { ...CLEAN_REPORT, baselineVersion: "1.0.0", findings: [BREAKING_FACT, BREAKING_ERROR], errors: 1, warnings: 1 } }
+          : { status: 200, body: CLEAN_REPORT };
       },
+      "POST /api/v1/contracts/5/versions": { status: 400, body: { title: "Bad Request", status: 400, detail: "The document has 1 blocking finding(s): BREAKING_WITHOUT_MAJOR_BUMP" } },
       "POST /api/v1/contracts/5/versions?allowInvalid=true": { status: 201, body: { ...VERSION, id: 12 } },
     });
     const user = userEvent.setup();
     renderPage();
     await waitFor(() => expect(editorValue()).toContain("openapi"));
-    expect(await screen.findByText("paths is required")).toBeInTheDocument();
+    expect(await screen.findByText("GET /orders was removed")).toBeInTheDocument();
+    expect(await screen.findByText("Breaking changes require a major version bump")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save draft" }));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText(/found 1 blocking finding/)).toBeInTheDocument();
+    expect(within(screen.getByRole("dialog")).getByText("BREAKING_WITHOUT_MAJOR_BUMP")).toBeInTheDocument();
+    const checkBodies = mockFetch.mock.calls
+      .filter(([url, init]) => url === "/api/v1/contracts/versions/check" && (init as RequestInit | undefined)?.method === "POST")
+      .map((call) => bodyOf(call));
+    expect(checkBodies.length).toBeGreaterThanOrEqual(2);
+    expect(checkBodies).toEqual(expect.arrayContaining([expect.objectContaining({ contractId: 5 })]));
+    expect(checkBodies.every((body) => (body as { contractId?: number }).contractId === 5)).toBe(true);
     await user.click(screen.getByRole("button", { name: "Save anyway" }));
     await waitFor(() => expect(findCall(mockFetch, "POST", "/api/v1/contracts/5/versions?allowInvalid=true")).toBeDefined());
   });

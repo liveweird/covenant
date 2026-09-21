@@ -1,5 +1,6 @@
 package ch.nokillswit.contracts.checks
 
+import com.fasterxml.jackson.databind.node.ObjectNode
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.PathItem
 import io.swagger.v3.parser.OpenAPIV3Parser
@@ -10,6 +11,15 @@ import org.openapitools.openapidiff.core.model.ChangedContent
 import org.openapitools.openapidiff.core.model.ChangedOperation
 import org.openapitools.openapidiff.core.model.ChangedSchema
 import org.slf4j.LoggerFactory
+import org.yaml.snakeyaml.LoaderOptions
+import org.yaml.snakeyaml.Yaml
+import org.yaml.snakeyaml.nodes.MappingNode
+import org.yaml.snakeyaml.nodes.ScalarNode
+import org.yaml.snakeyaml.reader.StreamReader
+import org.yaml.snakeyaml.scanner.ScannerImpl
+import org.yaml.snakeyaml.tokens.ScalarToken
+import org.yaml.snakeyaml.tokens.Token
+import java.io.StringReader
 
 /**
  * OpenAPI breaking changes (milestone 2): the candidate document against the baseline (the
@@ -66,13 +76,53 @@ object OpenApiBreaking {
         return out
     }
 
-    private val root31 = Regex("""(?m)^(\s*"?openapi"?\s*:\s*['"]?)3\.1\.\d+""")
-
     private fun parse(content: String): OpenAPI? = try {
-        OpenAPIV3Parser().readContents(root31.replaceFirst(content, "$" + "13.0.3"), null, options).openAPI
+        OpenAPIV3Parser().readContents(comparisonCopy(content), null, options).openAPI
     } catch (e: RuntimeException) {
         log.info("swagger-parser could not read a document for comparison: {}", e.toString())
         null
+    }
+
+    /** Relabel 3.1 on a comparison-only copy while retaining YAML anchors for swagger-parser. */
+    private fun comparisonCopy(content: String): String {
+        val parsed = DocumentParser.parse(content) as? ParseOutcome.Parsed ?: return content
+        if (!OPENAPI_31.matches(parsed.root.path("openapi").asText())) return content
+        if (parsed.format == DocumentFormat.yaml) return relabelYamlRoot(content)
+        val copy = parsed.root.deepCopy<ObjectNode>()
+        copy.put("openapi", "3.0.3")
+        return copy.toString()
+    }
+
+    /** SnakeYAML's node marks let us replace only the root scalar, leaving aliases and layout intact. */
+    private fun relabelYamlRoot(content: String): String {
+        val loaderOptions = LoaderOptions().apply { codePointLimit = YAML_CODE_POINT_LIMIT }
+        val root = Yaml(loaderOptions).compose(StringReader(content)) as? MappingNode ?: return content
+        val version = root.value.firstNotNullOfOrNull { entry ->
+            val key = entry.keyNode as? ScalarNode
+            val value = entry.valueNode as? ScalarNode
+            value?.takeIf { key?.value == "openapi" && OPENAPI_31.matches(it.value) }
+        } ?: return content
+        val scanner = ScannerImpl(StreamReader(content), loaderOptions)
+        var versionToken: ScalarToken? = null
+        while (!scanner.checkToken(Token.ID.StreamEnd)) {
+            val token = scanner.getToken()
+            if (
+                token is ScalarToken &&
+                token.value == version.value &&
+                token.startMark.index >= version.startMark.index &&
+                token.endMark.index <= version.endMark.index
+            ) {
+                versionToken = token
+                break
+            }
+        }
+        val token = versionToken ?: return content
+        val codePointCount = content.codePointCount(0, content.length)
+        if (token.startMark.index !in 0..codePointCount || token.endMark.index !in 0..codePointCount) return content
+        val start = content.offsetByCodePoints(0, token.startMark.index)
+        val end = content.offsetByCodePoints(0, token.endMark.index)
+        val trailingWhitespace = content.substring(start, end).takeLastWhile { it.isWhitespace() }
+        return content.replaceRange(start, end, "'3.0.3'$trailingWhitespace")
     }
 
     private fun operation(op: ChangedOperation): List<Finding> {
@@ -167,4 +217,6 @@ object OpenApiBreaking {
     private fun esc(segment: String) = segment.replace("~", "~0").replace("/", "~1")
 
     private const val MAX_SCHEMA_DEPTH = 3
+    private const val YAML_CODE_POINT_LIMIT = 8 * 1024 * 1024
+    private val OPENAPI_31 = Regex("""3\.1\.\d+""")
 }

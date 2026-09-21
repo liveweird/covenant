@@ -84,7 +84,7 @@ components:
           enum: [OPENAPI, ASYNCAPI, ODCS]
         content:
           type: string
-          description: The raw document text (YAML or JSON), at most CHECKER_MAX_BYTES.
+          description: The raw candidate document text (YAML or JSON); the JVM enforces its document cap.
         previousContent:
           type: string
           description: |
@@ -164,7 +164,7 @@ components:
           schema:
             $ref: '#/components/schemas/ProblemDetail'
     PayloadTooLarge:
-      description: The body exceeds CHECKER_MAX_BYTES.
+      description: The whole JSON request body exceeds CHECKER_MAX_BYTES.
       content:
         application/problem+json:
           schema:

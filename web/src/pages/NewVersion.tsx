@@ -76,7 +76,8 @@ export default function NewVersion() {
   const format = detectFormat(effectiveContent);
   // Naming the contract adds the breaking-change comparison against its highest published version
   // (an unparsable URL id is NaN, which the hook's JSON body carries as null — no branch needed).
-  const check = useDocumentCheck({ type: type ?? "OPENAPI", content: type ? effectiveContent : "", version: effectiveVersion || null, contractId: id });
+  const checkDocument = { type: type ?? "OPENAPI", content: type ? effectiveContent : "", version: effectiveVersion || null, contractId: id };
+  const check = useDocumentCheck(checkDocument);
   const diagnostics = toDiagnostics(check.findings, effectiveContent);
 
   const versionError = validateVersion(effectiveVersion, t("versions.validation.versionRequired"), t("versions.validation.versionFormat"));
@@ -84,7 +85,7 @@ export default function NewVersion() {
   const hasHard = check.findings.some((f) => f.source === "SYNTAX");
 
   const save = useVersionSave({
-    document: () => ({ type: type ?? "OPENAPI", content: effectiveContent, version: effectiveVersion }),
+    document: () => checkDocument,
     saveRequest: (options) =>
       createVersion(
         id,

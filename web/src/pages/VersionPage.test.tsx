@@ -8,6 +8,9 @@ import { MODEL_OPENAPI } from "../test/readerFixtures";
 
 vi.mock("../components/LazyCodeEditor", async () => (await import("../test/codeEditorStub")).codeEditorMock());
 
+const BREAKING_FACT = { severity: "WARN" as const, source: "BREAKING" as const, code: "REMOVED_OPERATION", message: "GET /orders was removed", path: "/paths/~1orders/get" };
+const BREAKING_ERROR = { severity: "ERROR" as const, source: "BREAKING" as const, code: "BREAKING_WITHOUT_MAJOR_BUMP", message: "Breaking changes require a major version bump" };
+
 function renderPage(route = "/contracts/5/versions/11") {
   return renderWithProviders(
     <Routes>
@@ -131,6 +134,60 @@ describe("VersionPage", () => {
     await waitFor(() => expect(findCall(mockFetch, "PUT", "/api/v1/contracts/5/versions/11/content")).toBeDefined());
     expect((bodyOf(findCall(mockFetch, "PUT", "/api/v1/contracts/5/versions/11/content")) as { content: string }).content).toContain("# note");
     await waitFor(() => expect(screen.getByRole("button", { name: "Edit document" })).toBeInTheDocument());
+  });
+
+  test("an edit rejected only for breaking changes keeps the contract baseline and retries with the waiver", async () => {
+    serve(mockFetch, {
+      ...base,
+      "POST /api/v1/contracts/versions/check": (_url, init) => {
+        const request = JSON.parse(String(init?.body)) as { contractId?: number };
+        return request.contractId === 5
+          ? { status: 200, body: { ...CLEAN_REPORT, baselineVersion: "1.0.0", findings: [BREAKING_FACT, BREAKING_ERROR], errors: 1, warnings: 1 } }
+          : { status: 200, body: CLEAN_REPORT };
+      },
+      "PUT /api/v1/contracts/5/versions/11/content": { status: 400, body: { title: "Bad Request", status: 400, detail: "The document has 1 blocking finding(s): BREAKING_WITHOUT_MAJOR_BUMP" } },
+      "PUT /api/v1/contracts/5/versions/11/content?allowInvalid=true": { status: 200, body: { ...VERSION, findings: [BREAKING_FACT, BREAKING_ERROR] } },
+    });
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "Edit document" }));
+    await user.type(screen.getByRole("textbox", { name: "Contract document" }), "# breaking edit");
+    expect(await screen.findByText("GET /orders was removed")).toBeInTheDocument();
+    expect(await screen.findByText("Breaking changes require a major version bump")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(within(screen.getByRole("dialog")).getByText("BREAKING_WITHOUT_MAJOR_BUMP")).toBeInTheDocument();
+    const checkBodies = mockFetch.mock.calls
+      .filter(([url, init]) => url === "/api/v1/contracts/versions/check" && (init as RequestInit | undefined)?.method === "POST")
+      .map((call) => bodyOf(call));
+    expect(checkBodies.length).toBeGreaterThanOrEqual(2);
+    expect(checkBodies.every((body) => (body as { contractId?: number }).contractId === 5)).toBe(true);
+    await user.click(screen.getByRole("button", { name: "Save anyway" }));
+    await waitFor(() => expect(findCall(mockFetch, "PUT", "/api/v1/contracts/5/versions/11/content?allowInvalid=true")).toBeDefined());
+  });
+
+  test("a HARD recovery finding remains unwaivable", async () => {
+    let strictSaveAttempted = false;
+    serve(mockFetch, {
+      ...base,
+      "POST /api/v1/contracts/versions/check": () =>
+        strictSaveAttempted
+          ? { status: 200, body: { ...CLEAN_REPORT, findings: [{ ...SOFT_ERROR, source: "SYNTAX", code: "YAML_PARSE", message: "bad indent" }], errors: 1 } }
+          : { status: 200, body: CLEAN_REPORT },
+      "PUT /api/v1/contracts/5/versions/11/content": () => {
+        strictSaveAttempted = true;
+        return { status: 400, body: { title: "Bad Request", status: 400, detail: "The document has 1 blocking finding(s): YAML_PARSE" } };
+      },
+    });
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "Edit document" }));
+    await user.type(screen.getByRole("textbox", { name: "Contract document" }), "# race");
+    await waitFor(() => expect(screen.getByRole("button", { name: /^save$/i })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+    expect(await screen.findByText("The version was rejected — see the details")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(findCall(mockFetch, "PUT", "/api/v1/contracts/5/versions/11/content?allowInvalid=true")).toBeUndefined();
   });
 
   test("cancel leaves editing without saving; a published version offers no Edit", async () => {

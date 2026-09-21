@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { parseDocument } from "yaml";
 import { CheckBusy } from "../src/isolation.ts";
 import type { CheckRequest, CheckResponse } from "../src/protocol.ts";
 import { configFromEnv, handler, type CheckerConfig } from "../src/server.ts";
@@ -28,7 +29,7 @@ describe("configFromEnv", () => {
     expect(configFromEnv({})).toEqual({
       port: 9090,
       token: undefined,
-      maxBodyBytes: 2 * 1024 * 1024,
+      maxBodyBytes: 8 * 1024 * 1024 + 1024,
       timeoutMs: 20_000,
       maxConcurrentChecks: 1,
       maxQueuedChecks: 8,
@@ -112,6 +113,63 @@ describe("the HTTP contract", () => {
   test("unknown paths are 404 and a wrong method is 405", async () => {
     expect((await fetch(`${base}/nope`)).status).toBe(404);
     expect((await fetch(`${base}/check`)).status).toBe(405);
+  });
+});
+
+describe("the default request-body budget", () => {
+  test("accepts two maximum-size valid documents after backslash-heavy JSON escaping", async () => {
+    const config = configFromEnv({ PORT: "0" });
+    let received: CheckRequest | undefined;
+    const checkFn = async (request: CheckRequest): Promise<CheckResponse> => {
+      received = request;
+      return { findings: [], engine: [] };
+    };
+    const { server, base } = await listen(config, checkFn);
+    const prefix = 'asyncapi: 3.0.0\ninfo: {title: t, version: "1.0.0"}\nchannels: {}\n# ';
+    const maximumEscapedDocument = prefix + "\\".repeat(2 * 1024 * 1024 - Buffer.byteLength(prefix));
+    const body = JSON.stringify({
+      type: "ASYNCAPI",
+      content: maximumEscapedDocument,
+      previousContent: maximumEscapedDocument,
+    });
+    try {
+      expect(Buffer.byteLength(maximumEscapedDocument)).toBe(2 * 1024 * 1024);
+      expect(parseDocument(maximumEscapedDocument).errors).toEqual([]);
+      expect(Buffer.byteLength(body)).toBeLessThanOrEqual(config.maxBodyBytes);
+      const res = await fetch(`${base}/check`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+      });
+      expect(res.status).toBe(200);
+      expect(received?.content).toBe(maximumEscapedDocument);
+      expect(received?.previousContent).toBe(maximumEscapedDocument);
+    } finally {
+      server.close();
+    }
+  });
+
+  test("rejects an actually serialized body above the default budget", async () => {
+    const config = configFromEnv({ PORT: "0" });
+    const { server, base } = await listen(config, async () => ({ findings: [], engine: [] }));
+    const body = JSON.stringify({ type: "ODCS", content: "x".repeat(config.maxBodyBytes) });
+    try {
+      expect(Buffer.byteLength(body)).toBeGreaterThan(config.maxBodyBytes);
+      const res = await fetch(`${base}/check`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+      });
+      expect(res.status).toBe(413);
+      expect(await res.json()).toMatchObject({
+        status: 413,
+        title: "Payload Too Large",
+        detail: `Request body exceeds ${config.maxBodyBytes} bytes`,
+        instance: "/check",
+      });
+    } finally {
+      server.close();
+    }
   });
 });
 
