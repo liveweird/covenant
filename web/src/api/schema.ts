@@ -1210,6 +1210,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contracts/{id}/release-lines/{major}/migration-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                major: components["parameters"]["ReleaseLineMajor"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Get a release line's migration plan and cached contract usage
+         * @description Any authenticated user. Returns one coherent local database snapshot of the release-line plan and the complete bounded Toadie cache projection for the whole contract. It never refreshes Toadie and cannot identify which version or major a remote service uses. The complete response has a conservative 8 MiB serialized-size budget to prevent cached graph fan-out from exhausting server memory; an oversized report returns 409 rather than partial or truncated usage.
+         */
+        get: operations["getReleaseLineMigrationReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contracts/{id}/versions": {
         parameters: {
             query?: never;
@@ -3587,6 +3610,43 @@ export interface components {
             versionCount: number;
             /** Format: int64 */
             updatedAt: number;
+        };
+        /** @enum {string} */
+        MigrationUsageScope: "CONTRACT";
+        /** @enum {string} */
+        MigrationVersionAdoption: "UNKNOWN";
+        ReleaseLineMigrationReportResponse: {
+            /**
+             * Format: int64
+             * @description Epoch millis captured once for this local snapshot.
+             */
+            generatedAt: number;
+            /** Format: int32 */
+            contractId: number;
+            contractName: string;
+            contractType: components["schemas"]["ContractType"];
+            /** Format: int32 */
+            major: number;
+            supportStatus: components["schemas"]["SupportStatus"];
+            /** Format: date */
+            deprecatesOn: string | null;
+            /** Format: date */
+            supportEndsOn: string | null;
+            supportPolicy: string | null;
+            migrationGuide: string | null;
+            replacement: components["schemas"]["ReleaseLineReplacement"] | null;
+            recommendedVersion: components["schemas"]["ReleaseLineVersionSummary"] | null;
+            /**
+             * Format: int64
+             * @description Epoch millis of the release-line plan.
+             */
+            planUpdatedAt: number;
+            usageScope: components["schemas"]["MigrationUsageScope"];
+            versionAdoption: components["schemas"]["MigrationVersionAdoption"];
+            connection: components["schemas"]["ToadieConnectionRef"] | null;
+            cache: components["schemas"]["ToadieCacheStatus"];
+            linkedApis: components["schemas"]["ToadieLinkResponse"][];
+            services: components["schemas"]["ToadieUsageRow"][];
         };
         ReleaseLinePage: {
             items: components["schemas"]["ReleaseLineResponse"][];
@@ -6385,6 +6445,34 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             415: components["responses"]["UnsupportedMediaType"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getReleaseLineMigrationReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+                major: components["parameters"]["ReleaseLineMajor"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Migration plan and cached contract-level usage */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseLineMigrationReportResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalServerError"];
         };
     };

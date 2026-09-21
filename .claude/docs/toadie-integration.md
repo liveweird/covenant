@@ -94,3 +94,12 @@ An additive database migration alone does not make older binaries understand new
 Test boundaries include real HTTP pagination/error/cancellation handling; encrypted persistence
 and rotation; role/writer guards; revision races; identity-preserving rename and missing IDs;
 schema conformance; read-only and editable SPA states; translations; and browser accessibility.
+
+## Migration report exports (0.15.0)
+
+Release-line migration reports reuse the complete cached usage projection under a read-only
+local snapshot transaction, with all linked APIs and provider/consumer services independent of
+UI paging. They retain missing mappings and stale/disabled observation warnings, and do not
+refresh the connection. The selected Covenant major is planning context only: exact version
+and major adoption remain unknown. Generation time never replaces `lastSuccessAt` as the
+observation timestamp. See `release-lines.md` for the report API and sharing behavior.

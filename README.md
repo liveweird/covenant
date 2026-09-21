@@ -241,6 +241,16 @@ Toadie, the observation's freshness, and the migration plan. Usage remains contr
 Covenant does not assume which release line those services use. This feature needs no Toadie
 changes. See [release-line rules](.claude/docs/release-lines.md) for details.
 
+Use **Download report** in a release line's impact dialog to share its saved migration plan
+as a Markdown file. The report includes support and deprecation dates, replacement and
+recommendation, full migration instructions, and declared provider/consumer services with
+systems and teams. It reads the complete local Toadie cache, independently of table filters
+and paging, without refreshing Toadie. Generation, plan-update and last-successful-observation
+timestamps are distinct. Missing mappings and stale/unavailable observations remain visible;
+exact version or major-line adoption is unknown, and an empty observation does not establish
+that retirement is safe. Every authenticated reader can download a report. Reports exceeding
+the 8 MiB export budget show an error instead of downloading incomplete data.
+
 The **Lifecycle** page (`/lifecycle`) brings major release lines together across the catalog.
 Filter by owner, domain, system, contract type, support status or deadline window, then use
 attention counts to find approaching deadlines, reached support-end dates, incomplete migration

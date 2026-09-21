@@ -205,3 +205,14 @@ adoption explicitly unknown and never present empty usage as retirement approval
 notifications translate structural stages; the server supplies no invented actor.
 
 Registry and version pickers must fetch all pages through the existing `listAllSystems`, `listAllTeams` and `listAllVersions` helpers or provide server-side search/paging. All-page arrays use distinct query keys from page envelopes; member-scoped owner teams retain `memberId` on every request. Toadie API placeholder rows may survive paging/search only within the same connection identity. Published-version sync passes the source major explicitly to the new-version route while retaining fetched document state.
+
+## Migration and impact report downloads (0.15.0)
+
+The impact dialog's Download report action fetches the saved release-line report on demand,
+then uses the shared text-download helper to save localized Markdown. The report ignores the
+visible usage table's filters/paging and any unsaved policy form. Preserve complete plain-text
+guidance with safe Markdown escaping; never turn stored content into executable HTML or
+untrusted links. Generation, plan-update and cache-observation timestamps are separate UTC
+instants. Include missing/stale/unavailable warnings and always state contract-level usage,
+unknown version/line adoption and the limits of an empty observation. A failed read produces an
+inline error and no partial file; downloading never confirms retirement or modifies a policy.

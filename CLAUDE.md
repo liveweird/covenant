@@ -65,6 +65,13 @@ infers version adoption. See `.claude/docs/toadie-integration.md` for mapping, t
 concurrency, cache semantics and deployment. The SPA adds Toadie connection administration
 and a Usage from Toadie panel on contract details.
 
+### Shareable migration and impact reports (0.15.0)
+
+The release-line migration-report endpoint returns the saved plan and complete cached declared
+usage for one contract in a consistent local read. The SPA exports a localized Markdown file
+from the existing impact dialog. It does not refresh Toadie or infer version adoption. See
+`.claude/docs/release-lines.md` for snapshot semantics, limitations and permissions.
+
 ### The contract standards (the domain reference)
 
 **`.claude/docs/contract-standards.md` is the local offline reference for the formats Covenant stores, validates and diffs** — OpenAPI 3.0 vs 3.1, AsyncAPI 2.6 vs 3.x, ODCS 3.x, JSON Schema 2020-12, Avro, SemVer 2.0 and how Covenant maps changes onto version bumps. Consult it when designing any contract feature instead of browsing; each section names the upstream source it snapshots — re-check upstream (and update the snapshot) when adding a validation rule. The official JSON Schemas the JVM validates against are vendored under `server/src/main/resources/schemas/` (its README records versions and origins; never hand-edit them).

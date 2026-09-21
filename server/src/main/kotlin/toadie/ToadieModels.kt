@@ -8,6 +8,8 @@ const val MAX_TOADIE_CONNECTIONS = 10
 const val MAX_TOADIE_LINKS = 100
 const val MAX_TOADIE_NAME_LENGTH = 100
 const val MAX_TOADIE_URL_LENGTH = 2048
+const val MAX_MIGRATION_REPORT_BYTES = 8 * 1024 * 1024
+internal const val MIGRATION_REPORT_ENVELOPE_RESERVE_BYTES = 256 * 1024
 
 @Serializable
 data class ToadieMapping(

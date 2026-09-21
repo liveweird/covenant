@@ -173,3 +173,34 @@ The SPA reuses the existing impact and policy dialogs; full policy reads happen 
 action, and `canWrite` uses the existing Covenant ownership rule. Imported teams grant no
 permissions. Independent page and summary requests may observe intervening edits. No new
 schema or persisted lifecycle value is introduced.
+
+## Shareable migration and impact reports (0.15.0)
+
+`GET /api/v1/contracts/{id}/release-lines/{major}/migration-report` returns one computed,
+flat JSON report for any authenticated reader, including nonwriters. It contains the saved
+plan, a safe contract identity, replacement and recommendation summaries, and complete linked
+APIs and declared provider/consumer services from the existing Toadie cache. These embedded
+arrays are part of a report, not a paged collection: existing connector bounds of 5,000 total
+snapshot entities and 100 contract links apply. An incremental 8 MiB JSON export budget also
+limits repeated service/team metadata; an oversized report returns an explicit 409 without a
+partial result. No version document bodies or credentials are
+included. Missing/deleted source resources return 404; retained empty lines remain readable.
+
+A report-owned read-only REPEATABLE_READ transaction observes the plan, links, connection
+metadata and snapshot rows together. Shared transaction-scoped projections preserve existing
+release-line and usage semantics. One captured time drives generation and freshness. This is a
+consistent local read of a remote observation, not proof of an atomic remote graph snapshot.
+Generation time, saved plan update, last successful observation and last refresh attempt have
+different meanings; a later failed attempt must not be presented as an observation start.
+
+The impact dialog downloads localized Markdown from a fresh report read, independent of the
+visible usage table's search, role or page. It explicitly exports the saved policy even when
+opened from an unsaved end-of-support form. Plain-text names and guidance are escaped before
+inclusion in Markdown. The file preserves unavailable replacements/mappings, last-good rows
+and cache-state warnings, and explains that exact version/major adoption is unknown. A current
+empty observation is not proof of no consumers or safe retirement. Imported teams remain
+architecture metadata, with no effect on permissions.
+
+Generating or downloading a report does not refresh Toadie, update policy/lifecycle, create
+history or notifications, or store a report. There are no public sharing links or new database
+migrations. The downloaded file is a snapshot for planning discussions, not a live view.

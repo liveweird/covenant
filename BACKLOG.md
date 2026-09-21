@@ -19,7 +19,9 @@ cover same-instant password changes and deferred responses. Legacy refresh token
 fresh sign-in. Kubernetes uses `Recreate` to prevent mixed old/new password writers; no
 Kubernetes deployment was performed.
 
-The six remaining audit findings are fixed and locally verified for **0.14.3**: 451 backend
+The six remaining audit findings shipped in **0.14.3** through
+[PR #39](https://github.com/liveweird/covenant/pull/39), main commit `a60c137`, with Docker Compose
+deployment and exact-main CI verified: 451 backend
 tests, 606 frontend tests, build/static/coverage gates, independent review, API conformance and
 browser checks passed. The catalog was also checked read-only: no active systems, contracts or environments reference deleted
 parents in the affected relationships.
@@ -46,12 +48,18 @@ Preserve the seven sample contracts and the configured Toadie connection/cache. 
 untracked `covenant-handoff-reply.md` is intentionally excluded from commits; do not overwrite
 or delete it. Toadie's newly shipped capabilities are separate backlog work, not regressions.
 
-## Proposed next steps
+## Migration and impact reports
 
-1. **Shareable migration and impact reports.** Export a release line's dates, replacement,
-   migration guidance and declared affected services/teams for planning discussions. Include
-   observation timestamps, missing/stale usage warnings, and the limit that exact version
-   adoption is unknown. Reuse the existing Toadie integration; no Toadie changes are expected.
+**Shareable migration and impact reports (0.15.0).** Download a saved release line's support
+and deprecation dates, replacement, recommendation, migration guidance and complete cached
+provider/consumer services with systems and teams as localized Markdown. The report carries
+separate generation/plan/observation timestamps, missing/stale usage warnings and explicitly
+unknown exact version/line adoption. It reuses Toadie's current integration without upstream
+changes or refreshes. A read-only local database snapshot keeps the plan and observation
+consistent; an 8 MiB export budget rejects oversized reports instead of truncating them.
+Implementation and verification are complete: 453 backend tests, 614 frontend tests, seven
+real-browser lifecycle/report journeys, static/build/coverage gates, API conformance and
+independent review pass. Version and bilingual changelog are updated.
 
 ## Deferred
 

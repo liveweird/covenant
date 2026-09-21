@@ -152,3 +152,10 @@ V20 before serving requests. Do not mix old/new replicas: old code does not adva
 revision. The supplied single-instance Kubernetes Deployment uses `Recreate` to enforce this
 cutover, with brief downtime; Compose replaces its single app container. Do not roll back to
 pre-0.14.1 password writers while revision-bearing refresh tokens remain valid.
+
+**Migration-report reads.** The release-line migration report owns a read-only REPEATABLE_READ
+transaction over the active contract, saved release-line projection and cached Toadie links,
+connection and snapshot entities. Shared transaction-scoped helpers reuse existing mappings;
+no unrelated public service transaction defines the report boundary. This cross-feature read
+keeps cache metadata and service rows consistent during concurrent refresh publication without
+locking writers or performing any remote request.

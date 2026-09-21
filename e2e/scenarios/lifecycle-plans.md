@@ -16,6 +16,18 @@
    - *Expected*: both dates, the migration instructions, and the 2.x replacement persist.
    - *Expected*: the dates remain advisory; the deprecated 1.0.0 version does not transition.
 
+## Scenario: a migration report includes the saved plan and all declared usage without changing lifecycle
+
+1. Open the read-only impact dialog for the saved 1.x plan.
+2. Filter the visible consumer table, then choose Download report.
+   - *Expected*: a Markdown file includes the saved dates, complete guidance, 2.x replacement,
+     both API mappings, provider Checkout service and consumer Storefront website, their
+     Commerce system and Retail team, regardless of the visible table filter.
+   - *Expected*: the report states whole-contract usage and unknown adoption, without secrets.
+   - *Expected*: the dialog passes accessibility checks; attach the report and screenshot.
+3. Close the dialog.
+   - *Expected*: downloading does not transition deprecated 1.0.0 or require write confirmation.
+
 ## Scenario: retirement reviews declared consumers and requires explicit acknowledgement
 
 1. Open Retire for deprecated 1.0.0 after its contract has linked two APIs from the owned
