@@ -88,7 +88,8 @@ export default function VersionPage() {
   const type = contract.data?.type ?? "OPENAPI";
   // Naming the contract adds the breaking-change comparison against its highest published version
   // (an unparsable URL id is NaN, which the hook's JSON body carries as null — no branch needed).
-  const check = useDocumentCheck({ type, content: editing ? text : "", version: stored?.version ?? null, contractId: id });
+  const checkDocument = { type, content: editing ? text : "", version: stored?.version ?? null, contractId: id };
+  const check = useDocumentCheck(checkDocument);
   const storedFindings = stored?.findings;
   const liveFindings = check.findings;
   const findings = useMemo(() => (editing ? liveFindings : (storedFindings ?? [])), [editing, liveFindings, storedFindings]);
@@ -101,7 +102,7 @@ export default function VersionPage() {
     await queryClient.invalidateQueries({ queryKey: ["contracts"] });
   }
   const save = useVersionSave({
-    document: () => ({ type, content: text, version: stored?.version ?? null }),
+    document: () => checkDocument,
     saveRequest: (options) => updateVersionContent(id, vid, text, options),
     onSaved: async (_saved, waived) => {
       setEditing(false);

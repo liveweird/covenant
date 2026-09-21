@@ -22,5 +22,7 @@ from the repository root:
 `node -e 'const fs=require("node:fs"); process.stdout.write(JSON.stringify({type:"OPENAPI",content:fs.readFileSync("checker/test/fixtures/openapi/petstore-3.1.yaml","utf8")}))' | curl -sS -XPOST localhost:9090/check -H 'content-type: application/json' --data-binary @-`.
 
 Env: `PORT` (9090), `CHECKER_TOKEN` (optional shared secret, header `X-Checker-Token`),
-`CHECKER_MAX_BYTES` (2 MiB), `CHECKER_TIMEOUT_MS` (20000), `CHECKER_MAX_CONCURRENT`
-(1 child process), and `CHECKER_MAX_QUEUED` (8 waiting requests).
+`CHECKER_MAX_BYTES` (8 MiB + 1 KiB whole-request budget), `CHECKER_TIMEOUT_MS` (20000), `CHECKER_MAX_CONCURRENT`
+(1 child process), and `CHECKER_MAX_QUEUED` (8 waiting requests). If the server's
+`CONTRACT_MAX_DOCUMENT_BYTES` is changed, configure the checker budget to at least four times
+that value plus 1024 bytes for two maximally JSON-escaped documents and their envelope.

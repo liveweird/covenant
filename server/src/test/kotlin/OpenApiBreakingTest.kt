@@ -1,10 +1,13 @@
 package ch.nokillswit
 
+import ch.nokillswit.contracts.checks.DocumentParser
 import ch.nokillswit.contracts.checks.FindingSource
 import ch.nokillswit.contracts.checks.OpenApiBreaking
+import ch.nokillswit.contracts.checks.ParseOutcome
 import ch.nokillswit.contracts.checks.Severity
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -144,11 +147,93 @@ class OpenApiBreakingTest {
     fun `OpenAPI 3-1 documents compare through the 3-0 model, YAML and JSON roots alike`() {
         val base31 = base.edit("openapi: 3.0.3", "openapi: 3.1.0")
         val narrowed31 = base31.edit(petNameAndTag, petTagOnly)
-        assertEquals(listOf(OpenApiBreaking.CODE_CHANGED_RESPONSE), OpenApiBreaking.compare(base31, narrowed31)!!.map { it.code })
-        val operation = """{"/a": {"get": {"responses": {"200": {"description": "ok"}}}}}"""
-        val json = """{"openapi": "3.1.0", "info": {"title": "J", "version": "1"}, "paths": $operation}"""
-        val jsonWithout = json.replace(operation, "{}")
-        assertEquals(listOf(OpenApiBreaking.CODE_REMOVED_OPERATION), OpenApiBreaking.compare(json, jsonWithout)!!.map { it.code })
+        val prettyJson = """
+            {
+              "openapi": "3.1.0",
+              "info": { "title": "Pets", "version": "1.0.0" },
+              "paths": {
+                "/pets": {
+                  "get": {
+                    "responses": {
+                      "200": {
+                        "description": "ok",
+                        "content": {
+                          "application/json": {
+                            "schema": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "required": ["id", "name"],
+                                "properties": {
+                                  "id": { "type": "integer" },
+                                  "name": { "type": "string" }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+        val prettyJsonWithoutName = prettyJson.edit("\"name\": { \"type\": \"string\" }", "\"tag\": { \"type\": \"string\" }")
+        val compactJson = prettyJson.lineSequence().joinToString("") { it.trim() }
+        val compactJsonWithoutName = prettyJsonWithoutName.lineSequence().joinToString("") { it.trim() }
+
+        listOf(
+            "YAML" to OpenApiBreaking.compare(base31, narrowed31),
+            "pretty JSON" to OpenApiBreaking.compare(prettyJson, prettyJsonWithoutName),
+            "compact JSON" to OpenApiBreaking.compare(compactJson, compactJsonWithoutName),
+        ).forEach { (format, facts) ->
+            val fact = assertNotNull(facts, format).single()
+            assertEquals(OpenApiBreaking.CODE_CHANGED_RESPONSE, fact.code, format)
+            assertEquals("/paths/~1pets/get/responses/200", fact.path, format)
+            assertTrue(fact.message.contains("'items.name' was removed"), "$format: ${fact.message}")
+        }
+    }
+
+    @Test
+    fun `OpenAPI 3-1 YAML anchors retain nested response schemas during comparison`() {
+        val anchored = """
+            # 🐾 exercises SnakeYAML code-point offsets against Kotlin's UTF-16 indices.
+            openapi: &v319 "\u0033.1.0"
+            x-original-version: *v319
+            info: { title: Pets, version: 1.0.0 }
+            components:
+              schemas:
+                Pet: &pet
+                  type: object
+                  required: [id, name]
+                  properties:
+                    id: { type: integer }
+                    name: { type: string }
+            paths:
+              /pets:
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          schema:
+                            type: array
+                            items: *pet
+        """.trimIndent()
+        val outcome = DocumentParser.parse(anchored)
+        val parsed = assertIs<ParseOutcome.Parsed>(outcome, outcome.toString())
+        assertEquals("3.1.0", parsed.root.path("openapi").asText())
+        val merged = anchored.edit("items: *pet", "items:\n                              <<: *pet")
+
+        listOf("alias" to anchored, "merge key" to merged).forEach { (syntax, original) ->
+            val withoutName = original.edit("name: { type: string }", "tag: { type: string }")
+            val fact = assertNotNull(OpenApiBreaking.compare(original, withoutName), syntax).single()
+            assertEquals(OpenApiBreaking.CODE_CHANGED_RESPONSE, fact.code, syntax)
+            assertEquals("/paths/~1pets/get/responses/200", fact.path, syntax)
+            assertTrue(fact.message.contains("'items.name' was removed"), "$syntax: ${fact.message}")
+        }
     }
 
     @Test
