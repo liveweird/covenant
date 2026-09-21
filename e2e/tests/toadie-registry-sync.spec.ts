@@ -141,22 +141,32 @@ test.describe.serial("Toadie registry synchronization", () => {
     await editor.getByRole("textbox", { name: "Backend base URL" }).fill(upstream.baseUrl);
     await editor.getByRole("textbox", { name: "Browser URL" }).fill(upstream.browserUrl);
     await editor.getByRole("textbox", { name: "API key", exact: true }).fill(upstream.key);
-    await editor.getByRole("button", { name: "Registry metadata mapping", exact: true }).click();
-    await editor.getByRole("switch", { name: /Enable registry metadata sync/ }).check();
-    for (const name of ["Domain description property", "System description property", "Team description property"]) {
-      await editor.getByRole("textbox", { name, exact: true }).fill("description");
-    }
-    await editor.getByRole("checkbox", { name: "I understand that Toadie domain nesting will be flattened" }).check();
     const [created] = await Promise.all([
       page.waitForResponse((response) => response.url().endsWith("/api/v1/toadie-connections") && response.request().method() === "POST"),
       editor.getByRole("button", { name: "Create", exact: true }).click(),
     ]);
     connectionId = await createdId(created);
     await expect(editor).toHaveCount(0);
+    await rowOperation(page, connectionName, "Sync registry metadata");
+    const setup = page.getByRole("dialog", { name: `Sync registry metadata from ${connectionName}` });
+    await setup.getByRole("button", { name: "Configure registry sync", exact: true }).click();
+    const configuration = page.getByRole("dialog", { name: "Edit Toadie connection", exact: true });
+    await expect(configuration.getByRole("button", { name: "Registry metadata mapping", exact: true })).toHaveAttribute("aria-expanded", "true");
+    await configuration.getByRole("switch", { name: /Enable registry metadata sync/ }).check();
+    for (const name of ["Domain description property", "System description property", "Team description property"]) {
+      await configuration.getByRole("textbox", { name, exact: true }).fill("description");
+    }
+    await configuration.getByRole("checkbox", { name: "I understand that Toadie domain nesting will be flattened" }).check();
+    const [configured] = await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith(`/api/v1/toadie-connections/${connectionId}`) && response.request().method() === "PUT"),
+      configuration.getByRole("button", { name: "Save", exact: true }).click(),
+    ]);
+    expect(configured.status()).toBe(204);
+    await expect(configuration).toHaveCount(0);
     await expect.poll(async () => {
-      const state = await (await api.get(`/api/v1/toadie-connections/${connectionId}`)).json() as { lastSuccessAt: number | null };
-      return state.lastSuccessAt != null;
-    }).toBe(true);
+      const state = await (await api.get(`/api/v1/toadie-connections/${connectionId}`)).json() as { lastSuccessAt: number | null; refreshing: boolean; lastErrorCode: string | null };
+      return state.lastSuccessAt != null && !state.refreshing && state.lastErrorCode == null;
+    }, { timeout: 15_000 }).toBe(true);
     const localDomain = await (await api.get(`/api/v1/domains/${seeded.domainId}`)).json() as { name: string };
     expect(await syncRecord(page, "Domains", domainName, localDomain.name)).toBe(seeded.domainId);
     const localSystem = await (await api.get(`/api/v1/systems/${seeded.systemId}`)).json() as { name: string };

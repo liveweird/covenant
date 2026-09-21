@@ -92,4 +92,20 @@ describe("Toadie connections page", () => {
       teamDescriptionProperty: null,
     });
   });
+
+  test("an unconfigured registry sync directs the administrator to the expanded mapping editor", async () => {
+    localStorage.setItem("covenant.auth.roles", JSON.stringify(["ADMIN"]));
+    const user = userEvent.setup();
+    renderWithProviders(<ToadieConnections />);
+    await user.click(await screen.findByRole("button", { name: "Operations for Architecture" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Sync registry metadata" }));
+    const setupDialog = await screen.findByRole("dialog");
+    expect(within(setupDialog).getByText("Configure registry metadata mapping on this connection before synchronizing.")).toBeInTheDocument();
+    await user.click(within(setupDialog).getByRole("button", { name: "Configure registry sync" }));
+    const editor = await screen.findByRole("dialog");
+    expect(within(editor).getByRole("button", { name: "Registry metadata mapping" })).toHaveAttribute("aria-expanded", "true");
+    expect(within(editor).getByRole("switch", { name: /^Enable registry metadata sync/ })).not.toBeChecked();
+    expect(within(editor).queryByRole("checkbox", { name: "I understand that Toadie domain nesting will be flattened" })).not.toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => typeof url === "string" && (url.includes("registry-candidates") || url.startsWith("/api/v1/domains?") || url.startsWith("/api/v1/systems?") || url.startsWith("/api/v1/teams?")))).toBe(false);
+  });
 });

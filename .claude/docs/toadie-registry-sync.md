@@ -40,6 +40,9 @@ create one automatically or assign a system to an unrelated name match.
 ## Administrator flow
 
 1. Configure the optional registry mapping on a Toadie connection and refresh its cache.
+   For an unconfigured connection, **Sync registry metadata** explains the required setup;
+   **Configure registry sync** opens the registry mapping section without enabling it automatically.
+   Failed candidate reads stop loading and expose a retry action.
 2. Browse the paged domain, system or team candidates. Select at most 50 records of one kind.
 3. Choose import for a new record, or explicitly select the existing local record to link.
    Matching names are not identity. The stored binding uses connection-scoped numeric IDs.

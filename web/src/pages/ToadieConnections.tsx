@@ -44,6 +44,7 @@ export default function ToadieConnections() {
     refetchInterval: ({ state }) => state.data?.items.some((row) => row.refreshing) ? 1500 : false,
   });
   const [editor, setEditor] = useState<ToadieConnection | "new" | null>(null);
+  const [expandRegistryMapping, setExpandRegistryMapping] = useState(false);
   const [registrySync, setRegistrySync] = useState<ToadieConnection | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const remove = useDeleteConfirm<ToadieConnection>({
@@ -66,7 +67,7 @@ export default function ToadieConnections() {
   const columnCount = admin ? 6 : 5;
   return (
     <Stack gap="md">
-      <PageHeader title={t("toadie.title")} description={t("toadie.intro")} actions={admin && <Button leftSection={<IconPlus size={16} />} onClick={() => setEditor("new")}>{t("toadie.newConnection")}</Button>} />
+      <PageHeader title={t("toadie.title")} description={t("toadie.intro")} actions={admin && <Button leftSection={<IconPlus size={16} />} onClick={() => { setExpandRegistryMapping(false); setEditor("new"); }}>{t("toadie.newConnection")}</Button>} />
       {(query.isError || refreshError) && <Alert color="red" variant="light" title={query.isError ? t("toadie.loadFailed") : t("toadie.refreshFailed")}>{query.isError ? loadErrorMessage(query.error, t) : refreshError}</Alert>}
       <Table>
         <Table.Thead><Table.Tr>
@@ -89,7 +90,7 @@ export default function ToadieConnections() {
               {admin && <Table.Td ta="right"><RowActionsMenu label={t("common.table.operationsAria", { name: row.name })}>
                 <Menu.Item leftSection={<IconRefresh size={14} />} disabled={row.refreshing || !row.enabled} onClick={() => void refresh(row)}>{t("toadie.refresh")}</Menu.Item>
                 <Menu.Item leftSection={<IconDatabaseImport size={14} />} onClick={() => setRegistrySync(row)}>{t("toadie.registry.action")}</Menu.Item>
-                <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => setEditor(row)}>{t("common.action.edit")}</Menu.Item>
+                <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => { setExpandRegistryMapping(false); setEditor(row); }}>{t("common.action.edit")}</Menu.Item>
                 <Menu.Divider />
                 <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => remove.requestDelete(row)}>{t("common.action.delete")}</Menu.Item>
               </RowActionsMenu></Table.Td>}
@@ -98,8 +99,12 @@ export default function ToadieConnections() {
         </Table.Tbody>
       </Table>
       <PaginationBar total={query.data?.total ?? 0} page={paging.page} pageSize={paging.pageSize} onPageChange={paging.setPage} onPageSizeChange={paging.setPageSize} />
-      {editor != null && <ToadieConnectionEditorModal target={editor === "new" ? null : editor} onClose={() => setEditor(null)} onSaved={async () => { setEditor(null); await queryClient.invalidateQueries({ queryKey: ["toadie"] }); }} />}
-      {registrySync != null && <ToadieRegistrySyncModal connection={registrySync} onClose={() => setRegistrySync(null)} onApplied={async () => {
+      {editor != null && <ToadieConnectionEditorModal target={editor === "new" ? null : editor} expandRegistryMapping={expandRegistryMapping} onClose={() => setEditor(null)} onSaved={async () => { setEditor(null); await queryClient.invalidateQueries({ queryKey: ["toadie"] }); }} />}
+      {registrySync != null && <ToadieRegistrySyncModal connection={registrySync} onClose={() => setRegistrySync(null)} onConfigure={() => {
+        setRegistrySync(null);
+        setExpandRegistryMapping(true);
+        setEditor(registrySync);
+      }} onApplied={async () => {
         setRegistrySync(null);
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ["toadie"] }),

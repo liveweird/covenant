@@ -6,8 +6,9 @@ import { createToadieConnection, updateToadieConnection, type ToadieConnection }
 import { EMPTY_TOADIE_FORM, fromToadieConnection, MAX_TOADIE_NAME_LENGTH, toadieFormValidation, toadieSaveErrorMessage, toToadieRequest, type ToadieFormValues } from "../utils/toadieForm";
 import { showSuccessToast } from "../utils/toast";
 
-export default function ToadieConnectionEditorModal({ target, onClose, onSaved }: {
+export default function ToadieConnectionEditorModal({ target, expandRegistryMapping = false, onClose, onSaved }: {
   target: ToadieConnection | null;
+  expandRegistryMapping?: boolean;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -47,7 +48,7 @@ export default function ToadieConnectionEditorModal({ target, onClose, onSaved }
           <PasswordInput label={t("toadie.field.apiKey")} description={target?.hasApiKey ? t("toadie.field.apiKeyKeep") : undefined} autoComplete="new-password" {...form.getInputProps("apiKey")} />
           <Switch label={t("toadie.field.enabled")} {...form.getInputProps("enabled", { type: "checkbox" })} />
           <NumberInput label={t("toadie.field.refreshInterval")} min={1} max={10_080} allowDecimal={false} {...form.getInputProps("refreshIntervalMinutes")} />
-          <Accordion variant="contained">
+          <Accordion variant="contained" defaultValue={expandRegistryMapping ? "registryMapping" : null}>
             <Accordion.Item value="mapping">
               <Accordion.Control>{t("toadie.field.advanced")}</Accordion.Control>
               <Accordion.Panel>
