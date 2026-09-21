@@ -121,7 +121,8 @@ the same commit** — this list is the coverage map, the scenario file is the de
   pinned recommendations, line filtering, accessibility, and ending support without retiring versions.
 - [`lifecycle-plans.spec.ts`](scenarios/lifecycle-plans.md) — lifecycle dates, migration instructions
   and a replacement release line persist without automatic transitions; retirement reviews an owned
-  Toadie fixture's declared consumer/system/team and requires explicit acknowledgement.
+  Toadie fixture's declared consumer/system/team and requires explicit acknowledgement; a Markdown
+  report download includes saved plans and all declared roles independently of table filters.
 - [`lifecycle-overview.spec.ts`](scenarios/lifecycle-overview.md) — the catalog-wide release-line view:
   name and deadline/attention filtering, summary-count drill-down, migration-plan completion through
   the shared policy modal, no-date discovery, contract-level impact limits, accessibility and screenshot.

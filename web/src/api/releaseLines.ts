@@ -5,6 +5,7 @@ type ReleaseLinePage = paths["/api/v1/contracts/{id}/release-lines"]["get"]["res
 export type ReleaseLineResponse = components["schemas"]["ReleaseLineResponse"];
 export type ReleaseLineUpdateBody = components["schemas"]["ReleaseLineUpdateRequest"];
 export type SupportStatus = components["schemas"]["SupportStatus"];
+export type ReleaseLineMigrationReportResponse = components["schemas"]["ReleaseLineMigrationReportResponse"];
 
 async function listReleaseLines(contractId: number, page: number, pageSize: number): Promise<ReleaseLinePage> {
   const params = buildQuery({ page, pageSize, sort: "-major" });
@@ -28,4 +29,8 @@ export async function updateReleaseLine(contractId: number, major: number, body:
 
 export async function getReleaseLine(contractId: number, major: number): Promise<ReleaseLineResponse> {
   return jsonRequest(`/api/v1/contracts/${contractId}/release-lines/${major}`);
+}
+
+export async function getReleaseLineMigrationReport(contractId: number, major: number): Promise<ReleaseLineMigrationReportResponse> {
+  return jsonRequest(`/api/v1/contracts/${contractId}/release-lines/${major}/migration-report`);
 }

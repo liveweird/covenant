@@ -17,6 +17,8 @@ import ch.nokillswit.infra.paging.parsePaging
 import ch.nokillswit.infra.paging.repeatedEnum
 import ch.nokillswit.infra.paging.toPage
 import ch.nokillswit.infra.paging.SortField
+import ch.nokillswit.toadie.ToadieService
+import ch.nokillswit.toadie.ToadieServiceKey
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.resources.Resource
@@ -192,7 +194,11 @@ class ContractsRoute {
         class ReleaseLines(val parent: Id) {
             @Serializable
             @Resource("{major}")
-            class Major(val parent: ReleaseLines, val major: Int)
+            class Major(val parent: ReleaseLines, val major: Int) {
+                @Serializable
+                @Resource("migration-report")
+                class MigrationReport(val parent: Major)
+            }
         }
     }
 }
@@ -249,12 +255,13 @@ fun Application.configureContractRoutes() {
     val subscriptions = attributes[ContractSubscriptionServiceKey]
     val errorService = attributes[ContractErrorServiceKey]
     val releaseLines = attributes[ReleaseLineServiceKey]
+    val toadie = attributes[ToadieServiceKey]
     routing {
         authenticate {
             contractCollection(contractService, activity)
             contractItem(contractService, activity, eventService, subscriptions)
             contractErrors(errorService)
-            releaseLines(contractService, releaseLines, activity)
+            releaseLines(contractService, releaseLines, toadie, activity)
         }
     }
 }
@@ -262,6 +269,7 @@ fun Application.configureContractRoutes() {
 private fun Route.releaseLines(
     contractService: ContractService,
     releaseLines: ReleaseLineService,
+    toadie: ToadieService,
     activity: ContractActivity,
 ) {
     get<ContractsRoute.Id.ReleaseLines> { route ->
@@ -278,6 +286,16 @@ private fun Route.releaseLines(
         call.caller()
         if (route.major < 0) throw io.ktor.server.plugins.BadRequestException("major must be non-negative")
         call.respond(HttpStatusCode.OK, releaseLines.read(route.parent.parent.id, route.major).orNotFound("Release line"))
+    }
+    get<ContractsRoute.Id.ReleaseLines.Major.MigrationReport> { route ->
+        call.caller()
+        val major = route.parent.major
+        if (major < 0) throw io.ktor.server.plugins.BadRequestException("major must be non-negative")
+        call.respond(
+            HttpStatusCode.OK,
+            releaseLines.migrationReport(route.parent.parent.parent.id, major, toadie)
+                .orNotFound("Release line"),
+        )
     }
     put<ContractsRoute.Id.ReleaseLines.Major> { route ->
         val caller = call.caller()

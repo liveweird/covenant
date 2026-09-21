@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import AxeBuilder from "@axe-core/playwright";
 import type { APIRequestContext, APIResponse, Page } from "@playwright/test";
 import { apiAsAdmin, expect, login, PETSTORE, seedContractViaApi, teardownSeededContract, test, type SeededContract, uniqueText } from "./helpers";
@@ -100,6 +101,37 @@ test.describe.serial("release-line lifecycle plans", () => {
     await expect(line(page, 1)).toContainText(`${seeded.contractName} · 2.x`);
     const version = await (await api.get(`${versionsPath()}/${seeded.versionId}`)).json() as { lifecycle: string };
     expect(version.lifecycle).toBe("DEPRECATED");
+  });
+
+  test("a migration report includes the saved plan and all declared usage without changing lifecycle", async ({ page }, testInfo) => {
+    await login(page);
+    await page.goto(`/contracts/${seeded.contractId}`);
+    await line(page, 1).getByRole("button", { name: "Review retirement impact for 1.x", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Retirement impact for 1.x", exact: true });
+    await expect(dialog).toContainText("Storefront website");
+    // Search only the visible consumer table; the report must still include every declared role.
+    await dialog.getByRole("textbox", { name: "Service", exact: true }).fill("no-visible-services");
+    await expect(dialog.getByText("Storefront website", { exact: true })).toHaveCount(0);
+    const downloaded = page.waitForEvent("download");
+    await dialog.getByRole("button", { name: "Download report", exact: true }).click();
+    const download = await downloaded;
+    expect(download.suggestedFilename()).toMatch(/\.md$/);
+    const file = await download.path();
+    expect(file).not.toBeNull();
+    const report = await readFile(file!, "utf8");
+    const plainText = report.replace(/\\([\\`*_{}[\]()<>#+\-.!|])/g, "$1");
+    for (const expected of [seeded.contractName, "1.x", "2.x", "2030-06-01", "2030-12-31",
+      "Move consumers to the 2.x API before support ends.", "Checkout service", "Storefront website",
+      "Commerce system", "Retail team", "Orders API", "Order events"]) expect(plainText).toContain(expected);
+    expect(report).toMatch(/whole contract/i);
+    expect(report).toMatch(/unknown/i);
+    expect(report).not.toContain(upstream.key);
+    await testInfo.attach("Migration and impact report", { body: report, contentType: "text/markdown" });
+    const scan = await new AxeBuilder({ page }).include('[role="dialog"]').withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+    expect(scan.violations.map(({ id, impact }) => ({ id, impact }))).toEqual([]);
+    await testInfo.attach("Report download action", { body: await dialog.screenshot(), contentType: "image/png" });
+    await dialog.getByRole("button", { name: "Close", exact: true }).last().click();
+    expect(((await (await api.get(`${versionsPath()}/${seeded.versionId}`)).json()) as { lifecycle: string }).lifecycle).toBe("DEPRECATED");
   });
 
   test("retirement reviews declared consumers and requires explicit acknowledgement", async ({ page }, testInfo) => {

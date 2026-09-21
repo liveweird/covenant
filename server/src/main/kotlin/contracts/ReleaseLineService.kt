@@ -8,6 +8,10 @@ import ch.nokillswit.infra.db.SoftDeletable
 import ch.nokillswit.infra.db.nowMillis
 import ch.nokillswit.infra.paging.PageRequest
 import ch.nokillswit.infra.paging.applyPaging
+import ch.nokillswit.toadie.ToadieService
+import ch.nokillswit.toadie.MAX_MIGRATION_REPORT_BYTES
+import ch.nokillswit.toadie.MIGRATION_REPORT_ENVELOPE_RESERVE_BYTES
+import io.r2dbc.spi.IsolationLevel
 import io.ktor.server.plugins.BadRequestException
 import io.ktor.util.AttributeKey
 import kotlinx.coroutines.flow.map
@@ -35,6 +39,7 @@ val RELEASE_LINE_SORT_FIELDS = setOf("major", "updatedAt")
 class ReleaseLineService(
     private val database: R2dbcDatabase,
     private val contracts: ContractService,
+    private val afterMigrationPlanRead: suspend () -> Unit = {},
 ) {
     object ReleaseLines : UIntIdTable("contract_release_lines"), SoftDeletable {
         val contractId = reference("contract_id", ContractService.Contracts)
@@ -62,7 +67,58 @@ class ReleaseLineService(
 
     suspend fun read(contractId: UInt, major: Int): ReleaseLineResponse? = suspendTransaction(database) {
         requireActiveContract(contractId)
+        readInTransaction(contractId, major)
+    }
+
+    internal suspend fun readInTransaction(contractId: UInt, major: Int): ReleaseLineResponse? =
         lineRow(contractId, major)?.let { response(it) }
+
+    suspend fun migrationReport(
+        contractId: UInt,
+        major: Int,
+        toadie: ToadieService,
+    ): ReleaseLineMigrationReportResponse? = suspendTransaction(
+        database,
+        transactionIsolation = IsolationLevel.REPEATABLE_READ,
+        readOnly = true,
+    ) {
+        val contract = ContractService.Contracts.select(
+            ContractService.Contracts.name,
+            ContractService.Contracts.type,
+        ).where {
+            (ContractService.Contracts.id eq contractId) and ContractService.Contracts.active()
+        }.toList().singleOrNull() ?: throw NotFoundException("Contract not found")
+        val line = readInTransaction(contractId, major) ?: return@suspendTransaction null
+        val generatedAt = nowMillis()
+        afterMigrationPlanRead()
+        val usage = checkNotNull(
+            toadie.fullUsageInTransaction(
+                contractId,
+                generatedAt,
+                (MAX_MIGRATION_REPORT_BYTES - MIGRATION_REPORT_ENVELOPE_RESERVE_BYTES).toLong(),
+            ),
+        )
+        ReleaseLineMigrationReportResponse(
+            generatedAt = generatedAt,
+            contractId = contractId,
+            contractName = contract[ContractService.Contracts.name],
+            contractType = ContractType.valueOf(contract[ContractService.Contracts.type]),
+            major = line.major,
+            supportStatus = line.supportStatus,
+            deprecatesOn = line.deprecatesOn,
+            supportEndsOn = line.supportEndsOn,
+            supportPolicy = line.supportPolicy,
+            migrationGuide = line.migrationGuide,
+            replacement = line.replacement,
+            recommendedVersion = line.recommendedVersion,
+            planUpdatedAt = line.updatedAt,
+            usageScope = MigrationUsageScope.CONTRACT,
+            versionAdoption = MigrationVersionAdoption.UNKNOWN,
+            connection = usage.connection,
+            cache = usage.cache,
+            linkedApis = usage.linkedApis,
+            services = usage.services,
+        )
     }
 
     suspend fun update(

@@ -26,7 +26,7 @@ independent support policies, deprecation/migration plans, deadline reminders an
 Toadie's Port ontology; validation, lint, and breaking-change
 detection; import with dry run, guarded URL fetch, source references and sync, diff, download,
 and export; history, followers and in-app notifications; optional version reviews with a
-personal/catalog review inbox; lifecycle overview; and catalog facets. ADMIN-curated
+personal/catalog review inbox; lifecycle overview; shareable migration and impact reports; and catalog facets. ADMIN-curated
 Environments hold HTTP, Kafka, and PostgreSQL targets with passwords encrypted at rest. Try-it
 executes requests against those targets and reports live conformance findings. The contract
 reader renders a server-produced model alongside the source/editor views. The Errors report

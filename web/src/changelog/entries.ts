@@ -17,6 +17,20 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "0.15.0",
+    date: "2026-09-21",
+    en: `**Share migration plans and declared impact.**
+
+- Download a Markdown report from a release line's impact dialog for planning discussions.
+- Reports include the saved support dates, replacement, recommendation, migration instructions and declared provider/consumer services with their systems and teams.
+- Generation and observation timestamps, unavailable mappings and stale usage warnings travel with the report. Usage describes the whole contract; exact version and release-line adoption remain unknown.`,
+    pl: `**Udostępniaj plany migracji i deklarowane zależności.**
+
+- Pobierz raport Markdown z okna wpływu wycofania linii wydań do rozmów o planowanej migracji.
+- Raport zawiera zapisane daty wsparcia, kontrakt zastępujący, rekomendowaną wersję, instrukcje migracji oraz deklarowane usługi dostawców i konsumentów wraz z ich systemami i zespołami.
+- Raport zachowuje daty wygenerowania i obserwacji, niedostępne powiązania oraz ostrzeżenia o nieaktualnych danych. Użycie dotyczy całego kontraktu; używane wersje i linie wydań pozostają nieznane.`,
+  },
+  {
     version: "0.14.3",
     date: "2026-09-21",
     en: `**Catalog integrity and reliable selections.**

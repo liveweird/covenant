@@ -1,6 +1,10 @@
 package ch.nokillswit.contracts
 
 import ch.nokillswit.infra.paging.PageResponse
+import ch.nokillswit.toadie.ToadieCacheStatus
+import ch.nokillswit.toadie.ToadieConnectionRef
+import ch.nokillswit.toadie.ToadieLinkResponse
+import ch.nokillswit.toadie.ToadieUsageRow
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -45,6 +49,35 @@ data class ReleaseLineResponse(
     val recommendedVersion: ReleaseLineVersionSummary?,
     val versionCount: Long,
     val updatedAt: Long,
+)
+
+@Serializable
+enum class MigrationUsageScope { CONTRACT }
+
+@Serializable
+enum class MigrationVersionAdoption { UNKNOWN }
+
+@Serializable
+data class ReleaseLineMigrationReportResponse(
+    val generatedAt: Long,
+    val contractId: UInt,
+    val contractName: String,
+    val contractType: ContractType,
+    val major: Int,
+    val supportStatus: SupportStatus,
+    val deprecatesOn: String?,
+    val supportEndsOn: String?,
+    val supportPolicy: String?,
+    val migrationGuide: String?,
+    val replacement: ReleaseLineReplacement?,
+    val recommendedVersion: ReleaseLineVersionSummary?,
+    val planUpdatedAt: Long,
+    val usageScope: MigrationUsageScope,
+    val versionAdoption: MigrationVersionAdoption,
+    val connection: ToadieConnectionRef?,
+    val cache: ToadieCacheStatus,
+    val linkedApis: List<ToadieLinkResponse>,
+    val services: List<ToadieUsageRow>,
 )
 
 typealias ReleaseLinePageResponse = PageResponse<ReleaseLineResponse>

@@ -1783,6 +1783,32 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '415': { $ref: '#/components/responses/UnsupportedMediaType' }
         '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/contracts/{id}/release-lines/{major}/migration-report:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+      - $ref: '#/components/parameters/ReleaseLineMajor'
+    get:
+      tags: [contracts]
+      operationId: getReleaseLineMigrationReport
+      summary: Get a release line's migration plan and cached contract usage
+      description: >-
+        Any authenticated user. Returns one coherent local database snapshot of the release-line
+        plan and the complete bounded Toadie cache projection for the whole contract. It never
+        refreshes Toadie and cannot identify which version or major a remote service uses. The
+        complete response has a conservative 8 MiB serialized-size budget to prevent cached graph
+        fan-out from exhausting server memory; an oversized report returns 409 rather than partial
+        or truncated usage.
+      responses:
+        '200':
+          description: Migration plan and cached contract-level usage
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReleaseLineMigrationReportResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
   /api/v1/contracts/{id}/versions:
     parameters:
       - $ref: '#/components/parameters/ResourceId'
@@ -4899,6 +4925,47 @@ components:
           nullable: true
         versionCount: { type: integer, format: int64, minimum: 0 }
         updatedAt: { type: integer, format: int64 }
+    MigrationUsageScope:
+      type: string
+      enum: [CONTRACT]
+    MigrationVersionAdoption:
+      type: string
+      enum: [UNKNOWN]
+    ReleaseLineMigrationReportResponse:
+      type: object
+      required: [generatedAt, contractId, contractName, contractType, major, supportStatus, deprecatesOn, supportEndsOn, supportPolicy, migrationGuide, replacement, recommendedVersion, planUpdatedAt, usageScope, versionAdoption, connection, cache, linkedApis, services]
+      properties:
+        generatedAt: { type: integer, format: int64, description: Epoch millis captured once for this local snapshot. }
+        contractId: { type: integer, format: int32, minimum: 0 }
+        contractName: { type: string }
+        contractType: { $ref: '#/components/schemas/ContractType' }
+        major: { type: integer, format: int32, minimum: 0 }
+        supportStatus: { $ref: '#/components/schemas/SupportStatus' }
+        deprecatesOn: { type: string, format: date, nullable: true }
+        supportEndsOn: { type: string, format: date, nullable: true }
+        supportPolicy: { type: string, nullable: true }
+        migrationGuide: { type: string, nullable: true }
+        replacement:
+          allOf: [{ $ref: '#/components/schemas/ReleaseLineReplacement' }]
+          nullable: true
+        recommendedVersion:
+          allOf: [{ $ref: '#/components/schemas/ReleaseLineVersionSummary' }]
+          nullable: true
+        planUpdatedAt: { type: integer, format: int64, description: Epoch millis of the release-line plan. }
+        usageScope: { $ref: '#/components/schemas/MigrationUsageScope' }
+        versionAdoption: { $ref: '#/components/schemas/MigrationVersionAdoption' }
+        connection:
+          allOf: [{ $ref: '#/components/schemas/ToadieConnectionRef' }]
+          nullable: true
+        cache: { $ref: '#/components/schemas/ToadieCacheStatus' }
+        linkedApis:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/ToadieLinkResponse' }
+        services:
+          type: array
+          maxItems: 5000
+          items: { $ref: '#/components/schemas/ToadieUsageRow' }
     ReleaseLinePage:
       type: object
       required: [items, page, pageSize, total]

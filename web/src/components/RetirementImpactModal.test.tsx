@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { StrictMode } from "react";
 import userEvent from "@testing-library/user-event";
 import { fireEvent } from "@testing-library/react";
 import { renderWithProviders, screen, waitFor, within } from "../test/render";
@@ -7,6 +8,9 @@ import RetirementImpactModal from "./RetirementImpactModal";
 import LifecycleActions from "./LifecycleActions";
 import ReleaseLinePolicyModal from "./ReleaseLinePolicyModal";
 import type { ReleaseLineResponse } from "../api/releaseLines";
+import { setToken } from "../api/session";
+
+const NativeURL = URL;
 
 const PLAN: ReleaseLineResponse = {
   id: 21, contractId: 5, major: 1, supportStatus: "MAINTENANCE", supportEndsOn: "2027-12-31", supportPolicy: null,
@@ -18,14 +22,20 @@ const CACHE = { state: "STALE", lastSuccessAt: 10, lastAttemptAt: 20, lastErrorC
 const LINKS = { contractId: 5, connection: { id: 2, name: "Toadie" }, cache: CACHE, items: [{ id: 1, title: "Orders", status: "MISSING" }] };
 const USAGE = { page: 1, pageSize: 20, total: 1, cache: CACHE, items: [{ id: "2", identifier: "storefront", title: "Storefront", url: null,
   roles: ["CONSUMER"], systems: [], teams: [{ entityId: "7", title: "Retail", url: null }], version: null, releaseLine: null }] };
+const REPORT = { generatedAt: 100, contractId: 5, contractName: "Orders", contractType: "OPENAPI", major: 1,
+  supportStatus: "MAINTENANCE", deprecatesOn: "2027-06-01", supportEndsOn: "2027-12-31", supportPolicy: null,
+  migrationGuide: "Saved guide", replacement: PLAN.replacement, recommendedVersion: null, planUpdatedAt: 99,
+  usageScope: "CONTRACT", versionAdoption: "UNKNOWN", connection: null, cache: CACHE, linkedApis: [], services: [] };
 
 describe("retirement impact", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
   beforeEach(() => {
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     localStorage.setItem("covenant.auth.token", "token");
     fetchMock = vi.fn((url: string, init?: RequestInit) => {
       if (init?.method === "PUT") return Promise.resolve(new Response(null, { status: 204 }));
       if (url === "/api/v1/contracts/5/release-lines/1") return Promise.resolve(jsonResponse(200, PLAN));
+      if (url === "/api/v1/contracts/5/release-lines/1/migration-report") return Promise.resolve(jsonResponse(200, REPORT));
       if (url === "/api/v1/contracts/5/toadie-links") return Promise.resolve(jsonResponse(200, LINKS));
       if (url.startsWith("/api/v1/contracts/5/toadie-usage?")) return Promise.resolve(jsonResponse(200, USAGE));
       if (url.startsWith("/api/v1/contracts?")) return Promise.resolve(jsonResponse(200, { items: [], total: 0 }));
@@ -34,7 +44,7 @@ describe("retirement impact", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
   });
-  afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); });
+  afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); });
 
   test("a reader sees the plan, consumer teams and stale/missing caveats without mutation controls", async () => {
     const close = vi.fn();
@@ -49,9 +59,92 @@ describe("retirement impact", () => {
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Role" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit Toadie links" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Download report" })).toBeEnabled();
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("role=CONSUMER"))).toBe(true);
     await userEvent.setup().click(screen.getAllByRole("button", { name: "Close" }).at(-1)!);
     expect(close).toHaveBeenCalled();
+  });
+
+  test("a failed report download shows an inline error and retries without invoking the retirement action", async () => {
+    let reportAttempts = 0;
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/v1/contracts/5/release-lines/1/migration-report") {
+        reportAttempts += 1;
+        return Promise.resolve(reportAttempts === 1 ? jsonResponse(503, { status: 503 }) : jsonResponse(200, REPORT));
+      }
+      if (url === "/api/v1/contracts/5/toadie-links") return Promise.resolve(jsonResponse(200, LINKS));
+      if (url.startsWith("/api/v1/contracts/5/toadie-usage?")) return Promise.resolve(jsonResponse(200, USAGE));
+      return Promise.resolve(jsonResponse(404, { status: 404 }));
+    });
+    const transition = vi.fn();
+    const createObjectURL = vi.fn(() => "blob:report");
+    class TestURL extends NativeURL {
+      static readonly createObjectURL = createObjectURL;
+      static readonly revokeObjectURL = vi.fn();
+    }
+    vi.stubGlobal("URL", TestURL);
+    const user = userEvent.setup();
+    renderWithProviders(<RetirementImpactModal contractId={5} major={1} plan={PLAN} canWrite={false} onClose={vi.fn()} onConfirm={transition} confirmLabel="Retire" />);
+    await user.click(screen.getByRole("button", { name: "Download report" }));
+    expect(await screen.findByText("Could not download the migration report. Try again.")).toBeInTheDocument();
+    expect(transition).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Download report" }));
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce());
+    expect(reportAttempts).toBe(2);
+    expect(transition).not.toHaveBeenCalled();
+  });
+
+  test("a size-limit conflict is actionable and never creates a partial download", async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/v1/contracts/5/release-lines/1/migration-report") return Promise.resolve(jsonResponse(409, { status: 409 }));
+      if (url === "/api/v1/contracts/5/toadie-links") return Promise.resolve(jsonResponse(200, LINKS));
+      if (url.startsWith("/api/v1/contracts/5/toadie-usage?")) return Promise.resolve(jsonResponse(200, USAGE));
+      return Promise.resolve(jsonResponse(404, { status: 404 }));
+    });
+    const createObjectURL = vi.fn(() => "blob:report");
+    class TestURL extends NativeURL {
+      static readonly createObjectURL = createObjectURL;
+      static readonly revokeObjectURL = vi.fn();
+    }
+    vi.stubGlobal("URL", TestURL);
+    renderWithProviders(<RetirementImpactModal contractId={5} major={1} plan={PLAN} canWrite={false} onClose={vi.fn()} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Download report" }));
+    expect(await screen.findByText(/exceeds the 8 MiB export limit/)).toBeInTheDocument();
+    expect(createObjectURL).not.toHaveBeenCalled();
+  });
+
+  test("downloads successfully under React Strict Mode", async () => {
+    const createObjectURL = vi.fn(() => "blob:report");
+    class TestURL extends NativeURL {
+      static readonly createObjectURL = createObjectURL;
+      static readonly revokeObjectURL = vi.fn();
+    }
+    vi.stubGlobal("URL", TestURL);
+    renderWithProviders(<StrictMode><RetirementImpactModal contractId={5} major={1} plan={PLAN} canWrite={false} onClose={vi.fn()} /></StrictMode>);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Download report" }));
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce());
+  });
+
+  test("discards a delayed report after the signed-in session is replaced", async () => {
+    let resolveReport!: (response: Response) => void;
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/v1/contracts/5/release-lines/1/migration-report") return new Promise<Response>((resolve) => { resolveReport = resolve; });
+      if (url === "/api/v1/contracts/5/toadie-links") return Promise.resolve(jsonResponse(200, LINKS));
+      if (url.startsWith("/api/v1/contracts/5/toadie-usage?")) return Promise.resolve(jsonResponse(200, USAGE));
+      return Promise.resolve(jsonResponse(404, { status: 404 }));
+    });
+    const createObjectURL = vi.fn(() => "blob:report");
+    class TestURL extends NativeURL {
+      static readonly createObjectURL = createObjectURL;
+      static readonly revokeObjectURL = vi.fn();
+    }
+    vi.stubGlobal("URL", TestURL);
+    renderWithProviders(<RetirementImpactModal contractId={5} major={1} plan={PLAN} canWrite={false} onClose={vi.fn()} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Download report" }));
+    setToken("another-user-token");
+    resolveReport(jsonResponse(200, REPORT));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Download report" })).toBeEnabled());
+    expect(createObjectURL).not.toHaveBeenCalled();
   });
 
   test("retirement remains an explicit decision after a failed usage read; cancel never transitions", async () => {

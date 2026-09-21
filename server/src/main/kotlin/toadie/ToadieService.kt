@@ -30,10 +30,18 @@ val ToadieServiceKey = AttributeKey<ToadieService>("ToadieService")
 
 data class ToadieConnectionListResult(val items: List<ToadieConnectionResponse>, val total: Long)
 data class ToadieApiListResult(val items: List<ToadieEntityRef>, val total: Long)
+@kotlinx.serialization.Serializable
+internal data class ToadieFullUsageProjection(
+    val connection: ToadieConnectionRef?,
+    val cache: ToadieCacheStatus,
+    val linkedApis: List<ToadieLinkResponse>,
+    val services: List<ToadieUsageRow>,
+)
 data class RefreshClaim(val connectionId: UInt, val revision: Long, val token: String, val config: ToadieFetchConfig)
 enum class RefreshClaimResult { ACCEPTED, COALESCED, COOLDOWN, MISSING, DISABLED }
 
 private val json = Json { ignoreUnknownKeys = false }
+private val budgetJson = Json { encodeDefaults = true; explicitNulls = true }
 
 class ToadieService(
     private val database: R2dbcDatabase,
@@ -234,45 +242,17 @@ class ToadieService(
         }
 
     suspend fun links(contractId: UInt): ToadieLinksResponse? = suspendTransaction(database) {
-        val contractExists = ContractService.Contracts.select(ContractService.Contracts.id).where {
-            (ContractService.Contracts.id eq contractId) and ContractService.Contracts.active()
-        }.toList().isNotEmpty()
-        if (!contractExists) return@suspendTransaction null
-        val rows = Links.selectAll().where { Links.contractId eq contractId }.toList()
-        if (rows.isEmpty()) return@suspendTransaction ToadieLinksResponse(contractId, null, unlinkedStatus(), emptyList())
-        val connectionId = rows.first()[Links.connectionId].value
-        val connection = activeConnection(connectionId)
-        var cachedPredicate: Op<Boolean> = (SnapshotEntities.connectionId eq connectionId) and
-            (SnapshotEntities.entityId inList rows.map { it[Links.apiEntityId] })
-        connection?.let {
-            cachedPredicate = cachedPredicate and
-                (SnapshotEntities.blueprint.lowerCase() eq it[Connections.apiBlueprint].lowercase())
-        }
-        val cached = SnapshotEntities.selectAll().where { cachedPredicate }
-            .toList().associateBy { it[SnapshotEntities.entityId] }
-        val disconnected = connection == null
-        val ref = connection?.toRef()
-        val items = rows.map { link ->
-            val current = cached[link[Links.apiEntityId]]
-            ToadieLinkResponse(
-                id = link[Links.id].value,
-                connectionId = connectionId,
-                apiEntityId = link[Links.apiEntityId],
-                identifier = current?.get(SnapshotEntities.identifier) ?: link[Links.identifier],
-                title = current?.get(SnapshotEntities.title) ?: link[Links.title],
-                url = if (connection != null) {
-                    entityUrl(connection[Connections.browserUrl], link[Links.apiEntityId])
-                } else {
-                    link[Links.url]
-                },
-                status = when {
-                    disconnected -> ToadieLinkStatus.DISCONNECTED
-                    current == null -> ToadieLinkStatus.MISSING
-                    else -> ToadieLinkStatus.AVAILABLE
-                },
-            )
-        }
-        ToadieLinksResponse(contractId, ref, connection?.cacheStatus() ?: disconnectedStatus(), items)
+        val linkState = linksInTransaction(contractId) ?: return@suspendTransaction null
+        val connection = linkState.first
+        val links = linkState.second
+        if (links.isEmpty()) return@suspendTransaction ToadieLinksResponse(contractId, null, unlinkedStatus(), emptyList())
+        val cachedApis = cachedLinkedApis(connection, links)
+        ToadieLinksResponse(
+            contractId,
+            connection?.toRef(),
+            connection?.cacheStatus() ?: disconnectedStatus(),
+            projectLinks(connection, links, cachedApis),
+        )
     }
 
     suspend fun usage(
@@ -281,47 +261,8 @@ class ToadieService(
         role: ToadieUsageRole?,
         paging: PageRequest,
     ): ToadieUsageResponse? = suspendTransaction(database) {
-        val linkState = linksInTransaction(contractId) ?: return@suspendTransaction null
-        if (linkState.second.isEmpty()) {
-            return@suspendTransaction ToadieUsageResponse(emptyList(), paging.page, paging.pageSize, 0, linkState.first?.toRef(),
-                linkState.first?.cacheStatus() ?: unlinkedStatus())
-        }
-        val connection = linkState.first
-        if (connection == null) {
-            return@suspendTransaction ToadieUsageResponse(emptyList(), paging.page, paging.pageSize, 0, null, disconnectedStatus())
-        }
-        val mapping = connection.mapping()
-        val entities = SnapshotEntities.selectAll().where { SnapshotEntities.connectionId eq connection[Connections.id].value }
-            .map { it.toSnapshot() }.toList()
-        val linkedIds = linkState.second.map { it[Links.apiEntityId] }.toSet()
-        val apiIdentifiersById = entities.filter { it.blueprint.equals(mapping.apiBlueprint, ignoreCase = true) && it.id in linkedIds }
-            .associate { it.id to it.identifier }
-        val targetIdentifiers = apiIdentifiersById.values.toSet()
-        val systems = entities.filter { it.blueprint.equals(connection[Connections.snapshotSystemBlueprint], ignoreCase = true) }
-            .associateBy { it.identifier }
-        val teams = entities.filter { it.blueprint.equals("_team", ignoreCase = true) }.associateBy { it.identifier }
-        val browserUrl = connection[Connections.browserUrl]
-        var rows = entities.asSequence().filter { it.blueprint.equals(mapping.serviceBlueprint, ignoreCase = true) }.mapNotNull { service ->
-            val providedIdentifiers = service.relations[mapping.providesRelation].orEmpty()
-                .filter { it in targetIdentifiers }
-            val consumedIdentifiers = service.relations[mapping.consumesRelation].orEmpty()
-                .filter { it in targetIdentifiers }
-            if (providedIdentifiers.isEmpty() && consumedIdentifiers.isEmpty()) return@mapNotNull null
-            val provided = apiIdentifiersById.filterValues { it in providedIdentifiers }.keys.sorted()
-            val consumed = apiIdentifiersById.filterValues { it in consumedIdentifiers }.keys.sorted()
-            ToadieUsageRow(
-                id = service.id, identifier = service.identifier, title = service.title,
-                url = entityUrl(browserUrl, service.id),
-                roles = buildList {
-                    if (provided.isNotEmpty()) add(ToadieUsageRole.PROVIDER)
-                    if (consumed.isNotEmpty()) add(ToadieUsageRole.CONSUMER)
-                },
-                providedApiEntityIds = provided, consumedApiEntityIds = consumed,
-                systems = service.relations[mapping.systemRelation].orEmpty()
-                    .mapNotNull(systems::get).map { it.toRef(browserUrl) },
-                teams = service.teamIdentifiers.mapNotNull(teams::get).map { it.toRef(browserUrl) },
-            )
-        }
+        val projection = fullUsageInTransaction(contractId) ?: return@suspendTransaction null
+        var rows = projection.services.asSequence()
         query?.trim()?.takeIf { it.isNotEmpty() }?.let { raw ->
             val q = foldSearch(raw)
             rows = rows.filter { q in foldSearch(it.identifier) || q in foldSearch(it.title) }
@@ -343,8 +284,85 @@ class ToadieService(
         }
         ToadieUsageResponse(
             items = pageItems, page = paging.page, pageSize = paging.pageSize,
-            total = ordered.size.toLong(), connection = connection.toRef(), cache = connection.cacheStatus(),
+            total = ordered.size.toLong(), connection = projection.connection, cache = projection.cache,
         )
+    }
+
+    /** Complete bounded cached projection. The caller may own a wider read transaction. */
+    internal suspend fun fullUsageInTransaction(
+        contractId: UInt,
+        now: Long = nowMillis(),
+        maxProjectedBytes: Long? = null,
+    ): ToadieFullUsageProjection? {
+        val linkState = linksInTransaction(contractId) ?: return null
+        val connection = linkState.first
+        val links = linkState.second
+        if (links.isEmpty()) return ToadieFullUsageProjection(null, unlinkedStatus(), emptyList(), emptyList())
+        val connectionId = links.first()[Links.connectionId].value
+        if (connection == null) {
+            val retained = projectLinks(null, links, cachedLinkedApis(null, links))
+            return ToadieFullUsageProjection(null, disconnectedStatus(), retained, emptyList())
+        }
+        val mapping = connection.mapping()
+        val entities = SnapshotEntities.selectAll().where { SnapshotEntities.connectionId eq connectionId }
+            .map { it.toSnapshot() }.toList()
+        val cachedApis = entities.filter {
+            it.blueprint.equals(mapping.apiBlueprint, ignoreCase = true)
+        }.associateBy { it.id }
+        val linkedApis = projectLinks(connection, links, cachedApis)
+        val linkedIds = links.map { it[Links.apiEntityId] }.toSet()
+        val apiIdentifiersById = cachedApis.filterKeys { it in linkedIds }.mapValues { it.value.identifier }
+        val targetIdentifiers = apiIdentifiersById.values.toSet()
+        val systems = entities.filter {
+            it.blueprint.equals(connection[Connections.snapshotSystemBlueprint], ignoreCase = true)
+        }.associateBy { it.identifier }
+        val teams = entities.filter { it.blueprint.equals("_team", ignoreCase = true) }.associateBy { it.identifier }
+        val browserUrl = connection[Connections.browserUrl]
+        val systemRefs = systems.mapValues { it.value.toRef(browserUrl) }
+        val teamRefs = teams.mapValues { it.value.toRef(browserUrl) }
+        var projectedBytes = maxProjectedBytes?.let {
+            budgetJson.encodeToString(
+                ToadieFullUsageProjection(connection.toRef(), connection.cacheStatus(now), linkedApis, emptyList()),
+            ).toByteArray(Charsets.UTF_8).size.toLong()
+        } ?: 0L
+        if (maxProjectedBytes != null && projectedBytes > maxProjectedBytes) {
+            throw ConflictException("Migration report exceeds the 8 MiB export limit")
+        }
+        val services = mutableListOf<ToadieUsageRow>()
+        entities.asSequence()
+            .filter { it.blueprint.equals(mapping.serviceBlueprint, ignoreCase = true) }
+            .sortedBy { it.id.toULongOrNull() ?: ULong.MAX_VALUE }
+            .mapNotNull { service ->
+                val providedIdentifiers = service.relations[mapping.providesRelation].orEmpty()
+                    .filter { it in targetIdentifiers }
+                val consumedIdentifiers = service.relations[mapping.consumesRelation].orEmpty()
+                    .filter { it in targetIdentifiers }
+                if (providedIdentifiers.isEmpty() && consumedIdentifiers.isEmpty()) return@mapNotNull null
+                val provided = apiIdentifiersById.filterValues { it in providedIdentifiers }.keys.sorted()
+                val consumed = apiIdentifiersById.filterValues { it in consumedIdentifiers }.keys.sorted()
+                ToadieUsageRow(
+                    id = service.id, identifier = service.identifier, title = service.title,
+                    url = entityUrl(browserUrl, service.id),
+                    roles = buildList {
+                        if (provided.isNotEmpty()) add(ToadieUsageRole.PROVIDER)
+                        if (consumed.isNotEmpty()) add(ToadieUsageRole.CONSUMER)
+                    },
+                    providedApiEntityIds = provided, consumedApiEntityIds = consumed,
+                    systems = service.relations[mapping.systemRelation].orEmpty()
+                        .mapNotNull(systemRefs::get),
+                    teams = service.teamIdentifiers.mapNotNull(teamRefs::get),
+                )
+            }.forEach { row ->
+                maxProjectedBytes?.let { limit ->
+                    val rowBytes = budgetJson.encodeToString(row).toByteArray(Charsets.UTF_8).size.toLong() + 1L
+                    if (projectedBytes + rowBytes > limit) {
+                        throw ConflictException("Migration report exceeds the 8 MiB export limit")
+                    }
+                    projectedBytes += rowBytes
+                }
+                services.add(row)
+            }
+        return ToadieFullUsageProjection(connection.toRef(), connection.cacheStatus(now), linkedApis, services)
     }
 
     suspend fun claimRefresh(id: UInt, force: Boolean): Pair<RefreshClaimResult, RefreshClaim?> = suspendTransaction(database) {
@@ -454,6 +472,28 @@ class ToadieService(
         return connection to links
     }
 
+    private suspend fun cachedLinkedApis(
+        connection: ResultRow?,
+        links: List<ResultRow>,
+    ): Map<String, ToadieEntitySnapshot> {
+        if (links.isEmpty()) return emptyMap()
+        val connectionId = links.first()[Links.connectionId].value
+        var predicate: Op<Boolean> = (SnapshotEntities.connectionId eq connectionId) and
+            (SnapshotEntities.entityId inList links.map { it[Links.apiEntityId] })
+        connection?.let {
+            predicate = predicate and
+                (SnapshotEntities.blueprint.lowerCase() eq it[Connections.apiBlueprint].lowercase())
+        }
+        return SnapshotEntities.selectAll().where { predicate }.map { it.toSnapshot() }.toList()
+            .associateBy { it.id }
+    }
+
+    private fun projectLinks(
+        connection: ResultRow?,
+        links: List<ResultRow>,
+        cachedApis: Map<String, ToadieEntitySnapshot>,
+    ) = links.map { it.toLinkResponse(connection, cachedApis) }
+
     private fun ResultRow.toResponse(): ToadieConnectionResponse {
         val status = cacheStatus()
         return ToadieConnectionResponse(
@@ -477,7 +517,7 @@ class ToadieService(
         this[Connections.systemRelation] = mapping.systemRelation
     }
 
-    private fun ResultRow.cacheStatus(): ToadieCacheStatus = toadieCacheStatus()
+    private fun ResultRow.cacheStatus(now: Long = nowMillis()): ToadieCacheStatus = toadieCacheStatus(now)
 
     private fun ResultRow.toRef() = ToadieConnectionRef(
         this[Connections.id].value, this[Connections.name], this[Connections.browserUrl],
@@ -492,6 +532,26 @@ class ToadieService(
         json.decodeFromString(this[SnapshotEntities.teamIdentifiers]), json.decodeFromString(this[SnapshotEntities.relations]),
         this[SnapshotEntities.remoteUpdatedAt],
     )
+
+    private fun ResultRow.toLinkResponse(
+        connection: ResultRow?,
+        cachedApis: Map<String, ToadieEntitySnapshot>,
+    ): ToadieLinkResponse {
+        val current = cachedApis[this[Links.apiEntityId]]
+        return ToadieLinkResponse(
+            id = this[Links.id].value,
+            connectionId = this[Links.connectionId].value,
+            apiEntityId = this[Links.apiEntityId],
+            identifier = current?.identifier ?: this[Links.identifier],
+            title = current?.title ?: this[Links.title],
+            url = connection?.let { entityUrl(it[Connections.browserUrl], this[Links.apiEntityId]) } ?: this[Links.url],
+            status = when {
+                connection == null -> ToadieLinkStatus.DISCONNECTED
+                current == null -> ToadieLinkStatus.MISSING
+                else -> ToadieLinkStatus.AVAILABLE
+            },
+        )
+    }
 }
 
 private fun ToadieEntitySnapshot.toRef(browserUrl: String) =
