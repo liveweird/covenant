@@ -49,3 +49,11 @@ Release-line deadline reminders are structural `RELEASE_LINE_DEPRECATION_DUE` an
 do not append user-action history. Policy changes still use `RELEASE_LINE_UPDATED`; events
 record date/replacement facts without copying migration-guide text. Reminder scan/line failures
 log warnings and remain retryable. See `release-lines.md` for atomic deduplication and UTC rules.
+
+**Registry synchronization (1.0.0).** Explicit source linking/import emits `toadie_registry.synced`
+and detachment emits `toadie_registry.detached`, with actor and registry/source identifiers.
+Automatic metadata or source-status changes emit `toadie_registry.reconciled` without a user
+actor after successful publication commits; unchanged records emit nothing. Preview and candidate reads remain
+read-only and unaudited. No property values, descriptions, upstream documents or credentials
+belong in these logs. These operations do not change contract ownership or lifecycle and do
+not append contract product history or follower notifications.

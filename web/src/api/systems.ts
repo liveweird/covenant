@@ -36,3 +36,7 @@ export async function updateSystem(id: number, body: SystemBody): Promise<void> 
 export async function deleteSystem(id: number): Promise<void> {
   await voidRequest(`/api/v1/systems/${id}`, { method: "DELETE" });
 }
+
+export async function detachSystemToadieSource(id: number): Promise<void> {
+  await voidRequest(`/api/v1/systems/${id}/toadie-source`, { method: "DELETE" });
+}

@@ -18,14 +18,15 @@ The `org.postgresql:postgresql` JDBC driver is on the classpath solely for Flywa
 
 **Cross-feature table reads (the service-layer rule, inherited from Lettuce).** A feature service MAY query another feature's Exposed table objects directly when the read must run **inside its own transaction** (SQL joins, atomic snapshots) — the transaction boundary must be explicit rather than relying on an unrelated service to preserve it. Exposed reuses an enclosing transaction for nested `suspendTransaction` calls on the same database; the importer deliberately uses that behavior to compose one atomic item. Route handlers never touch tables (services only). The reads in place: `TeamService` joins `UserService.Users` for the roster's display fields and the active-member counts, and checks member ids against active users inside the create/add transaction; `TeamService.activeTeamIdsOf` is written to be called from the contract write's transaction (the writer guard); `DomainService` counts active rows of `SystemService.Systems` per domain (the list caption and the holds-systems delete rule) and `SystemService` joins `DomainService.Domains` for the domain name and checks the domain id inside its write transaction. The contract catalog adds the creator/owner display-name joins and the Domain → System → Contract tree assembled from three reads in one transaction; `ContractService.facts` reads `ContractSubscriptionService.ContractSubscriptions` for the per-row follower counts and the caller's own follows (`subscribed`/`subscriberCount` on every contract response); `ContractSubscriptionService.subscribe` checks the contract row inside its insert transaction. `EnvironmentService` joins `SystemService.Systems` for the system name and checks the system id inside its write transaction; **`SystemService.delete` soft-deletes the system's rows in `EnvironmentService.Environments` in the same transaction** — a sanctioned cross-feature WRITE (an environment is configuration OF its system); the other two writes are intra-package — `ContractVersionService` recomputes `ContractService.Contracts.latest_version_id` inside every version write and `ContractService.delete` soft-deletes the contract's rows in `ContractVersionService.ContractVersions` (the pair frees its identities as one unit). `SystemService` counts active rows of `ContractService.Contracts` per system (`contractCount` on every response and the holds-contracts 409 on delete) and `TeamService.delete` counts the contracts the team still owns (the owns-contracts 409) — the hierarchy's delete rules run one level down, inside the deleting transaction. `infra/db/EventLog.kt` joins `UserService.Users` to resolve the acting user's display name on every history page. `ContractErrorService` (the Errors report) joins the shared `contracts/ContractJoins.kt` spine — `ContractService.Contracts` ⋈ `SystemService.Systems` ⋈ `DomainService.Domains` ⋈ the two owner OUTER joins — with `ContractVersionService.ContractVersions` (every ACTIVE version, not `ContractService`'s "latest" alias), a pure read with no write of its own. List each here as it lands — the list IS the permission.
 
-Current migrations are `V1`–`V22`. The foundation below covers `V1`–`V15`; `V16` adds major
+Current migrations are `V1`–`V23`. The foundation below covers `V1`–`V15`; `V16` adds major
 release lines (see `release-lines.md`), `V17` adds Toadie usage (see the section below), `V18`
 adds lifecycle planning/reminders, `V19` adds version reviews (see `version-reviews.md`), `V20`
 adds user credential revisions, and `V21` adds the immutable
 `covenant_semver_prerelease_key(TEXT) → TEXT[]` helper used for database SemVer ordering. V21
 encodes numeric prerelease identifiers at the stored maximum width of 100 digits, leaves existing
 data untouched, and callers apply explicit `C` collation to its text-array result. V22 adds nullable
-remote ontology revision metadata to the Toadie cache (see below).
+remote ontology revision metadata to the Toadie cache; V23 adds optional registry synchronization
+(see the sections below).
 The foundation combines Toadie's auth/users migrations with the flat teams, registries and
 contract catalog:
 
@@ -167,3 +168,19 @@ connection and snapshot entities. Shared transaction-scoped helpers reuse existi
 no unrelated public service transaction defines the report boundary. This cross-feature read
 keeps cache metadata and service rows consistent during concurrent refresh publication without
 locking writers or performing any remote request.
+
+### Registry sources from Toadie (V23, 1.0.0)
+
+V23 adds optional registry mapping to connections, selected description/error fields to cache
+rows, and separate domain/system/team source bindings with concrete foreign keys. These bindings
+are hard-deleted relationship rows on detach or successful local deletion; business registries
+retain soft deletion. Remote disappearance never deletes a local registry record.
+
+The registry synchronization service is authorized to read and write domains, systems and teams
+inside its own transaction to apply an ADMIN-approved preview or reconcile already-linked
+metadata during cache publication. It never writes team_members, users, contracts, versions or
+Environments. Local registry read responses batch source bindings and connection freshness.
+A shared transaction-scoped registry advisory lock stabilizes names and system placement across
+ordinary writes and sync; connection-first then registry-gate ordering applies to sync, while
+ordinary registry writes never lock a connection. Existing parent guards remain required.
+See [registry synchronization](toadie-registry-sync.md) for preview tokens, conflicts and recovery.

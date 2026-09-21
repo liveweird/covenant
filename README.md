@@ -233,6 +233,20 @@ reads the complete mapped graph. The last-successful-refresh time includes succe
 same-revision freshness checks. See [the integration reference](.claude/docs/toadie-integration.md)
 for compatibility and operational details.
 
+## Registry metadata from Toadie
+
+Since **1.0.0**, administrators can enable registry synchronization on a Toadie connection,
+preview selected Port domains, systems and teams, and import them or explicitly link them to
+existing Covenant records. Link domains before systems; a system without a source domain
+needs an explicit local fallback. Nested source domains are flattened only after acknowledgement.
+
+Linked names and configured descriptions follow Toadie during refresh. Source information,
+freshness and conflicts stay visible in the registries. Missing upstream entities preserve
+local records, contracts and Environments. Team memberships and contract permissions remain
+managed in Covenant. Detach a source to return its metadata to local management; local-only
+registries continue to work. No Toadie code changes are required. See
+[registry synchronization](.claude/docs/toadie-registry-sync.md) for mapping and failure behavior.
+
 ## Planned deprecation and retirement
 
 Release-line policies can announce deprecation and support-end dates, link to a replacement

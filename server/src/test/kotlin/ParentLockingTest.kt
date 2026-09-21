@@ -196,48 +196,39 @@ class ParentLockingTest {
         val caller = CallerPrincipal(userId, "parent-contract@example.test", setOf(UserRole.ADMIN))
 
         coroutineScope {
-            val systemId = TestContracts.seedSystem("contract-attach")
-            val teamId = TestTeams.seed(name("owner-team"))
-            val created = CompletableDeferred<Int>()
-            val release = CompletableDeferred<Unit>()
-            val create = async {
-                suspendTransaction(database) {
-                    maxAttempts = 1
-                    contracts.create(ContractCreateRequest(systemId, ContractType.OPENAPI, name("contract"), ownerTeamId = teamId), caller)
-                    created.complete(backendPid())
-                    release.await()
+            // Registry deletes share an advisory gate. Probe each parent separately so the
+            // assertion measures the contract's parent-row lock, not another delete's gate.
+            for (deleteSystem in listOf(true, false)) {
+                val systemId = TestContracts.seedSystem("contract-attach")
+                val teamId = TestTeams.seed(name("owner-team"))
+                val created = CompletableDeferred<Int>()
+                val release = CompletableDeferred<Unit>()
+                val create = async {
+                    suspendTransaction(database) {
+                        maxAttempts = 1
+                        contracts.create(
+                            ContractCreateRequest(systemId, ContractType.OPENAPI, name("contract"), ownerTeamId = teamId),
+                            caller,
+                        )
+                        created.complete(backendPid())
+                        release.await()
+                    }
                 }
+                val createHolderPid = created.await()
+                val deletePid = CompletableDeferred<Int>()
+                val deletion = async {
+                    runCatching {
+                        suspendTransaction(database) {
+                            maxAttempts = 1
+                            deletePid.complete(backendPid())
+                            if (deleteSystem) TestSystems.service.delete(systemId) else teams.delete(teamId)
+                        }
+                    }.exceptionOrNull()
+                }
+                releaseAfterBlocked(database, deletePid.await(), createHolderPid, release)
+                create.await()
+                assertIs<ConflictException>(deletion.await())
             }
-            val createHolderPid = created.await()
-            val systemPid = CompletableDeferred<Int>()
-            val systemDelete = async {
-                runCatching {
-                    suspendTransaction(database) {
-                        maxAttempts = 1
-                        systemPid.complete(backendPid())
-                        TestSystems.service.delete(systemId)
-                    }
-                }.exceptionOrNull()
-            }
-            val teamPid = CompletableDeferred<Int>()
-            val teamDelete = async {
-                runCatching {
-                    suspendTransaction(database) {
-                        maxAttempts = 1
-                        teamPid.complete(backendPid())
-                        teams.delete(teamId)
-                    }
-                }.exceptionOrNull()
-            }
-            try {
-                waitUntilBlocked(database, systemPid.await(), createHolderPid)
-                waitUntilBlocked(database, teamPid.await(), createHolderPid)
-            } finally {
-                release.complete(Unit)
-            }
-            create.await()
-            assertIs<ConflictException>(systemDelete.await())
-            assertIs<ConflictException>(teamDelete.await())
 
             val deletedSystem = TestContracts.seedSystem("contract-system-delete")
             val liveTeam = TestTeams.seed(name("live-team"))

@@ -388,7 +388,7 @@ export interface paths {
         get: operations["getTeam"];
         /**
          * Rename / re-describe a team
-         * @description ADMIN only, guard before the id lookup (uniform 403). The roster is managed per member below.
+         * @description ADMIN only, guard before the id lookup (uniform 403). The roster is managed per member below. Source-managed names, configured descriptions and system placement cannot change locally; detach the source first (409).
          */
         put: operations["updateTeam"];
         post?: never;
@@ -474,7 +474,8 @@ export interface paths {
         get: operations["getDomain"];
         /**
          * Replace a domain
-         * @description ADMIN only, guard before the id lookup (uniform 403). Full replace.
+         * @description Source-managed names, configured descriptions and system placement cannot change locally; detach the source first (409).
+         *     ADMIN only, guard before the id lookup (uniform 403). Full replace.
          */
         put: operations["updateDomain"];
         post?: never;
@@ -532,7 +533,8 @@ export interface paths {
         get: operations["getSystem"];
         /**
          * Replace a system
-         * @description ADMIN only, guard before the id lookup (uniform 403). Full replace — a changed `domainId` MOVES the system to another domain.
+         * @description Source-managed names, configured descriptions and system placement cannot change locally; detach the source first (409).
+         *     ADMIN only, guard before the id lookup (uniform 403). Full replace — a changed `domainId` MOVES the system to another domain.
          */
         put: operations["updateSystem"];
         post?: never;
@@ -612,6 +614,138 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/toadie-connections/{id}/registry-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List cached Port registry candidates
+         * @description ADMIN only. Requires registry mapping and a complete cached projection; stale cached candidates may be browsed. q searches identifier and title case- and accent-insensitively. Sortable fields are id and title; default id ascending. Parent refers to the domain parent, system domain, or team parent according to kind. No remote request or local mutation occurs.
+         */
+        get: operations["listToadieRegistryCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/toadie-connections/{id}/registry-sync/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview selected registry imports or links
+         * @description ADMIN only. Read-only local snapshot; requires a current complete cache. Select 1-50 records of one kind; duplicate source or local IDs are invalid. Domains must be linked before systems. Names never establish identity. The opaque plan token binds configuration, source revision and relevant local state. Issues are returned per item; canApply is false when any conflict exists.
+         */
+        post: operations["previewToadieRegistrySync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/toadie-connections/{id}/registry-sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply a previewed registry selection
+         * @description ADMIN only. Atomically imports, links or updates the complete selection, retaining existing local IDs, contracts, Environments, rosters and ownership. Requires a current complete cache and matching preview token; changed state or conflicts return 409 with no partial writes. Names and configured descriptions follow the source; systems follow a linked source domain or an explicit fallback when no remote domain is declared. Existing binding uniqueness prevents duplicate imports. At most 5000 bindings per connection.
+         */
+        post: operations["applyToadieRegistrySync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/domains/{id}/toadie-source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Detach a domain from its Port source
+         * @description ADMIN only. Retains the local ID, current metadata and all dependents. Source-owned fields become locally editable. An already-local active record also returns 204; missing or deleted records return 404.
+         */
+        delete: operations["detachDomainToadieSource"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/systems/{id}/toadie-source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Detach a system from its Port source
+         * @description ADMIN only. Retains the local ID, current metadata and all dependents. Source-owned fields become locally editable. An already-local active record also returns 204; missing or deleted records return 404.
+         */
+        delete: operations["detachSystemToadieSource"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/toadie-source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Detach a team from its Port source
+         * @description ADMIN only. Retains the local ID, current metadata and all dependents. Source-owned fields become locally editable. An already-local active record also returns 204; missing or deleted records return 404.
+         */
+        delete: operations["detachTeamToadieSource"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/toadie-connections": {
         parameters: {
             query?: never;
@@ -649,13 +783,13 @@ export interface paths {
         get: operations["getToadieConnection"];
         /**
          * Replace a Toadie connection
-         * @description ADMIN only. Omitted API key retains the encrypted value. The base URL is immutable; mapping changes invalidate the snapshot.
+         * @description ADMIN only. Full replacement except an omitted API key retains the encrypted value. The base URL is immutable; usage or registry mapping changes invalidate the snapshot. Omitting registryMapping disables registry sync while retaining bindings and source-owned field protection until explicit detach.
          */
         put: operations["updateToadieConnection"];
         post?: never;
         /**
          * Soft-delete a Toadie connection
-         * @description ADMIN only. Existing contract links remain visible as disconnected.
+         * @description ADMIN only. Existing contract links and registry sources remain visible as disconnected; local registries and their dependents are preserved.
          */
         delete: operations["deleteToadieConnection"];
         options?: never;
@@ -2218,6 +2352,8 @@ export interface components {
             deleted: boolean;
         };
         TeamResponse: {
+            /** @description Linked Port source; null for a local registry record. Source ownership never grants permissions. */
+            source?: components["schemas"]["ToadieRegistrySource"] | null;
             /** Format: int32 */
             id: number;
             name: string;
@@ -2235,6 +2371,8 @@ export interface components {
             updatedAt: number;
         };
         TeamListItem: {
+            /** @description Linked Port source; null for a local registry record. Source ownership never grants permissions. */
+            source?: components["schemas"]["ToadieRegistrySource"] | null;
             /** Format: int32 */
             id: number;
             name: string;
@@ -2261,6 +2399,8 @@ export interface components {
             description?: string | null;
         };
         DomainResponse: {
+            /** @description Linked Port source; null for a local registry record. Source ownership never grants permissions. */
+            source?: components["schemas"]["ToadieRegistrySource"] | null;
             /** Format: int32 */
             id: number;
             name: string;
@@ -2362,6 +2502,137 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ToadieRegistryMapping: {
+            /** @default domain */
+            domainBlueprint: string;
+            /** @default domain */
+            systemDomainRelation: string | null;
+            /** @default parent_domain */
+            domainParentRelation: string | null;
+            /**
+             * @description Explicit acknowledgement that nested Port domains become flat Covenant domains.
+             * @enum {boolean}
+             */
+            flattenDomains: true;
+            /** @description Optional stored string property; omitted/null keeps descriptions locally managed. */
+            domainDescriptionProperty?: string | null;
+            /** @description Optional stored string property; omitted/null keeps descriptions locally managed. */
+            systemDescriptionProperty?: string | null;
+            /** @description Optional stored string property; omitted/null keeps descriptions locally managed. */
+            teamDescriptionProperty?: string | null;
+        };
+        /** @enum {string} */
+        ToadieRegistryKind: "DOMAIN" | "SYSTEM" | "TEAM";
+        /** @enum {string} */
+        ToadieRegistryAction: "IMPORT" | "LINK" | "UPDATE";
+        /** @enum {string} */
+        ToadieRegistrySourceStatus: "AVAILABLE" | "MISSING" | "CONFLICT" | "DISCONNECTED";
+        ToadieRegistrySource: {
+            /** Format: int32 */
+            connectionId: number;
+            connectionName: string;
+            entityId: string;
+            identifier: string;
+            title: string;
+            url: string | null;
+            status: components["schemas"]["ToadieRegistrySourceStatus"];
+            /**
+             * Format: int64
+             * @description Epoch milliseconds.
+             */
+            lastSyncedAt: number | null;
+            lastErrorCode: string | null;
+            descriptionSynced: boolean;
+            /** Format: int32 */
+            fallbackDomainId: number | null;
+            cache: components["schemas"]["ToadieCacheStatus"];
+        };
+        ToadieRegistryCandidate: {
+            entityId: string;
+            identifier: string;
+            title: string;
+            description: string | null;
+            /**
+             * Format: int64
+             * @description Epoch milliseconds.
+             */
+            remoteUpdatedAt: number;
+            parentEntityId: string | null;
+            parentIdentifier: string | null;
+            parentTitle: string | null;
+            /** Format: int32 */
+            linkedLocalId: number | null;
+            linkedLocalName: string | null;
+            /** Format: int32 */
+            fallbackDomainId: number | null;
+            /** @description Stable conflict codes, including SOURCE_LIMIT_EXCEEDED when a connection would exceed 5000 registry bindings. */
+            issues: string[];
+        };
+        ToadieRegistryCandidatePage: {
+            items: components["schemas"]["ToadieRegistryCandidate"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int64 */
+            total: number;
+            cache: components["schemas"]["ToadieCacheStatus"];
+        };
+        ToadieRegistrySelection: {
+            entityId: string;
+            /**
+             * Format: int32
+             * @description Omitted/null imports; an explicit local ID links that active registry record.
+             */
+            localId?: number | null;
+            /**
+             * Format: int32
+             * @description SYSTEM only; used when the source has no domain relation. Never overrides an unmapped source domain.
+             */
+            fallbackDomainId?: number | null;
+        };
+        ToadieRegistryPreviewRequest: {
+            kind: components["schemas"]["ToadieRegistryKind"];
+            items: components["schemas"]["ToadieRegistrySelection"][];
+        };
+        ToadieRegistryApplyRequest: {
+            kind: components["schemas"]["ToadieRegistryKind"];
+            items: components["schemas"]["ToadieRegistrySelection"][];
+            expectedPlanToken: string;
+        };
+        ToadieRegistryLocalState: {
+            name: string;
+            description: string | null;
+            /** Format: int32 */
+            domainId: number | null;
+        };
+        ToadieRegistryPreviewItem: {
+            entityId: string;
+            /** Format: int32 */
+            localId: number | null;
+            action: components["schemas"]["ToadieRegistryAction"];
+            before: components["schemas"]["ToadieRegistryLocalState"] | null;
+            after: components["schemas"]["ToadieRegistryLocalState"];
+            /** @description Stable conflict codes, including SOURCE_LIMIT_EXCEEDED when a connection would exceed 5000 registry bindings. */
+            issues: string[];
+        };
+        ToadieRegistryPreviewResponse: {
+            kind: components["schemas"]["ToadieRegistryKind"];
+            cache: components["schemas"]["ToadieCacheStatus"];
+            planToken: string;
+            canApply: boolean;
+            items: components["schemas"]["ToadieRegistryPreviewItem"][];
+        };
+        ToadieRegistryApplyItem: {
+            entityId: string;
+            /** Format: int32 */
+            localId: number;
+            action: components["schemas"]["ToadieRegistryAction"];
+        };
+        ToadieRegistryApplyResponse: {
+            kind: components["schemas"]["ToadieRegistryKind"];
+            items: components["schemas"]["ToadieRegistryApplyItem"][];
+        };
         ToadieMapping: {
             /** @default service */
             serviceBlueprint: string;
@@ -2375,6 +2646,8 @@ export interface components {
             systemRelation: string;
         };
         ToadieConnectionRequest: {
+            /** @description Opt-in registry projection; omitted/null on replace disables sync while preserving bindings and managed fields until detach. */
+            registryMapping?: components["schemas"]["ToadieRegistryMapping"] | null;
             name: string;
             baseUrl: string;
             browserUrl: string;
@@ -2389,6 +2662,8 @@ export interface components {
             apiKey: string;
         };
         ToadieConnectionResponse: {
+            /** @description Opt-in registry projection; omitted/null on replace disables sync while preserving bindings and managed fields until detach. */
+            registryMapping?: components["schemas"]["ToadieRegistryMapping"] | null;
             /** Format: int32 */
             id: number;
             name: string;
@@ -2505,6 +2780,8 @@ export interface components {
             cache: components["schemas"]["ToadieCacheStatus"];
         };
         SystemResponse: {
+            /** @description Linked Port source; null for a local registry record. Source ownership never grants permissions. */
+            source?: components["schemas"]["ToadieRegistrySource"] | null;
             /** Format: int32 */
             id: number;
             /** Format: int32 */
@@ -5398,6 +5675,190 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listToadieRegistryCandidates: {
+        parameters: {
+            query: {
+                kind: components["schemas"]["ToadieRegistryKind"];
+                /** @description 1-based page index. Defaults to 1. */
+                page?: components["parameters"]["Page"];
+                /** @description Rows per page. Defaults to 20, maximum 100. */
+                pageSize?: components["parameters"]["PageSize"];
+                /**
+                 * @description Sort spec. Format: `field` (ascending) or `-field` (descending). Multiple fields are
+                 *     comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
+                 *     sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
+                 *     always appended as a deterministic tiebreaker.
+                 */
+                sort?: components["parameters"]["Sort"];
+                /** @description Case- and accent-insensitive free-text search; each endpoint documents the fields searched. */
+                q?: components["parameters"]["Q"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToadieRegistryCandidatePage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    previewToadieRegistrySync: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToadieRegistryPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToadieRegistryPreviewResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["UnsupportedMediaType"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    applyToadieRegistrySync: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToadieRegistryApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToadieRegistryApplyResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["UnsupportedMediaType"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    detachDomainToadieSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Detached, or already locally managed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    detachSystemToadieSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Detached, or already locally managed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    detachTeamToadieSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ResourceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Detached, or already locally managed */
             204: {
                 headers: {
                     [name: string]: unknown;

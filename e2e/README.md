@@ -116,6 +116,7 @@ the same commit** — this list is the coverage map, the scenario file is the de
   rules (draft deletes, an active version blocks the contract, deprecate → retire, then delete);
   plus a regular user's read-only tree, page and list.
 - [`toadie-usage.spec.ts`](scenarios/toadie-usage.md) — configure an encrypted connection, link multiple APIs, display declared provider/consumer usage, restart a scan when the upstream revision changes, and preserve the last coherent observation when revisions keep changing or GraphQL fails.
+- [`toadie-registry-sync.spec.ts`](scenarios/toadie-registry-sync.md) — preview/import/link Port registries, preserve local IDs and team authorization, refresh metadata, retain missing-source records, and detach for local editing.
 - [`release-lines.spec.ts`](scenarios/release-lines.md) — older-minor maintenance backports while
   a newer major stays active, deprecated-version baselines, independent support policies and
   pinned recommendations, line filtering, accessibility, and ending support without retiring versions.

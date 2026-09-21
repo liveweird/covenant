@@ -8,12 +8,14 @@ export default function ClearableTextInput({
   onChange,
   clearLabel,
   placeholder,
+  disabled = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   clearLabel: string;
   placeholder?: string;
+  disabled?: boolean;
 }) {
   const { t } = useTranslation();
   return (
@@ -21,6 +23,7 @@ export default function ClearableTextInput({
       label={label}
       placeholder={placeholder ?? t("common.filter.contains")}
       value={value}
+      disabled={disabled}
       onChange={(e) => onChange(e.currentTarget.value)}
       rightSection={
         value ? (
@@ -30,6 +33,7 @@ export default function ClearableTextInput({
             tabIndex={-1}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onChange("")}
+            disabled={disabled}
           />
         ) : null
       }

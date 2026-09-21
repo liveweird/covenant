@@ -17,6 +17,20 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "1.0.0",
+    date: "2026-09-21",
+    en: `**Covenant 1.0 — contract lifecycle management connected to your architecture.**
+
+- Preview and import selected domains, systems and teams from Toadie's Port ontology, or link them to existing Covenant records.
+- Linked metadata follows Toadie, with visible source and synchronization status. Missing upstream records preserve their local contracts and environments.
+- Team memberships, contract permissions and lifecycle decisions remain managed in Covenant. Local-only registries continue to work.`,
+    pl: `**Covenant 1.0 — zarządzanie cyklem życia kontraktów połączone z architekturą.**
+
+- Przeglądaj i importuj wybrane domeny, systemy i zespoły z ontologii Port w Toadie lub łącz je z istniejącymi rekordami Covenant.
+- Metadane powiązanych rekordów są aktualizowane z Toadie, a źródło i stan synchronizacji pozostają widoczne. Brak rekordu w źródle nie usuwa lokalnych kontraktów ani środowisk.
+- Członkostwo w zespołach, uprawnienia do kontraktów i decyzje dotyczące cyklu życia nadal są zarządzane w Covenant. Rejestry lokalne pozostają dostępne.`,
+  },
+  {
     version: "0.16.0",
     date: "2026-09-21",
     en: `**More reliable and efficient Toadie refreshes.**

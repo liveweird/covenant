@@ -38,6 +38,10 @@ class ToadieConnectionsRoute {
     class Id(val parent: ToadieConnectionsRoute = ToadieConnectionsRoute(), val id: UInt) {
         @Serializable @Resource("refresh") class Refresh(val parent: Id)
         @Serializable @Resource("apis") class Apis(val parent: Id)
+        @Serializable @Resource("registry-candidates") class RegistryCandidates(val parent: Id)
+        @Serializable @Resource("registry-sync") class RegistrySync(val parent: Id) {
+            @Serializable @Resource("preview") class Preview(val parent: RegistrySync)
+        }
     }
 }
 
@@ -60,6 +64,7 @@ fun Application.configureToadieRoutes() {
     routing {
         authenticate {
             connectionRoutes(service, refresh, developmentMode)
+            registryRoutes(service)
             contractRoutes(service, refresh, contracts, activity)
         }
     }

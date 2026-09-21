@@ -13,6 +13,26 @@ const DEFAULT_TOADIE_MAPPING = {
   systemRelation: "system",
 } as const;
 
+const DEFAULT_REGISTRY_MAPPING = {
+  domainBlueprint: "domain",
+  systemDomainRelation: "domain",
+  domainParentRelation: "parent_domain",
+  flattenDomains: false,
+  domainDescriptionProperty: "",
+  systemDescriptionProperty: "",
+  teamDescriptionProperty: "",
+} as const;
+
+type RegistryMappingValues = {
+  domainBlueprint: string;
+  systemDomainRelation: string;
+  domainParentRelation: string;
+  flattenDomains: boolean;
+  domainDescriptionProperty: string;
+  systemDescriptionProperty: string;
+  teamDescriptionProperty: string;
+};
+
 export type ToadieFormValues = {
   name: string;
   baseUrl: string;
@@ -25,6 +45,8 @@ export type ToadieFormValues = {
   providesRelation: string;
   consumesRelation: string;
   systemRelation: string;
+  registryEnabled: boolean;
+  registryMapping: RegistryMappingValues;
 };
 
 export const EMPTY_TOADIE_FORM: ToadieFormValues = {
@@ -35,6 +57,8 @@ export const EMPTY_TOADIE_FORM: ToadieFormValues = {
   enabled: true,
   refreshIntervalMinutes: 60,
   ...DEFAULT_TOADIE_MAPPING,
+  registryEnabled: false,
+  registryMapping: DEFAULT_REGISTRY_MAPPING,
 };
 
 function isHttpUrl(raw: string): boolean {
@@ -66,14 +90,50 @@ export function toadieFormValidation(t: TFunction, existing: ToadieConnection | 
     providesRelation: mappingRule,
     consumesRelation: mappingRule,
     systemRelation: mappingRule,
+    registryMapping: {
+      domainBlueprint: (value: string, values: ToadieFormValues) =>
+        !values.registryEnabled || IDENTIFIER.test(value.trim()) ? null : t("toadie.validation.mapping"),
+      systemDomainRelation: (value: string, values: ToadieFormValues) =>
+        !values.registryEnabled || !value.trim() || IDENTIFIER.test(value.trim()) ? null : t("toadie.validation.mapping"),
+      domainParentRelation: (value: string, values: ToadieFormValues) =>
+        !values.registryEnabled || !value.trim() || IDENTIFIER.test(value.trim()) ? null : t("toadie.validation.mapping"),
+      domainDescriptionProperty: (value: string, values: ToadieFormValues) =>
+        !values.registryEnabled || !value.trim() || IDENTIFIER.test(value.trim()) ? null : t("toadie.validation.mapping"),
+      systemDescriptionProperty: (value: string, values: ToadieFormValues) =>
+        !values.registryEnabled || !value.trim() || IDENTIFIER.test(value.trim()) ? null : t("toadie.validation.mapping"),
+      teamDescriptionProperty: (value: string, values: ToadieFormValues) =>
+        !values.registryEnabled || !value.trim() || IDENTIFIER.test(value.trim()) ? null : t("toadie.validation.mapping"),
+      flattenDomains: (value: boolean, values: ToadieFormValues) =>
+        !values.registryEnabled || value ? null : t("toadie.validation.flattenDomains"),
+    },
   };
 }
 
 export function fromToadieConnection(row: ToadieConnection): ToadieFormValues {
-  return { name: row.name, baseUrl: row.baseUrl, browserUrl: row.browserUrl, apiKey: "", enabled: row.enabled, refreshIntervalMinutes: row.refreshIntervalMinutes, ...row.mapping };
+  const registryMapping = row.registryMapping;
+  return {
+    name: row.name,
+    baseUrl: row.baseUrl,
+    browserUrl: row.browserUrl,
+    apiKey: "",
+    enabled: row.enabled,
+    refreshIntervalMinutes: row.refreshIntervalMinutes,
+    ...row.mapping,
+    registryEnabled: registryMapping != null,
+    registryMapping: registryMapping == null ? DEFAULT_REGISTRY_MAPPING : {
+      domainBlueprint: registryMapping.domainBlueprint,
+      systemDomainRelation: registryMapping.systemDomainRelation ?? "",
+      domainParentRelation: registryMapping.domainParentRelation ?? "",
+      flattenDomains: registryMapping.flattenDomains,
+      domainDescriptionProperty: registryMapping.domainDescriptionProperty ?? "",
+      systemDescriptionProperty: registryMapping.systemDescriptionProperty ?? "",
+      teamDescriptionProperty: registryMapping.teamDescriptionProperty ?? "",
+    },
+  };
 }
 
 export function toToadieRequest(values: ToadieFormValues): ToadieConnectionBody {
+  const optionalIdentifier = (value: string) => value.trim() || null;
   return {
     name: values.name.trim(),
     baseUrl: values.baseUrl.trim().replace(/\/$/, ""),
@@ -87,6 +147,15 @@ export function toToadieRequest(values: ToadieFormValues): ToadieConnectionBody 
       consumesRelation: values.consumesRelation.trim(),
       systemRelation: values.systemRelation.trim(),
     },
+    registryMapping: values.registryEnabled ? {
+      domainBlueprint: values.registryMapping.domainBlueprint.trim(),
+      systemDomainRelation: optionalIdentifier(values.registryMapping.systemDomainRelation),
+      domainParentRelation: optionalIdentifier(values.registryMapping.domainParentRelation),
+      flattenDomains: true,
+      domainDescriptionProperty: optionalIdentifier(values.registryMapping.domainDescriptionProperty),
+      systemDescriptionProperty: optionalIdentifier(values.registryMapping.systemDescriptionProperty),
+      teamDescriptionProperty: optionalIdentifier(values.registryMapping.teamDescriptionProperty),
+    } : null,
     ...(values.apiKey.trim() ? { apiKey: values.apiKey.trim() } : {}),
   };
 }

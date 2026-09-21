@@ -6,6 +6,7 @@ import ch.nokillswit.infra.validation.requireNameAndDescription
 import ch.nokillswit.infra.validation.sanitizedDescription
 import io.ktor.server.plugins.BadRequestException
 import kotlinx.serialization.Serializable
+import ch.nokillswit.toadie.ToadieRegistrySource
 
 /**
  * Flat teams (V6): a name plus its members — the unit contract ownership is scoped to
@@ -50,6 +51,7 @@ data class TeamResponse(
     val members: List<TeamMemberResponse>,
     val createdAt: Long,
     val updatedAt: Long,
+    val source: ToadieRegistrySource? = null,
 )
 
 /** The list row — the roster collapsed to a count of ACTIVE members. */
@@ -61,6 +63,7 @@ data class TeamListItem(
     val memberCount: Int,
     val createdAt: Long,
     val updatedAt: Long,
+    val source: ToadieRegistrySource? = null,
 )
 
 typealias TeamPageResponse = PageResponse<TeamListItem>

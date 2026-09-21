@@ -1,9 +1,12 @@
-# Toadie contract usage (0.10.0; revision-aware refresh in 0.16.0)
+# Toadie integration (usage 0.10.0; revision refresh 0.16.0; registries 1.0.0)
 
 Toadie owns architecture and declared provider/consumer relationships in its Port ontology.
 Covenant owns contract documents, versions, release lines and support policies. This connector
 reads Toadie's existing `/integration/graphql` API; it does not use the Backstage catalog,
-modify Toadie, copy service registries, synchronize accounts, or grant permissions from ownership.
+modify Toadie, synchronize accounts, or grant permissions from ownership. Since 1.0.0,
+ADMIN may opt into one-way metadata synchronization for selected domains, systems and teams.
+Local IDs, team rosters and contract permissions remain Covenant-owned. Read
+[registry synchronization](toadie-registry-sync.md) before changing that boundary.
 
 ## Connection and mapping
 

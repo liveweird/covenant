@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Badge, Button, Menu, Stack, Table, Text, Tooltip } from "@mantine/core";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { IconBrandDatabricks, IconPencil, IconPlus, IconRefresh, IconTrash } from "@tabler/icons-react";
+import { IconBrandDatabricks, IconDatabaseImport, IconPencil, IconPlus, IconRefresh, IconTrash } from "@tabler/icons-react";
 import { deleteToadieConnection, listToadieConnections, refreshToadieConnection, type ToadieConnection } from "../api/toadie";
 import { isAdmin } from "../api/session";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
@@ -13,6 +13,7 @@ import RowActionsMenu from "../components/RowActionsMenu";
 import SortHeader from "../components/SortHeader";
 import TableLoadingRow from "../components/TableLoadingRow";
 import ToadieConnectionEditorModal from "../components/ToadieConnectionEditorModal";
+import ToadieRegistrySyncModal from "../components/ToadieRegistrySyncModal";
 import { useDeleteConfirm } from "../hooks/useDeleteConfirm";
 import { usePagedSort } from "../hooks/usePagedSort";
 import { formatDateTime, relativeTimeAgo } from "../utils/relativeTime";
@@ -43,6 +44,7 @@ export default function ToadieConnections() {
     refetchInterval: ({ state }) => state.data?.items.some((row) => row.refreshing) ? 1500 : false,
   });
   const [editor, setEditor] = useState<ToadieConnection | "new" | null>(null);
+  const [registrySync, setRegistrySync] = useState<ToadieConnection | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const remove = useDeleteConfirm<ToadieConnection>({
     mutationFn: (row) => deleteToadieConnection(row.id),
@@ -86,6 +88,7 @@ export default function ToadieConnections() {
               <Table.Td><Text size="sm">{row.refreshIntervalMinutes} min</Text></Table.Td>
               {admin && <Table.Td ta="right"><RowActionsMenu label={t("common.table.operationsAria", { name: row.name })}>
                 <Menu.Item leftSection={<IconRefresh size={14} />} disabled={row.refreshing || !row.enabled} onClick={() => void refresh(row)}>{t("toadie.refresh")}</Menu.Item>
+                <Menu.Item leftSection={<IconDatabaseImport size={14} />} onClick={() => setRegistrySync(row)}>{t("toadie.registry.action")}</Menu.Item>
                 <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => setEditor(row)}>{t("common.action.edit")}</Menu.Item>
                 <Menu.Divider />
                 <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => remove.requestDelete(row)}>{t("common.action.delete")}</Menu.Item>
@@ -96,6 +99,16 @@ export default function ToadieConnections() {
       </Table>
       <PaginationBar total={query.data?.total ?? 0} page={paging.page} pageSize={paging.pageSize} onPageChange={paging.setPage} onPageSizeChange={paging.setPageSize} />
       {editor != null && <ToadieConnectionEditorModal target={editor === "new" ? null : editor} onClose={() => setEditor(null)} onSaved={async () => { setEditor(null); await queryClient.invalidateQueries({ queryKey: ["toadie"] }); }} />}
+      {registrySync != null && <ToadieRegistrySyncModal connection={registrySync} onClose={() => setRegistrySync(null)} onApplied={async () => {
+        setRegistrySync(null);
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["toadie"] }),
+          queryClient.invalidateQueries({ queryKey: ["domains"] }),
+          queryClient.invalidateQueries({ queryKey: ["systems"] }),
+          queryClient.invalidateQueries({ queryKey: ["teams"] }),
+          queryClient.invalidateQueries({ queryKey: ["contracts"] }),
+        ]);
+      }} />}
       <ConfirmDeleteModal confirm={remove} title={t("toadie.deleteTitle")} errorTitle={t("toadie.deleteFailed")} errorMessage={(error) => saveErrorMessage(error, t, { failedStatus: "common.error.actionFailedStatus", failed: "common.error.actionFailed" })} body={(row) => t("toadie.deleteBody", { name: row.name })} />
     </Stack>
   );

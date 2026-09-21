@@ -59,3 +59,7 @@ export async function addTeamMember(teamId: number, userId: number): Promise<voi
 export async function removeTeamMember(teamId: number, userId: number): Promise<void> {
   await voidRequest(`/api/v1/teams/${teamId}/members/${userId}`, { method: "DELETE" });
 }
+
+export async function detachTeamToadieSource(id: number): Promise<void> {
+  await voidRequest(`/api/v1/teams/${id}/toadie-source`, { method: "DELETE" });
+}

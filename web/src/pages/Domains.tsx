@@ -7,7 +7,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { IconFolders, IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
 import { ApiError } from "../api/http";
 import { isAdmin } from "../api/session";
-import { createDomain, deleteDomain, listDomains, updateDomain, type DomainResponse } from "../api/domains";
+import { createDomain, deleteDomain, detachDomainToadieSource, listDomains, updateDomain, type DomainResponse } from "../api/domains";
 import ClearableTextInput from "../components/ClearableTextInput";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import EmptyState from "../components/EmptyState";
@@ -17,6 +17,7 @@ import PaginationBar from "../components/PaginationBar";
 import RowActionsMenu from "../components/RowActionsMenu";
 import SortHeader from "../components/SortHeader";
 import TableLoadingRow from "../components/TableLoadingRow";
+import ToadieRegistrySourceStatus from "../components/ToadieRegistrySourceStatus";
 import { useDeleteConfirm } from "../hooks/useDeleteConfirm";
 import { usePagedSort } from "../hooks/usePagedSort";
 import { isString, useStoredState } from "../hooks/useStoredState";
@@ -65,7 +66,7 @@ export default function Domains() {
     successMessage: t("domains.toast.deleted"),
   });
 
-  const columnCount = admin ? 4 : 3;
+  const columnCount = admin ? 5 : 4;
 
   return (
     <Stack gap="md">
@@ -94,6 +95,7 @@ export default function Domains() {
             <SortHeader field="name" label={t("common.field.name")} activeField={sortField} activeDir={sortDir} onToggle={toggleSort} />
             <Table.Th>{t("common.field.description")}</Table.Th>
             <Table.Th>{t("domains.column.systems")}</Table.Th>
+            <Table.Th>{t("toadie.registry.source")}</Table.Th>
             {admin && <Table.Th aria-label={t("common.table.operations")} style={{ width: 1 }} />}
           </Table.Tr>
         </Table.Thead>
@@ -101,8 +103,9 @@ export default function Domains() {
           {isLoading && !data ? (
             <TableLoadingRow colSpan={columnCount} />
           ) : data && data.items.length > 0 ? (
-            data.items.map((domain) => (
-              <Table.Tr key={domain.id}>
+            data.items.map((domain) => {
+              const source = domain.source;
+              return <Table.Tr key={domain.id}>
                 <Table.Td>
                   <Text size="sm" fw={500}>
                     {domain.name}
@@ -116,6 +119,10 @@ export default function Domains() {
                 <Table.Td>
                   <Text size="sm">{domain.systemCount}</Text>
                 </Table.Td>
+                <Table.Td><ToadieRegistrySourceStatus source={source} compact={!admin} onDetach={admin && source ? async () => {
+                  await detachDomainToadieSource(domain.id);
+                  await Promise.all([queryClient.invalidateQueries({ queryKey: ["domains"] }), queryClient.invalidateQueries({ queryKey: ["toadie"] })]);
+                } : undefined} /></Table.Td>
                 {admin && (
                   <Table.Td style={{ width: 1 }} ta="right">
                     <RowActionsMenu label={t("common.table.operationsAria", { name: domain.name })}>
@@ -129,8 +136,8 @@ export default function Domains() {
                     </RowActionsMenu>
                   </Table.Td>
                 )}
-              </Table.Tr>
-            ))
+              </Table.Tr>;
+            })
           ) : !isError ? (
             <Table.Tr>
               <Table.Td colSpan={columnCount}>
@@ -174,6 +181,7 @@ function DomainEditorModal({ target, onClose, onSaved }: { target: DomainRespons
     initialValues: target ? { name: target.name, description: target.description ?? "" } : EMPTY_REGISTRY_FORM,
     validate: registryFormValidation(t, "domains"),
   });
+  const source = target?.source;
 
   async function save(values: RegistryFormValues) {
     setError(null);
@@ -199,7 +207,8 @@ function DomainEditorModal({ target, onClose, onSaved }: { target: DomainRespons
     <Modal closeButtonProps={{ "aria-label": t("common.action.close") }} opened onClose={onClose} title={target ? t("domains.editTitle") : t("domains.createTitle")} centered>
       <form onSubmit={form.onSubmit(save)} noValidate>
         <Stack>
-          <TextInput label={t("common.field.name")} maxLength={MAX_REGISTRY_NAME_LENGTH} data-autofocus {...form.getInputProps("name")} />
+          {source && <Alert color="gray" variant="light">{t("toadie.registry.metadataLocked")}{!source.descriptionSynced && ` ${t("toadie.registry.descriptionLocal")}`}</Alert>}
+          <TextInput label={t("common.field.name")} maxLength={MAX_REGISTRY_NAME_LENGTH} data-autofocus disabled={Boolean(source)} {...form.getInputProps("name")} />
           <Textarea
             label={t("common.field.description")}
             autosize
@@ -207,6 +216,7 @@ function DomainEditorModal({ target, onClose, onSaved }: { target: DomainRespons
             maxLength={MAX_REGISTRY_DESCRIPTION_LENGTH}
             description={charCountDescription(form.values.description.length, MAX_REGISTRY_DESCRIPTION_LENGTH)}
             inputWrapperOrder={["label", "input", "description", "error"]}
+            disabled={source?.descriptionSynced === true}
             {...form.getInputProps("description")}
           />
           {error && (

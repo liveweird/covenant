@@ -23,7 +23,8 @@ shared paging, and the React shell (nav model, command palette, theme, changelog
 and its SPA are implemented: flat teams with rosters; the Domain → System → Contract → Version
 hierarchy; team/user ownership; SemVer and lifecycle rules; parallel major release lines with
 independent support policies, deprecation/migration plans, deadline reminders and stable recommendations; read-only provider/consumer usage from
-Toadie's Port ontology; validation, lint, and breaking-change
+Toadie's Port ontology; optional one-way domain/system/team metadata synchronization from
+Toadie with explicit admin linking and local memberships; validation, lint, and breaking-change
 detection; import with dry run, guarded URL fetch, source references and sync, diff, download,
 and export; history, followers and in-app notifications; optional version reviews with a
 personal/catalog review inbox; lifecycle overview; shareable migration and impact reports; and catalog facets. ADMIN-curated
@@ -75,6 +76,8 @@ This is a Kotlin/Gradle backend plus three standalone npm workspaces:
   projections. Toadie 2.12+ revisions guard every scan with one bounded restart; scheduled
   refreshes can reconfirm an unchanged graph, while manual refreshes always scan fully.
   Read `.claude/docs/toadie-integration.md` before changing this boundary.
+  Registry metadata sync is documented in `.claude/docs/toadie-registry-sync.md`; imported
+  teams never grant permissions, and upstream disappearance never deletes local dependents.
 - `server/src/main/resources/application.yaml` declaratively registers application modules.
   `main.kt` only starts `EngineMain`; do not wire features from it. Module order matters because
   modules publish and consume Ktor application attributes.

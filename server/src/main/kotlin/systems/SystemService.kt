@@ -19,6 +19,7 @@ import org.jetbrains.exposed.v1.core.dao.id.UIntIdTable
 import org.jetbrains.exposed.v1.r2dbc.*
 import org.jetbrains.exposed.v1.r2dbc.transactions.suspendTransaction
 import ch.nokillswit.environments.EnvironmentService
+import ch.nokillswit.toadie.*
 
 val SystemServiceKey = AttributeKey<SystemService>("SystemService")
 
@@ -51,8 +52,12 @@ class SystemService(private val database: R2dbcDatabase, private val domains: Do
         filter.domainId?.let { predicate = predicate and (Systems.domainId eq it) }
         val total = Systems.selectAll().where { predicate }.count()
         val rows = joined().selectAll().where { predicate }.applyPaging(paging, SORTABLE_COLUMNS).toList()
+        val sources = registrySources(ToadieRegistryKind.SYSTEM, rows.map { it[Systems.id].value })
         val counts = activeContractCounts(rows.map { it[Systems.id].value })
-        SystemListResult(items = rows.map { it.toResponse(counts[it[Systems.id].value] ?: 0) }, total = total)
+        SystemListResult(items = rows.map {
+            val id = it[Systems.id].value
+            it.toResponse(counts[id] ?: 0, sources[id])
+        }, total = total)
     }
 
     /** Every active system with its domain, name-ordered — the tree's second level (registry-scale, unpaged). */
@@ -60,17 +65,22 @@ class SystemService(private val database: R2dbcDatabase, private val domains: Do
         val rows = joined().selectAll().where { Systems.active() }
             .orderBy(Systems.name.lowerCase() to SortOrder.ASC, Systems.id to SortOrder.ASC)
             .toList()
+        val sources = registrySources(ToadieRegistryKind.SYSTEM, rows.map { it[Systems.id].value })
         val counts = activeContractCounts(rows.map { it[Systems.id].value })
-        rows.map { it.toResponse(counts[it[Systems.id].value] ?: 0) }
+        rows.map { val id = it[Systems.id].value; it.toResponse(counts[id] ?: 0, sources[id]) }
     }
 
     suspend fun read(id: UInt): SystemResponse? = suspendTransaction(database) {
         joined().selectAll().where { (Systems.id eq id) and Systems.active() }.toList().singleOrNull()
-            ?.toResponse(activeContractCounts(listOf(id))[id] ?: 0)
+            ?.toResponse(
+                activeContractCounts(listOf(id))[id] ?: 0,
+                registrySources(ToadieRegistryKind.SYSTEM, listOf(id))[id],
+            )
     }
 
     /** Creates inside an ACTIVE domain (an unknown one is the client's fault → 400). */
     suspend fun create(request: SystemRequest): UInt = suspendTransaction(database) {
+        acquireToadieRegistryLock()
         validateSystemRequest(request)
         requireDomain(request.domainId)
         val stamp = nowMillis()
@@ -85,8 +95,12 @@ class SystemService(private val database: R2dbcDatabase, private val domains: Do
 
     /** Full replace — the domain may change (moving the system); the name clash rides the V8 index → 409. */
     suspend fun update(id: UInt, request: SystemRequest): Int = suspendTransaction(database) {
+        acquireToadieRegistryLock()
         validateSystemRequest(request)
         requireDomain(request.domainId)
+        Systems.selectAll().where { (Systems.id eq id) and Systems.active() }
+            .forUpdate().toList().singleOrNull() ?: return@suspendTransaction 0
+        requireRegistryFieldsMutable(ToadieRegistryKind.SYSTEM, id, request.name, request.description, request.domainId)
         Systems.update({ (Systems.id eq id) and Systems.active() }) {
             it[domainId] = request.domainId
             it[name] = request.name
@@ -101,6 +115,7 @@ class SystemService(private val database: R2dbcDatabase, private val domains: Do
      * the system and go with it, in the same transaction (a sanctioned cross-feature write — see persistence.md).
      */
     suspend fun delete(id: UInt): Int = suspendTransaction(database) {
+        acquireToadieRegistryLock()
         if (!Systems.lockActiveForUpdate(id)) return@suspendTransaction 0
         if ((activeContractCounts(listOf(id))[id] ?: 0) > 0) {
             throw ConflictException("The system still holds contracts — move or delete them first")
@@ -110,6 +125,7 @@ class SystemService(private val database: R2dbcDatabase, private val domains: Do
             it[updatedAt] = nowMillis()
         }
         if (rows > 0) {
+            deleteRegistrySource(ToadieRegistryKind.SYSTEM, id)
             val e = EnvironmentService.Environments
             e.update({ (e.systemId eq id) and (e.markedAsDeleted eq false) }) {
                 it[e.markedAsDeleted] = true
@@ -127,7 +143,7 @@ class SystemService(private val database: R2dbcDatabase, private val domains: Do
     private suspend fun activeContractCounts(ids: List<UInt>): Map<UInt, Int> =
         ContractService.Contracts.activeCountsBy(ContractService.Contracts.systemId, ids)
 
-    private fun ResultRow.toResponse(contractCount: Int) = SystemResponse(
+    private fun ResultRow.toResponse(contractCount: Int, source: ToadieRegistrySource?) = SystemResponse(
         id = this[Systems.id].value,
         domainId = this[Systems.domainId].value,
         domainName = this[DomainService.Domains.name],
@@ -136,5 +152,6 @@ class SystemService(private val database: R2dbcDatabase, private val domains: Do
         contractCount = contractCount,
         createdAt = this[Systems.createdAt],
         updatedAt = this[Systems.updatedAt],
+        source = source,
     )
 }

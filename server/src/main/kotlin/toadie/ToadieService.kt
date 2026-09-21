@@ -48,6 +48,8 @@ class ToadieService(
     private val cipher: FieldCipher,
     private val contracts: ContractService,
 ) : EncryptedAtRest {
+    private val registry = ToadieRegistryService(database)
+
     object Connections : UIntIdTable("toadie_connections"), SoftDeletable {
         val name = varchar("name", MAX_TOADIE_NAME_LENGTH)
         val baseUrl = varchar("base_url", MAX_TOADIE_URL_LENGTH)
@@ -60,6 +62,13 @@ class ToadieService(
         val providesRelation = varchar("provides_relation", 100)
         val consumesRelation = varchar("consumes_relation", 100)
         val systemRelation = varchar("system_relation", 100)
+        val registryDomainBlueprint = varchar("registry_domain_blueprint", 100).nullable()
+        val registrySystemDomainRelation = varchar("registry_system_domain_relation", 100).nullable()
+        val registryDomainParentRelation = varchar("registry_domain_parent_relation", 100).nullable()
+        val registryFlattenDomains = bool("registry_flatten_domains").nullable()
+        val registryDomainDescriptionProperty = varchar("registry_domain_description_property", 100).nullable()
+        val registrySystemDescriptionProperty = varchar("registry_system_description_property", 100).nullable()
+        val registryTeamDescriptionProperty = varchar("registry_team_description_property", 100).nullable()
         val snapshotSystemBlueprint = varchar("snapshot_system_blueprint", 100).nullable()
         val remoteRevision = long("remote_revision").nullable()
         val configRevision = long("config_revision")
@@ -83,6 +92,8 @@ class ToadieService(
         val teamIdentifiers = text("team_identifiers")
         val relations = text("relations")
         val remoteUpdatedAt = long("remote_updated_at")
+        val registryDescription = varchar("registry_description", 2000).nullable()
+        val registryErrorCode = varchar("registry_error_code", 100).nullable()
         override val primaryKey = PrimaryKey(connectionId, entityId)
     }
 
@@ -133,6 +144,7 @@ class ToadieService(
             it[enabled] = request.enabled
             it[refreshIntervalMinutes] = request.refreshIntervalMinutes
             it.applyMapping(request.mapping)
+            it.applyRegistryMapping(request.registryMapping)
             it[configRevision] = 1
             it[refreshing] = false
             it[createdAt] = stamp
@@ -147,7 +159,7 @@ class ToadieService(
         if (request.baseUrl != current[Connections.baseUrl]) {
             throw ConflictException("baseUrl is the connection identity; create a new connection to change it")
         }
-        val mappingChanged = request.mapping != current.mapping()
+        val mappingChanged = request.mapping != current.mapping() || request.registryMapping != current.registryMapping()
         val apiKeyChanged = request.apiKey != null
         val key = request.apiKey?.let(cipher::encrypt) ?: current[Connections.apiKey]
         val changed = Connections.update({ (Connections.id eq id) and Connections.active() }) {
@@ -157,6 +169,7 @@ class ToadieService(
             it[enabled] = request.enabled
             it[refreshIntervalMinutes] = request.refreshIntervalMinutes
             it.applyMapping(request.mapping)
+            it.applyRegistryMapping(request.registryMapping)
             it[configRevision] = current[Connections.configRevision] + 1
             it[refreshing] = false
             it[leaseUntil] = null
@@ -173,6 +186,21 @@ class ToadieService(
         if (mappingChanged) SnapshotEntities.deleteWhere { SnapshotEntities.connectionId eq id }
         changed
     }
+
+    suspend fun registryCandidates(
+        connectionId: UInt,
+        kind: ToadieRegistryKind,
+        query: String?,
+        paging: PageRequest,
+    ) = registry.candidates(connectionId, kind, query, paging)
+
+    suspend fun previewRegistrySync(connectionId: UInt, request: ToadieRegistryPreviewRequest) =
+        registry.preview(connectionId, request)
+
+    suspend fun applyRegistrySync(connectionId: UInt, request: ToadieRegistryApplyRequest) =
+        registry.apply(connectionId, request)
+
+    suspend fun detachRegistrySource(kind: ToadieRegistryKind, localId: UInt) = registry.detach(kind, localId)
 
     suspend fun delete(id: UInt): Int = suspendTransaction(database) {
         Connections.update({ (Connections.id eq id) and Connections.active() }) {
@@ -399,10 +427,11 @@ class ToadieService(
             row[Connections.configRevision],
             token,
             ToadieFetchConfig(
-                row[Connections.baseUrl],
-                cipher.decrypt(row[Connections.apiKey]),
-                row.mapping(),
-                row[Connections.remoteRevision].takeIf {
+                baseUrl = row[Connections.baseUrl],
+                apiKey = cipher.decrypt(row[Connections.apiKey]),
+                mapping = row.mapping(),
+                registryMapping = row.registryMapping(),
+                knownRevision = row[Connections.remoteRevision].takeIf {
                     !force && row[Connections.lastSuccessAt] != null && row[Connections.snapshotSystemBlueprint] != null
                 },
             ),
@@ -417,59 +446,79 @@ class ToadieService(
         }.toList()
     }
 
-    suspend fun publish(claim: RefreshClaim, snapshot: ToadieSnapshot): Boolean = suspendTransaction(database) {
-        require(snapshot.revision >= 0) { "Remote revision must be non-negative" }
-        val valid = Connections.selectAll().where {
+    suspend fun publish(claim: RefreshClaim, snapshot: ToadieSnapshot): Boolean {
+        var audits = emptyList<RegistryAuditFact>()
+        val result = suspendTransaction(database) {
+            require(snapshot.revision >= 0) { "Remote revision must be non-negative" }
+            val valid = Connections.selectAll().where {
                 (Connections.id eq claim.connectionId) and Connections.active() and
                 (Connections.configRevision eq claim.revision) and (Connections.refreshToken eq claim.token) and
                 (Connections.refreshing eq true)
-        }.forUpdate().toList().singleOrNull() ?: return@suspendTransaction false
-        SnapshotEntities.deleteWhere { SnapshotEntities.connectionId eq claim.connectionId }
-        snapshot.entities.forEach { entity ->
-            SnapshotEntities.insert {
-                it[connectionId] = claim.connectionId
-                it[entityId] = entity.id
-                it[blueprint] = entity.blueprint
-                it[identifier] = entity.identifier
-                it[title] = entity.title
-                it[teamIdentifiers] = json.encodeToString(entity.teamIdentifiers)
-                it[relations] = json.encodeToString(entity.relations)
-                it[remoteUpdatedAt] = entity.updatedAt
+            }.forUpdate().toList().singleOrNull() ?: return@suspendTransaction false
+            SnapshotEntities.deleteWhere { SnapshotEntities.connectionId eq claim.connectionId }
+            snapshot.entities.forEach { entity ->
+                SnapshotEntities.insert {
+                    it[connectionId] = claim.connectionId
+                    it[entityId] = entity.id
+                    it[blueprint] = entity.blueprint
+                    it[identifier] = entity.identifier
+                    it[title] = entity.title
+                    it[teamIdentifiers] = json.encodeToString(entity.teamIdentifiers)
+                    it[relations] = json.encodeToString(entity.relations)
+                    it[remoteUpdatedAt] = entity.updatedAt
+                    it[registryDescription] = entity.registryDescription
+                    it[registryErrorCode] = entity.registryErrorCode
+                }
             }
+            Connections.update({
+                (Connections.id eq claim.connectionId) and (Connections.configRevision eq claim.revision) and
+                    (Connections.refreshToken eq claim.token)
+            }) {
+                it[lastSuccessAt] = snapshot.fetchedAt
+                it[snapshotSystemBlueprint] = snapshot.systemBlueprint
+                it[remoteRevision] = snapshot.revision
+                it[lastErrorCode] = null
+                it[refreshing] = false
+                it[leaseUntil] = null
+                it[refreshToken] = null
+            }
+            check(valid[Connections.refreshToken] == claim.token)
+            acquireToadieRegistryLock()
+            val published = checkNotNull(activeConnection(claim.connectionId))
+            audits = registry.reconcile(published)
+            true
         }
-        Connections.update({
-            (Connections.id eq claim.connectionId) and (Connections.configRevision eq claim.revision) and
-                (Connections.refreshToken eq claim.token)
-        }) {
-            it[lastSuccessAt] = snapshot.fetchedAt
-            it[snapshotSystemBlueprint] = snapshot.systemBlueprint
-            it[remoteRevision] = snapshot.revision
-            it[lastErrorCode] = null
-            it[refreshing] = false
-            it[leaseUntil] = null
-            it[refreshToken] = null
-        }
-        check(valid[Connections.refreshToken] == claim.token)
-        true
+        if (result) registry.auditReconciliations(audits)
+        return result
     }
 
-    suspend fun publish(claim: RefreshClaim, unchanged: ToadieUnchanged): Boolean = suspendTransaction(database) {
-        check(claim.config.knownRevision == unchanged.revision) {
-            "An unchanged refresh must match the claimed remote revision"
+    suspend fun publish(claim: RefreshClaim, unchanged: ToadieUnchanged): Boolean {
+        var audits = emptyList<RegistryAuditFact>()
+        val result = suspendTransaction(database) {
+            check(claim.config.knownRevision == unchanged.revision) {
+                "An unchanged refresh must match the claimed remote revision"
+            }
+            val valid = Connections.selectAll().where {
+                (Connections.id eq claim.connectionId) and Connections.active() and
+                    (Connections.configRevision eq claim.revision) and (Connections.refreshToken eq claim.token) and
+                    (Connections.refreshing eq true) and (Connections.remoteRevision eq unchanged.revision) and
+                    Connections.lastSuccessAt.isNotNull() and Connections.snapshotSystemBlueprint.isNotNull()
+            }.forUpdate().toList().singleOrNull() ?: return@suspendTransaction false
+            Connections.update({
+                (Connections.id eq claim.connectionId) and (Connections.refreshToken eq claim.token)
+            }) {
+                it[lastSuccessAt] = unchanged.checkedAt
+                it[lastErrorCode] = null
+                it[refreshing] = false
+                it[leaseUntil] = null
+                it[refreshToken] = null
+            }
+            acquireToadieRegistryLock()
+            audits = registry.reconcile(valid)
+            true
         }
-        val updated = Connections.update({
-            (Connections.id eq claim.connectionId) and Connections.active() and
-                (Connections.configRevision eq claim.revision) and (Connections.refreshToken eq claim.token) and
-                (Connections.refreshing eq true) and (Connections.remoteRevision eq unchanged.revision) and
-                Connections.lastSuccessAt.isNotNull() and Connections.snapshotSystemBlueprint.isNotNull()
-        }) {
-            it[lastSuccessAt] = unchanged.checkedAt
-            it[lastErrorCode] = null
-            it[refreshing] = false
-            it[leaseUntil] = null
-            it[refreshToken] = null
-        }
-        updated == 1
+        if (result) registry.auditReconciliations(audits)
+        return result
     }
 
     suspend fun fail(claim: RefreshClaim, code: String) = suspendTransaction(database) {
@@ -535,7 +584,8 @@ class ToadieService(
         val status = cacheStatus()
         return ToadieConnectionResponse(
             this[Connections.id].value, this[Connections.name], this[Connections.baseUrl], this[Connections.browserUrl],
-            this[Connections.enabled], this[Connections.refreshIntervalMinutes], mapping(), this[Connections.apiKey].isNotEmpty(),
+            this[Connections.enabled], this[Connections.refreshIntervalMinutes], mapping(), registryMapping(),
+            this[Connections.apiKey].isNotEmpty(),
             this[Connections.createdAt], this[Connections.updatedAt], status.lastAttemptAt, status.lastSuccessAt,
             status.refreshing, status.lastErrorCode, status.state == ToadieCacheState.STALE,
         )
@@ -554,6 +604,16 @@ class ToadieService(
         this[Connections.systemRelation] = mapping.systemRelation
     }
 
+    private fun UpdateBuilder<*>.applyRegistryMapping(mapping: ToadieRegistryMapping?) {
+        this[Connections.registryDomainBlueprint] = mapping?.domainBlueprint
+        this[Connections.registrySystemDomainRelation] = mapping?.systemDomainRelation
+        this[Connections.registryDomainParentRelation] = mapping?.domainParentRelation
+        this[Connections.registryFlattenDomains] = mapping?.flattenDomains
+        this[Connections.registryDomainDescriptionProperty] = mapping?.domainDescriptionProperty
+        this[Connections.registrySystemDescriptionProperty] = mapping?.systemDescriptionProperty
+        this[Connections.registryTeamDescriptionProperty] = mapping?.teamDescriptionProperty
+    }
+
     private fun ResultRow.cacheStatus(now: Long = nowMillis()): ToadieCacheStatus = toadieCacheStatus(now)
 
     private fun ResultRow.toRef() = ToadieConnectionRef(
@@ -568,6 +628,7 @@ class ToadieService(
         this[SnapshotEntities.identifier], this[SnapshotEntities.title],
         json.decodeFromString(this[SnapshotEntities.teamIdentifiers]), json.decodeFromString(this[SnapshotEntities.relations]),
         this[SnapshotEntities.remoteUpdatedAt],
+        this[SnapshotEntities.registryDescription], this[SnapshotEntities.registryErrorCode],
     )
 
     private fun ResultRow.toLinkResponse(

@@ -18,6 +18,16 @@ fun sanitizeToadieRequest(request: ToadieConnectionRequest): ToadieConnectionReq
         consumesRelation = request.mapping.consumesRelation.trim(),
         systemRelation = request.mapping.systemRelation.trim(),
     ),
+    registryMapping = request.registryMapping?.let { mapping ->
+        mapping.copy(
+            domainBlueprint = mapping.domainBlueprint.trim(),
+            systemDomainRelation = mapping.systemDomainRelation?.trim()?.takeIf(String::isNotEmpty),
+            domainParentRelation = mapping.domainParentRelation?.trim()?.takeIf(String::isNotEmpty),
+            domainDescriptionProperty = mapping.domainDescriptionProperty?.trim()?.takeIf(String::isNotEmpty),
+            systemDescriptionProperty = mapping.systemDescriptionProperty?.trim()?.takeIf(String::isNotEmpty),
+            teamDescriptionProperty = mapping.teamDescriptionProperty?.trim()?.takeIf(String::isNotEmpty),
+        )
+    },
 )
 
 fun validateToadieRequest(request: ToadieConnectionRequest, apiKeyRequired: Boolean, allowHttp: Boolean) {
@@ -36,6 +46,22 @@ fun validateToadieRequest(request: ToadieConnectionRequest, apiKeyRequired: Bool
     }
     if (values.any { !TOADIE_IDENTIFIER.matches(it) }) {
         throw BadRequestException("mapping values contain unsupported characters")
+    }
+    request.registryMapping?.let { registry ->
+        if (!registry.flattenDomains) throw BadRequestException("registryMapping.flattenDomains must be true")
+        val registryValues = listOfNotNull(
+            registry.domainBlueprint, registry.systemDomainRelation, registry.domainParentRelation,
+            registry.domainDescriptionProperty, registry.systemDescriptionProperty, registry.teamDescriptionProperty,
+        )
+        if (registryValues.any { !TOADIE_IDENTIFIER.matches(it) }) {
+            throw BadRequestException("registryMapping values contain unsupported characters")
+        }
+        val reserved = setOf(
+            request.mapping.serviceBlueprint.lowercase(), request.mapping.apiBlueprint.lowercase(), "_team",
+        )
+        if (registry.domainBlueprint.lowercase() in reserved) {
+            throw BadRequestException("registryMapping.domainBlueprint must identify a distinct blueprint")
+        }
     }
 }
 

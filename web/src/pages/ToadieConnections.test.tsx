@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
-import { screen } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import ToadieConnections from "./ToadieConnections";
 import { jsonResponse } from "../test/http";
 import { renderWithProviders } from "../test/render";
@@ -53,5 +53,43 @@ describe("Toadie connections page", () => {
     await user.click(await screen.findByRole("button", { name: "Operations for Architecture" }));
     await user.click(await screen.findByRole("menuitem", { name: "Refresh now" }));
     await vi.waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url, init]) => url === "/api/v1/toadie-connections/2/refresh" && init?.method === "POST")).toBe(true));
+  });
+
+  test("an administrator explicitly confirms connection deletion", async () => {
+    localStorage.setItem("covenant.auth.roles", JSON.stringify(["ADMIN"]));
+    const user = userEvent.setup();
+    renderWithProviders(<ToadieConnections />);
+    await user.click(await screen.findByRole("button", { name: "Operations for Architecture" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url, init]) => url === "/api/v1/toadie-connections/2" && init?.method === "DELETE")).toBe(true));
+  });
+
+  test("an administrator explicitly acknowledges flat domains before enabling registry sync", async () => {
+    localStorage.setItem("covenant.auth.roles", JSON.stringify(["ADMIN"]));
+    const user = userEvent.setup();
+    renderWithProviders(<ToadieConnections />);
+    await user.click(await screen.findByRole("button", { name: "Operations for Architecture" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Registry metadata mapping" }));
+    await user.click(within(dialog).getByRole("switch", { name: /^Enable registry metadata sync/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    expect(await within(dialog).findByText("Acknowledge that nested Toadie domains will be flattened")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("checkbox", { name: "I understand that Toadie domain nesting will be flattened" }));
+    await user.type(within(dialog).getByLabelText("Domain description property"), "summary");
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url, init]) => url === "/api/v1/toadie-connections/2" && init?.method === "PUT")).toBe(true));
+    const call = vi.mocked(fetch).mock.calls.find(([url, init]) => url === "/api/v1/toadie-connections/2" && init?.method === "PUT");
+    const body = JSON.parse((call?.[1] as RequestInit).body as string);
+    expect(body.registryMapping).toEqual({
+      domainBlueprint: "domain",
+      systemDomainRelation: "domain",
+      domainParentRelation: "parent_domain",
+      flattenDomains: true,
+      domainDescriptionProperty: "summary",
+      systemDescriptionProperty: null,
+      teamDescriptionProperty: null,
+    });
   });
 });
