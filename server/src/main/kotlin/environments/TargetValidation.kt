@@ -4,6 +4,8 @@ import ch.nokillswit.infra.validation.sanitizeSingleLine
 import ch.nokillswit.infra.validation.requireNameAndDescription
 import ch.nokillswit.infra.validation.sanitizedDescription
 import io.ktor.server.plugins.BadRequestException
+import java.net.InetAddress
+import java.net.UnknownHostException
 import java.net.URI
 import java.net.URISyntaxException
 
@@ -67,7 +69,7 @@ private fun validateHttpBaseUrl(raw: String) {
         uri.rawQuery == null && uri.rawFragment == null && !uri.host.isNullOrBlank()
     if (!ok) throw BadRequestException(HTTP_BASE_URL_INVALID)
     val host = uri.host.trim('[', ']').lowercase()
-    if (host.startsWith("169.254.") || host.startsWith("fe80:")) {
+    if (literalAddress(host)?.isLinkLocalAddress == true) {
         throw BadRequestException("httpBaseUrl must not point at a link-local address")
     }
 }
@@ -108,4 +110,29 @@ private fun validateCredentialLengths(username: String?, password: String?) {
     if (password != null && password.length > MAX_TARGET_PASSWORD_LENGTH) {
         throw BadRequestException("password must be at most $MAX_TARGET_PASSWORD_LENGTH characters")
     }
+}
+
+/** Literal-only parsing: hostnames are intentionally allowed and must never trigger DNS here. */
+private fun literalAddress(host: String): InetAddress? {
+    if (':' in host) {
+        // URI already validated the IPv6 syntax. Drop the zone: classification is about the
+        // address bytes, not whether that network interface exists on this Covenant host.
+        return try {
+            InetAddress.getByName(host.substringBefore('%'))
+        } catch (_: UnknownHostException) {
+            throw BadRequestException(HTTP_BASE_URL_INVALID)
+        }
+    }
+    if (host.any { it !in '0'..'9' && it != '.' }) return null
+    // URI accepts single-decimal and four-part IPv4 hosts; shorter dotted forms already fail
+    // its host syntax. Parse bytes ourselves so invalid numeric hosts cannot fall back to DNS.
+    val parts = host.split('.')
+    val numbers = parts.map { it.toLongOrNull() ?: return null }
+    val bytes = when {
+        parts.size == 1 && numbers[0] in 0..0xffffffffL ->
+            ByteArray(4) { index -> (numbers[0] shr ((3 - index) * Byte.SIZE_BITS)).toByte() }
+        parts.size == 4 && numbers.all { it in 0..255 } -> numbers.map { it.toByte() }.toByteArray()
+        else -> return null
+    }
+    return InetAddress.getByAddress(bytes)
 }

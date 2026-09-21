@@ -12,6 +12,8 @@ import ch.nokillswit.infra.db.SoftDeletable
 import ch.nokillswit.infra.db.active
 import ch.nokillswit.infra.db.activeCountsBy
 import ch.nokillswit.infra.db.nowMillis
+import ch.nokillswit.infra.db.lockActiveForUpdate
+import ch.nokillswit.infra.db.requireActiveForKeyShare
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.dao.id.UIntIdTable
 import org.jetbrains.exposed.v1.r2dbc.*
@@ -83,6 +85,7 @@ class DomainService(private val database: R2dbcDatabase) {
 
     /** Soft delete — refused (409) while an active system still points here, so the tree never dangles. */
     suspend fun delete(id: UInt): Int = suspendTransaction(database) {
+        if (!Domains.lockActiveForUpdate(id)) return@suspendTransaction 0
         if ((activeSystemCounts(listOf(id))[id] ?: 0) > 0) {
             throw ConflictException("The domain still holds systems — move or delete them first")
         }
@@ -92,9 +95,8 @@ class DomainService(private val database: R2dbcDatabase) {
         }
     }
 
-    /** True when the id is an ACTIVE domain — the systems service's FK check, run inside ITS transaction. */
-    suspend fun existsActive(id: UInt): Boolean =
-        Domains.select(Domains.id).where { (Domains.id eq id) and Domains.active() }.count() > 0
+    /** Validates and locks an ACTIVE domain for a system attach/move in the caller's transaction. */
+    suspend fun requireActiveForAttach(id: UInt) = Domains.requireActiveForKeyShare(id, "domain")
 
     /** One grouped query over the systems table for the rows' active-system counts (a sanctioned cross-feature read). */
     private suspend fun activeSystemCounts(ids: List<UInt>): Map<UInt, Int> =

@@ -40,6 +40,7 @@ class MigrationChecksumTest {
         "V18__release_line_lifecycle_planning.sql" to 535372252,
         "V19__version_reviews.sql" to 1832065989,
         "V20__user_credential_revision.sql" to 289120118,
+        "V21__semver_prerelease_order.sql" to 1326345492,
     )
 
     @Test

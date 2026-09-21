@@ -13,6 +13,7 @@ import { isContentEditable } from "../utils/lifecycle";
 import { collapseUnchanged } from "../utils/lineDiff";
 import { relativeTimeAgo } from "../utils/relativeTime";
 import { FETCH_URL_ERROR_KEYS, loadErrorMessage, saveErrorMessage } from "../utils/saveError";
+import { parseSemver } from "../utils/semver";
 import { compareSyncSides } from "../utils/syncComparison";
 import { showSuccessToast } from "../utils/toast";
 
@@ -157,8 +158,9 @@ function SyncModalBody({
   function onNewVersion() {
     if (fetched == null) return;
     const seeded: SeededDocument = { content: fetched.content, sourceUrl: fetched.sourceUrl };
+    const sourceMajor = parseSemver(version.version)?.major;
     onClose();
-    navigate(newVersionPath(contract.id, version.id), { state: seeded });
+    navigate(newVersionPath(contract.id, version.id, sourceMajor), { state: seeded });
   }
 
   return (

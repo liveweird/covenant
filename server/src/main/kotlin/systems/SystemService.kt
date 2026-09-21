@@ -6,7 +6,6 @@ import ch.nokillswit.domains.DomainService
 import ch.nokillswit.infra.db.containsNormalized
 import ch.nokillswit.infra.paging.PageRequest
 import ch.nokillswit.infra.paging.applyPaging
-import io.ktor.server.plugins.BadRequestException
 import io.ktor.util.AttributeKey
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
@@ -14,6 +13,7 @@ import ch.nokillswit.infra.db.SoftDeletable
 import ch.nokillswit.infra.db.active
 import ch.nokillswit.infra.db.activeCountsBy
 import ch.nokillswit.infra.db.nowMillis
+import ch.nokillswit.infra.db.lockActiveForUpdate
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.dao.id.UIntIdTable
 import org.jetbrains.exposed.v1.r2dbc.*
@@ -101,6 +101,7 @@ class SystemService(private val database: R2dbcDatabase, private val domains: Do
      * the system and go with it, in the same transaction (a sanctioned cross-feature write — see persistence.md).
      */
     suspend fun delete(id: UInt): Int = suspendTransaction(database) {
+        if (!Systems.lockActiveForUpdate(id)) return@suspendTransaction 0
         if ((activeContractCounts(listOf(id))[id] ?: 0) > 0) {
             throw ConflictException("The system still holds contracts — move or delete them first")
         }
@@ -119,7 +120,7 @@ class SystemService(private val database: R2dbcDatabase, private val domains: Do
     }
 
     private suspend fun requireDomain(domainId: UInt) {
-        if (!domains.existsActive(domainId)) throw BadRequestException("Unknown or deleted domain id: $domainId")
+        domains.requireActiveForAttach(domainId)
     }
 
     /** One grouped query over the contracts table for the rows' active-contract counts (a sanctioned cross-feature read). */

@@ -49,11 +49,11 @@ kover {
         }
         verify {
             rule {
-                // Line-coverage floor (actual 96.5% on 2026-09-05, measured with the @Serializable
+                // Line-coverage floor (actual 96.95% on 2026-09-21, measured with the @Serializable
                 // exclusion above — the floors were 88/66 before it; re-measure with
                 // `:server:koverXmlReport` and RAISE, never lower).
-                minBound(95)
-                // Branch-coverage floor (actual 77.4%, 2026-09-05). NOTE: `check` runs only
+                minBound(96)
+                // Branch-coverage floor (actual 76.51%, 2026-09-21). NOTE: `check` runs only
                 // koverVerify — run `:server:koverXmlReport` for fresh actuals.
                 minBound(76, coverageUnits = kotlinx.kover.gradle.plugin.dsl.CoverageUnit.BRANCH)
             }

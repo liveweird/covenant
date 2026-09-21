@@ -44,19 +44,16 @@ val VERSION_DEFAULT_SORT: List<SortField> = listOf(SortField("version", descendi
 internal val findingsSerializer = ListSerializer(Finding.serializer())
 
 /**
- * `"version"` expands to the four SemVer columns (prerelease NULL sorts as a release, ranked
+ * `"version"` expands to the numeric columns and identifier-aware prerelease key (prerelease NULL sorts as a release, ranked
  * above — the same rule for every caller); every other field maps through [columns]. Lifted out
  * of [ContractVersionService] (it was `applySemverSort`, a private member reading its own
  * `SORTABLE_COLUMNS`) so `ContractErrorService`'s errors-report query — which paginates the same
  * `contract_versions` rows under a different column whitelist — shares one implementation.
  */
 internal fun Query.applySemverPaging(req: PageRequest, columns: Map<String, Column<*>>): Query {
-    val v = ContractVersionService.ContractVersions
     val expanded = req.sort.flatMap { sf ->
         if (sf.name == "version") {
-            val order = if (sf.descending) SortOrder.DESC else SortOrder.ASC
-            val nulls = if (sf.descending) SortOrder.DESC_NULLS_FIRST else SortOrder.ASC_NULLS_LAST
-            listOf(v.semverMajor to order, v.semverMinor to order, v.semverPatch to order, v.semverPrerelease to nulls)
+            semverOrder(sf.descending)
         } else {
             val column = columns[sf.name] ?: error("unsortable field ${sf.name}")
             listOf(column to if (sf.descending) SortOrder.DESC else SortOrder.ASC)

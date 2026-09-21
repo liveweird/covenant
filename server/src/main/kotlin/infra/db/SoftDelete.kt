@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.toList
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.dao.id.EntityID
 import org.jetbrains.exposed.v1.core.dao.id.UIntIdTable
+import org.jetbrains.exposed.v1.core.vendors.ForUpdateOption
 import org.jetbrains.exposed.v1.r2dbc.select
 
 /**
@@ -46,3 +47,23 @@ suspend fun <T> T.requireActive(rowId: UInt, label: String)
     val exists = select(id).where { (id eq rowId) and active() }.toList().isNotEmpty()
     if (!exists) throw BadRequestException("Unknown or deleted $label id: $rowId")
 }
+
+/**
+ * Validates a client-supplied active parent and holds KEY SHARE through the caller's transaction.
+ * A concurrent parent delete must therefore finish first (and this answers 400) or wait until the
+ * child/reference write commits. Use only on attach/move paths; ordinary reads need no row lock.
+ */
+suspend fun <T> T.requireActiveForKeyShare(rowId: UInt, label: String)
+    where T : UIntIdTable, T : SoftDeletable {
+    val exists = select(id)
+        .where { (id eq rowId) and active() }
+        .forUpdate(ForUpdateOption.PostgreSQL.ForKeyShare())
+        .toList()
+        .isNotEmpty()
+    if (!exists) throw BadRequestException("Unknown or deleted $label id: $rowId")
+}
+
+/** Materializes and locks an active row before a delete path runs its separate child-count query. */
+suspend fun <T> T.lockActiveForUpdate(rowId: UInt): Boolean
+    where T : UIntIdTable, T : SoftDeletable =
+    select(id).where { (id eq rowId) and active() }.forUpdate().toList().isNotEmpty()

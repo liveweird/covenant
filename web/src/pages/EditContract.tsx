@@ -7,7 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getContract, transferContractOwner, updateContract } from "../api/contracts";
 import { ApiError } from "../api/http";
 import { isAdmin } from "../api/session";
-import { listSystems } from "../api/systems";
+import { listAllSystems } from "../api/systems";
 import ContractFormFields from "../components/ContractFormFields";
 import EditPageLoadState from "../components/EditPageLoadState";
 import PageHeader from "../components/PageHeader";
@@ -41,7 +41,7 @@ export default function EditContract() {
   const [error, setError] = useState<string | null>(null);
 
   const contract = useQuery({ queryKey: ["contracts", "detail", id], queryFn: () => getContract(id), enabled: Number.isFinite(id) });
-  const systems = useQuery({ queryKey: ["systems", "all"], queryFn: () => listSystems({ page: 1, pageSize: 100, sort: "name" }) });
+  const systems = useQuery({ queryKey: ["systems", "all-pages"], queryFn: () => listAllSystems() });
   const form = useForm<ContractFormValues>({
     initialValues: EMPTY_CONTRACT_FORM,
     validate: contractFormValidation(t, { withOwner: admin, withSystem: false }),
@@ -91,7 +91,7 @@ export default function EditContract() {
             <ContractFormFields
               form={form}
               mode="edit"
-              systems={systems.data?.items ?? []}
+              systems={systems.data ?? []}
               ownerEditable={admin}
               currentOwner={{ value: ownerValueOf(data.owner), label: data.owner.name }}
             />

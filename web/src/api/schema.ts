@@ -566,7 +566,7 @@ export interface paths {
          * Create an environment
          * @description ADMIN only (guarded before the body decodes). At least one target (`httpBaseUrl`, `kafka`,
          *     `postgres`) is required. Static shape rules only — an absolute http(s) base URL without
-         *     credentials, query or fragment (link-local hosts refused); 1–20 `host:port` bootstrap
+         *     credentials, query or fragment (link-local address literals refused, including abbreviated IPv4 and the full IPv6 range); 1–20 `host:port` bootstrap
          *     servers; a SASL protocol needs a mechanism, a username and a password; a JDBC URL
          *     starting with `jdbc:postgresql://` whose parameters are limited to `ssl`, `sslmode`,
          *     `currentSchema`, `ApplicationName`. `systemId` must be an active system (`400`); a
@@ -2293,7 +2293,7 @@ export interface components {
             systemId: number;
             name: string;
             description?: string | null;
-            /** @description Absolute http(s) URL without credentials, query or fragment; replaces the document's servers. */
+            /** @description Absolute http(s) URL without credentials, query or fragment; link-local address literals are refused. Internal hosts are permitted and validation performs no DNS lookup. Replaces the document's servers. */
             httpBaseUrl?: string | null;
             kafka?: components["schemas"]["KafkaTargetRequest"] | null;
             postgres?: components["schemas"]["PostgresTargetRequest"] | null;

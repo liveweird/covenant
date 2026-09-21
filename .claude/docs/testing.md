@@ -24,6 +24,12 @@ Backend tests live flat in `server/src/test/kotlin/` (kotlin.test + `io.ktor.ser
 
 **Frontend static analysis (sonarjs + knip).** The SPA's counterpart, same zero-findings/no-baseline policy: `cd web && npm run lint` carries `eslint-plugin-sonarjs` (recommended set) plus core size/complexity backstops tuned generously for React's one-function-per-page architecture (`cognitive-complexity` 40, `complexity` 50 — backstops against future monsters, not targets); every override in `web/eslint.config.js` carries the idiom comment. `cd web && npm run knip` is the dead-code gate (unused files/exports/dependencies; test files count as entries, so a flagged export is unused even by tests) — the generated `src/api/schema.ts` is excluded from both (type-checked by `tsc`, not style-linted).
 
+**Parent-reference race regressions.** `ParentLockingTest` holds real service transactions
+open before commit, verifies the expected blocking backend with PostgreSQL `pg_blocking_pids`,
+and covers both attach-first and delete-first ordering. Retain the bounded waits, `finally`
+release gates and disabled transaction retries when extending these tests. `ContractImportTest`
+also deletes an import's parent while document checking is paused and verifies no orphan is stored.
+
 **Contract transaction regressions.** `ContractLockingTest` pins owning-team-only roster locks, revocation before external dispatch, and disabled transaction retry around that dispatch. `ContractVersionTest` uses barriers to reject stale content/baseline/source reports and checks concurrent latest-pointer and delete/publication behavior. `ContractImportTest` covers single-pass checks and rollback after a parent insert when first-version insertion fails.
 
 **Checker tests.** `checker/test/*.test.ts` (Vitest, Node environment): the HTTP contract (400/401/413/504 problem bodies, the healthz shape), the severity/source mapping, the external-`$ref` refusal, and one fixture document per format with its expected findings under `checker/test/fixtures/` (valid + invalid OpenAPI 3.0/3.1, AsyncAPI 2.6/3.0/3.1, Swagger 2.0 refused). The current and previous external-`$ref` documents are covered, as are `415` plus `instance` handling and child-process timeout termination, crash containment and bounded queue handling. Engines run for real — a fixture's expected findings pin the ruleset behaviour, so a Spectral/parser upgrade that changes a verdict fails loudly here, not in production.

@@ -19,6 +19,7 @@ import ch.nokillswit.infra.db.SoftDeletable
 import ch.nokillswit.infra.db.active
 import ch.nokillswit.infra.db.activeCountsBy
 import ch.nokillswit.infra.db.requireActive
+import ch.nokillswit.infra.db.requireActiveForKeyShare
 import ch.nokillswit.infra.db.nowMillis
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.dao.id.UIntIdTable
@@ -110,8 +111,8 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
         val ownership = validateContractCreate(request) // re-checked service-side
         val teamIds = currentTeamIds(caller, ownership.teamId, lockMembership = true)
         requireOwnerAssignable(caller, ownership, teamIds)
-        requireActiveSystem(request.systemId)
-        requireActiveOwner(ownership)
+        requireActiveSystemForAttach(request.systemId)
+        requireActiveOwner(ownership, lockTeam = true)
         val stamp = nowMillis()
         Contracts.insert {
             it[systemId] = request.systemId
@@ -149,7 +150,7 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
     suspend fun transferOwner(id: UInt, ownership: Ownership, caller: CallerPrincipal): Ownership? = suspendTransaction(database) {
         requireAdmin(caller)
         val previous = lockedOwnershipOf(id) ?: return@suspendTransaction null
-        requireActiveOwner(ownership)
+        requireActiveOwner(ownership, lockTeam = true)
         Contracts.update({ (Contracts.id eq id) and Contracts.active() }) {
             it[ownerTeamId] = ownership.teamId
             it[ownerUserId] = ownership.userId
@@ -198,12 +199,7 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
         val versions = suspendTransaction(database) {
             val v = ContractVersionService.ContractVersions
             v.selectAll().where { (v.contractId eq id) and (v.markedAsDeleted eq false) }
-                .orderBy(
-                    v.semverMajor to SortOrder.DESC,
-                    v.semverMinor to SortOrder.DESC,
-                    v.semverPatch to SortOrder.DESC,
-                    v.semverPrerelease to SortOrder.DESC_NULLS_FIRST,
-                )
+                .orderBy(*semverOrder(descending = true).toTypedArray())
                 .map {
                     ExportedVersion(
                         it[v.version],
@@ -346,8 +342,14 @@ class ContractService(private val database: R2dbcDatabase, private val teams: Te
 
     private suspend fun requireActiveSystem(systemId: UInt) = SystemService.Systems.requireActive(systemId, "system")
 
-    private suspend fun requireActiveOwner(ownership: Ownership) {
-        ownership.teamId?.let { TeamService.Teams.requireActive(it, "team") }
+    private suspend fun requireActiveSystemForAttach(systemId: UInt) =
+        SystemService.Systems.requireActiveForKeyShare(systemId, "system")
+
+    private suspend fun requireActiveOwner(ownership: Ownership, lockTeam: Boolean = false) {
+        ownership.teamId?.let {
+            if (lockTeam) TeamService.Teams.requireActiveForKeyShare(it, "team")
+            else TeamService.Teams.requireActive(it, "team")
+        }
         ownership.userId?.let { UserService.Users.requireActive(it, "user") }
     }
 

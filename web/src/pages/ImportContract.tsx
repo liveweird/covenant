@@ -6,7 +6,7 @@ import { useForm } from "@mantine/form";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconFileImport, IconListCheck } from "@tabler/icons-react";
 import { checkImportContracts, importContracts, type ImportItem, type ImportItemResult, type ImportStatus } from "../api/contracts";
-import { listSystems } from "../api/systems";
+import { listAllSystems } from "../api/systems";
 import DocumentSourcePicker from "../components/DocumentSourcePicker";
 import FindingsPanel from "../components/FindingsPanel";
 import LazyCodeEditor, { type JumpRequest } from "../components/LazyCodeEditor";
@@ -57,7 +57,7 @@ export default function ImportContract() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const systems = useQuery({ queryKey: ["systems", "all"], queryFn: () => listSystems({ page: 1, pageSize: 100, sort: "name" }) });
+  const systems = useQuery({ queryKey: ["systems", "all-pages"], queryFn: () => listAllSystems() });
   // The Infer page hands over its generated draft this way (a new contract knows no type yet, so
   // it rides along); a plain visit (no state) starts from a blank paste exactly as before.
   const seeded = useLocation().state as SeededDocument | null;
@@ -135,7 +135,7 @@ export default function ImportContract() {
           <Group align="flex-start" gap="md" wrap="wrap">
             <Select
               label={t("contracts.field.system")}
-              data={systemOptions(systems.data?.items ?? [])}
+              data={systemOptions(systems.data ?? [])}
               searchable
               allowDeselect={false}
               w={260}

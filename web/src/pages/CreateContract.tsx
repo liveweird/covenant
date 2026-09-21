@@ -5,7 +5,7 @@ import { useForm } from "@mantine/form";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContract } from "../api/contracts";
 import { ApiError } from "../api/http";
-import { listSystems } from "../api/systems";
+import { listAllSystems } from "../api/systems";
 import ContractFormFields from "../components/ContractFormFields";
 import PageHeader from "../components/PageHeader";
 import { contractFormValidation, contractSaveErrorMessage, EMPTY_CONTRACT_FORM, toContractCreateRequest, type ContractFormValues } from "../utils/contractForm";
@@ -26,7 +26,7 @@ export default function CreateContract() {
   const [params] = useSearchParams();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const systems = useQuery({ queryKey: ["systems", "all"], queryFn: () => listSystems({ page: 1, pageSize: 100, sort: "name" }) });
+  const systems = useQuery({ queryKey: ["systems", "all-pages"], queryFn: () => listAllSystems() });
   const form = useForm<ContractFormValues>({
     initialValues: { ...EMPTY_CONTRACT_FORM, systemId: params.get("systemId") },
     validate: contractFormValidation(t),
@@ -54,7 +54,7 @@ export default function CreateContract() {
       <Paper withBorder p="xl" maw={FORM_MAX_WIDTH}>
         <form onSubmit={form.onSubmit(save)} noValidate>
           <Stack gap="lg">
-            <ContractFormFields form={form} mode="create" systems={systems.data?.items ?? []} ownerEditable />
+            <ContractFormFields form={form} mode="create" systems={systems.data ?? []} ownerEditable />
             {error && (
               <Alert color="red" variant="light">
                 {error}

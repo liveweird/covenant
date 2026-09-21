@@ -138,7 +138,7 @@ ch.nokillswit
 │                       (Contracts table; the list/tree joins, facets (six group-bys over the shared
 │                       predicate, each dimension lifted), authorizeWrite reading team_members inside the tx, the
 │                       published-versions 409 on delete, export), ContractVersionService.kt
-│                       (ContractVersions table; SemVer > highest, the HARD/SOFT gate, transitions,
+│                       (ContractVersions table; SemVer precedence uniqueness + backports, the HARD/SOFT gate, transitions,
 │                       recomputeLatest, applySemverPaging shared with the errors report), ContractErrors.kt
 │                       (the Errors report's DTOs + ErrorListFilter + the pure foldErrorFacets/Finding.matches
 │                       fold — Toadie's `/errors` ported onto Covenant's stored findings) and

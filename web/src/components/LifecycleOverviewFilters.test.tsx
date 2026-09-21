@@ -50,8 +50,7 @@ describe("Lifecycle overview registry filters", () => {
   test("a selected domain and registry choices beyond the first 100 remain discoverable", async () => {
     const user = userEvent.setup();
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    // ContractFilterControls uses this key with a TeamPage. The lifecycle picker must keep
-    // its all-pages Team[] on a different key or navigation between the pages crashes.
+    // Legacy page-shaped cache entries must not be reused by all-pages pickers.
     queryClient.setQueryData(["teams", "picker", "all"], { items: [{ id: 1, name: "Cached page team" }], page: 1, pageSize: 100, total: 1 });
     renderWithProviders(<Harness />, { queryClient });
     expect(await screen.findByDisplayValue("Late domain")).toBeInTheDocument();

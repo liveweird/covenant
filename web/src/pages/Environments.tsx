@@ -6,7 +6,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { IconPencil, IconPlugConnected, IconPlus, IconTrash } from "@tabler/icons-react";
 import { deleteEnvironment, listEnvironments, type EnvironmentResponse } from "../api/environments";
 import { isAdmin } from "../api/session";
-import { listSystems } from "../api/systems";
+import { listAllSystems } from "../api/systems";
 import ClearableTextInput from "../components/ClearableTextInput";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import EmptyState from "../components/EmptyState";
@@ -43,8 +43,8 @@ export default function Environments() {
   const { page, setPage, pageSize, setPageSize, sortField, sortDir, sortParam, toggleSort } =
     usePagedSort<SortField>("name", [debouncedName, systemFilter], { key: SETTINGS_KEY, sortFields: SORT_FIELDS });
 
-  const systems = useQuery({ queryKey: ["systems", "all"], queryFn: () => listSystems({ page: 1, pageSize: 100, sort: "name" }) });
-  const systemOptions = (systems.data?.items ?? []).map((s) => ({ value: String(s.id), label: `${s.domainName} / ${s.name}` }));
+  const systems = useQuery({ queryKey: ["systems", "all-pages"], queryFn: () => listAllSystems() });
+  const systemOptions = (systems.data ?? []).map((s) => ({ value: String(s.id), label: `${s.domainName} / ${s.name}` }));
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["environments", "list", page, pageSize, sortParam, debouncedName, systemFilter],

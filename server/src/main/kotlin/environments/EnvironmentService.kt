@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import ch.nokillswit.infra.db.SoftDeletable
 import ch.nokillswit.infra.db.active
-import ch.nokillswit.infra.db.requireActive
+import ch.nokillswit.infra.db.requireActiveForKeyShare
 import ch.nokillswit.infra.db.nowMillis
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.dao.id.UIntIdTable
@@ -171,7 +171,7 @@ class EnvironmentService(private val database: R2dbcDatabase, private val cipher
         }
     }
 
-    private suspend fun requireSystem(systemId: UInt) = SystemService.Systems.requireActive(systemId, "system")
+    private suspend fun requireSystem(systemId: UInt) = SystemService.Systems.requireActiveForKeyShare(systemId, "system")
 
     private fun ResultRow.toResponse() = EnvironmentResponse(
         id = this[Environments.id].value,
