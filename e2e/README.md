@@ -115,7 +115,8 @@ the same commit** — this list is the coverage map, the scenario file is the de
   compared; (2) 1.0.0 proposed and activated (text locked) → the Reader opened (the operation card,
   an axe scan, remembered across a reload) → downloaded → a breaking change against it flagged by
   the live check until the Major bump → the History section read; (3) teardown through the delete
-  rules (draft deletes, an active version blocks the contract, deprecate → retire, then delete);
+  rules (draft deletes, an active version blocks the contract, deprecate → retire, then delete),
+  waiting for the destination contract page before using its shared action menu;
   plus a regular user's read-only tree, page and list.
 - [`toadie-usage.spec.ts`](scenarios/toadie-usage.md) — configure an encrypted connection, link multiple APIs, display declared provider/consumer usage, restart a scan when the upstream revision changes, and preserve the last coherent observation when revisions keep changing or GraphQL fails.
 - [`toadie-registry-sync.spec.ts`](scenarios/toadie-registry-sync.md) — preview/import/link Port registries, preserve local IDs and team authorization, refresh metadata, retain missing-source records, and detach for local editing.
@@ -151,7 +152,8 @@ the same commit** — this list is the coverage map, the scenario file is the de
   and a PostgreSQL table described live through an environment becomes an ODCS draft (`physicalType`,
   a property and its primary key checked in the preview) — both opened in the ordinary editor and
   saved as DRAFT through the ordinary Import flow; an existing contract preserves a chosen
-  version through inference → new-version editor → save; teardown of everything.
+  version through inference → new-version editor → save, waiting for the version-creation
+  response before asserting navigation; teardown of everything.
 - [`i18n.spec.ts`](scenarios/i18n.md) — the synced per-user language: a throwaway user
   switches to Polish, the choice survives a reload AND a wiped-device re-login (served from
   the stored value), and the admin's English flips it back; seeded accounts stay English.
@@ -161,7 +163,8 @@ the same commit** — this list is the coverage map, the scenario file is the de
   badge; teardown of the contract, registries and user.
 - [`mfa.spec.ts`](scenarios/mfa.md) — email MFA + the flags surfaces: the /feature-flags
   row switch and per-user editor round-trip a throwaway user's MFA flag; an MFA-enabled
-  account signs in through the emailed 6-digit code via Mailpit (skips itself without it).
+  account signs in using the fully revealed generated password and the emailed 6-digit code
+  via Mailpit (skips itself without it).
 - [`password-reset.spec.ts`](scenarios/password-reset.md) — the forgot-password flow:
   neutral confirmation + per-email throttle for unknown addresses; the full email roundtrip
   through the compose stack's Mailpit (new password works, old one is dead — skips itself
@@ -180,6 +183,10 @@ Specs log in with the seeded admin (`admin@covenant.local`, password `changeme`)
 content where they create any — so they don't depend on a clean database or absolute counts.
 
 ### Logging in
+
+`createUserViaUi()` waits for the one-time password reveal to render before reading the
+password. A click on Show password alone is not evidence that the mask has been replaced.
+Every journey that creates a user through this shared helper inherits that synchronization.
 
 `helpers.login()` drives the **real login form** (clearing any leftover `covenant.auth.*`
 localStorage session first — while one exists, `RedirectIfAuthed` bounces `/login` away and the

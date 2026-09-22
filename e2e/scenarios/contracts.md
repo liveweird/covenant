@@ -58,7 +58,8 @@ The comparison caption identifies a published predecessor (ACTIVE or DEPRECATED)
 13. The admin signs in again, opens the contract page and tears down through the rules: the 1.1.0 draft deletes from its row; deleting the contract is
    refused while 1.0.0 is active ("still has active or deprecated versions"); they deprecate and
    retire 1.0.0 after reviewing the retirement-impact dialog and explicitly acknowledging its
-   declared-usage limitations, delete the contract, then the system, domain and team.
+   declared-usage limitations, return to the contract page before opening its actions, delete the
+   contract, then the system, domain and team.
    - *Expected*: each step lands where described; the contract delete returns to the list.
 
 ## Scenario: a regular user reads a contract in the hierarchy and the list but gets no write actions

@@ -29,6 +29,17 @@ suspended and abandoned render could discard it. Rendering now reads the flag wi
 mutation; the committed page acknowledges it in an effect. A deterministic suspended-render
 regression covers this path and a fresh mount verifies the notice is shown only once.
 
+**Browser-test synchronization follow-up (2026-09-22).** Three timing
+failures seen in the release browser runs are corrected: contract teardown waits for the
+destination heading before opening its actions; inference waits for the version-creation
+response and asserts `201` before checking navigation; user creation waits for the password's
+revealed state before reading it. Scenarios and the browser coverage map are synchronized.
+All **72 browser tests passed without retries**, and a separate inference run passed with the
+real save response held for **11 seconds**, beyond the previous heading assertion's timeout.
+Global timeouts are unchanged. Browser-test lint, typecheck, dead-code, scenario and four setup
+checks passed; independent review found no actionable issues. These are test-only changes;
+the app version remains **1.0.3**.
+
 **Releases and tags stopped at v0.8.0.** The app version is 1.0.3 and the changelog covers
 every release, but the repository holds four tags (`v0.6.0`, `v0.6.1`,
 `v0.7.0`, `v0.8.0`) and four GitHub releases, the newest v0.8.0. The sixteen versions from
