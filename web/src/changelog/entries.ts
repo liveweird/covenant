@@ -17,6 +17,18 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "1.0.4",
+    date: "2026-09-22",
+    en: `**Maintenance updates for the interface and contract editor.**
+
+- Updated interface and editor libraries with upstream fixes for focus, keyboard navigation and cursor positioning.
+- Refreshed development tooling while retaining the supported runtime and compiler versions.`,
+    pl: `**Aktualizacje utrzymaniowe interfejsu i edytora kontraktów.**
+
+- Zaktualizowano biblioteki interfejsu i edytora, uwzględniając poprawki fokusu, nawigacji klawiaturą i położenia kursora.
+- Odświeżono narzędzia programistyczne, zachowując wspierane wersje środowisk uruchomieniowych i kompilatora.`,
+  },
+  {
     version: "1.0.3",
     date: "2026-09-22",
     en: `**Reliable sign-out confirmation.**

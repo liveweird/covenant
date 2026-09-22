@@ -43,27 +43,32 @@ the app version remains **1.0.3**.
 **Release/tag consistency restored (2026-09-22).** The sixteen missing versions from 0.8.1
 through 1.0.3 now have annotated tags at their original main release commits and bilingual
 GitHub releases copied from the corresponding changelog snapshots. The four existing
-tags/releases remain intact; only v1.0.3 is Latest. Backfilled notes distinguish the original
+tags/releases remain intact; v1.0.3 was marked Latest at the backfill. Backfilled notes distinguish the original
 changelog date from the actual publication date. The
 [application release process](.claude/docs/app-releases.md) requires tag/release verification
 for future publication; later documentation/test-only commits never move existing tags.
 
 ## Dependency updates
 
-Eleven Dependabot pull requests are open and none has been triaged. Each needs an explicit
-decision rather than a routine merge, because
-[dependencies.md](.claude/docs/dependencies.md) constrains most of them.
+The eleven open Dependabot PRs were triaged on **2026-09-22**. All are explicitly deferred:
+Node 26 and its type packages await an LTS runtime migration; JDK 24 does not match the JDK/JRE
+21 toolchain; TypeScript 7 exceeds current tooling peer ranges; networknt 3 crosses the Jackson
+2 boundary; Stoplight types 14 cannot align the current parser/Spectral graph by itself.
+They remain open; no security alerts were dismissed or update rules suppressed.
 
-| Pull request | Update | Standing constraint |
-| --- | --- | --- |
-| [#26](https://github.com/liveweird/covenant/pull/26), [#28](https://github.com/liveweird/covenant/pull/28) | Node 24 to 26, root and checker images | Keep production on an LTS line. |
-| [#27](https://github.com/liveweird/covenant/pull/27) | eclipse-temurin 21 to 24 JDK | The Gradle toolchain and `mise.toml` pin JDK 21; what runs should be what is tested. |
-| [#9](https://github.com/liveweird/covenant/pull/9), [#14](https://github.com/liveweird/covenant/pull/14), [#16](https://github.com/liveweird/covenant/pull/16) | `@types/node` 24 to 26, web/e2e/checker | Types match the Node runtime major, so these follow the image decision. |
-| [#4](https://github.com/liveweird/covenant/pull/4), [#6](https://github.com/liveweird/covenant/pull/6), [#7](https://github.com/liveweird/covenant/pull/7) | TypeScript 6 to 7, web/e2e/checker | Needs a coordinated migration: the ESLint tooling requires below 6.1 and `openapi-typescript` declares 5. One shared major across the three workspaces. |
-| [#10](https://github.com/liveweird/covenant/pull/10) | networknt json-schema-validator 2.0.7 to 3.0.7 | Blocked by the Jackson 2 boundary; networknt 3 accepts Jackson 3 nodes, incompatible with the current parser and Avro pipeline. |
-| [#3](https://github.com/liveweird/covenant/pull/3) | `@stoplight/types` 13 to 14, checker | Shares a mixed Stoplight type graph with Spectral and the AsyncAPI parser; review peer requirements and real fixture verdicts first. |
+Compatible npm updates are implemented for **1.0.4**: aligned Mantine
+9.6.2, CodeMirror state/view fixes, TanStack Query 5.103.2, react-i18next 17.0.15, Tabler icons
+3.48.0, and typescript-eslint 8.70.1 across all three workspaces. Node/JDK image digests still
+match their committed pins. GitHub reported no open Dependabot security alerts, and all three
+npm audits reported zero known vulnerabilities.
 
-Dependabot security alerts are separate from these version updates and are not tracked here.
+Verification passed: 639 frontend tests, 51 checker tests, all workspace static/build/coverage
+gates, 72 browser journeys without retries, seven sample-contract checks, both image builds
+and independent review. The local Compose verification stack is healthy; test data was cleaned up.
+
+See the [dated triage report](.claude/docs/dependency-triage-2026-09-22.md) for individual PR
+links, compatibility evidence, exact update versions and conditions for revisiting each
+migration. This targeted pass is not a comprehensive JVM/container vulnerability scan.
 
 ## Quality-checkup fixes
 
