@@ -17,7 +17,7 @@ import { IconCheck, IconChevronDown, IconHistory, IconKey, IconLogout } from "@t
 import { logout } from "../api/auth";
 import { getUserId, isAdmin } from "../api/session";
 import { getUser, setUserLanguage } from "../api/users";
-import { flagSignedOut, notifyAuthChange } from "../auth";
+import { flagSignedOut } from "../auth";
 import { asSupportedLanguage, NATIVE_LANGUAGE_NAMES, SUPPORTED_LANGUAGES } from "../i18n";
 import { useChangelogUnseen } from "../hooks/useChangelogSeen";
 
@@ -76,8 +76,9 @@ export default function UserMenu() {
     const revocation = logout();
     queryClient.clear();
     flagSignedOut();
+    // The explicit navigation commits the cleared session and /login together. Broadcasting the
+    // clear here can rerender RequireAuth on the old protected URL and save it as a login return.
     navigate("/login", { replace: true });
-    notifyAuthChange();
     await revocation;
   }
 

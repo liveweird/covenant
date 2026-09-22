@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router-dom";
 import { renderWithProviders, screen, waitFor } from "../test/render";
 import i18n from "../i18n";
+import { RedirectIfAuthed, RequireAuth } from "../auth";
+import Login from "../pages/Login";
 import UserMenu from "./UserMenu";
 
 const ME = { id: 7, name: "Alice Admin", email: "alice@covenant.local", roles: ["ADMIN"], disabledFeatures: [], language: "en" };
@@ -27,6 +29,19 @@ function renderMenu() {
       <Route path="/" element={<UserMenu />} />
       <Route path="/login" element={<p>login page</p>} />
     </Routes>,
+  );
+}
+
+function renderProtectedMenu() {
+  return renderWithProviders(
+    <Routes>
+      <Route path="/login" element={<RedirectIfAuthed><Login /></RedirectIfAuthed>} />
+      <Route element={<RequireAuth />}>
+        <Route path="/" element={<p>home page</p>} />
+        <Route path="/contracts/:id" element={<UserMenu />} />
+      </Route>
+    </Routes>,
+    { route: "/contracts/7" },
   );
 }
 
@@ -95,17 +110,39 @@ describe("UserMenu", () => {
     expect(screen.getByRole("menuitem", { name: "Sign out" })).toBeInTheDocument();
   });
 
-  test("Sign out clears and navigates without waiting for server revocation", async () => {
+  test("Sign out from a protected route starts the next session at home without waiting for revocation", async () => {
     const revokeResponse = deferred<Response>();
-    vi.stubGlobal("fetch", vi.fn((url: string) =>
-      url === "/api/v1/users/7" ? Promise.resolve(Response.json(ME)) : revokeResponse.promise,
-    ));
+    vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => {
+      if (url === "/api/v1/users/7") return Promise.resolve(Response.json(ME));
+      if (url === "/api/v1/logout") return revokeResponse.promise;
+      if (url === "/api/v1/login" && init?.method === "POST") {
+        return Promise.resolve(Response.json({
+          token: "next-token",
+          expiresAt: 1,
+          refreshToken: "next-refresh",
+          refreshExpiresAt: 2,
+          userId: 7,
+          roles: ["ADMIN"],
+          disabledFeatures: [],
+          language: "en",
+        }));
+      }
+      return Promise.resolve(new Response(null, { status: 204 }));
+    }));
     const user = userEvent.setup();
-    renderMenu();
+    renderProtectedMenu();
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(await screen.findByRole("menuitem", { name: "Sign out" }));
     await waitFor(() => expect(localStorage.getItem("covenant.auth.token")).toBeNull());
-    expect(await screen.findByText("login page")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
+
+    await user.type(screen.getByRole("textbox", { name: "Email" }), "alice@covenant.local");
+    await user.type(screen.getByLabelText("Password"), "new-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(await screen.findByText("home page")).toBeInTheDocument();
+    expect(localStorage.getItem("covenant.auth.token")).toBe("next-token");
     revokeResponse.resolve(new Response(null, { status: 204 }));
+    await waitFor(() => expect(localStorage.getItem("covenant.auth.token")).toBe("next-token"));
   });
 });

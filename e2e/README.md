@@ -103,7 +103,9 @@ the same commit** — this list is the coverage map, the scenario file is the de
   new version, compare, team, edit-user, user-features), `/reset-password`, the not-found page, and
   the overlays scoped to their dialog (the notifications drawer, the Try it drawer, a registry editor
   modal); `color-contrast` included (the theme's tokens are AA-tested in `web/src/theme.test.ts`).
-- [`auth.spec.ts`](scenarios/auth.md) — login / logout / invalid credentials / guarded deep link with query and hash.
+- [`auth.spec.ts`](scenarios/auth.md) — login / logout / invalid credentials / guarded deep link with query and hash;
+  explicit sign-out from a non-home protected page returns the next sign-in to the Hierarchy,
+  including while server revocation is delayed.
 - [`changelog.spec.ts`](scenarios/changelog.md) — the what's-new dot on a fresh device
   leads to the changelog via the version stamp and clears once read (no language switching
   — it runs as the seed admin; see `i18n.spec.ts`).
