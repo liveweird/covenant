@@ -26,6 +26,16 @@
    - *Expected*: the page renders without New environment or any row operations.
 2. The admin signs back in and deletes the user.
 
+## Scenario: deleting an environment while its first filtered response is pending cannot restore the deleted row
+
+1. Seed a uniquely named environment and its domain/system through the real API; the test owns all three.
+2. Sign in and load the unfiltered Environments list, then enter the environment name filter.
+3. Hold the first real filtered response containing that row while the previous page remains visible.
+4. Delete the environment through its row menu and confirmation; verify the API no longer returns it.
+5. Deliver the held pre-delete response after deletion succeeds.
+   - *Expected*: the deleted row disappears without navigation or clearing the filter.
+6. Release any held response and delete only the owned records through the API, even on failure.
+
 ## Not covered here (and why)
 
 - **The shape rules, the per-system 409, secrets never in a response, the system cascade,

@@ -5,17 +5,25 @@ documented in [README.md](README.md) and the release changelog.
 
 ## Open defects and operational gaps
 
-**Investigate intermittent Environments delete display.** During ODCS verification on
-2026-09-22, `e2e/tests/environments.spec.ts` timed out at the post-delete row-removal
-assertion (line 87): the row remained visible although the DELETE succeeded and the active
-API inventory no longer contained the environment. The full run passed 72/73 tests, including
-all Toadie journeys; the same Environments flow passed in a targeted six-test rerun on the
-final Compose image. The trace shows the filtered GET overlapped DELETE and returned the old row; no GET followed
-the successful deletion. The exact invalidation timing remains unconfirmed. Start by waiting
-for the debounced filtered GET to settle before edit/delete, then check whether the race
-reproduces. Trace/screenshot evidence was retained, and test-owned leftovers were removed
-through the normal APIs. No Environments behavior or assertions were changed in the ODCS work.
+**Environments stale mutation response fixed in 1.0.6.** A newly keyed filtered query can
+show the previous page through `keepPreviousData` while its own cache has no data. Invalidating
+that query after delete reused its first in-flight request, allowing a pre-delete response to
+restore the deleted row. Environments now explicitly cancels pending reads before invalidating
+after successful delete or editor save. Filter and page state are preserved.
 
+The issue was reproduced against deployed 1.0.5 by holding a real filtered response until after
+the DELETE completed, and independently in a page-level regression with the real QueryClient.
+The browser regression deliberately keeps the filter request pending during deletion; no
+filter-settle wait, navigation workaround or timeout increase hides the race.
+
+Verification passed: **645 frontend tests** with coverage, build/lint/dead-code gates,
+**74 browser tests without retries**, browser static/scenario/setup gates, and independent
+review. The Compose verification build is healthy and all test-owned records were removed.
+
+Follow-up: assess the same initial-fetch invalidation pattern in other paged registries
+(Users, Teams, Domains, Systems, Contracts and Toadie connections). They use similar query
+patterns, but this reproduction and fix are scoped to Environments; those pages have not
+been demonstrated failing by this regression.
 
 **Nightly logout regression fixed in 1.0.2.** The failed
 2026-09-21 and 2026-09-22 runs were investigated using their Playwright attachments. The

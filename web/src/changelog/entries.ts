@@ -17,6 +17,18 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "1.0.6",
+    date: "2026-09-22",
+    en: `**Environment lists stay current after changes.**
+
+- Deleting an environment while a filter is loading no longer allows an older response to restore the deleted row.
+- Saving an environment also refreshes the list without reusing a request started before the save.`,
+    pl: `**Lista środowisk pozostaje aktualna po zmianach.**
+
+- Usunięcie środowiska podczas ładowania filtra nie pozwala już starszej odpowiedzi przywrócić usuniętego wiersza.
+- Zapis środowiska również odświeża listę bez ponownego użycia żądania rozpoczętego przed zapisem.`,
+  },
+  {
     version: "1.0.5",
     date: "2026-09-22",
     en: `**Easier ODCS dataset setup with Toadie.**
