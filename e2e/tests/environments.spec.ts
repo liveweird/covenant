@@ -2,8 +2,8 @@
 // HTTP and a PostgreSQL target (the stack's own services), edits it leaving the password blank
 // (the badge stays — the stored secret is kept), and deletes it; a regular user reads the list
 // without controls. Owns: its throwaway domain/system/environment/user (unique `e2e-*` names).
-import type { Page } from "@playwright/test";
-import { createUserViaUi, deleteUserRow, expect, login, openFilters, rowOperation, signOut, test, uniqueText } from "./helpers";
+import type { Page, Route } from "@playwright/test";
+import { apiAsAdmin, createUserViaUi, deleteUserRow, expect, login, openFilters, rowOperation, signOut, test, uniqueText } from "./helpers";
 
 async function confirmDelete(page: Page, urlPattern: RegExp) {
   await Promise.all([
@@ -102,4 +102,78 @@ test("a regular user reads the environments list without controls", async ({ pag
   await login(page);
   await page.goto("/users");
   await deleteUserRow(page, reader.name);
+});
+
+
+test("deleting an environment while its first filtered response is pending cannot restore the deleted row", async ({ page }) => {
+  const { api } = await apiAsAdmin();
+  const ownedPaths: string[] = [];
+  const envName = uniqueText("e2e-env-race");
+  let releaseResponse!: () => void;
+  const responseGate = new Promise<void>((resolve) => { releaseResponse = resolve; });
+  let markHeld!: () => void;
+  const responseHeld = new Promise<void>((resolve) => { markHeld = resolve; });
+  let markSettled!: () => void;
+  const responseSettled = new Promise<void>((resolve) => { markSettled = resolve; });
+  let intercepted = false;
+  const handler = async (route: Route) => {
+    const request = route.request();
+    if (request.method() !== "GET" || new URL(request.url()).searchParams.get("name") !== envName || intercepted) {
+      await route.continue();
+      return;
+    }
+    intercepted = true;
+    try {
+      // Capture a real pre-delete result, then deliver it after the mutation succeeds.
+      const response = await route.fetch();
+      expect(response.status()).toBe(200);
+      expect((await response.json() as { items: { name: string }[] }).items.map((row) => row.name)).toEqual([envName]);
+      markHeld();
+      await responseGate;
+      await route.fulfill({ response });
+    } finally {
+      markSettled();
+    }
+  };
+  async function create(path: string, data: object) {
+    const response = await api.post(`/api/v1/${path}`, { data });
+    expect(response.status(), await response.text()).toBe(201);
+    const { id } = await response.json() as { id: number };
+    ownedPaths.unshift(`/api/v1/${path}/${id}`);
+    return id;
+  }
+  try {
+    const domainId = await create("domains", { name: uniqueText("e2e-env-race-dom") });
+    const systemId = await create("systems", { domainId, name: uniqueText("e2e-env-race-sys") });
+    const environmentId = await create("environments", { systemId, name: envName, httpBaseUrl: "http://checker:9090" });
+    await login(page);
+    await page.goto("/environments");
+    const row = page.getByRole("row", { name: new RegExp(envName) });
+    await expect(row).toBeVisible();
+    await page.route("**/api/v1/environments?*", handler);
+    await openFilters(page);
+    await page.getByLabel("Name", { exact: true }).fill(envName);
+    await responseHeld;
+    // The previous page remains actionable while the new filtered query has no cached data.
+    await rowOperation(page, envName, `Delete ${envName}`);
+    await confirmDelete(page, new RegExp(`/api/v1/environments/${environmentId}$`));
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect((await api.get(`/api/v1/environments/${environmentId}`)).status()).toBe(404);
+    releaseResponse();
+    await responseSettled;
+    await expect(row).toHaveCount(0);
+    await expect(page.getByLabel("Name", { exact: true })).toHaveValue(envName);
+  } finally {
+    releaseResponse();
+    if (intercepted) await responseSettled;
+    await page.unroute("**/api/v1/environments?*", handler);
+    try {
+      for (const path of ownedPaths) {
+        const response = await api.delete(path);
+        expect([204, 404], `${path}: ${response.status()}`).toContain(response.status());
+      }
+    } finally {
+      await api.dispose();
+    }
+  }
 });

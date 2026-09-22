@@ -144,7 +144,7 @@ the same commit** — this list is the coverage map, the scenario file is the de
 - [`environments.spec.ts`](scenarios/environments.md) — the try-it targets registry: an admin
   creates an environment on a throwaway system with HTTP + PostgreSQL targets (the stack's own
   services), edits it leaving the password blank (the stored secret is kept — the badge stays),
-  deletes it; a regular user's read-only list.
+  deletes it; a regular user's read-only list; a held initial filter response cannot restore a deleted row.
 - [`tryit.spec.ts`](scenarios/tryit.md) — live conformance: an environment pointing at the stack's
   own Postgres, an imported ODCS contract declaring the `users` table with one bogus column, Try it →
   Run → the sample table and the `COLUMN_MISSING`/`COLUMN_EXTRA` findings; teardown of everything.

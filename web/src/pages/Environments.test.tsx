@@ -29,6 +29,11 @@ function serve(mockFetch: FetchMock, mutations: Record<string, { status: number;
 const findCall = (mockFetch: FetchMock, method: string, url: string) =>
   mockFetch.mock.calls.find(([u, init]) => ((init as RequestInit | undefined)?.method ?? "GET") === method && u === url);
 const bodyOf = (call: unknown[] | undefined) => JSON.parse((call![1] as RequestInit).body as string);
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
 
 describe("Environments page", () => {
   let mockFetch: FetchMock;
@@ -126,5 +131,77 @@ describe("Environments page", () => {
     expect(await screen.findByText(/"staging" \(gateway\) will be deleted/)).toBeInTheDocument();
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^delete$/i }));
     await waitFor(() => expect(findCall(mockFetch, "DELETE", "/api/v1/environments/4")).toBeDefined());
+  });
+
+  test("a filtered request already in flight cannot restore an environment after deletion", async () => {
+    const filtered = deferred<Response>();
+    const deleted = deferred<Response>();
+    let filteredReads = 0;
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      if (method === "GET" && url.startsWith("/api/v1/systems?")) return Promise.resolve(jsonResponse(200, SYSTEMS));
+      if (method === "GET" && url.startsWith("/api/v1/environments?") && url.includes("name=staging")) {
+        filteredReads += 1;
+        return filteredReads === 1 ? filtered.promise : Promise.resolve(jsonResponse(200, { ...PAGE, items: [], total: 0 }));
+      }
+      if (method === "GET" && url.startsWith("/api/v1/environments?")) return Promise.resolve(jsonResponse(200, PAGE));
+      if (method === "DELETE" && url === "/api/v1/environments/4") return deleted.promise;
+      return Promise.resolve(jsonResponse(404, { title: "x", status: 404 }));
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<Environments />);
+    await screen.findByText("staging");
+    await user.click(screen.getByRole("button", { name: /filters/i }));
+    await user.type(screen.getByLabelText("Name", { exact: true }), "staging");
+    await waitFor(() => expect(filteredReads).toBe(1));
+
+    await user.click(screen.getByRole("button", { name: "Operations for staging" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Delete staging" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^delete$/i }));
+    await waitFor(() => expect(findCall(mockFetch, "DELETE", "/api/v1/environments/4")).toBeDefined());
+    deleted.resolve(new Response(null, { status: 204 }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    filtered.resolve(jsonResponse(200, PAGE));
+
+    await waitFor(() => expect(filteredReads).toBe(2));
+    await waitFor(() => expect(screen.queryByText("staging")).not.toBeInTheDocument());
+  });
+
+  test("a filtered request already in flight cannot restore stale environment fields after editing", async () => {
+    const filtered = deferred<Response>();
+    let filteredReads = 0;
+    const edited = { ...STAGING, description: "updated while filtered" };
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      if (method === "GET" && url.startsWith("/api/v1/systems?")) return Promise.resolve(jsonResponse(200, SYSTEMS));
+      if (method === "GET" && url.startsWith("/api/v1/environments?") && url.includes("name=staging")) {
+        filteredReads += 1;
+        return filteredReads === 1 ? filtered.promise : Promise.resolve(jsonResponse(200, { ...PAGE, items: [edited] }));
+      }
+      if (method === "GET" && url.startsWith("/api/v1/environments?")) return Promise.resolve(jsonResponse(200, PAGE));
+      if (method === "PUT" && url === "/api/v1/environments/4") return Promise.resolve(new Response(null, { status: 204 }));
+      return Promise.resolve(jsonResponse(404, { title: "x", status: 404 }));
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<Environments />);
+    await screen.findByText("staging");
+    await user.click(screen.getByRole("button", { name: /filters/i }));
+    await user.type(screen.getByLabelText("Name", { exact: true }), "staging");
+    await waitFor(() => expect(filteredReads).toBe(1));
+
+    await user.click(screen.getByRole("button", { name: "Operations for staging" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Edit staging" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.clear(within(dialog).getByLabelText("Description"));
+    await user.type(within(dialog).getByLabelText("Description"), edited.description);
+    await user.click(within(dialog).getByRole("button", { name: /^save$/i }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    filtered.resolve(jsonResponse(200, PAGE));
+
+    await waitFor(() => expect(filteredReads).toBe(2));
+    await waitFor(() => {
+      expect(screen.getByText(edited.description)).toBeInTheDocument();
+      expect(screen.queryByText(STAGING.description)).not.toBeInTheDocument();
+    });
   });
 });
