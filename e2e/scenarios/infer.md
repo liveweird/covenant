@@ -26,8 +26,9 @@
    exchange and generate a draft.
    - *Expected*: the generated document declares `2.0.0`.
 7. They open the draft in the new-version editor and save it.
-   - *Expected*: both the Version field and document retain `2.0.0`; the saved version page
-     shows the contract name and `2.0.0`.
+   - *Expected*: both the Version field and document retain `2.0.0`; the current contract's
+     version-creation request returns `201`, then the saved version page shows the contract name
+     and `2.0.0`.
 8. Teardown: the contract, system, domain and team are deleted via the API.
 
 ## Scenario: admin describes the users table through an environment and imports the inferred ODCS draft

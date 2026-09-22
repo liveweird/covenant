@@ -105,7 +105,13 @@ test("user infers an OpenAPI draft from a pasted exchange and saves it as the co
   await expect(page).toHaveURL(new RegExp(`/contracts/${row.contractId}/versions/new$`));
   await expect(page.getByLabel("Version", { exact: true })).toHaveValue("2.0.0");
   await expect(page.getByRole("textbox", { name: "Contract document" })).toContainText("2.0.0");
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  const [versionResponse] = await Promise.all([
+    page.waitForResponse(
+      (r) => r.request().method() === "POST" && r.url().endsWith(`/api/v1/contracts/${row.contractId}/versions`),
+    ),
+    page.getByRole("button", { name: "Save draft", exact: true }).click(),
+  ]);
+  expect(versionResponse.status()).toBe(201);
   await expect(page.getByRole("heading", { name: `${row.name} 2.0.0` })).toBeVisible();
 
   const seeded: SeededContract = { domainId, systemId, teamId, teamName, contractId: row.contractId, contractName: row.name, versionId: row.versionId };

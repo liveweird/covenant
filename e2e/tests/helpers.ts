@@ -81,7 +81,10 @@ export async function createUserViaUi(
   const dialog = page.getByRole("dialog");
   // Masked as "*" until revealed — click the eye toggle first.
   await dialog.getByRole("button", { name: "Show password" }).click();
+  await expect(dialog.getByRole("button", { name: "Hide password" })).toHaveAttribute("aria-pressed", "true");
   const password = (await dialog.locator("code").textContent()) ?? "";
+  // Keep the credential out of assertion output: validate only the captured value's shape.
+  expect(password.length > 0 && !/^\*+$/.test(password), "generated password is revealed").toBe(true);
   // Mantine renders both a header X and the footer button named Close.
   await dialog.getByRole("button", { name: "Close", exact: true }).last().click();
   await expect(page).toHaveURL(/\/users$/);

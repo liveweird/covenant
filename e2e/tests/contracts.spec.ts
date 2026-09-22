@@ -221,6 +221,7 @@ test.describe.serial("the contract core loop", () => {
   await retirement.getByRole("button", { name: "Retire" }).click();
   await expect(page.getByRole("button", { name: "Retire" })).toHaveCount(0);
   await page.getByRole("link", { name: "Back to the contract" }).click();
+  await expect(page.getByRole("heading", { name: contractName, exact: true })).toBeVisible();
   await page.getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menuitem", { name: "Delete" }).click();
   await confirmDelete(page, /\/api\/v1\/contracts\/\d+$/);

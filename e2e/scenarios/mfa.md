@@ -25,8 +25,9 @@
 
 *Skips itself when Mailpit (`http://localhost:8027`) is unreachable.*
 
-1. The admin creates a throwaway user, enables their MFA in the per-user editor, and signs
-   out.
+1. The admin creates a throwaway user, waits for **Show password** to become **Hide password** and
+   captures the non-masked generated password, enables their MFA in the per-user editor, and
+   signs out.
 2. The user submits correct credentials on the login form.
    - *Expected*: the card switches to the sign-in-code step (no session yet); a
      "Covenant: your sign-in code" email with a 6-digit code lands in Mailpit.
