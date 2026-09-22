@@ -249,6 +249,9 @@ passwords. The selected UI language is also stored on the user and drives server
 `web/src/changelog/version.ts` (`APP_VERSION`) is the sole source of the displayed app version;
 the Gradle snapshot version is unrelated. A release adds the newest bilingual markdown entry to
 `web/src/changelog/entries.ts` and bumps `APP_VERSION` in the same change; tests pin their parity.
+Publication also requires an annotated version tag at the verified main release commit and
+matching bilingual GitHub release notes; follow `.claude/docs/app-releases.md`. Test-only or
+documentation changes can retain the app version and never move an existing release tag.
 
 ## Testing and Verification
 

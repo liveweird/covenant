@@ -159,6 +159,7 @@ The user-facing changelog is a **build-time artifact** — no DB, no API, change
 
 - Write both language bodies by hand (or LLM) — never derive them from commit messages. Bodies are *content*, so they live in the data file, not `locales/`; the PL body follows the Polish voice conventions (inclusive slash forms, active voice).
 - Keep dates descending (same-day releases are fine — newest stays on top), versions unique, and both bodies non-empty — pinned by `src/changelog/entries.test.ts`.
+- Complete publication with the annotated version tag and bilingual GitHub release described in [the application release process](../.claude/docs/app-releases.md). Documentation/test-only changes may retain the version; published tags never move.
 - Keep phrases that tests assert on in plain text runs: markdown formatting splits text nodes, and testing-library's `getByText` matches direct text nodes only.
 
 Rendering & UI wiring:
