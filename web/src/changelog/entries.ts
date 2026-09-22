@@ -17,6 +17,16 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "1.0.3",
+    date: "2026-09-22",
+    en: `**Reliable sign-out confirmation.**
+
+- The sign-out confirmation remains visible when the login page retries rendering.`,
+    pl: `**Niezawodne potwierdzenie wylogowania.**
+
+- Potwierdzenie wylogowania pozostaje widoczne, gdy strona logowania ponawia renderowanie.`,
+  },
+  {
     version: "1.0.2",
     date: "2026-09-22",
     en: `**Predictable navigation after signing out.**

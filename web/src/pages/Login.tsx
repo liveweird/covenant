@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
 import { Alert, Anchor, Button, Center, PasswordInput, PinInput, Stack, Text, TextInput } from "@mantine/core";
 import { isEmail, isNotEmpty, useForm } from "@mantine/form";
 import { isMfaChallenge, login, verifyMfa, type MfaChallenge } from "../api/auth";
 import { saveErrorMessage } from "../utils/saveError";
-import { consumeSignedOut, notifyAuthChange } from "../auth";
+import { consumeSignedOut, hasPendingSignedOut, notifyAuthChange } from "../auth";
 import AuthCard from "../components/AuthCard";
 import { MAX_EMAIL_LENGTH } from "../utils/userForm";
 
@@ -22,7 +22,12 @@ export default function Login() {
   const location = useLocation();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [signedOut, setSignedOut] = useState<boolean>(() => consumeSignedOut());
+  // Read during render without mutating the handoff. React may discard this render (for example
+  // when a lazy sibling suspends); consume only after this Login instance actually commits.
+  const [signedOut, setSignedOut] = useState(hasPendingSignedOut);
+  useEffect(() => {
+    if (signedOut) consumeSignedOut();
+  }, [signedOut]);
   // Email MFA: non-null switches the card to the code-entry step.
   const [challenge, setChallenge] = useState<MfaChallenge | null>(null);
   const [code, setCode] = useState("");

@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
-import { renderWithProviders, screen, waitFor } from "../test/render";
+import { act, renderWithProviders, screen, waitFor } from "../test/render";
 import { jsonResponse } from "../test/http";
 import { Route, Routes, useLocation } from "react-router-dom";
+import { flagSignedOut } from "../auth";
 import Login from "./Login";
 
 function DestinationProbe() {
@@ -51,6 +53,38 @@ describe("Login", () => {
     renderWithProviders(<Login />, { route: "/login" });
     await submit();
     await waitFor(() => expect(localStorage.getItem("covenant.auth.token")).toBe("access-1"));
+  });
+
+  test("a speculative login render cannot consume the signed-out notice before commit", async () => {
+    let release!: () => void;
+    let ready = false;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    function SuspendUntilReady() {
+      if (!ready) throw gate;
+      return null;
+    }
+
+    flagSignedOut();
+    const login = renderWithProviders(
+      <Suspense fallback={<p>loading login</p>}>
+        <Login />
+        <SuspendUntilReady />
+      </Suspense>,
+      { route: "/login" },
+    );
+    expect(screen.getByText("loading login")).toBeInTheDocument();
+
+    await act(async () => {
+      ready = true;
+      release();
+      await gate;
+    });
+
+    expect(screen.getByText("You've been signed out.")).toBeInTheDocument();
+
+    login.unmount();
+    renderWithProviders(<Login />, { route: "/login" });
+    expect(screen.queryByText("You've been signed out.")).not.toBeInTheDocument();
   });
 
   test("a successful login restores the deep link's query string and hash", async () => {
