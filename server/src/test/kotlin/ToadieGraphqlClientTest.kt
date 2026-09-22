@@ -93,6 +93,46 @@ class ToadieGraphqlClientTest {
 
     private fun config(f: Fixture) = ToadieFetchConfig(f.url, "private-fixture-key", ToadieMapping())
 
+    @Test
+    fun `dataset mapping reads explicit service relations without scanning APIs or database resources`() = fixture { f ->
+        f.blueprintRows = mapper.readTree(blueprints).toList().map { it as ObjectNode }.onEach {
+            if (it.path("identifier").asText() == "service") {
+                val relations = it.path("relations") as ObjectNode
+                relations.set<JsonNode>("produces_datasets", mapper.readTree("""{"target":"dataset","many":true}"""))
+                relations.set<JsonNode>("consumes_datasets", mapper.readTree("""{"target":"dataset","many":true}"""))
+                relations.set<JsonNode>("depends_on", mapper.readTree("""{"target":"resource","many":true}"""))
+            }
+        } + mapper.readTree("""[
+            {"id":"6","identifier":"dataset","relations":{}},
+            {"id":"7","identifier":"resource","relations":{}}
+        ]""").toList()
+        f.entityRows = mapper.readTree(entities).toList().map { it as ObjectNode }.onEach {
+            if (it.path("identifier").asText() == "checkout") {
+                val relations = it.path("relations") as ObjectNode
+                relations.set<JsonNode>("produces_datasets", mapper.readTree("""["orders","settlements"]"""))
+                relations.set<JsonNode>("consumes_datasets", mapper.readTree("""["orders"]"""))
+                relations.set<JsonNode>("depends_on", mapper.readTree("""["warehouse"]"""))
+            }
+        } + mapper.readTree("""[
+            {"id":"6","blueprint":"dataset","identifier":"orders","title":"Orders dataset","relations":{},"updatedAt":1},
+            {"id":"7","blueprint":"dataset","identifier":"settlements","title":"Settlements","relations":{},"updatedAt":1},
+            {"id":"8","blueprint":"resource","identifier":"warehouse","title":"Warehouse","relations":{},"updatedAt":1}
+        ]""").toList()
+        HttpToadieGraphqlClient(pageSize = 1).use { client ->
+            val mapping = ToadieMapping(apiBlueprint = "dataset",
+                providesRelation = "produces_datasets", consumesRelation = "consumes_datasets")
+            val snapshot = runBlocking { client.fetch(config(f).copy(mapping = mapping)) } as ToadieSnapshot
+            assertEquals(setOf("dataset", "service", "system", "_team"), snapshot.entities.map { it.blueprint }.toSet())
+            assertEquals(setOf("6", "7"), snapshot.entities.filter { it.blueprint == "dataset" }.map { it.id }.toSet())
+            val service = snapshot.entities.single { it.blueprint == "service" }
+            assertEquals(listOf("orders", "settlements"), service.relations["produces_datasets"])
+            assertEquals(listOf("orders"), service.relations["consumes_datasets"])
+            assertEquals(setOf("produces_datasets", "consumes_datasets", "system"), service.relations.keys)
+            assertEquals(setOf("dataset", "service", "system", "_team"),
+                f.requests.mapNotNull { it.path("variables").path("blueprint").textValue() }.toSet())
+        }
+    }
+
     private fun registryFixture(f: Fixture) {
         f.blueprintRows = mapper.readTree(blueprints).toList().map { it as ObjectNode }.onEach {
             it.set<JsonNode>("schema", mapper.readTree("""{"properties":{"description":{"type":"string"}}}"""))

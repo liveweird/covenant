@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 
 // A test-owned HTTP upstream: the browser talks only to Covenant, whose real GraphQL client
 // reads this fixture through Docker's host gateway. No live Toadie architecture is modified.
-export async function startToadieFixture() {
+export async function startToadieFixture({ datasets = false }: { datasets?: boolean } = {}) {
   const key = `e2e-${randomUUID()}`;
   let fail = false;
   let revisionNumber = 1;
@@ -15,6 +15,7 @@ export async function startToadieFixture() {
     { id: "2", identifier: "service", relations: {
       provides_apis: { target: "api", many: true }, consumes_apis: { target: "api", many: true },
       system: { target: "system", many: false },
+      ...(datasets ? { produces_datasets: { target: "dataset", many: true }, consumes_datasets: { target: "dataset", many: true }, depends_on: { target: "resource", many: true } } : {}),
     } },
     { id: "3", identifier: "system", schema: { properties: { description: { type: "string" } } }, relations: {
       domain: { target: "domain", many: false },
@@ -25,6 +26,16 @@ export async function startToadieFixture() {
     { id: "5", identifier: "domain", schema: { properties: { description: { type: "string" } } }, relations: {
       parent_domain: { target: "domain", many: false },
     } },
+    ...(datasets ? [
+      { id: "6", identifier: "dataset", relations: { stored_in: { target: "resource", many: false } } },
+      { id: "7", identifier: "resource", relations: {} },
+      { id: "8", identifier: "api_adoption", relations: {
+        consumer: { target: "service", many: false }, api: { target: "api", many: false },
+      } },
+      { id: "9", identifier: "dataset_adoption", relations: {
+        consumer: { target: "service", many: false }, dataset: { target: "dataset", many: false },
+      } },
+    ] : []),
   ];
   const entities = [
     { id: "1", blueprint: "api", identifier: "orders", title: "Orders API", relations: {} },
@@ -38,6 +49,19 @@ export async function startToadieFixture() {
     { id: "7", blueprint: "domain", identifier: "commerce", title: "Commerce domain", relations: { parent_domain: "enterprise" } },
     { id: "8", blueprint: "domain", identifier: "enterprise", title: "Enterprise domain", relations: {} },
     { id: "9", blueprint: "system", identifier: "unassigned", title: "Unassigned system", relations: {} },
+    ...(datasets ? [
+      { id: "10", blueprint: "dataset", identifier: "orders", title: "Orders dataset", relations: { stored_in: "warehouse" } },
+      { id: "11", blueprint: "dataset", identifier: "settlements", title: "Daily settlements", relations: {} },
+      { id: "12", blueprint: "service", identifier: "pipeline", title: "Settlement pipeline", team: ["retail"],
+        relations: { produces_datasets: ["orders", "settlements"], consumes_datasets: ["orders"], system: "commerce" } },
+      { id: "13", blueprint: "service", identifier: "database-only", title: "Database-only service",
+        relations: { depends_on: ["warehouse"], system: "commerce" } },
+      { id: "14", blueprint: "resource", identifier: "warehouse", title: "Warehouse", relations: {} },
+      { id: "15", blueprint: "api_adoption", identifier: "storefront-orders", title: "Declared API adoption",
+        properties: { major_line: "1", status: "active" }, relations: { consumer: "storefront", api: "orders" } },
+      { id: "16", blueprint: "dataset_adoption", identifier: "pipeline-orders", title: "Declared dataset adoption",
+        properties: { contract_version: "1.0.0", status: "active" }, relations: { consumer: "pipeline", dataset: "orders" } },
+    ] : []),
   ].map((entity) => ({ team: null, updatedAt: 1, properties: { description: `Description of ${entity.title}` }, ...entity }));
   const server: Server = createServer(async (req, res) => {
     if (req.url !== "/integration/graphql" || req.method !== "POST" || req.headers.authorization !== `Bearer ${key}`) {

@@ -1314,7 +1314,7 @@ paths:
     get:
       tags: [toadie]
       operationId: listToadieApis
-      summary: List cached API entities for a connection
+      summary: List cached API or dataset entities for a connection
       description: "Any authenticated user. `q` searches identifier and title case- and accent-insensitively. Sortable: `id`, `title`; default `id` ascending."
       parameters:
         - $ref: '#/components/parameters/Page'
@@ -1322,7 +1322,7 @@ paths:
         - $ref: '#/components/parameters/Sort'
         - $ref: '#/components/parameters/Q'
       responses:
-        '200': { description: Cached API page, content: { application/json: { schema: { $ref: '#/components/schemas/ToadieEntityPage' } } } }
+        '200': { description: Cached API or dataset page, content: { application/json: { schema: { $ref: '#/components/schemas/ToadieEntityPage' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -1336,7 +1336,7 @@ paths:
     get:
       tags: [toadie]
       operationId: getContractToadieLinks
-      summary: Get a contract's explicit Toadie API links
+      summary: Get a contract's explicit Toadie API or dataset links
       responses:
         '200': { description: Link state, content: { application/json: { schema: { $ref: '#/components/schemas/ToadieLinksResponse' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -1346,8 +1346,8 @@ paths:
     put:
       tags: [toadie]
       operationId: replaceContractToadieLinks
-      summary: Replace a contract's explicit Toadie API links
-      description: Contract writer only. At most 100 unique API entity IDs, all present in the current snapshot. A null connection with an empty list clears links.
+      summary: Replace a contract's explicit Toadie API or dataset links
+      description: Contract writer only. At most 100 unique API or dataset entity IDs from one connection, all present in the current snapshot. A null connection with an empty list clears links.
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/ToadieLinksRequest' } } }
@@ -1368,7 +1368,7 @@ paths:
     get:
       tags: [toadie]
       operationId: getContractToadieUsage
-      summary: Get cached providers and consumers for a contract's linked APIs
+      summary: Get cached providers and consumers for a contract's linked APIs or datasets
       description: "Any authenticated user. `q` searches service identifier and title case- and accent-insensitively; `role` is exact. Sortable: `id`, `title`; default `id` ascending."
       parameters:
         - $ref: '#/components/parameters/Page'
@@ -4046,11 +4046,12 @@ components:
             $ref: '#/components/schemas/ToadieRegistryApplyItem'
           maxItems: 50
     ToadieMapping:
+      description: One target blueprint per connection. Use separate connections to the same instance for API and dataset mappings.
       type: object
       required: [serviceBlueprint, apiBlueprint, providesRelation, consumesRelation, systemRelation]
       properties:
         serviceBlueprint: { type: string, default: service, maxLength: 100 }
-        apiBlueprint: { type: string, default: api, maxLength: 100 }
+        apiBlueprint: { type: string, default: api, maxLength: 100, description: 'Target blueprint; api for API contracts or dataset for ODCS. The field name is retained for compatibility.' }
         providesRelation: { type: string, default: provides_apis, maxLength: 100 }
         consumesRelation: { type: string, default: consumes_apis, maxLength: 100 }
         systemRelation: { type: string, default: system, maxLength: 100 }
@@ -4141,7 +4142,7 @@ components:
       required: [connectionId, apiEntityIds]
       properties:
         connectionId: { type: integer, format: int32, minimum: 0, nullable: true }
-        apiEntityIds: { type: array, maxItems: 100, uniqueItems: true, items: { type: string } }
+        apiEntityIds: { type: array, maxItems: 100, uniqueItems: true, items: { type: string }, description: 'IDs of API or dataset entities from the selected connection target blueprint.' }
     ToadieLinkStatus:
       type: string
       enum: [AVAILABLE, MISSING, DISCONNECTED]
@@ -4365,7 +4366,7 @@ components:
       type: object
       required: [consumerCount, providerCount, cache, unavailableLinkCount]
       description: >-
-        Distinct services across linked APIs for the WHOLE contract, repeated on each major.
+        Distinct services across linked APIs or datasets for the WHOLE contract, repeated on each major.
         Counts are null for unlinked, never-synced, disconnected or incomplete mappings.
         Stale/disabled observations may retain last-known counts; zero never proves safe retirement.
       properties:
@@ -4401,7 +4402,7 @@ components:
             available replacement. Advisory only; a replacement is not mandatory for saving a policy.
         usageUncertain:
           type: boolean
-          description: Cache is not CURRENT or at least one selected API mapping is unavailable.
+          description: Cache is not CURRENT or at least one selected API or dataset mapping is unavailable.
         usage: { $ref: '#/components/schemas/ToadieUsageSummary' }
     LifecycleOverviewPage:
       type: object

@@ -5,12 +5,21 @@ import { saveErrorMessage } from "./saveError";
 import { nameRule } from "./formRules";
 
 export const MAX_TOADIE_NAME_LENGTH = 100;
-const DEFAULT_TOADIE_MAPPING = {
-  serviceBlueprint: "service",
-  apiBlueprint: "api",
-  providesRelation: "provides_apis",
-  consumesRelation: "consumes_apis",
-  systemRelation: "system",
+export const TOADIE_MAPPING_PRESETS = {
+  api: {
+    serviceBlueprint: "service",
+    apiBlueprint: "api",
+    providesRelation: "provides_apis",
+    consumesRelation: "consumes_apis",
+    systemRelation: "system",
+  },
+  dataset: {
+    serviceBlueprint: "service",
+    apiBlueprint: "dataset",
+    providesRelation: "produces_datasets",
+    consumesRelation: "consumes_datasets",
+    systemRelation: "system",
+  },
 } as const;
 
 const DEFAULT_REGISTRY_MAPPING = {
@@ -56,10 +65,14 @@ export const EMPTY_TOADIE_FORM: ToadieFormValues = {
   apiKey: "",
   enabled: true,
   refreshIntervalMinutes: 60,
-  ...DEFAULT_TOADIE_MAPPING,
+  ...TOADIE_MAPPING_PRESETS.api,
   registryEnabled: false,
   registryMapping: DEFAULT_REGISTRY_MAPPING,
 };
+
+export function applyToadieMappingPreset(values: ToadieFormValues, preset: keyof typeof TOADIE_MAPPING_PRESETS): ToadieFormValues {
+  return { ...values, ...TOADIE_MAPPING_PRESETS[preset] };
+}
 
 function isHttpUrl(raw: string): boolean {
   try {

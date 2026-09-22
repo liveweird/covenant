@@ -32,7 +32,7 @@
     "VERSION_REVIEW_APPROVED": "{{actor}} zatwierdził/a recenzję {{contractName}} {{version}}.",
     "VERSION_REVIEW_CHANGES_REQUESTED": "{{actor}} poprosił/a o zmiany w recenzji {{contractName}} {{version}}.",
     "RELEASE_LINE_UPDATED": "{{actor}} zaktualizował/a zasady wsparcia dla {{contractName}} {{major}}.x ({{supportStatus}}).",
-    "TOADIE_LINKS_UPDATED": "{{actor}} zaktualizował/a powiązania API w Toadie dla {{contractName}}.",
+    "TOADIE_LINKS_UPDATED": "{{actor}} zaktualizował/a powiązania API lub zbiorów danych w Toadie dla {{contractName}}.",
     "RELEASE_LINE_DEPRECATION_DUE": "Linia {{major}}.x kontraktu {{contractName}}: planowane wycofanie z zalecanego użycia {{deadline}} ({{stage}}).",
     "RELEASE_LINE_SUPPORT_END_DUE": "Linia {{major}}.x kontraktu {{contractName}}: koniec wsparcia {{deadline}} ({{stage}})."
   },

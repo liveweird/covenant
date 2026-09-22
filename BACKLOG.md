@@ -5,6 +5,18 @@ documented in [README.md](README.md) and the release changelog.
 
 ## Open defects and operational gaps
 
+**Investigate intermittent Environments delete display.** During ODCS verification on
+2026-09-22, `e2e/tests/environments.spec.ts` timed out at the post-delete row-removal
+assertion (line 87): the row remained visible although the DELETE succeeded and the active
+API inventory no longer contained the environment. The full run passed 72/73 tests, including
+all Toadie journeys; the same Environments flow passed in a targeted six-test rerun on the
+final Compose image. The trace shows the filtered GET overlapped DELETE and returned the old row; no GET followed
+the successful deletion. The exact invalidation timing remains unconfirmed. Start by waiting
+for the debounced filtered GET to settle before edit/delete, then check whether the race
+reproduces. Trace/screenshot evidence was retained, and test-owned leftovers were removed
+through the normal APIs. No Environments behavior or assertions were changed in the ODCS work.
+
+
 **Nightly logout regression fixed in 1.0.2.** The failed
 2026-09-21 and 2026-09-22 runs were investigated using their Playwright attachments. The
 regular reader signed in successfully and saw the previous contract with read-only controls;
@@ -139,24 +151,25 @@ and 50 changelog/locale tests, eight browser journeys, an unchanged-revision int
 API conformance and independent review. Version and bilingual changelog are updated.
 No changes are required in Toadie.
 
-Remaining Toadie proposals: verify/document separate dataset mappings for ODCS, then design a
-reader for optional declared adoption entities. Toadie's narrower key scopes and incremental
-change feed were declined upstream; they are not pending Covenant prerequisites. Adoption
+Remaining Toadie proposal: design a reader for optional declared adoption entities. Toadie's
+narrower key scopes and incremental change feed were declined upstream; they are not pending Covenant prerequisites. Adoption
 blueprints are importable ontology definitions, so absence must remain valid.
 
 Toadie **2.13.0** has since shipped both ontology extensions, so neither is blocked upstream
 any more. Names to map: the blueprint `dataset`, with the service-side relations
 `produces_datasets` and `consumes_datasets` and `system`, which a second connection mapping
-can select without a Covenant change; and the relation entities `api_adoption` (`consumer` to
+can select with the existing backend; and the relation entities `api_adoption` (`consumer` to
 service, `api` to api, optional `environment`, plus `major_line`, `status`, `declared_by`,
 `verified_at`, `notes`) and `dataset_adoption`, which carries `contract_version` instead of
 `major_line`. An absent `major_line` or `contract_version` means undeclared, so a reader must
 keep treating adoption as unknown rather than inferring it. Toadie documents both in its own
 `.claude/docs/ontology.md`, with sample rows under
-`sample-data/port/commerce-payments/entities/`. The open design question is whether one
-connection can carry an API mapping and a dataset mapping together, or whether that needs two
-connections: the current configuration selects one target blueprint and one provides/consumes
-relation pair.
+`sample-data/port/commerce-payments/entities/`. The dataset mapping setup is implemented in **1.0.5**:
+explicit API/dataset presets, bilingual setup guidance, and backend/browser regression coverage.
+Use two connections to the same instance, one per mapping; each ODCS contract can link multiple
+datasets from its dataset connection. Database dependencies never imply dataset usage.
+See [the setup instructions](.claude/docs/toadie-integration.md#configure-odcs-dataset-usage).
+The optional adoption reader remains future work; no Toadie code changes were required.
 
 ## Registry synchronization from Toadie
 

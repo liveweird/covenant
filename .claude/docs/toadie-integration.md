@@ -11,7 +11,7 @@ Local IDs, team rosters and contract permissions remain Covenant-owned. Read
 ## Connection and mapping
 
 ADMIN manages `/api/v1/toadie-connections`. Authenticated users read sanitized connection
-metadata and cached API choices. The server base URL and browser URL are separate: a Compose
+metadata and cached API or dataset choices. The server base URL and browser URL are separate: a Compose
 app can use `http://host.docker.internal:8081` while browser links use `http://localhost:8081`.
 Production uses HTTPS. The server URL identifies the remote instance and is immutable; create
 a separate connection to change instances. Numeric remote IDs are decimal strings, scoped to
@@ -24,24 +24,69 @@ the actual blueprint definitions, derives the system blueprint from the mapped r
 resolves entity references byte-exact within each blueprint. Effective ownership comes from
 Toadie's `team` field, including inherited teams, and `_team` supplies display names.
 
-The default API blueprint covers OpenAPI and AsyncAPI. An ODCS dataset requires an explicit
-data-contract/dataset ontology mapping; a service's dependency on a database is not evidence
-that it consumes a particular dataset contract. The connector does not infer that relationship.
+The default API blueprint covers OpenAPI and AsyncAPI. ODCS contracts can use the dataset
+ontology shipped with Toadie 2.13.0. These are importable ontology definitions: upgrading
+Toadie alone does not create them in an existing catalog. The configured blueprints and
+relations must exist; custom identifiers remain supported.
+
+### Configure ODCS dataset usage
+
+1. Keep the existing API connection. Create a second, distinctly named connection such as
+   **Local Toadie datasets**, using the same backend URL, browser URL and integration client
+   key (or another valid key for that instance).
+2. Open **Advanced mapping** and choose **Use dataset mapping**. The presets are explicit
+   form actions; opening or editing a connection never replaces a saved custom mapping.
+   Fields remain editable after applying either preset.
+3. Save and wait for a successful refresh. The dataset preset requires these definitions:
+
+| Mapping field | API preset | Dataset preset |
+| --- | --- | --- |
+| Service blueprint | `service` | `service` |
+| API or dataset blueprint (`apiBlueprint`) | `api` | `dataset` |
+| Provides or produces relation | `provides_apis` | `produces_datasets` |
+| Consumes relation | `consumes_apis` | `consumes_datasets` |
+| System relation | `system` | `system` |
+
+4. Open an ODCS contract, choose **Edit Toadie links**, select the dataset connection, select
+   the datasets represented by the document, and save. One ODCS document may link several
+   datasets. A producer appears as **Provider**; a service may have both roles and is shown
+   once even when it references several selected datasets.
+
+Each connection has one target blueprint and one provides/consumes relation pair. API and
+dataset mappings therefore use **two connections**, even to one instance; their snapshots,
+refresh status and links are independent. Each contract links entities from **one connection**.
+Changing an existing connection's mapping invalidates its cache, so create the second
+connection rather than repurposing the API connection.
+
+Registry synchronization is optional and separate. For the same upstream registries, reuse
+one chosen registry-sync connection and its bindings; do not import the same registries again
+through the new dataset connection. Mapping presets preserve the registry settings already
+entered in the form.
+
+Link datasets explicitly: an ODCS schema name, database name, `stored_in` relation or service
+dependency on a database does not establish dataset consumption. No dataset is inferred or
+created automatically. Optional `api_adoption` and `dataset_adoption` entities are not read;
+exact contract version and release-line adoption remain unknown. No Toadie code changes are
+needed for this setup.
+
+The existing API paths and field names, including `/apis`, `apiBlueprint`, `apiEntityIds`
+and the usage row's API-ID lists, also represent the configured dataset entities. They remain
+unchanged for API-client compatibility.
 
 ## Linking and reading usage
 
 `GET/PUT /api/v1/contracts/{id}/toadie-links` reads or replaces a contract's mapping. One contract
-can link up to 100 API entities from one connection, allowing one AsyncAPI document to cover
+can link up to 100 API or dataset entities from one connection, allowing one AsyncAPI document to cover
 multiple topics. PUT requires the current contract writer, both before body decoding and in
 the committing transaction. A null connection and empty IDs clears the mapping. Link changes
 use the shared contract activity path; automatic observations do not generate product history.
 
 `GET /api/v1/contracts/{id}/toadie-usage` returns a paged table of services with provider/consumer
-roles, linked API IDs, systems, teams, and safe Toadie links. It deduplicates a service appearing
-through several linked APIs and can show both roles. Version and release-line fields are
+roles, linked API or dataset IDs, systems, teams, and safe Toadie links. It deduplicates a service appearing
+through several linked APIs or datasets and can show both roles. Version and release-line fields are
 explicitly unknown: architecture consumption is not a deployment or adoption measurement.
 
-Missing mapped APIs remain visible; disconnected connections do not erase their labels. A
+Missing mapped APIs or datasets remain visible; disconnected connections do not erase their labels. A
 current empty result means **no declared usage observed**, never proof that a contract is unused.
 Port ownership/lifecycle and Covenant ownership/lifecycle have independent meanings.
 
@@ -131,7 +176,7 @@ schema conformance; read-only and editable SPA states; translations; and browser
 ## Migration report exports (0.15.0)
 
 Release-line migration reports reuse the complete cached usage projection under a read-only
-local snapshot transaction, with all linked APIs and provider/consumer services independent of
+local snapshot transaction, with all linked APIs or datasets and provider/consumer services independent of
 UI paging. They retain missing mappings and stale/disabled observation warnings, and do not
 refresh the connection. The selected Covenant major is planning context only: exact version
 and major adoption remain unknown. Generation time never replaces `lastSuccessAt` as the

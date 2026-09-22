@@ -72,7 +72,7 @@ This is a Kotlin/Gradle backend plus three standalone npm workspaces:
   in `plugins/`, `audit/`, and `authz/`; database, mail, encryption at rest (`infra/crypto`),
   paging, and shared validation infrastructure live in `infra/`.
 - `toadie/` under the server feature packages owns ADMIN-curated encrypted connections,
-  contract-to-Port API links, bounded GraphQL reads and refresh, and cached provider/consumer
+  contract-to-Port API/dataset links, bounded GraphQL reads and refresh, and cached provider/consumer
   projections. Toadie 2.12+ revisions guard every scan with one bounded restart; scheduled
   refreshes can reconfirm an unchanged graph, while manual refreshes always scan fully.
   Read `.claude/docs/toadie-integration.md` before changing this boundary.

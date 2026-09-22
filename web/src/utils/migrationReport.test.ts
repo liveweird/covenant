@@ -35,8 +35,8 @@ describe("migration report Markdown", () => {
     expect(markdown).toContain("Service 0");
     expect(markdown).toContain("Service 100");
     expect(markdown).toContain("Roles: Provider, Consumer");
-    expect(markdown).toContain("Provided API entity IDs: ` api-provided `");
-    expect(markdown).toContain("Consumed API entity IDs: ` api-orders `");
+    expect(markdown).toContain("Provided entity IDs: ` api-provided `");
+    expect(markdown).toContain("Consumed entity IDs: ` api-orders `");
     expect(markdown).toContain("Identifier: ` sys-100 `; Entity ID: ` system-100 `");
     expect(markdown).toContain("Identifier: ` team-100 `; Entity ID: ` team-100 `");
     expect(markdown).toContain("Report generated at (UTC): 2026-09-21T10:11:12.000Z");

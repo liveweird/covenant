@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import i18n from "../i18n";
 import { ApiError } from "../api/http";
-import { EMPTY_TOADIE_FORM, fromToadieConnection, toadieFormValidation, toadieSaveErrorMessage, toToadieRequest } from "./toadieForm";
+import { applyToadieMappingPreset, EMPTY_TOADIE_FORM, fromToadieConnection, TOADIE_MAPPING_PRESETS, toadieFormValidation, toadieSaveErrorMessage, toToadieRequest } from "./toadieForm";
 
 const CONNECTION = {
   id: 1,
@@ -57,6 +57,25 @@ describe("Toadie connection form", () => {
       registryMapping: null,
     });
     expect(toToadieRequest({ ...values, apiKey: " replacement " })).toHaveProperty("apiKey", "replacement");
+  });
+
+  test("mapping presets replace only the five ontology fields", () => {
+    const custom = {
+      ...EMPTY_TOADIE_FORM,
+      name: "Dataset catalog",
+      apiKey: "secret",
+      registryEnabled: true,
+      registryMapping: { ...EMPTY_TOADIE_FORM.registryMapping, flattenDomains: true },
+      serviceBlueprint: "custom-service",
+      apiBlueprint: "custom-contract",
+    };
+
+    const dataset = applyToadieMappingPreset(custom, "dataset");
+
+    expect(dataset).toEqual({ ...custom, ...TOADIE_MAPPING_PRESETS.dataset });
+    expect(dataset.apiKey).toBe("secret");
+    expect(dataset.registryMapping).toBe(custom.registryMapping);
+    expect(applyToadieMappingPreset(dataset, "api")).toEqual({ ...custom, ...TOADIE_MAPPING_PRESETS.api });
   });
 
   test("requires explicit flattening acknowledgement and serializes optional registry mapping fields", () => {

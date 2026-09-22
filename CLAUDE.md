@@ -57,8 +57,12 @@ line-filtered versions and line-aware creation.
 
 ### Toadie usage integration (0.10.0)
 
+API and ODCS dataset mappings use separate connections to the same Toadie instance. The
+Advanced mapping presets and explicit multi-dataset linking are documented in
+`.claude/docs/toadie-integration.md`; optional adoption entities remain unread.
+
 The `toadie/` server package reads Toadie’s existing Port GraphQL API through ADMIN-curated
-connections with encrypted machine keys. Contract writers link one or more remote APIs;
+connections with encrypted machine keys. Contract writers link one or more remote APIs or datasets;
 read-only usage shows provider/consumer services, systems and teams. Periodic/manual refresh
 preserves the last successful observation on failure. Since 0.16.0, Toadie 2.12+ is required:
 full scans compare revisions across every page with one bounded restart, scheduled refreshes
