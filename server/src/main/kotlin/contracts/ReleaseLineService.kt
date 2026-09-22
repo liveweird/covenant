@@ -118,6 +118,7 @@ class ReleaseLineService(
             cache = usage.cache,
             linkedApis = usage.linkedApis,
             services = usage.services,
+            adoptions = usage.adoptions,
         )
     }
 

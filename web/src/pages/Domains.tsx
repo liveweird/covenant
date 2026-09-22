@@ -33,6 +33,7 @@ import {
 } from "../utils/registryForm";
 import { loadErrorMessage, saveErrorMessage } from "../utils/saveError";
 import { showSuccessToast } from "../utils/toast";
+import { refreshQueriesAfterMutation } from "../utils/queryRefresh";
 
 const SORT_FIELDS = ["name", "updatedAt"] as const;
 type SortField = (typeof SORT_FIELDS)[number];
@@ -62,7 +63,7 @@ export default function Domains() {
   const [editorTarget, setEditorTarget] = useState<DomainResponse | "new" | null>(null);
   const remove = useDeleteConfirm<DomainResponse>({
     mutationFn: (row) => deleteDomain(row.id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["domains"] }),
+    onSuccess: () => refreshQueriesAfterMutation(queryClient, ["domains"]),
     successMessage: t("domains.toast.deleted"),
   });
 
@@ -121,7 +122,7 @@ export default function Domains() {
                 </Table.Td>
                 <Table.Td><ToadieRegistrySourceStatus source={source} compact={!admin} onDetach={admin && source ? async () => {
                   await detachDomainToadieSource(domain.id);
-                  await Promise.all([queryClient.invalidateQueries({ queryKey: ["domains"] }), queryClient.invalidateQueries({ queryKey: ["toadie"] })]);
+                  await refreshQueriesAfterMutation(queryClient, ["domains"], ["toadie"]);
                 } : undefined} /></Table.Td>
                 {admin && (
                   <Table.Td style={{ width: 1 }} ta="right">
@@ -155,7 +156,7 @@ export default function Domains() {
           onClose={() => setEditorTarget(null)}
           onSaved={async () => {
             setEditorTarget(null);
-            await queryClient.invalidateQueries({ queryKey: ["domains"] });
+            await refreshQueriesAfterMutation(queryClient, ["domains"]);
           }}
         />
       )}

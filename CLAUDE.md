@@ -59,7 +59,9 @@ line-filtered versions and line-aware creation.
 
 API and ODCS dataset mappings use separate connections to the same Toadie instance. The
 Advanced mapping presets and explicit multi-dataset linking are documented in
-`.claude/docs/toadie-integration.md`; optional adoption entities remain unread.
+`.claude/docs/toadie-integration.md`; optional adoption declarations are read only when an
+ADMIN enables the separate mapping. See `.claude/docs/toadie-adoption.md` for the operating
+rules.
 
 The `toadie/` server package reads Toadie’s existing Port GraphQL API through ADMIN-curated
 connections with encrypted machine keys. Contract writers link one or more remote APIs or datasets;
@@ -68,9 +70,18 @@ preserves the last successful observation on failure. Since 0.16.0, Toadie 2.12+
 full scans compare revisions across every page with one bounded restart, scheduled refreshes
 reconfirm unchanged revisions without rescanning, and manual refreshes always scan fully.
 It never synchronizes authorization or
-infers version adoption. See `.claude/docs/toadie-integration.md` for mapping, transport,
+infers runtime version adoption: runtime use remains unknown, while explicitly declared API
+major lines and dataset contract versions are exposed as separate source declarations. See
+`.claude/docs/toadie-integration.md` and `.claude/docs/toadie-adoption.md` for mapping, transport,
 concurrency, cache semantics and deployment. The SPA adds Toadie connection administration
 and a Usage from Toadie panel on contract details.
+
+### Declared adoption reader (1.1.0)
+
+An opt-in per-connection reader exposes Toadie's API major-line and dataset contract-version
+declarations in lifecycle impact views and migration reports. These declarations retain their
+source values and provenance; they do not prove runtime use, change architecture counts or make
+retirement safe. Missing declarations remain unknown. See `.claude/docs/toadie-adoption.md`.
 
 ### Registry synchronization from Toadie (1.0.0)
 
@@ -279,6 +290,7 @@ ch.nokillswit
 See `web/CLAUDE.md` for the frontend conventions (flat directories, co-located tests, typed i18n with EN/PL parity, the transport layer, theming — purple is the interactive accent only; red = blocking, orange = waived finding, teal = success).
 
 @.claude/docs/toadie-integration.md
+@.claude/docs/toadie-adoption.md
 
 @.claude/docs/version-reviews.md
 

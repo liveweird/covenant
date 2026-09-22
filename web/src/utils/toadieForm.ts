@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { ToadieConnection, ToadieConnectionBody } from "../api/toadie";
+import type { ToadieAdoptionKind, ToadieConnection, ToadieConnectionBody } from "../api/toadie";
 import { ApiError } from "../api/http";
 import { saveErrorMessage } from "./saveError";
 import { nameRule } from "./formRules";
@@ -19,6 +19,33 @@ export const TOADIE_MAPPING_PRESETS = {
     providesRelation: "produces_datasets",
     consumesRelation: "consumes_datasets",
     systemRelation: "system",
+  },
+} as const;
+
+export const TOADIE_ADOPTION_MAPPING_PRESETS = {
+  api: {
+    blueprint: "api_adoption",
+    kind: "API_MAJOR_LINE" as ToadieAdoptionKind,
+    consumerRelation: "consumer",
+    targetRelation: "api",
+    environmentRelation: "environment",
+    valueProperty: "major_line",
+    statusProperty: "status",
+    declaredByProperty: "declared_by",
+    verifiedAtProperty: "verified_at",
+    notesProperty: "notes",
+  },
+  dataset: {
+    blueprint: "dataset_adoption",
+    kind: "DATASET_CONTRACT_VERSION" as ToadieAdoptionKind,
+    consumerRelation: "consumer",
+    targetRelation: "dataset",
+    environmentRelation: "environment",
+    valueProperty: "contract_version",
+    statusProperty: "status",
+    declaredByProperty: "declared_by",
+    verifiedAtProperty: "verified_at",
+    notesProperty: "notes",
   },
 } as const;
 
@@ -42,6 +69,19 @@ type RegistryMappingValues = {
   teamDescriptionProperty: string;
 };
 
+type AdoptionMappingValues = {
+  blueprint: string;
+  kind: ToadieAdoptionKind;
+  consumerRelation: string;
+  targetRelation: string;
+  environmentRelation: string;
+  valueProperty: string;
+  statusProperty: string;
+  declaredByProperty: string;
+  verifiedAtProperty: string;
+  notesProperty: string;
+};
+
 export type ToadieFormValues = {
   name: string;
   baseUrl: string;
@@ -54,6 +94,8 @@ export type ToadieFormValues = {
   providesRelation: string;
   consumesRelation: string;
   systemRelation: string;
+  adoptionEnabled: boolean;
+  adoptionMapping: AdoptionMappingValues;
   registryEnabled: boolean;
   registryMapping: RegistryMappingValues;
 };
@@ -66,12 +108,18 @@ export const EMPTY_TOADIE_FORM: ToadieFormValues = {
   enabled: true,
   refreshIntervalMinutes: 60,
   ...TOADIE_MAPPING_PRESETS.api,
+  adoptionEnabled: false,
+  adoptionMapping: TOADIE_ADOPTION_MAPPING_PRESETS.api,
   registryEnabled: false,
   registryMapping: DEFAULT_REGISTRY_MAPPING,
 };
 
 export function applyToadieMappingPreset(values: ToadieFormValues, preset: keyof typeof TOADIE_MAPPING_PRESETS): ToadieFormValues {
   return { ...values, ...TOADIE_MAPPING_PRESETS[preset] };
+}
+
+export function applyToadieAdoptionMappingPreset(values: ToadieFormValues, preset: keyof typeof TOADIE_ADOPTION_MAPPING_PRESETS): ToadieFormValues {
+  return { ...values, adoptionMapping: { ...TOADIE_ADOPTION_MAPPING_PRESETS[preset] } };
 }
 
 function isHttpUrl(raw: string): boolean {
@@ -103,6 +151,17 @@ export function toadieFormValidation(t: TFunction, existing: ToadieConnection | 
     providesRelation: mappingRule,
     consumesRelation: mappingRule,
     systemRelation: mappingRule,
+    adoptionMapping: {
+      blueprint: (value: string, values: ToadieFormValues) => !values.adoptionEnabled || IDENTIFIER.test(value.trim()) ? null : t("toadie.validation.mapping"),
+      consumerRelation: (value: string, values: ToadieFormValues) => !values.adoptionEnabled || IDENTIFIER.test(value.trim()) ? null : t("toadie.validation.mapping"),
+      targetRelation: (value: string, values: ToadieFormValues) => !values.adoptionEnabled || IDENTIFIER.test(value.trim()) ? null : t("toadie.validation.mapping"),
+      environmentRelation: (value: string, values: ToadieFormValues) => !values.adoptionEnabled || !value.trim() || IDENTIFIER.test(value.trim()) ? null : t("toadie.validation.mapping"),
+      valueProperty: (value: string, values: ToadieFormValues) => !values.adoptionEnabled || IDENTIFIER.test(value.trim()) ? null : t("toadie.validation.mapping"),
+      statusProperty: (value: string, values: ToadieFormValues) => !values.adoptionEnabled || !value.trim() || IDENTIFIER.test(value.trim()) ? null : t("toadie.validation.mapping"),
+      declaredByProperty: (value: string, values: ToadieFormValues) => !values.adoptionEnabled || !value.trim() || IDENTIFIER.test(value.trim()) ? null : t("toadie.validation.mapping"),
+      verifiedAtProperty: (value: string, values: ToadieFormValues) => !values.adoptionEnabled || !value.trim() || IDENTIFIER.test(value.trim()) ? null : t("toadie.validation.mapping"),
+      notesProperty: (value: string, values: ToadieFormValues) => !values.adoptionEnabled || !value.trim() || IDENTIFIER.test(value.trim()) ? null : t("toadie.validation.mapping"),
+    },
     registryMapping: {
       domainBlueprint: (value: string, values: ToadieFormValues) =>
         !values.registryEnabled || IDENTIFIER.test(value.trim()) ? null : t("toadie.validation.mapping"),
@@ -124,6 +183,7 @@ export function toadieFormValidation(t: TFunction, existing: ToadieConnection | 
 
 export function fromToadieConnection(row: ToadieConnection): ToadieFormValues {
   const registryMapping = row.registryMapping;
+  const adoptionMapping = row.adoptionMapping;
   return {
     name: row.name,
     baseUrl: row.baseUrl,
@@ -132,6 +192,15 @@ export function fromToadieConnection(row: ToadieConnection): ToadieFormValues {
     enabled: row.enabled,
     refreshIntervalMinutes: row.refreshIntervalMinutes,
     ...row.mapping,
+    adoptionEnabled: adoptionMapping != null,
+    adoptionMapping: adoptionMapping == null ? TOADIE_ADOPTION_MAPPING_PRESETS.api : {
+      ...adoptionMapping,
+      environmentRelation: adoptionMapping.environmentRelation ?? "",
+      statusProperty: adoptionMapping.statusProperty ?? "",
+      declaredByProperty: adoptionMapping.declaredByProperty ?? "",
+      verifiedAtProperty: adoptionMapping.verifiedAtProperty ?? "",
+      notesProperty: adoptionMapping.notesProperty ?? "",
+    },
     registryEnabled: registryMapping != null,
     registryMapping: registryMapping == null ? DEFAULT_REGISTRY_MAPPING : {
       domainBlueprint: registryMapping.domainBlueprint,
@@ -160,6 +229,18 @@ export function toToadieRequest(values: ToadieFormValues): ToadieConnectionBody 
       consumesRelation: values.consumesRelation.trim(),
       systemRelation: values.systemRelation.trim(),
     },
+    adoptionMapping: values.adoptionEnabled ? {
+      blueprint: values.adoptionMapping.blueprint.trim(),
+      kind: values.adoptionMapping.kind,
+      consumerRelation: values.adoptionMapping.consumerRelation.trim(),
+      targetRelation: values.adoptionMapping.targetRelation.trim(),
+      environmentRelation: optionalIdentifier(values.adoptionMapping.environmentRelation),
+      valueProperty: values.adoptionMapping.valueProperty.trim(),
+      statusProperty: optionalIdentifier(values.adoptionMapping.statusProperty),
+      declaredByProperty: optionalIdentifier(values.adoptionMapping.declaredByProperty),
+      verifiedAtProperty: optionalIdentifier(values.adoptionMapping.verifiedAtProperty),
+      notesProperty: optionalIdentifier(values.adoptionMapping.notesProperty),
+    } : null,
     registryMapping: values.registryEnabled ? {
       domainBlueprint: values.registryMapping.domainBlueprint.trim(),
       systemDomainRelation: optionalIdentifier(values.registryMapping.systemDomainRelation),

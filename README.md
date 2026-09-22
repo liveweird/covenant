@@ -238,7 +238,8 @@ Use dataset mapping**. It reads Toadie 2.13's `dataset` blueprint through servic
 `produces_datasets` and `consumes_datasets`; those ontology definitions must be present in
 Toadie. Keep the API connection for OpenAPI/AsyncAPI. Link one or more datasets explicitly
 from the ODCS contract's **Edit Toadie links** dialog. Database dependencies do not imply
-dataset consumption, and optional adoption entities are not read. See the
+dataset consumption. Optional adoption entities can be read using a separate opt-in mapping;
+see [declared adoption](.claude/docs/toadie-adoption.md). See the
 [ODCS setup instructions](.claude/docs/toadie-integration.md#configure-odcs-dataset-usage).
 
 ## Registry metadata from Toadie
@@ -273,7 +274,8 @@ recommendation, full migration instructions, and declared provider/consumer serv
 systems and teams. It reads the complete local Toadie cache, independently of table filters
 and paging, without refreshing Toadie. Generation, plan-update and last-successful-observation
 timestamps are distinct. Missing mappings and stale/unavailable observations remain visible;
-exact version or major-line adoption is unknown, and an empty observation does not establish
+runtime version or major-line adoption is unknown; source declarations are shown separately,
+and an empty observation does not establish
 that retirement is safe. Every authenticated reader can download a report. Reports exceeding
 the 8 MiB export budget show an error instead of downloading incomplete data.
 

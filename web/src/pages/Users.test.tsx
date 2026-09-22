@@ -13,6 +13,14 @@ const USER_ID_KEY = "covenant.auth.userId";
 
 type FetchMock = ReturnType<typeof vi.fn>;
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 const SEED_USERS = [
   { id: 1, name: "Alice Admin", email: "alice@example.com", roles: ["ADMIN"] },
   { id: 2, name: "Bob Basic", email: "bob@example.com", roles: [] },
@@ -151,6 +159,43 @@ describe("Users page", () => {
       expect.objectContaining({ message: "User deleted", color: "teal" }),
     );
     toast.mockRestore();
+  });
+
+  test("deleting while the first filtered request is pending cannot restore its stale row", async () => {
+    const filtered = deferred<Response>();
+    let filteredReads = 0;
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      if (method === "DELETE" && url === "/api/v1/users/2") {
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      if (method === "GET" && url.startsWith("/api/v1/users?")) {
+        const name = new URL(url, "http://test").searchParams.get("name");
+        if (name === "Bob Basic") {
+          filteredReads++;
+          if (filteredReads === 1) return filtered.promise;
+          return Promise.resolve(usersPage([SEED_USERS[0]]));
+        }
+        return Promise.resolve(usersPage(SEED_USERS));
+      }
+      return Promise.resolve(jsonResponse(404, {}));
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Bob Basic");
+    await user.click(screen.getByRole("button", { name: /filters/i }));
+    await user.type(screen.getByLabelText("Name"), "Bob Basic");
+    await waitFor(() => expect(filteredReads).toBe(1));
+
+    await user.click(screen.getByRole("button", { name: "Operations for Bob Basic" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Delete Bob Basic" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^delete$/i }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    filtered.resolve(usersPage(SEED_USERS));
+    await waitFor(() => expect(filteredReads).toBe(2));
+    await waitFor(() => expect(screen.queryByText("Bob Basic")).not.toBeInTheDocument());
   });
 
   test("a 409 on delete surfaces the last-administrator message in the modal", async () => {

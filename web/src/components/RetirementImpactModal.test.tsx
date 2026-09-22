@@ -25,7 +25,7 @@ const USAGE = { page: 1, pageSize: 20, total: 1, cache: CACHE, items: [{ id: "2"
 const REPORT = { generatedAt: 100, contractId: 5, contractName: "Orders", contractType: "OPENAPI", major: 1,
   supportStatus: "MAINTENANCE", deprecatesOn: "2027-06-01", supportEndsOn: "2027-12-31", supportPolicy: null,
   migrationGuide: "Saved guide", replacement: PLAN.replacement, recommendedVersion: null, planUpdatedAt: 99,
-  usageScope: "CONTRACT", versionAdoption: "UNKNOWN", connection: null, cache: CACHE, linkedApis: [], services: [] };
+  usageScope: "CONTRACT", versionAdoption: "UNKNOWN", connection: null, cache: CACHE, linkedApis: [], services: [], adoptions: { availability: "NOT_CONFIGURED", items: [] } };
 
 describe("retirement impact", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
@@ -38,6 +38,7 @@ describe("retirement impact", () => {
       if (url === "/api/v1/contracts/5/release-lines/1/migration-report") return Promise.resolve(jsonResponse(200, REPORT));
       if (url === "/api/v1/contracts/5/toadie-links") return Promise.resolve(jsonResponse(200, LINKS));
       if (url.startsWith("/api/v1/contracts/5/toadie-usage?")) return Promise.resolve(jsonResponse(200, USAGE));
+      if (url.startsWith("/api/v1/contracts/5/toadie-adoptions?")) return Promise.resolve(jsonResponse(200, { ...USAGE, items: [], total: 0, availability: "NOT_CONFIGURED" }));
       if (url.startsWith("/api/v1/contracts?")) return Promise.resolve(jsonResponse(200, { items: [], total: 0 }));
       if (url.includes("/versions?") || url.includes("/release-lines?")) return Promise.resolve(jsonResponse(200, { items: [], total: 0 }));
       return Promise.resolve(jsonResponse(404, { title: "Not found", status: 404 }));
@@ -53,7 +54,7 @@ describe("retirement impact", () => {
     expect(await screen.findByText("Planned deprecation: 2027-06-01")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "New orders · 2.x" })).toHaveAttribute("href", "/contracts/9");
     expect(screen.getByText("Retail")).toBeInTheDocument();
-    expect(screen.getByText(/whole contract.*version and release line are unknown/)).toBeInTheDocument();
+    expect(screen.getByText(/whole contract.*runtime adoption remains unknown/)).toBeInTheDocument();
     expect(screen.getByText(/Usage information is incomplete/)).toBeInTheDocument();
     expect(screen.getAllByText("Unknown")).toHaveLength(2);
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();

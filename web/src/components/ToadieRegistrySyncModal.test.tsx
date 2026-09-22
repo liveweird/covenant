@@ -9,6 +9,7 @@ import type { ToadieConnection, ToadieRegistryCandidate } from "../api/toadie";
 type FetchMock = ReturnType<typeof vi.fn>;
 const CACHE = { state: "CURRENT", lastAttemptAt: 10, lastSuccessAt: 10, refreshing: false, lastErrorCode: null };
 const CONNECTION: ToadieConnection = {
+  adoptionMapping: null,
   id: 3,
   name: "Architecture",
   baseUrl: "https://toadie.internal",

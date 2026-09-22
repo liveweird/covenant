@@ -25,7 +25,11 @@
     "consumesRelation": "Consumes relation",
     "systemRelation": "System relation"
   },
-  "column": { "status": "Status", "lastSuccess": "Last successful refresh", "interval": "Refresh interval" },
+  "column": {
+    "status": "Status",
+    "lastSuccess": "Last successful refresh",
+    "interval": "Refresh interval"
+  },
   "status": {
     "current": "Current",
     "stale": "Stale",
@@ -56,7 +60,13 @@
     "invalid": "One or more fields are invalid",
     "gone": "This connection no longer exists — reload the page"
   },
-  "toast": { "created": "Toadie connection created", "saved": "Toadie connection saved", "deleted": "Toadie connection deleted", "registrySynced": "Registry metadata synchronized", "sourceDetached": "Toadie source detached" },
+  "toast": {
+    "created": "Toadie connection created",
+    "saved": "Toadie connection saved",
+    "deleted": "Toadie connection deleted",
+    "registrySynced": "Registry metadata synchronized",
+    "sourceDetached": "Toadie source detached"
+  },
   "registry": {
     "configTitle": "Registry metadata mapping",
     "enabled": "Enable registry metadata sync",
@@ -142,6 +152,63 @@
     "detachBody": "Current metadata and local relationships will be preserved. Source-managed fields become editable and future syncs will not update this record.",
     "detachFailed": "Could not detach the Toadie source"
   },
+  "adoptionMapping": {
+    "title": "Declared adoption mapping",
+    "enabled": "Read declared adoption",
+    "enabledHint": "Opt in to reading explicit version or major-line declarations. This does not change runtime usage evidence.",
+    "help": "Choose a preset or edit the Toadie blueprint, relations, and properties for this connection.",
+    "useApi": "Use API adoption mapping",
+    "useDataset": "Use dataset adoption mapping",
+    "blueprint": "Adoption blueprint",
+    "kind": "Adoption kind",
+    "apiMajorLine": "API major line",
+    "datasetContractVersion": "Dataset contract version",
+    "consumerRelation": "Consumer relation",
+    "targetRelation": "Target relation",
+    "environmentRelation": "Environment relation",
+    "valueProperty": "Adoption value property",
+    "statusProperty": "Status property",
+    "declaredByProperty": "Declared by property",
+    "verifiedAtProperty": "Verified at property",
+    "notesProperty": "Notes property",
+    "optional": "Leave blank when this value is not mapped."
+  },
+  "adoptions": {
+    "title": "Declared adoption from Toadie",
+    "intro": "Explicit upstream version or major-line declarations. These declarations are separate from observed runtime usage.",
+    "loadFailed": "Could not load declared adoption",
+    "search": "Search adoption declarations",
+    "sourceSnapshot": "Source cache refreshed: {{time}}",
+    "availability": {
+      "NOT_CONFIGURED": "Declared adoption is not configured for this connection.",
+      "NOT_SCANNED": "The configured adoption mapping has not been scanned yet.",
+      "BLUEPRINT_MISSING": "The configured adoption blueprint is missing from the latest source snapshot."
+    },
+    "incompleteWarning": "The adoption source cache is stale or unavailable. Retained rows come from the last successful source snapshot.",
+    "refreshingWarning": "The adoption source cache is refreshing. Rows may change when the queued refresh completes.",
+    "noConsumptionEdge": "No consumption relationship",
+    "empty": "No adoption declarations found",
+    "emptyIncomplete": "No adoption rows are available in this incomplete source snapshot",
+    "declaration": "Declaration",
+    "consumer": "Consumer",
+    "target": "API or dataset",
+    "environment": "Environment",
+    "value": "Declared value",
+    "status": "Status",
+    "provenance": "Provenance and verification",
+    "allEnvironments": "All environments",
+    "unknownEnvironment": "Unknown environment scope",
+    "unknown": "Unknown",
+    "apiMajorLine": "API major line",
+    "datasetContractVersion": "Dataset contract version",
+    "notProvided": "Not provided",
+    "verifiedAt": "Verified upstream: {{time}}",
+    "knownStatus": {
+      "current": "Current",
+      "migrating": "Migrating",
+      "retiring": "Retiring"
+    }
+  },
   "usage": {
     "lastRefreshed": "Last successful refresh: {{time}}",
     "title": "Usage from Toadie",
@@ -166,8 +233,8 @@
     "role": "Role",
     "systems": "Systems",
     "teams": "Teams",
-    "version": "Version",
-    "releaseLine": "Release line",
+    "version": "Runtime version",
+    "releaseLine": "Runtime release line",
     "unknown": "Unknown",
     "provider": "Provider",
     "consumer": "Consumer",

@@ -1,3 +1,4 @@
+import { refreshQueriesAfterMutation } from "../utils/queryRefresh";
 import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
 import { Alert, Button, Group, Menu, Stack, Table, Text, Tooltip } from "@mantine/core";
@@ -55,7 +56,7 @@ export default function Contracts() {
 
   const remove = useDeleteConfirm<ContractResponse>({
     mutationFn: (row) => deleteContract(row.id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["contracts"] }),
+    onSuccess: () => refreshQueriesAfterMutation(queryClient, ["contracts"]),
     successMessage: t("contracts.toast.deleted"),
   });
 

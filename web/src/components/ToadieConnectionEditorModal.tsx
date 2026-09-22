@@ -5,6 +5,7 @@ import { useForm } from "@mantine/form";
 import { createToadieConnection, updateToadieConnection, type ToadieConnection } from "../api/toadie";
 import { applyToadieMappingPreset, EMPTY_TOADIE_FORM, fromToadieConnection, MAX_TOADIE_NAME_LENGTH, toadieFormValidation, toadieSaveErrorMessage, toToadieRequest, type ToadieFormValues } from "../utils/toadieForm";
 import { showSuccessToast } from "../utils/toast";
+import ToadieAdoptionMappingFields from "./ToadieAdoptionMappingFields";
 
 export default function ToadieConnectionEditorModal({ target, expandRegistryMapping = false, onClose, onSaved }: {
   target: ToadieConnection | null;
@@ -83,6 +84,10 @@ export default function ToadieConnectionEditorModal({ target, expandRegistryMapp
                   </>}
                 </Stack>
               </Accordion.Panel>
+            </Accordion.Item>
+            <Accordion.Item value="adoptionMapping">
+              <Accordion.Control>{t("toadie.adoptionMapping.title")}</Accordion.Control>
+              <Accordion.Panel><ToadieAdoptionMappingFields form={form} /></Accordion.Panel>
             </Accordion.Item>
           </Accordion>
           {error && <Alert color="red" variant="light">{error}</Alert>}

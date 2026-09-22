@@ -1,3 +1,4 @@
+import { refreshQueriesAfterMutation } from "../utils/queryRefresh";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Badge, Button, Menu, Stack, Table, Text, Tooltip } from "@mantine/core";
@@ -49,7 +50,7 @@ export default function ToadieConnections() {
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const remove = useDeleteConfirm<ToadieConnection>({
     mutationFn: (row) => deleteToadieConnection(row.id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["toadie"] }),
+    onSuccess: () => refreshQueriesAfterMutation(queryClient, ["toadie"]),
     successMessage: t("toadie.toast.deleted"),
   });
 
@@ -58,7 +59,7 @@ export default function ToadieConnections() {
     try {
       await refreshToadieConnection(row.id);
       showSuccessToast(t("toadie.refreshAccepted"));
-      await queryClient.invalidateQueries({ queryKey: ["toadie"] });
+      await refreshQueriesAfterMutation(queryClient, ["toadie"]);
     } catch (error) {
       setRefreshError(saveErrorMessage(error, t, { failedStatus: "common.error.actionFailedStatus", failed: "common.error.actionFailed" }));
     }
@@ -99,20 +100,14 @@ export default function ToadieConnections() {
         </Table.Tbody>
       </Table>
       <PaginationBar total={query.data?.total ?? 0} page={paging.page} pageSize={paging.pageSize} onPageChange={paging.setPage} onPageSizeChange={paging.setPageSize} />
-      {editor != null && <ToadieConnectionEditorModal target={editor === "new" ? null : editor} expandRegistryMapping={expandRegistryMapping} onClose={() => setEditor(null)} onSaved={async () => { setEditor(null); await queryClient.invalidateQueries({ queryKey: ["toadie"] }); }} />}
+      {editor != null && <ToadieConnectionEditorModal target={editor === "new" ? null : editor} expandRegistryMapping={expandRegistryMapping} onClose={() => setEditor(null)} onSaved={async () => { setEditor(null); await refreshQueriesAfterMutation(queryClient, ["toadie"]); }} />}
       {registrySync != null && <ToadieRegistrySyncModal connection={registrySync} onClose={() => setRegistrySync(null)} onConfigure={() => {
         setRegistrySync(null);
         setExpandRegistryMapping(true);
         setEditor(registrySync);
       }} onApplied={async () => {
         setRegistrySync(null);
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ["toadie"] }),
-          queryClient.invalidateQueries({ queryKey: ["domains"] }),
-          queryClient.invalidateQueries({ queryKey: ["systems"] }),
-          queryClient.invalidateQueries({ queryKey: ["teams"] }),
-          queryClient.invalidateQueries({ queryKey: ["contracts"] }),
-        ]);
+        await refreshQueriesAfterMutation(queryClient, ["toadie"], ["domains"], ["systems"], ["teams"], ["contracts"]);
       }} />}
       <ConfirmDeleteModal confirm={remove} title={t("toadie.deleteTitle")} errorTitle={t("toadie.deleteFailed")} errorMessage={(error) => saveErrorMessage(error, t, { failedStatus: "common.error.actionFailedStatus", failed: "common.error.actionFailed" })} body={(row) => t("toadie.deleteBody", { name: row.name })} />
     </Stack>

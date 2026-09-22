@@ -118,6 +118,7 @@ the same commit** — this list is the coverage map, the scenario file is the de
   rules (draft deletes, an active version blocks the contract, deprecate → retire, then delete),
   waiting for the destination contract page before using its shared action menu;
   plus a regular user's read-only tree, page and list.
+- [`toadie-adoption.spec.ts`](scenarios/toadie-adoption.md) — explicit API adoption setup, parallel and unmatched declarations, ODCS reader/report exports, and failed-refresh retention.
 - [`toadie-datasets.spec.ts`](scenarios/toadie-datasets.md) — API and ODCS mappings to one Toadie instance, explicit multi-dataset links, deduplicated roles, unknown adoption and no database-dependency inference.
 - [`toadie-usage.spec.ts`](scenarios/toadie-usage.md) — configure an encrypted connection, link multiple APIs, display declared provider/consumer usage, restart a scan when the upstream revision changes, and preserve the last coherent observation when revisions keep changing or GraphQL fails.
 - [`toadie-registry-sync.spec.ts`](scenarios/toadie-registry-sync.md) — preview/import/link Port registries, preserve local IDs and team authorization, refresh metadata, retain missing-source records, and detach for local editing.
@@ -127,10 +128,12 @@ the same commit** — this list is the coverage map, the scenario file is the de
 - [`lifecycle-plans.spec.ts`](scenarios/lifecycle-plans.md) — lifecycle dates, migration instructions
   and a replacement release line persist without automatic transitions; retirement reviews an owned
   Toadie fixture's declared consumer/system/team and requires explicit acknowledgement; a Markdown
-  report download includes saved plans and all declared roles independently of table filters.
+  report download includes saved plans and all declared roles independently of table filters,
+  keeping runtime-unknown usage separate from explicit adoption declarations.
 - [`lifecycle-overview.spec.ts`](scenarios/lifecycle-overview.md) — the catalog-wide release-line view:
   name and deadline/attention filtering, summary-count drill-down, migration-plan completion through
-  the shared policy modal, no-date discovery, contract-level impact limits, accessibility and screenshot.
+  the shared policy modal, no-date discovery, contract-level impact limits and runtime-unknown
+  caveats, accessibility and screenshot.
 - [`review-inbox.spec.ts`](scenarios/review-inbox.md) — personal and catalog scope, follower
   attention, document review navigation, comment/decision semantics, superseded rounds,
   withdrawn/reproposed content and publication; accessibility and mobile verification.
@@ -141,6 +144,7 @@ the same commit** — this list is the coverage map, the scenario file is the de
   stored via the `allowInvalid` waiver shows up with its `OAS_PARSE` finding badge, the "Error"
   severity chip narrows it away and back, and its version link opens the version page; teardown of
   the contract and its registries.
+- [`list-mutation-refresh.spec.ts`](scenarios/list-mutation-refresh.md) — held first filter/search/sort responses cannot restore deleted Users, Teams, Domains, Systems, Contracts or Toadie connections; a held Feature Flags response cannot undo a successful toggle.
 - [`environments.spec.ts`](scenarios/environments.md) — the try-it targets registry: an admin
   creates an environment on a throwaway system with HTTP + PostgreSQL targets (the stack's own
   services), edits it leaving the password blank (the stored secret is kept — the badge stays),

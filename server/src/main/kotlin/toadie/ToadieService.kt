@@ -36,6 +36,7 @@ internal data class ToadieFullUsageProjection(
     val cache: ToadieCacheStatus,
     val linkedApis: List<ToadieLinkResponse>,
     val services: List<ToadieUsageRow>,
+    val adoptions: ToadieAdoptionsProjection,
 )
 data class RefreshClaim(val connectionId: UInt, val revision: Long, val token: String, val config: ToadieFetchConfig)
 enum class RefreshClaimResult { ACCEPTED, COALESCED, COOLDOWN, MISSING, DISABLED }
@@ -69,6 +70,18 @@ class ToadieService(
         val registryDomainDescriptionProperty = varchar("registry_domain_description_property", 100).nullable()
         val registrySystemDescriptionProperty = varchar("registry_system_description_property", 100).nullable()
         val registryTeamDescriptionProperty = varchar("registry_team_description_property", 100).nullable()
+        val adoptionBlueprint = varchar("adoption_blueprint", 100).nullable()
+        val adoptionKind = varchar("adoption_kind", 40).nullable()
+        val adoptionConsumerRelation = varchar("adoption_consumer_relation", 100).nullable()
+        val adoptionTargetRelation = varchar("adoption_target_relation", 100).nullable()
+        val adoptionEnvironmentRelation = varchar("adoption_environment_relation", 100).nullable()
+        val adoptionValueProperty = varchar("adoption_value_property", 100).nullable()
+        val adoptionStatusProperty = varchar("adoption_status_property", 100).nullable()
+        val adoptionDeclaredByProperty = varchar("adoption_declared_by_property", 100).nullable()
+        val adoptionVerifiedAtProperty = varchar("adoption_verified_at_property", 100).nullable()
+        val adoptionNotesProperty = varchar("adoption_notes_property", 100).nullable()
+        val snapshotAdoptionAvailability = varchar("snapshot_adoption_availability", 40)
+        val snapshotAdoptionEnvironmentBlueprint = varchar("snapshot_adoption_environment_blueprint", 100).nullable()
         val snapshotSystemBlueprint = varchar("snapshot_system_blueprint", 100).nullable()
         val remoteRevision = long("remote_revision").nullable()
         val configRevision = long("config_revision")
@@ -94,6 +107,7 @@ class ToadieService(
         val remoteUpdatedAt = long("remote_updated_at")
         val registryDescription = varchar("registry_description", 2000).nullable()
         val registryErrorCode = varchar("registry_error_code", 100).nullable()
+        val scalarProperties = text("scalar_properties").nullable()
         override val primaryKey = PrimaryKey(connectionId, entityId)
     }
 
@@ -145,6 +159,8 @@ class ToadieService(
             it[refreshIntervalMinutes] = request.refreshIntervalMinutes
             it.applyMapping(request.mapping)
             it.applyRegistryMapping(request.registryMapping)
+            it.applyAdoptionMapping(request.adoptionMapping)
+            it[snapshotAdoptionAvailability] = ToadieAdoptionAvailability.NOT_SCANNED.name
             it[configRevision] = 1
             it[refreshing] = false
             it[createdAt] = stamp
@@ -159,7 +175,8 @@ class ToadieService(
         if (request.baseUrl != current[Connections.baseUrl]) {
             throw ConflictException("baseUrl is the connection identity; create a new connection to change it")
         }
-        val mappingChanged = request.mapping != current.mapping() || request.registryMapping != current.registryMapping()
+        val mappingChanged = request.mapping != current.mapping() || request.registryMapping != current.registryMapping() ||
+            request.adoptionMapping != current.adoptionMapping()
         val apiKeyChanged = request.apiKey != null
         val key = request.apiKey?.let(cipher::encrypt) ?: current[Connections.apiKey]
         val changed = Connections.update({ (Connections.id eq id) and Connections.active() }) {
@@ -170,6 +187,7 @@ class ToadieService(
             it[refreshIntervalMinutes] = request.refreshIntervalMinutes
             it.applyMapping(request.mapping)
             it.applyRegistryMapping(request.registryMapping)
+            it.applyAdoptionMapping(request.adoptionMapping)
             it[configRevision] = current[Connections.configRevision] + 1
             it[refreshing] = false
             it[leaseUntil] = null
@@ -179,6 +197,12 @@ class ToadieService(
                 it[lastErrorCode] = null
                 it[snapshotSystemBlueprint] = null
                 it[remoteRevision] = null
+                it[snapshotAdoptionAvailability] = if (request.adoptionMapping == null) {
+                    ToadieAdoptionAvailability.NOT_CONFIGURED.name
+                } else {
+                    ToadieAdoptionAvailability.NOT_SCANNED.name
+                }
+                it[snapshotAdoptionEnvironmentBlueprint] = null
             }
             if (apiKeyChanged) it[remoteRevision] = null
             it[updatedAt] = nowMillis()
@@ -320,6 +344,15 @@ class ToadieService(
         )
     }
 
+    suspend fun adoptions(
+        contractId: UInt,
+        query: String?,
+        paging: PageRequest,
+    ): ToadieAdoptionResponse? = suspendTransaction(database) {
+        val projection = fullUsageInTransaction(contractId) ?: return@suspendTransaction null
+        adoptionPage(projection, query, paging)
+    }
+
     /** Complete bounded cached projection. The caller may own a wider read transaction. */
     internal suspend fun fullUsageInTransaction(
         contractId: UInt,
@@ -329,11 +362,17 @@ class ToadieService(
         val linkState = linksInTransaction(contractId) ?: return null
         val connection = linkState.first
         val links = linkState.second
-        if (links.isEmpty()) return ToadieFullUsageProjection(null, unlinkedStatus(), emptyList(), emptyList())
+        if (links.isEmpty()) return ToadieFullUsageProjection(
+            null, unlinkedStatus(), emptyList(), emptyList(),
+            ToadieAdoptionsProjection(ToadieAdoptionAvailability.NOT_SCANNED, emptyList()),
+        )
         val connectionId = links.first()[Links.connectionId].value
         if (connection == null) {
             val retained = projectLinks(null, links, cachedLinkedApis(null, links))
-            return ToadieFullUsageProjection(null, disconnectedStatus(), retained, emptyList())
+            return ToadieFullUsageProjection(
+                null, disconnectedStatus(), retained, emptyList(),
+                ToadieAdoptionsProjection(ToadieAdoptionAvailability.NOT_SCANNED, emptyList()),
+            )
         }
         val mapping = connection.mapping()
         val entities = SnapshotEntities.selectAll().where { SnapshotEntities.connectionId eq connectionId }
@@ -354,7 +393,10 @@ class ToadieService(
         val teamRefs = teams.mapValues { it.value.toRef(browserUrl) }
         var projectedBytes = maxProjectedBytes?.let {
             budgetJson.encodeToString(
-                ToadieFullUsageProjection(connection.toRef(), connection.cacheStatus(now), linkedApis, emptyList()),
+                ToadieFullUsageProjection(
+                    connection.toRef(), connection.cacheStatus(now), linkedApis, emptyList(),
+                    ToadieAdoptionsProjection(connection.adoptionAvailability(), emptyList()),
+                ),
             ).toByteArray(Charsets.UTF_8).size.toLong()
         } ?: 0L
         if (maxProjectedBytes != null && projectedBytes > maxProjectedBytes) {
@@ -394,7 +436,21 @@ class ToadieService(
                 }
                 services.add(row)
             }
-        return ToadieFullUsageProjection(connection.toRef(), connection.cacheStatus(now), linkedApis, services)
+        val adoptions = projectAdoptions(
+            connection.adoptionAvailability(), connection.adoptionMapping(), connection.mapping(),
+            connection[Connections.browserUrl], connection[Connections.snapshotAdoptionEnvironmentBlueprint],
+            entities, targetIdentifiers,
+        )
+        if (maxProjectedBytes != null) {
+            adoptions.items.forEach { row ->
+                val rowBytes = budgetJson.encodeToString(row).toByteArray(Charsets.UTF_8).size.toLong() + 1L
+                if (projectedBytes + rowBytes > maxProjectedBytes) {
+                    throw ConflictException("Migration report exceeds the 8 MiB export limit")
+                }
+                projectedBytes += rowBytes
+            }
+        }
+        return ToadieFullUsageProjection(connection.toRef(), connection.cacheStatus(now), linkedApis, services, adoptions)
     }
 
     suspend fun claimRefresh(id: UInt, force: Boolean): Pair<RefreshClaimResult, RefreshClaim?> = suspendTransaction(database) {
@@ -431,6 +487,7 @@ class ToadieService(
                 apiKey = cipher.decrypt(row[Connections.apiKey]),
                 mapping = row.mapping(),
                 registryMapping = row.registryMapping(),
+                adoptionMapping = row.adoptionMapping(),
                 knownRevision = row[Connections.remoteRevision].takeIf {
                     !force && row[Connections.lastSuccessAt] != null && row[Connections.snapshotSystemBlueprint] != null
                 },
@@ -468,6 +525,7 @@ class ToadieService(
                     it[remoteUpdatedAt] = entity.updatedAt
                     it[registryDescription] = entity.registryDescription
                     it[registryErrorCode] = entity.registryErrorCode
+                    it[scalarProperties] = json.encodeToString(entity.scalarProperties)
                 }
             }
             Connections.update({
@@ -477,6 +535,8 @@ class ToadieService(
                 it[lastSuccessAt] = snapshot.fetchedAt
                 it[snapshotSystemBlueprint] = snapshot.systemBlueprint
                 it[remoteRevision] = snapshot.revision
+                it[snapshotAdoptionAvailability] = snapshot.adoptionAvailability.name
+                it[snapshotAdoptionEnvironmentBlueprint] = snapshot.adoptionEnvironmentBlueprint
                 it[lastErrorCode] = null
                 it[refreshing] = false
                 it[leaseUntil] = null
@@ -584,7 +644,7 @@ class ToadieService(
         val status = cacheStatus()
         return ToadieConnectionResponse(
             this[Connections.id].value, this[Connections.name], this[Connections.baseUrl], this[Connections.browserUrl],
-            this[Connections.enabled], this[Connections.refreshIntervalMinutes], mapping(), registryMapping(),
+            this[Connections.enabled], this[Connections.refreshIntervalMinutes], mapping(), registryMapping(), adoptionMapping(),
             this[Connections.apiKey].isNotEmpty(),
             this[Connections.createdAt], this[Connections.updatedAt], status.lastAttemptAt, status.lastSuccessAt,
             status.refreshing, status.lastErrorCode, status.state == ToadieCacheState.STALE,
@@ -614,6 +674,39 @@ class ToadieService(
         this[Connections.registryTeamDescriptionProperty] = mapping?.teamDescriptionProperty
     }
 
+    private fun ResultRow.adoptionMapping(): ToadieAdoptionMapping? {
+        val blueprint = this[Connections.adoptionBlueprint] ?: return null
+        return ToadieAdoptionMapping(
+            blueprint = blueprint,
+            kind = ToadieAdoptionKind.valueOf(checkNotNull(this[Connections.adoptionKind])),
+            consumerRelation = checkNotNull(this[Connections.adoptionConsumerRelation]),
+            targetRelation = checkNotNull(this[Connections.adoptionTargetRelation]),
+            environmentRelation = this[Connections.adoptionEnvironmentRelation],
+            valueProperty = checkNotNull(this[Connections.adoptionValueProperty]),
+            statusProperty = this[Connections.adoptionStatusProperty],
+            declaredByProperty = this[Connections.adoptionDeclaredByProperty],
+            verifiedAtProperty = this[Connections.adoptionVerifiedAtProperty],
+            notesProperty = this[Connections.adoptionNotesProperty],
+        )
+    }
+
+    private fun UpdateBuilder<*>.applyAdoptionMapping(mapping: ToadieAdoptionMapping?) {
+        this[Connections.adoptionBlueprint] = mapping?.blueprint
+        this[Connections.adoptionKind] = mapping?.kind?.name
+        this[Connections.adoptionConsumerRelation] = mapping?.consumerRelation
+        this[Connections.adoptionTargetRelation] = mapping?.targetRelation
+        this[Connections.adoptionEnvironmentRelation] = mapping?.environmentRelation
+        this[Connections.adoptionValueProperty] = mapping?.valueProperty
+        this[Connections.adoptionStatusProperty] = mapping?.statusProperty
+        this[Connections.adoptionDeclaredByProperty] = mapping?.declaredByProperty
+        this[Connections.adoptionVerifiedAtProperty] = mapping?.verifiedAtProperty
+        this[Connections.adoptionNotesProperty] = mapping?.notesProperty
+    }
+
+    private fun ResultRow.adoptionAvailability(): ToadieAdoptionAvailability =
+        if (adoptionMapping() == null) ToadieAdoptionAvailability.NOT_CONFIGURED else
+            ToadieAdoptionAvailability.valueOf(this[Connections.snapshotAdoptionAvailability])
+
     private fun ResultRow.cacheStatus(now: Long = nowMillis()): ToadieCacheStatus = toadieCacheStatus(now)
 
     private fun ResultRow.toRef() = ToadieConnectionRef(
@@ -629,6 +722,7 @@ class ToadieService(
         json.decodeFromString(this[SnapshotEntities.teamIdentifiers]), json.decodeFromString(this[SnapshotEntities.relations]),
         this[SnapshotEntities.remoteUpdatedAt],
         this[SnapshotEntities.registryDescription], this[SnapshotEntities.registryErrorCode],
+        this[SnapshotEntities.scalarProperties]?.let { json.decodeFromString(it) } ?: emptyMap(),
     )
 
     private fun ResultRow.toLinkResponse(
@@ -652,13 +746,13 @@ class ToadieService(
     }
 }
 
-private fun ToadieEntitySnapshot.toRef(browserUrl: String) =
+internal fun ToadieEntitySnapshot.toRef(browserUrl: String) =
     ToadieEntityRef(id, identifier, title, entityUrl(browserUrl, id))
-private fun entityUrl(browserUrl: String, entityId: String) = "${browserUrl.trimEnd('/')}/entities/$entityId/edit"
+internal fun entityUrl(browserUrl: String, entityId: String) = "${browserUrl.trimEnd('/')}/entities/$entityId/edit"
 private fun unlinkedStatus() = ToadieCacheStatus(ToadieCacheState.UNLINKED, null, null, false, null)
 private fun disconnectedStatus() = ToadieCacheStatus(ToadieCacheState.DISCONNECTED, null, null, false, null)
 private fun sanitizeErrorCode(code: String): String =
     code.uppercase().replace(Regex("[^A-Z0-9_]+"), "_").take(100).ifBlank { "REFRESH_FAILED" }
-private fun foldSearch(value: String): String = Normalizer.normalize(value.lowercase(), Normalizer.Form.NFD)
+internal fun foldSearch(value: String): String = Normalizer.normalize(value.lowercase(), Normalizer.Form.NFD)
     .replace(Regex("\\p{M}+"), "")
     .replace("ł", "l").replace("ß", "ss").replace("æ", "ae").replace("ø", "o")

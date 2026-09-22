@@ -3,6 +3,9 @@ package ch.nokillswit
 import ch.nokillswit.toadie.HttpToadieGraphqlClient
 import ch.nokillswit.toadie.ToadieFetchConfig
 import ch.nokillswit.toadie.ToadieFetchException
+import ch.nokillswit.toadie.ToadieAdoptionAvailability
+import ch.nokillswit.toadie.ToadieAdoptionKind
+import ch.nokillswit.toadie.ToadieAdoptionMapping
 import ch.nokillswit.toadie.ToadieMapping
 import ch.nokillswit.toadie.ToadieRegistryMapping
 import ch.nokillswit.toadie.ToadieSnapshot
@@ -94,6 +97,159 @@ class ToadieGraphqlClientTest {
     private fun config(f: Fixture) = ToadieFetchConfig(f.url, "private-fixture-key", ToadieMapping())
 
     @Test
+    fun `optional adoption scan retains only mapped scalar metadata and raw declaration values`() = fixture { f ->
+        val adoption = ToadieAdoptionMapping()
+        f.blueprintRows = mapper.readTree(blueprints).toList() + mapper.readTree("""[
+            {"id":"6","identifier":"environment","relations":{}},
+            {"id":"7","identifier":"api_adoption","relations":{
+              "consumer":{"target":"service","many":false},"api":{"target":"api","many":false},
+              "environment":{"target":"environment","many":false}},
+             "schema":{"properties":{"major_line":{"type":"string"},"status":{"type":"string"},
+              "declared_by":{"type":"string"},"verified_at":{"type":"string"},"notes":{"type":"string"}}}}
+        ]""").toList()
+        f.entityRows = mapper.readTree(entities).toList() + mapper.readTree("""[
+            {"id":"6","blueprint":"environment","identifier":"production","title":"Production",
+             "relations":{},"updatedAt":1},
+            {"id":"7","blueprint":"api_adoption","identifier":"checkout-orders","title":"Checkout Orders",
+             "relations":{"consumer":"checkout","api":"orders","environment":"production"},"updatedAt":1,
+             "properties":{"major_line":"v2","status":"declared","declared_by":"team-a",
+              "verified_at":"2026-09-22T10:15:30+02:00","notes":"verbatim note","secret":"not retained"}}
+        ]""").toList()
+        HttpToadieGraphqlClient(pageSize = 1).use { client ->
+            val snapshot = runBlocking { client.fetch(config(f).copy(adoptionMapping = adoption)) } as ToadieSnapshot
+            assertEquals(ToadieAdoptionAvailability.AVAILABLE, snapshot.adoptionAvailability)
+            assertEquals("environment", snapshot.adoptionEnvironmentBlueprint)
+            val row = snapshot.entities.single { it.blueprint == "api_adoption" }
+            assertEquals("v2", row.scalarProperties["major_line"])
+            assertEquals("2026-09-22T10:15:30+02:00", row.scalarProperties["verified_at"])
+            assertFalse(row.scalarProperties.containsKey("secret"))
+            assertEquals(ToadieAdoptionKind.API_MAJOR_LINE, adoption.kind)
+        }
+        f.requests.clear()
+        val environmentReached = AtomicBoolean(false)
+        f.edit = { request, root ->
+            if (request.path("variables").path("blueprint").asText() == "environment") environmentReached.set(true)
+            if (environmentReached.get()) (root.path("data").elements().next() as ObjectNode).put("revision", "8")
+        }
+        HttpToadieGraphqlClient(pageSize = 1).use { client ->
+            val restarted = runBlocking { client.fetch(config(f).copy(adoptionMapping = adoption)) } as ToadieSnapshot
+            assertEquals(8, restarted.revision, "environment pages participate in the bounded revision restart")
+            assertTrue(f.requests.size > 14)
+        }
+
+        f.edit = { _, _ -> }
+        val adoptionEntity = f.entityRows!!.single { it.path("blueprint").asText() == "api_adoption" } as ObjectNode
+        val properties = adoptionEntity.path("properties") as ObjectNode
+        val relations = adoptionEntity.path("relations") as ObjectNode
+        for (invalidTimestamp in listOf("not-a-date", "+999999-01-01T00:00:00Z", "-0001-01-01T00:00:00Z")) {
+            properties.put("verified_at", invalidTimestamp)
+            HttpToadieGraphqlClient().use { client ->
+                val failure = assertFailsWith<ToadieFetchException> {
+                    runBlocking { client.fetch(config(f).copy(adoptionMapping = adoption)) }
+                }
+                assertEquals("INVALID_RESPONSE", failure.code)
+            }
+        }
+        properties.put("verified_at", "2026-09-22T10:15:30+02:00")
+        properties.put("status", 42)
+        HttpToadieGraphqlClient().use { client ->
+            val failure = assertFailsWith<ToadieFetchException> {
+                runBlocking { client.fetch(config(f).copy(adoptionMapping = adoption)) }
+            }
+            assertEquals("INVALID_RESPONSE", failure.code)
+        }
+        properties.put("status", "declared")
+        relations.put("api", "missing")
+        HttpToadieGraphqlClient().use { client ->
+            val failure = assertFailsWith<ToadieFetchException> {
+                runBlocking { client.fetch(config(f).copy(adoptionMapping = adoption)) }
+            }
+            assertEquals("INVALID_RESPONSE", failure.code)
+        }
+    }
+
+    @Test
+    fun `missing optional adoption blueprint succeeds while malformed present adoption fails`() = fixture { f ->
+        HttpToadieGraphqlClient().use { client ->
+            val snapshot = runBlocking {
+                client.fetch(config(f).copy(adoptionMapping = ToadieAdoptionMapping()))
+            } as ToadieSnapshot
+            assertEquals(ToadieAdoptionAvailability.BLUEPRINT_MISSING, snapshot.adoptionAvailability)
+            assertTrue(f.requests.none { it.path("variables").path("blueprint").asText() == "api_adoption" })
+        }
+
+        f.requests.clear()
+        f.blueprintRows = mapper.readTree(blueprints).toList() + mapper.readTree("""[
+            {"id":"7","identifier":"api_adoption","relations":{
+              "consumer":{"target":"service","many":false},"api":{"target":"api","many":false}},
+             "schema":{"properties":{"major_line":{"type":"number"},"status":{"type":"string"},
+              "declared_by":{"type":"string"},"verified_at":{"type":"string"},"notes":{"type":"string"}}}}
+        ]""").toList()
+        HttpToadieGraphqlClient().use { client ->
+            val failure = assertFailsWith<ToadieFetchException> {
+                runBlocking { client.fetch(config(f).copy(adoptionMapping = ToadieAdoptionMapping())) }
+            }
+            assertEquals("MAPPING_INVALID", failure.code)
+        }
+
+        f.blueprintRows = mapper.readTree(blueprints).toList()
+        HttpToadieGraphqlClient().use { client ->
+            val failure = assertFailsWith<ToadieFetchException> {
+                runBlocking {
+                    client.fetch(config(f).copy(adoptionMapping = ToadieAdoptionMapping(blueprint = "system")))
+                }
+            }
+            assertEquals("MAPPING_INVALID", failure.code)
+        }
+
+        f.blueprintRows = mapper.readTree(blueprints).toList() + mapper.readTree("""[
+            {"id":"7","identifier":"api_adoption","relations":{
+              "consumer":{"target":"service","many":false},"api":{"target":"api","many":false},
+              "environment":{"target":"service","many":false}},
+             "schema":{"properties":{"major_line":{"type":"string"},"status":{"type":"string"},
+              "declared_by":{"type":"string"},"verified_at":{"type":"string"},"notes":{"type":"string"}}}}
+        ]""").toList()
+        HttpToadieGraphqlClient().use { client ->
+            for (mapping in listOf(
+                ToadieAdoptionMapping(),
+                ToadieAdoptionMapping(environmentRelation = "consumer"),
+            )) {
+                val failure = assertFailsWith<ToadieFetchException> {
+                    runBlocking { client.fetch(config(f).copy(adoptionMapping = mapping)) }
+                }
+                assertEquals("MAPPING_INVALID", failure.code)
+            }
+        }
+
+        f.blueprintRows = mapper.readTree(blueprints).toList() + mapper.readTree("""[
+            {"id":"6","identifier":"environment","relations":{}},
+            {"id":"7","identifier":"ENVIRONMENT","relations":{}},
+            {"id":"8","identifier":"api_adoption","relations":{
+              "consumer":{"target":"service","many":false},"api":{"target":"api","many":false},
+              "environment":{"target":"environment","many":false}},
+             "schema":{"properties":{"major_line":{"type":"string"},"status":{"type":"string"},
+              "declared_by":{"type":"string"},"verified_at":{"type":"string"},"notes":{"type":"string"}}}}
+        ]""").toList()
+        HttpToadieGraphqlClient().use { client ->
+            val failure = assertFailsWith<ToadieFetchException> {
+                runBlocking { client.fetch(config(f).copy(adoptionMapping = ToadieAdoptionMapping())) }
+            }
+            assertEquals("MAPPING_INVALID", failure.code)
+        }
+
+        f.blueprintRows = mapper.readTree(blueprints).toList() + mapper.readTree("""[
+            {"id":"7","identifier":"api_adoption","relations":{},"schema":{}},
+            {"id":"8","identifier":"API_ADOPTION","relations":{},"schema":{}}
+        ]""").toList()
+        HttpToadieGraphqlClient().use { client ->
+            val failure = assertFailsWith<ToadieFetchException> {
+                runBlocking { client.fetch(config(f).copy(adoptionMapping = ToadieAdoptionMapping())) }
+            }
+            assertEquals("MAPPING_INVALID", failure.code)
+        }
+    }
+
+    @Test
     fun `dataset mapping reads explicit service relations without scanning APIs or database resources`() = fixture { f ->
         f.blueprintRows = mapper.readTree(blueprints).toList().map { it as ObjectNode }.onEach {
             if (it.path("identifier").asText() == "service") {
@@ -130,6 +286,51 @@ class ToadieGraphqlClientTest {
             assertEquals(setOf("produces_datasets", "consumes_datasets", "system"), service.relations.keys)
             assertEquals(setOf("dataset", "service", "system", "_team"),
                 f.requests.mapNotNull { it.path("variables").path("blueprint").textValue() }.toSet())
+        }
+    }
+
+    @Test
+    fun `dataset adoption accepts custom mapped names and absent optional scalar values`() = fixture { f ->
+        f.blueprintRows = mapper.readTree(blueprints).toList().map { it as ObjectNode }.onEach {
+            if (it.path("identifier").asText() == "service") {
+                val relations = it.path("relations") as ObjectNode
+                relations.set<JsonNode>("produces_datasets", mapper.readTree("""{"target":"dataset","many":true}"""))
+                relations.set<JsonNode>("consumes_datasets", mapper.readTree("""{"target":"dataset","many":true}"""))
+            }
+        } + mapper.readTree("""[
+            {"id":"6","identifier":"dataset","relations":{}},
+            {"id":"7","identifier":"custom_dataset_adoption","relations":{
+              "used_by":{"target":"service","many":false},"dataset_ref":{"target":"dataset","many":false}},
+             "schema":{"properties":{"declared_version":{"type":"string"}}}}
+        ]""").toList()
+        f.entityRows = mapper.readTree(entities).toList().map { it as ObjectNode }.onEach {
+            if (it.path("identifier").asText() == "checkout") {
+                val relations = it.path("relations") as ObjectNode
+                relations.set<JsonNode>("produces_datasets", mapper.readTree("""["orders"]"""))
+                relations.set<JsonNode>("consumes_datasets", mapper.readTree("""[]"""))
+            }
+        } + mapper.readTree("""[
+            {"id":"6","blueprint":"dataset","identifier":"orders","title":"Orders dataset","relations":{},"updatedAt":1},
+            {"id":"7","blueprint":"custom_dataset_adoption","identifier":"checkout-orders","title":"Checkout Orders",
+             "relations":{"used_by":"checkout","dataset_ref":"orders"},"properties":{},"updatedAt":1}
+        ]""").toList()
+        val usage = ToadieMapping(
+            apiBlueprint = "dataset", providesRelation = "produces_datasets", consumesRelation = "consumes_datasets",
+        )
+        val adoption = ToadieAdoptionMapping(
+            blueprint = "custom_dataset_adoption", kind = ToadieAdoptionKind.DATASET_CONTRACT_VERSION,
+            consumerRelation = "used_by", targetRelation = "dataset_ref", environmentRelation = null,
+            valueProperty = "declared_version", statusProperty = null, declaredByProperty = null,
+            verifiedAtProperty = null, notesProperty = null,
+        )
+        HttpToadieGraphqlClient(pageSize = 1).use { client ->
+            val snapshot = runBlocking {
+                client.fetch(config(f).copy(mapping = usage, adoptionMapping = adoption))
+            } as ToadieSnapshot
+            val row = snapshot.entities.single { it.blueprint == "custom_dataset_adoption" }
+            assertEquals(mapOf("declared_version" to null), row.scalarProperties)
+            assertEquals(ToadieAdoptionAvailability.AVAILABLE, snapshot.adoptionAvailability)
+            assertEquals(null, snapshot.adoptionEnvironmentBlueprint)
         }
     }
 
@@ -209,6 +410,12 @@ class ToadieGraphqlClientTest {
                 }
                 assertEquals("MAPPING_INVALID", failure.code)
             }
+            val roleCollision = assertFailsWith<ToadieFetchException> {
+                runBlocking {
+                    client.fetch(registryConfig(f).copy(adoptionMapping = ToadieAdoptionMapping(blueprint = "domain")))
+                }
+            }
+            assertEquals("MAPPING_INVALID", roleCollision.code)
         }
     }
 

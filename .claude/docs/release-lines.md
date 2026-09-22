@@ -199,7 +199,10 @@ The impact dialog downloads localized Markdown from a fresh report read, indepen
 visible usage table's search, role or page. It explicitly exports the saved policy even when
 opened from an unsaved end-of-support form. Plain-text names and guidance are escaped before
 inclusion in Markdown. The file preserves unavailable replacements/mappings, last-good rows
-and cache-state warnings, and explains that exact version/major adoption is unknown. A current
+and cache-state warnings, and explains that runtime version/major adoption is unknown.
+Since 1.1.0, the report also carries complete optional Toadie adoption declarations, including
+parallel environments and discrepancies with architecture consumption. It does not infer a
+match to the selected Covenant major; see [declared adoption](toadie-adoption.md). A current
 empty observation is not proof of no consumers or safe retirement. Imported teams remain
 architecture metadata, with no effect on permissions.
 

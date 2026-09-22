@@ -21,6 +21,7 @@ import { useResetPassword } from "../hooks/useResetPassword";
 import { isString, useStoredState } from "../hooks/useStoredState";
 import { loadErrorMessage, saveErrorMessage } from "../utils/saveError";
 import PageHeader from "../components/PageHeader";
+import { refreshQueriesAfterMutation } from "../utils/queryRefresh";
 
 const SORT_FIELDS = ["name", "email"] as const;
 type SortField = (typeof SORT_FIELDS)[number];
@@ -63,7 +64,7 @@ export default function Users() {
 
   const deleteConfirm = useDeleteConfirm<UserResponse>({
     mutationFn: (row) => deleteUser(row.id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+    onSuccess: () => refreshQueriesAfterMutation(queryClient, ["users"]),
     successMessage: t("users.toast.deleted"),
   });
 

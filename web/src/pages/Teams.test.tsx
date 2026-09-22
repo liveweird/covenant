@@ -11,6 +11,14 @@ const ROLES_KEY = "covenant.auth.roles";
 
 type FetchMock = ReturnType<typeof vi.fn>;
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 const PAGE = {
   items: [
     { id: 1, name: "Payments", description: "Money movers", memberCount: 2, createdAt: 1, updatedAt: 2 },
@@ -156,6 +164,43 @@ describe("Teams page", () => {
     await user.click(await screen.findByRole("menuitem", { name: "Delete Payments" }));
     await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: /^delete$/i }));
     expect(await screen.findByText(/still owns contracts/)).toBeInTheDocument();
+  });
+
+  test("deleting while the first filtered request is pending cannot restore its stale row", async () => {
+    const filtered = deferred<Response>();
+    let filteredReads = 0;
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      if (method === "DELETE" && url === "/api/v1/teams/2") {
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      if (method === "GET" && url.startsWith("/api/v1/teams?")) {
+        const name = new URL(url, "http://test").searchParams.get("name");
+        if (name === "Identity") {
+          filteredReads++;
+          if (filteredReads === 1) return filtered.promise;
+          return Promise.resolve(jsonResponse(200, { ...PAGE, items: [], total: 0 }));
+        }
+        return Promise.resolve(jsonResponse(200, PAGE));
+      }
+      return Promise.resolve(jsonResponse(404, { title: "x", status: 404 }));
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText("Identity");
+    await user.click(screen.getByRole("button", { name: /filters/i }));
+    await user.type(screen.getByLabelText("Name"), "Identity");
+    await waitFor(() => expect(filteredReads).toBe(1));
+
+    await user.click(screen.getByRole("button", { name: "Operations for Identity" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Delete Identity" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^delete$/i }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    filtered.resolve(jsonResponse(200, PAGE));
+    await waitFor(() => expect(filteredReads).toBe(2));
+    await waitFor(() => expect(screen.queryByText("Identity")).not.toBeInTheDocument());
   });
 
   test("the name filter refetches with name=", async () => {

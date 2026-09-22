@@ -109,7 +109,7 @@ test.describe.serial("catalog lifecycle overview", () => {
     }, { timeout: 15_000 }).toMatchObject({ state: "CURRENT", refreshing: false });
     await page.getByRole("button", { name: `Review impact for ${seeded.contractName} 3.x`, exact: true }).click();
     const impact = page.getByRole("dialog", { name: "Retirement impact for 3.x", exact: true });
-    await expect(impact).toContainText(/whole contract.*version and release line are unknown/i);
+    await expect(impact).toContainText(/whole contract.*runtime adoption remains unknown/i);
     await expect(impact.getByText("Unknown", { exact: true })).toHaveCount(2);
     await impact.getByRole("button", { name: "Close", exact: true }).last().click();
 

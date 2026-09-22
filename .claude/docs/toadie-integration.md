@@ -1,4 +1,4 @@
-# Toadie integration (usage 0.10.0; revision refresh 0.16.0; registries 1.0.0)
+# Toadie integration (usage 0.10.0; revisions 0.16.0; registries 1.0.0; adoption 1.1.0)
 
 Toadie owns architecture and declared provider/consumer relationships in its Port ontology.
 Covenant owns contract documents, versions, release lines and support policies. This connector
@@ -65,8 +65,8 @@ entered in the form.
 
 Link datasets explicitly: an ODCS schema name, database name, `stored_in` relation or service
 dependency on a database does not establish dataset consumption. No dataset is inferred or
-created automatically. Optional `api_adoption` and `dataset_adoption` entities are not read;
-exact contract version and release-line adoption remain unknown. No Toadie code changes are
+created automatically. Optional `api_adoption` and `dataset_adoption` entities can be read through a separate opt-in
+[adoption mapping](toadie-adoption.md). Runtime adoption remains unknown. No Toadie code changes are
 needed for this setup.
 
 The existing API paths and field names, including `/apis`, `apiBlueprint`, `apiEntityIds`
@@ -83,8 +83,10 @@ use the shared contract activity path; automatic observations do not generate pr
 
 `GET /api/v1/contracts/{id}/toadie-usage` returns a paged table of services with provider/consumer
 roles, linked API or dataset IDs, systems, teams, and safe Toadie links. It deduplicates a service appearing
-through several linked APIs or datasets and can show both roles. Version and release-line fields are
-explicitly unknown: architecture consumption is not a deployment or adoption measurement.
+through several linked APIs or datasets and can show both roles. Legacy version and release-line fields remain
+explicitly unknown: architecture consumption is not a runtime adoption measurement. The separate
+paged `/toadie-adoptions` endpoint preserves source declarations, including parallel environments
+and missing architecture consumption edges; see [declared adoption](toadie-adoption.md).
 
 Missing mapped APIs or datasets remain visible; disconnected connections do not erase their labels. A
 current empty result means **no declared usage observed**, never proof that a contract is unused.
@@ -127,8 +129,8 @@ both. Existing configuration-revision and refresh-claim guards protect both publ
 
 This is change detection, not a server-held historical snapshot or evidence of runtime adoption.
 The source can change after the final read. There is no webhook/subscription/delta protocol and
-no automatic retirement gate. Toadie's optional adoption blueprints are not read by this connector;
-exact version and release-line adoption remain unknown.
+no automatic retirement gate. Optional adoption declarations share this same scan and revision
+boundary when enabled; they are source claims, not observed runtime adoption.
 
 ## Credentials and transport
 
@@ -178,7 +180,8 @@ schema conformance; read-only and editable SPA states; translations; and browser
 Release-line migration reports reuse the complete cached usage projection under a read-only
 local snapshot transaction, with all linked APIs or datasets and provider/consumer services independent of
 UI paging. They retain missing mappings and stale/disabled observation warnings, and do not
-refresh the connection. The selected Covenant major is planning context only: exact version
-and major adoption remain unknown. Generation time never replaces `lastSuccessAt` as the
+refresh the connection. The selected Covenant major is planning context only. The separate declaration collection
+includes all linked targets and environments, without inferring a match to that major; runtime
+version and major adoption remain unknown. Generation time never replaces `lastSuccessAt` as the
 observation timestamp (which can be a same-revision reconfirmation). See `release-lines.md` for
 the report API and sharing behavior.

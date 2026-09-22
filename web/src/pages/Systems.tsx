@@ -32,6 +32,7 @@ import {
 } from "../utils/registryForm";
 import { loadErrorMessage, saveErrorMessage } from "../utils/saveError";
 import { showSuccessToast } from "../utils/toast";
+import { refreshQueriesAfterMutation } from "../utils/queryRefresh";
 
 const SORT_FIELDS = ["name", "domainId", "updatedAt"] as const;
 type SortField = (typeof SORT_FIELDS)[number];
@@ -69,10 +70,7 @@ export default function Systems() {
   const [editorTarget, setEditorTarget] = useState<SystemResponse | "new" | null>(null);
   const remove = useDeleteConfirm<SystemResponse>({
     mutationFn: (row) => deleteSystem(row.id),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["systems"] });
-      await queryClient.invalidateQueries({ queryKey: ["domains"] });
-    },
+    onSuccess: () => refreshQueriesAfterMutation(queryClient, ["systems"], ["domains"]),
     successMessage: t("systems.toast.deleted"),
   });
 
@@ -145,7 +143,7 @@ export default function Systems() {
                 </Table.Td>
                 <Table.Td><ToadieRegistrySourceStatus source={source} compact={!admin} onDetach={admin && source ? async () => {
                   await detachSystemToadieSource(system.id);
-                  await Promise.all([queryClient.invalidateQueries({ queryKey: ["systems"] }), queryClient.invalidateQueries({ queryKey: ["toadie"] })]);
+                  await refreshQueriesAfterMutation(queryClient, ["systems"], ["toadie"]);
                 } : undefined} /></Table.Td>
                 {admin && (
                   <Table.Td style={{ width: 1 }} ta="right">
@@ -181,8 +179,7 @@ export default function Systems() {
           onClose={() => setEditorTarget(null)}
           onSaved={async () => {
             setEditorTarget(null);
-            await queryClient.invalidateQueries({ queryKey: ["systems"] });
-            await queryClient.invalidateQueries({ queryKey: ["domains"] });
+            await refreshQueriesAfterMutation(queryClient, ["systems"], ["domains"]);
           }}
         />
       )}

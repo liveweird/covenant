@@ -23,7 +23,7 @@
    - *Expected*: a Markdown file includes the saved dates, complete guidance, 2.x replacement,
      both API mappings, provider Checkout service and consumer Storefront website, their
      Commerce system and Retail team, regardless of the visible table filter.
-   - *Expected*: the report states whole-contract usage and unknown adoption, without secrets.
+   - *Expected*: the report states whole-contract usage and unknown runtime adoption, with explicit declarations separate and without secrets.
    - *Expected*: the dialog passes accessibility checks; attach the report and screenshot.
 3. Close the dialog.
    - *Expected*: downloading does not transition deprecated 1.0.0 or require write confirmation.
@@ -33,7 +33,8 @@
 1. Open Retire for deprecated 1.0.0 after its contract has linked two APIs from the owned
    Toadie fixture.
    - *Expected*: the impact dialog shows the Storefront consumer, Commerce system, Retail team,
-     Unknown version/release-line values, and the contract-level usage limitation.
+     Unknown runtime version/release-line values, and the contract-level usage limitation,
+     with any explicit adoption declarations shown separately.
    - *Expected*: the modal has no WCAG A/AA violations; its screenshot is attached.
 2. Cancel without acknowledging.
    - *Expected*: 1.0.0 remains deprecated.

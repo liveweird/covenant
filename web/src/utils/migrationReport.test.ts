@@ -16,7 +16,7 @@ function report(overrides: Partial<ReleaseLineMigrationReportResponse> = {}): Re
     usageScope: "CONTRACT", versionAdoption: "UNKNOWN", connection: { id: 2, name: "Toadie", browserUrl: "https://toadie.example/" },
     cache: { state: "CURRENT", lastAttemptAt: Date.UTC(2026, 8, 21, 8), lastSuccessAt: Date.UTC(2026, 8, 21, 7), refreshing: false, lastErrorCode: null },
     linkedApis: [{ id: 4, connectionId: 2, apiEntityId: "api-orders", identifier: "orders", title: "Orders API", url: "https://toadie.example/apis/orders", status: "AVAILABLE" }],
-    services: [], ...overrides,
+    services: [], adoptions: { availability: "NOT_CONFIGURED", items: [] }, ...overrides,
   };
 }
 
@@ -50,12 +50,13 @@ describe("migration report Markdown", () => {
     await i18n.changeLanguage("pl");
     const markdown = migrationReportMarkdown(report(), i18n.t);
     expect(markdown).toContain("# Raport migracji i skutków wycofania");
-    expect(markdown).toContain("Dokładna wersja i linia główna są nieznane");
+    expect(markdown).toContain("Wersja i główna linia używana w działających systemach pozostają nieznane");
     expect(markdown).toContain("Nie dowodzi to, że kontrakt jest nieużywany");
     await i18n.changeLanguage("en");
   });
 
-  test("distinguishes current empty usage from stale or missing observations", () => {
+  test("distinguishes current empty usage from stale or missing observations", async () => {
+    await i18n.changeLanguage("en");
     const current = migrationReportMarkdown(report(), i18n.t);
     expect(current).toContain("No declared usage was observed in this snapshot");
     expect(current).not.toContain("Unknown usage is not zero usage");
@@ -67,13 +68,21 @@ describe("migration report Markdown", () => {
     expect(missing).toContain("Unknown usage is not zero usage");
   });
 
-  test("escapes hostile remote text and drops unsafe URLs", () => {
+  test("escapes hostile remote text and drops unsafe URLs", async () => {
+    await i18n.changeLanguage("en");
     const markdown = migrationReportMarkdown(report({
       contractName: "# False heading <script>alert(1)</script>",
       supportPolicy: "Use &copy; and ~~deprecated~~ literally.",
       migrationGuide: "[official](https://evil.example)\n# Retire immediately\n```nested```",
       connection: { id: 2, name: "Toadie", browserUrl: "https://toadie.example/&copy;" },
       services: [{ id: "x", identifier: "bad|id", title: "[Trusted](https://evil.example)", url: "javascript:alert(1)", roles: ["CONSUMER"], providedApiEntityIds: [], consumedApiEntityIds: [], systems: [], teams: [], version: null, releaseLine: null }],
+      adoptions: { availability: "AVAILABLE", items: [{
+        id: "adopt-1", identifier: "orders|prod", title: "Orders <declaration>", url: "javascript:alert(2)",
+        consumer: { entityId: "service-1", identifier: "checkout", title: "Checkout", url: null },
+        target: { entityId: "api-1", identifier: "orders", title: "Orders API", url: "https://toadie.example/apis/orders" },
+        environment: null, environmentScope: "ALL", kind: "API_MAJOR_LINE", value: "1.x `candidate`\n\n<img src=x onerror=alert(3)>", status: "current|stable\n\n[bad](javascript:alert(4))",
+        declaredBy: "portfolio/[owner]\n\n# forged heading", verifiedAt: Date.UTC(2026, 8, 20, 8), notes: "Keep `orders` compatible <script>not executable</script>.", matchesConsumption: false,
+      }] },
     }), i18n.t);
     const html = renderToStaticMarkup(createElement(MantineProvider, { env: "test" }, createElement(MarkdownView, null, markdown)));
     expect(html).toContain("# False heading &lt;script&gt;alert(1)&lt;/script&gt;");
@@ -83,7 +92,16 @@ describe("migration report Markdown", () => {
     expect(html).not.toContain("<del>");
     expect(html).not.toContain("<script>");
     expect(html).toContain('href="https://toadie.example/&amp;copy;"');
-    expect(markdown).not.toContain("javascript:");
+    expect(markdown).not.toContain("javascript:alert(1)");
+    expect(markdown).not.toContain("javascript:alert(2)");
+    expect(markdown).toContain("Orders <declaration>");
+    expect(markdown).toContain("Verified upstream at (UTC): 2026-09-20T08:00:00.000Z");
+    expect(markdown).toContain("```text\nKeep `orders` compatible <script>not executable</script>.\n```");
+    expect(html).toContain("&lt;script&gt;not executable&lt;/script&gt;");
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain("href=\"javascript:");
+    expect(markdown).toContain("\\<img src=x onerror=alert\\(3\\)\\>");
+    expect(markdown).toContain("\\# forged heading");
     expect(markdownText("<h1>&copy; ~~x~~</h1>")).toBe("\\<h1\\>\\&copy; \\~\\~x\\~\\~\\</h1\\>");
   });
 });

@@ -25,7 +25,11 @@
     "consumesRelation": "Relacja użycia",
     "systemRelation": "Relacja systemu"
   },
-  "column": { "status": "Stan", "lastSuccess": "Ostatnie udane odświeżenie", "interval": "Interwał odświeżania" },
+  "column": {
+    "status": "Stan",
+    "lastSuccess": "Ostatnie udane odświeżenie",
+    "interval": "Interwał odświeżania"
+  },
   "status": {
     "current": "Aktualne",
     "stale": "Nieaktualne",
@@ -56,7 +60,13 @@
     "invalid": "Jedno lub więcej pól jest nieprawidłowe",
     "gone": "To połączenie już nie istnieje — odśwież stronę"
   },
-  "toast": { "created": "Połączenie Toadie utworzone", "saved": "Połączenie Toadie zapisane", "deleted": "Połączenie Toadie usunięte", "registrySynced": "Metadane rejestru zsynchronizowane", "sourceDetached": "Źródło Toadie odłączone" },
+  "toast": {
+    "created": "Połączenie Toadie utworzone",
+    "saved": "Połączenie Toadie zapisane",
+    "deleted": "Połączenie Toadie usunięte",
+    "registrySynced": "Metadane rejestru zsynchronizowane",
+    "sourceDetached": "Źródło Toadie odłączone"
+  },
   "registry": {
     "configTitle": "Mapowanie metadanych rejestru",
     "enabled": "Włącz synchronizację metadanych rejestru",
@@ -142,6 +152,63 @@
     "detachBody": "Bieżące metadane i lokalne relacje zostaną zachowane. Pola zarządzane przez źródło staną się edytowalne, a przyszłe synchronizacje nie zaktualizują tego rekordu.",
     "detachFailed": "Nie udało się odłączyć źródła Toadie"
   },
+  "adoptionMapping": {
+    "title": "Mapowanie zadeklarowanej adopcji",
+    "enabled": "Odczytuj zadeklarowaną adopcję",
+    "enabledHint": "Włącz odczyt jawnych deklaracji wersji lub linii głównej. Nie zmienia to dowodów użycia w czasie działania.",
+    "help": "Wybierz ustawienie wstępne lub edytuj blueprint, relacje i właściwości Toadie dla tego połączenia.",
+    "useApi": "Użyj mapowania adopcji API",
+    "useDataset": "Użyj mapowania adopcji zbioru danych",
+    "blueprint": "Blueprint adopcji",
+    "kind": "Rodzaj adopcji",
+    "apiMajorLine": "Linia główna API",
+    "datasetContractVersion": "Wersja kontraktu zbioru danych",
+    "consumerRelation": "Relacja odbiorcy",
+    "targetRelation": "Relacja celu",
+    "environmentRelation": "Relacja środowiska",
+    "valueProperty": "Właściwość wartości adopcji",
+    "statusProperty": "Właściwość stanu",
+    "declaredByProperty": "Właściwość osoby deklarującej",
+    "verifiedAtProperty": "Właściwość czasu weryfikacji",
+    "notesProperty": "Właściwość uwag",
+    "optional": "Zostaw puste, gdy ta wartość nie jest mapowana."
+  },
+  "adoptions": {
+    "title": "Zadeklarowana adopcja z Toadie",
+    "intro": "Jawne deklaracje wersji lub linii głównej ze źródła. Są oddzielone od zaobserwowanego użycia w czasie działania.",
+    "loadFailed": "Nie udało się wczytać zadeklarowanej adopcji",
+    "search": "Szukaj deklaracji adopcji",
+    "sourceSnapshot": "Odświeżenie pamięci podręcznej źródła: {{time}}",
+    "availability": {
+      "NOT_CONFIGURED": "Zadeklarowana adopcja nie jest skonfigurowana dla tego połączenia.",
+      "NOT_SCANNED": "Skonfigurowane mapowanie adopcji nie zostało jeszcze przeskanowane.",
+      "BLUEPRINT_MISSING": "Skonfigurowanego blueprintu adopcji brakuje w najnowszej migawce źródła."
+    },
+    "incompleteWarning": "Pamięć podręczna źródła adopcji jest nieaktualna lub niedostępna. Zachowane wiersze pochodzą z ostatniej udanej migawki źródła.",
+    "refreshingWarning": "Pamięć podręczna źródła adopcji jest odświeżana. Wiersze mogą się zmienić po zakończeniu odświeżania.",
+    "noConsumptionEdge": "Brak relacji konsumpcji",
+    "empty": "Nie znaleziono deklaracji adopcji",
+    "emptyIncomplete": "W tej niepełnej migawce źródła nie ma dostępnych wierszy adopcji",
+    "declaration": "Deklaracja",
+    "consumer": "Odbiorca",
+    "target": "API lub zbiór danych",
+    "environment": "Środowisko",
+    "value": "Zadeklarowana wartość",
+    "status": "Stan",
+    "provenance": "Pochodzenie i weryfikacja",
+    "allEnvironments": "Wszystkie środowiska",
+    "unknownEnvironment": "Nieznany zakres środowisk",
+    "unknown": "Nieznana",
+    "apiMajorLine": "Linia główna API",
+    "datasetContractVersion": "Wersja kontraktu zbioru danych",
+    "notProvided": "Nie podano",
+    "verifiedAt": "Zweryfikowano w źródle: {{time}}",
+    "knownStatus": {
+      "current": "Bieżąca",
+      "migrating": "W migracji",
+      "retiring": "Wycofywana"
+    }
+  },
   "usage": {
     "lastRefreshed": "Ostatnie udane odświeżenie: {{time}}",
     "title": "Użycie z Toadie",
@@ -166,8 +233,8 @@
     "role": "Rola",
     "systems": "Systemy",
     "teams": "Zespoły",
-    "version": "Wersja",
-    "releaseLine": "Linia wydań",
+    "version": "Wersja w działającym systemie",
+    "releaseLine": "Linia w działającym systemie",
     "unknown": "Nieznana",
     "provider": "Dostawca",
     "consumer": "Odbiorca",

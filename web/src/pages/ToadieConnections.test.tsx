@@ -74,6 +74,35 @@ describe("Toadie connections page", () => {
         consumesRelation: "consumes_datasets",
         systemRelation: "system",
       });
+      expect(body.adoptionMapping).toBeNull();
+    });
+  });
+
+  test("declared adoption is explicitly enabled and its preset remains editable", async () => {
+    localStorage.setItem("covenant.auth.roles", JSON.stringify(["ADMIN"]));
+    const user = userEvent.setup();
+    renderWithProviders(<ToadieConnections />);
+    await user.click(await screen.findByRole("button", { name: "New connection" }));
+    const dialog = screen.getByRole("dialog");
+    await user.type(within(dialog).getByLabelText("Name"), "Adoption");
+    await user.type(within(dialog).getByLabelText("Backend base URL"), "https://toadie.internal");
+    await user.type(within(dialog).getByLabelText("Browser URL"), "https://toadie.example.com");
+    await user.type(within(dialog).getByLabelText("API key"), "secret");
+    await user.click(within(dialog).getByRole("button", { name: "Declared adoption mapping" }));
+    expect(within(dialog).getByRole("switch", { name: /^Read declared adoption/ })).not.toBeChecked();
+    await user.click(within(dialog).getByRole("switch", { name: /^Read declared adoption/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Use dataset adoption mapping" }));
+    expect(within(dialog).getByLabelText("Adoption blueprint")).toHaveValue("dataset_adoption");
+    expect(within(dialog).getByLabelText("Adoption value property")).toHaveValue("contract_version");
+    await user.clear(within(dialog).getByLabelText("Notes property"));
+    await user.click(within(dialog).getByRole("button", { name: "Create" }));
+    await waitFor(() => {
+      const call = vi.mocked(fetch).mock.calls.find(([url, init]) => url === "/api/v1/toadie-connections" && init?.method === "POST");
+      expect(JSON.parse((call?.[1] as RequestInit).body as string).adoptionMapping).toEqual({
+        blueprint: "dataset_adoption", kind: "DATASET_CONTRACT_VERSION", consumerRelation: "consumer", targetRelation: "dataset",
+        environmentRelation: "environment", valueProperty: "contract_version", statusProperty: "status", declaredByProperty: "declared_by",
+        verifiedAtProperty: "verified_at", notesProperty: null,
+      });
     });
   });
 
@@ -187,4 +216,34 @@ describe("Toadie connections page", () => {
     expect(within(editor).queryByRole("checkbox", { name: "I understand that Toadie domain nesting will be flattened" })).not.toBeInTheDocument();
     expect(vi.mocked(fetch).mock.calls.some(([url]) => typeof url === "string" && (url.includes("registry-candidates") || url.startsWith("/api/v1/domains?") || url.startsWith("/api/v1/systems?") || url.startsWith("/api/v1/teams?")))).toBe(false);
   });
+
+  test("a pending initial sort cannot restore a connection deleted from placeholder rows", async () => {
+    localStorage.setItem("covenant.auth.roles", JSON.stringify(["ADMIN"]));
+    const page = { items: [ROW], page: 1, pageSize: 20, total: 1 };
+    let release!: (response: Response) => void;
+    const stale = new Promise<Response>((resolve) => { release = resolve; });
+    let reads = 0;
+    vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => {
+      if (init?.method === "DELETE") return Promise.resolve(new Response(null, { status: 204 }));
+      if (new URL(url, "http://localhost").searchParams.get("sort") === "-name") {
+        reads += 1;
+        return reads === 1 ? stale : Promise.resolve(jsonResponse(200, { ...page, items: [], total: 0 }));
+      }
+      return Promise.resolve(jsonResponse(200, page));
+    }));
+    const user = userEvent.setup();
+    renderWithProviders(<ToadieConnections />);
+    await screen.findByText("Architecture");
+    await user.click(screen.getByRole("button", { name: /^Name$/ }));
+    await waitFor(() => expect(reads).toBe(1));
+    await user.click(screen.getByRole("button", { name: "Operations for Architecture" }));
+    await user.click(await screen.findByRole("menuitem", { name: /^Delete$/ }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^Delete$/ }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    release(jsonResponse(200, page));
+    await waitFor(() => expect(reads).toBe(2));
+    await waitFor(() => expect(screen.queryByText("Architecture")).not.toBeInTheDocument());
+    expect(screen.getByRole("columnheader", { name: "Name" })).toHaveAttribute("aria-sort", "descending");
+  });
+
 });

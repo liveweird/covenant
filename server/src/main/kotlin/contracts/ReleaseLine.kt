@@ -5,6 +5,7 @@ import ch.nokillswit.toadie.ToadieCacheStatus
 import ch.nokillswit.toadie.ToadieConnectionRef
 import ch.nokillswit.toadie.ToadieLinkResponse
 import ch.nokillswit.toadie.ToadieUsageRow
+import ch.nokillswit.toadie.ToadieAdoptionsProjection
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -78,6 +79,7 @@ data class ReleaseLineMigrationReportResponse(
     val cache: ToadieCacheStatus,
     val linkedApis: List<ToadieLinkResponse>,
     val services: List<ToadieUsageRow>,
+    val adoptions: ToadieAdoptionsProjection,
 )
 
 typealias ReleaseLinePageResponse = PageResponse<ReleaseLineResponse>

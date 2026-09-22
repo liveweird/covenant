@@ -55,6 +55,10 @@ class ContractToadieUsageRoute(val contractId: UInt) {
     @Serializable @Resource("refresh") class Refresh(val parent: ContractToadieUsageRoute)
 }
 
+@Serializable
+@Resource("/api/v1/contracts/{contractId}/toadie-adoptions")
+class ContractToadieAdoptionsRoute(val contractId: UInt)
+
 fun Application.configureToadieRoutes() {
     val service = attributes[ToadieServiceKey]
     val refresh = attributes[ToadieRefreshCoordinatorKey]
@@ -169,6 +173,13 @@ private fun Route.contractRoutes(
                         .getOrElse { throw BadRequestException("role must be PROVIDER or CONSUMER") }
                 }
                 val result = service.usage(route.contractId, call.request.queryParameters.optionalString("q"), role, paging)
+                    .orNotFound("Contract")
+                call.respond(HttpStatusCode.OK, result)
+            }
+            get<ContractToadieAdoptionsRoute> { route ->
+                call.caller()
+                val paging = call.parsePaging(USAGE_SORT_FIELDS)
+                val result = service.adoptions(route.contractId, call.request.queryParameters.optionalString("q"), paging)
                     .orNotFound("Contract")
                 call.respond(HttpStatusCode.OK, result)
             }

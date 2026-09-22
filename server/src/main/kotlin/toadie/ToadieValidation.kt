@@ -28,6 +28,19 @@ fun sanitizeToadieRequest(request: ToadieConnectionRequest): ToadieConnectionReq
             teamDescriptionProperty = mapping.teamDescriptionProperty?.trim()?.takeIf(String::isNotEmpty),
         )
     },
+    adoptionMapping = request.adoptionMapping?.let { mapping ->
+        mapping.copy(
+            blueprint = mapping.blueprint.trim(),
+            consumerRelation = mapping.consumerRelation.trim(),
+            targetRelation = mapping.targetRelation.trim(),
+            environmentRelation = mapping.environmentRelation?.trim()?.takeIf(String::isNotEmpty),
+            valueProperty = mapping.valueProperty.trim(),
+            statusProperty = mapping.statusProperty?.trim()?.takeIf(String::isNotEmpty),
+            declaredByProperty = mapping.declaredByProperty?.trim()?.takeIf(String::isNotEmpty),
+            verifiedAtProperty = mapping.verifiedAtProperty?.trim()?.takeIf(String::isNotEmpty),
+            notesProperty = mapping.notesProperty?.trim()?.takeIf(String::isNotEmpty),
+        )
+    },
 )
 
 fun validateToadieRequest(request: ToadieConnectionRequest, apiKeyRequired: Boolean, allowHttp: Boolean) {
@@ -58,9 +71,38 @@ fun validateToadieRequest(request: ToadieConnectionRequest, apiKeyRequired: Bool
         }
         val reserved = setOf(
             request.mapping.serviceBlueprint.lowercase(), request.mapping.apiBlueprint.lowercase(), "_team",
-        )
+        ) + listOfNotNull(request.adoptionMapping?.blueprint?.lowercase())
         if (registry.domainBlueprint.lowercase() in reserved) {
             throw BadRequestException("registryMapping.domainBlueprint must identify a distinct blueprint")
+        }
+    }
+    request.adoptionMapping?.let { adoption ->
+        val adoptionValues = listOfNotNull(
+            adoption.blueprint, adoption.consumerRelation, adoption.targetRelation, adoption.environmentRelation,
+            adoption.valueProperty, adoption.statusProperty, adoption.declaredByProperty,
+            adoption.verifiedAtProperty, adoption.notesProperty,
+        )
+        if (adoptionValues.any { !TOADIE_IDENTIFIER.matches(it) }) {
+            throw BadRequestException("adoptionMapping values contain unsupported characters")
+        }
+        val reserved = setOf(
+            request.mapping.serviceBlueprint.lowercase(), request.mapping.apiBlueprint.lowercase(), "_team",
+        ) + listOfNotNull(request.registryMapping?.domainBlueprint?.lowercase())
+        if (adoption.blueprint.lowercase() in reserved) {
+            throw BadRequestException("adoptionMapping.blueprint must identify a distinct blueprint")
+        }
+        val relations = listOfNotNull(
+            adoption.consumerRelation, adoption.targetRelation, adoption.environmentRelation,
+        )
+        if (relations.distinct().size != relations.size) {
+            throw BadRequestException("adoptionMapping relations must be distinct")
+        }
+        val properties = listOfNotNull(
+            adoption.valueProperty, adoption.statusProperty, adoption.declaredByProperty,
+            adoption.verifiedAtProperty, adoption.notesProperty,
+        )
+        if (properties.distinct().size != properties.size) {
+            throw BadRequestException("adoptionMapping properties must be distinct")
         }
     }
 }

@@ -21,7 +21,7 @@
      the plan complete and the incomplete-plan count falls to zero.
 4. Select the No dates set deadline filter and review 3.x impact.
    - *Expected*: only 3.x remains; link the owned fixture APIs before opening the review. The review explains that usage is contract-level
-     and its version and release line are unknown.
+     and runtime adoption remains unknown, with explicit declarations shown separately.
 5. Clear the deadline filter, scan the overview table with axe and capture a screenshot.
    - *Expected*: all three lines return with the same contract-level consumer count and the table has no WCAG A/AA violations.
 

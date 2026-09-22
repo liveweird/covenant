@@ -109,7 +109,7 @@
     "reviewImpact": "Review retirement impact for {{line}}",
     "impactTitle": "Retirement impact for {{line}}",
     "endSupport": "End support",
-    "usageScope": "These are declared consumers of the whole contract. Their version and release line are unknown. No declared consumers does not prove that retirement is safe.",
+    "usageScope": "These are architecture relationships for the whole contract. Explicit version and major-line declarations are shown separately; runtime adoption remains unknown. No declared consumers does not prove that retirement is safe.",
     "incompleteUsage": "Usage information is incomplete, stale, or unavailable. Review the known consumers and coordinate the migration before proceeding.",
     "acknowledgeImpact": "I have reviewed the declared usage and its limitations and choose to proceed.",
     "endSupportHint": "This ends support for the release line. It does not retire individual versions.",
@@ -131,13 +131,14 @@
       "plan": "Support and migration plan",
       "replacement": "Replacement",
       "usage": "Declared usage from Toadie",
-      "scopeWarning": "This report contains contract-level declared usage. Exact version and major-line adoption are unknown.",
+      "scopeWarning": "This report contains cached architecture usage for the whole contract. Runtime version and major-line adoption remain unknown; explicit upstream declarations are listed separately below.",
       "emptyWarning": "No observed declared usage is not proof that the contract is unused or that retirement is safe.",
       "incompleteWarning": "Usage is incomplete, stale, refreshing, or unavailable; retained rows may come from the last successful observation.",
       "scope": "Usage scope",
       "contractScope": "Whole contract",
       "versionAdoption": "Version and major-line adoption",
       "unknown": "Unknown",
+      "runtimeUnknown": "Unknown from runtime usage",
       "cacheState": "Cache state",
       "refreshing": "Refresh in progress",
       "lastSuccessAt": "Last successful refresh at (UTC)",
@@ -145,6 +146,28 @@
       "lastError": "Last refresh error code",
       "linkedApis": "Linked API or dataset mappings",
       "services": "Declared provider and consumer services",
+      "adoptions": "Explicit adoption declarations",
+      "adoptionWarning": "These are upstream declarations, not runtime evidence. Parallel, conflicting, and unmatched declarations are retained without choosing a winner.",
+      "adoptionKind": "Declaration kind",
+      "consumer": "Consumer",
+      "target": "API or dataset",
+      "environment": "Environment scope",
+      "declaredValue": "Declared value",
+      "declarationStatus": "Declaration status",
+      "declaredBy": "Declared by (upstream identifier)",
+      "verifiedAt": "Verified upstream at (UTC)",
+      "matchesConsumption": "Matches an observed consumption edge",
+      "notes": "Declaration notes",
+      "adoptionKinds": {
+        "API_MAJOR_LINE": "API major line",
+        "DATASET_CONTRACT_VERSION": "Dataset contract version"
+      },
+      "adoptionAvailability": {
+        "NOT_CONFIGURED": "Declared adoption was not configured for this snapshot.",
+        "NOT_SCANNED": "Declared adoption was configured but not scanned for this snapshot.",
+        "BLUEPRINT_MISSING": "The configured adoption blueprint was missing from this snapshot.",
+        "AVAILABLE": "No explicit adoption declarations were present in this snapshot."
+      },
       "noObservedUsage": "No declared usage was observed in this snapshot. This does not prove that the contract is unused or that retirement is safe.",
       "usageUnavailable": "No numeric usage conclusion is available from this incomplete snapshot. Unknown usage is not zero usage.",
       "identifier": "Identifier",
@@ -162,8 +185,15 @@
       "none": "None",
       "yes": "Yes",
       "no": "No",
-      "role": { "PROVIDER": "Provider", "CONSUMER": "Consumer" },
-      "linkStatus": { "AVAILABLE": "Available", "MISSING": "Missing", "DISCONNECTED": "Disconnected" }
+      "role": {
+        "PROVIDER": "Provider",
+        "CONSUMER": "Consumer"
+      },
+      "linkStatus": {
+        "AVAILABLE": "Available",
+        "MISSING": "Missing",
+        "DISCONNECTED": "Disconnected"
+      }
     }
   },
   "validation": {

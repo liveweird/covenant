@@ -18,6 +18,8 @@ import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.ByteArrayOutputStream
+import java.time.Instant
+import java.time.OffsetDateTime
 
 /**
  * Read-only, fixed GraphQL operations against an ADMIN-curated endpoint. No unmapped properties,
@@ -75,7 +77,7 @@ class HttpToadieGraphqlClient(
 
     private suspend fun readSnapshot(config: ToadieFetchConfig, budget: ReadBudget): ToadieSnapshot {
         val revision = RevisionTracker()
-        val blueprintFields = BLUEPRINT_FIELDS + if (config.registryMapping == null) "" else " schema"
+        val blueprintFields = blueprintFields(config)
         val blueprints = pages(config, "blueprints", blueprintFields, null, budget, revision)
         val mapping = config.mapping
         fun blueprint(identifier: String): JsonNode = blueprints.singleOrNull {
@@ -93,23 +95,130 @@ class HttpToadieGraphqlClient(
         if (text(blueprint(systemName), "identifier") != systemName) fail("MAPPING_INVALID")
         blueprint("_team")
         val registry = config.registryMapping?.let {
-            ToadieRegistryProjection(it, blueprints, systemName, setOf(apiName, serviceName, systemName, "_team"))
+            ToadieRegistryProjection(
+                it, blueprints, systemName,
+                setOf(apiName, serviceName, systemName, "_team") + listOfNotNull(config.adoptionMapping?.blueprint),
+            )
+        }
+        val adoption = config.adoptionMapping?.let { adoptionMapping ->
+            val matches = blueprints.filter {
+                text(it, "identifier").equals(adoptionMapping.blueprint, ignoreCase = true)
+            }
+            if (matches.size > 1) fail("MAPPING_INVALID")
+            matches.singleOrNull()?.let {
+                adoptionBlueprint(it, adoptionMapping, serviceName, apiName, systemName, registry?.domainName, blueprints)
+            }
+        }
+        val adoptionAvailability = when {
+            config.adoptionMapping == null -> ToadieAdoptionAvailability.NOT_CONFIGURED
+            adoption == null -> ToadieAdoptionAvailability.BLUEPRINT_MISSING
+            else -> ToadieAdoptionAvailability.AVAILABLE
         }
         val relationKeys = setOf(mapping.providesRelation, mapping.consumesRelation, mapping.systemRelation)
-        val names = linkedSetOf(apiName, serviceName, systemName, "_team").apply { registry?.let { add(it.domainName) } }
+        val names = linkedSetOf(apiName, serviceName, systemName, "_team").apply {
+            registry?.let { add(it.domainName) }
+            adoption?.let { projection ->
+                add(projection.blueprint)
+                projection.environmentBlueprint?.let(::add)
+            }
+        }
         val entities = names.flatMap { name ->
-            val keys = (if (name == serviceName) relationKeys else emptySet()) + registry?.relationKeys(name).orEmpty()
-            val fields = ENTITY_FIELDS + if (registry?.readsDescription(name) == true) " properties" else ""
+            val keys = (if (name == serviceName) relationKeys else emptySet()) + registry?.relationKeys(name).orEmpty() +
+                adoption?.relationKeys(name).orEmpty()
+            val readsProperties = registry?.readsDescription(name) == true || adoption?.readsProperties(name) == true
+            val fields = ENTITY_FIELDS + if (readsProperties) " properties" else ""
             pages(config, "entities", fields, name, budget, revision).map {
                 val entity = parseEntity(it, name, keys)
-                registry?.project(it, entity) ?: entity
+                val registryEntity = registry?.project(it, entity) ?: entity
+                adoption?.project(it, registryEntity) ?: registryEntity
             }
         }
         if (entities.size > maxEntities || entities.map { it.id }.toSet().size != entities.size) fail("LIMIT_EXCEEDED")
         revision.observe(revisionProbe(config, budget))
         validateReferences(entities, serviceName, apiName, systemName, mapping)
         registry?.validateReferences(entities)
-        return ToadieSnapshot(entities, systemName, System.currentTimeMillis(), checkNotNull(revision.value))
+        adoption?.validateReferences(entities)
+        return ToadieSnapshot(
+            entities, systemName, System.currentTimeMillis(), checkNotNull(revision.value),
+            adoptionAvailability, adoption?.environmentBlueprint,
+        )
+    }
+
+    private fun adoptionBlueprint(
+        blueprint: JsonNode,
+        mapping: ToadieAdoptionMapping,
+        serviceName: String,
+        apiName: String,
+        systemName: String,
+        registryDomainName: String?,
+        blueprints: List<JsonNode>,
+    ): AdoptionProjection {
+        val blueprintName = text(blueprint, "identifier")
+        val architectureRoles = setOf(serviceName, apiName, systemName, "_team") + listOfNotNull(registryDomainName)
+        if (architectureRoles.any { it.equals(blueprintName, ignoreCase = true) }) fail("MAPPING_INVALID")
+        val relationNames = listOfNotNull(
+            mapping.consumerRelation, mapping.targetRelation, mapping.environmentRelation,
+        )
+        if (relationNames.distinct().size != relationNames.size) fail("MAPPING_INVALID")
+        val relations = blueprint.path("relations")
+        val consumerTarget = relationTarget(relations, mapping.consumerRelation, many = false)
+        val targetTarget = relationTarget(relations, mapping.targetRelation, many = false)
+        if (consumerTarget != serviceName || targetTarget != apiName) fail("MAPPING_INVALID")
+        val environmentBlueprint = mapping.environmentRelation?.let { relation ->
+            relationTarget(relations, relation, many = false).let { target ->
+                val matches = blueprints.filter { text(it, "identifier").equals(target, ignoreCase = true) }
+                if (matches.size != 1) fail("MAPPING_INVALID")
+                val canonicalTarget = text(matches.single(), "identifier")
+                val reservedEnvironmentRoles = architectureRoles + blueprintName
+                if (reservedEnvironmentRoles.any { it.equals(canonicalTarget, ignoreCase = true) }) fail("MAPPING_INVALID")
+                canonicalTarget
+            }
+        }
+        val properties = blueprint.path("schema").path("properties")
+        if (!properties.isObject) fail("MAPPING_INVALID")
+        mapping.propertyNames().forEach { property ->
+            val definition = properties.path(property)
+            if (!definition.isObject || definition.path("type").textValue() != "string") fail("MAPPING_INVALID")
+        }
+        return AdoptionProjection(mapping, blueprintName, serviceName, apiName, environmentBlueprint)
+    }
+
+    private inner class AdoptionProjection(
+        private val mapping: ToadieAdoptionMapping,
+        val blueprint: String,
+        private val serviceBlueprint: String,
+        private val targetBlueprint: String,
+        val environmentBlueprint: String?,
+    ) {
+        fun relationKeys(name: String): Set<String> = if (name == blueprint) {
+            setOfNotNull(mapping.consumerRelation, mapping.targetRelation, mapping.environmentRelation)
+        } else emptySet()
+
+        fun readsProperties(name: String) = name == blueprint
+
+        fun project(node: JsonNode, entity: ToadieEntitySnapshot): ToadieEntitySnapshot {
+            if (entity.blueprint != blueprint) return entity
+            val properties = node.path("properties")
+            if (!properties.isObject) fail("INVALID_RESPONSE")
+            val selected = mapping.propertyNames().associateWith { property -> scalar(properties.path(property)) }
+            mapping.verifiedAtProperty?.let { selected[it]?.let(::parseVerifiedAt) }
+            return entity.copy(scalarProperties = selected)
+        }
+
+        fun validateReferences(entities: List<ToadieEntitySnapshot>) {
+            val identifiers = entities.groupBy { it.blueprint }.mapValues { (_, rows) -> rows.map { it.identifier }.toSet() }
+            entities.filter { it.blueprint == blueprint }.forEach { adoption ->
+                val consumers = adoption.relations[mapping.consumerRelation].orEmpty()
+                val targets = adoption.relations[mapping.targetRelation].orEmpty()
+                val environments = mapping.environmentRelation?.let { adoption.relations[it].orEmpty() }.orEmpty()
+                val invalidCardinality = consumers.size != 1 || targets.size != 1 || environments.size > 1
+                if (invalidCardinality) fail("INVALID_RESPONSE")
+                val danglingConsumer = consumers.single() !in identifiers[serviceBlueprint].orEmpty()
+                val danglingTarget = targets.single() !in identifiers[targetBlueprint].orEmpty()
+                val danglingEnvironment = environments.any { it !in identifiers[environmentBlueprint].orEmpty() }
+                if (danglingConsumer || danglingTarget || danglingEnvironment) fail("INVALID_RESPONSE")
+            }
+        }
     }
 
     private fun validateReferences(
@@ -161,6 +270,12 @@ class HttpToadieGraphqlClient(
         }.also { if (it.distinct().size != it.size) fail("INVALID_RESPONSE") }
     }
 
+    private fun scalar(node: JsonNode): String? {
+        if (node.isMissingNode || node.isNull) return null
+        if (!node.isTextual || node.textValue().length > MAX_ADOPTION_SCALAR_LENGTH) fail("INVALID_RESPONSE")
+        return node.textValue()
+    }
+
     private suspend fun pages(
         config: ToadieFetchConfig,
         field: String,
@@ -203,6 +318,9 @@ class HttpToadieGraphqlClient(
     private suspend fun revisionProbe(config: ToadieFetchConfig, budget: ReadBudget): Long = revision(
         request(config, "blueprints", "revision", null, 1, 1, budget),
     )
+
+    private fun blueprintFields(config: ToadieFetchConfig): String =
+        BLUEPRINT_FIELDS + if (config.registryMapping == null && config.adoptionMapping == null) "" else " schema"
 
     private suspend fun request(
         config: ToadieFetchConfig,
@@ -284,6 +402,18 @@ class HttpToadieGraphqlClient(
     private companion object {
         const val BLUEPRINT_FIELDS = "id identifier relations"
         const val ENTITY_FIELDS = "id blueprint identifier title team relations updatedAt"
+        const val MAX_ADOPTION_SCALAR_LENGTH = 2000
         fun fail(code: String): Nothing = throw ToadieFetchException(code)
     }
+}
+
+private fun ToadieAdoptionMapping.propertyNames(): Set<String> = setOfNotNull(
+    valueProperty, statusProperty, declaredByProperty, verifiedAtProperty, notesProperty,
+)
+
+internal fun parseVerifiedAt(value: String): Long {
+    if (!value.matches(Regex("^\\d{4}-\\d{2}-\\d{2}T.*"))) throw ToadieFetchException("INVALID_RESPONSE")
+    return runCatching { Instant.parse(value).toEpochMilli() }
+        .recoverCatching { OffsetDateTime.parse(value).toInstant().toEpochMilli() }
+        .getOrElse { throw ToadieFetchException("INVALID_RESPONSE") }
 }
