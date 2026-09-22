@@ -1,5 +1,8 @@
 # Toadie integration improvements: implementation handoff
 
+Historical proposal. Current implementation status is tracked in [BACKLOG.md](../../BACKLOG.md);
+the adoption reader implemented for Covenant 1.1.0 is described in [toadie-adoption.md](toadie-adoption.md).
+
 Prepared 2026-09-20 for work in `~/Sources/toadie`. These proposals consolidate the limitations
 identified while implementing Covenant's read-only integration. They are not prerequisites for
 the working integration and are not all confirmed defects. Recheck Toadie's current branch

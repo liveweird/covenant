@@ -19,6 +19,7 @@ import { FEATURES, isAdmin, type Feature } from "../api/session";
 import { listUsers, updateUserFeatures, type UserPage } from "../api/users";
 import { showSuccessToast } from "../utils/toast";
 import { loadErrorMessage, saveErrorMessage } from "../utils/saveError";
+import { refreshQueriesAfterMutation } from "../utils/queryRefresh";
 import PageHeader from "../components/PageHeader";
 
 const SORT_FIELDS = ["id", "name", "email"] as const;
@@ -119,7 +120,7 @@ export default function FeatureFlags() {
       ),
     onNothingToDo: () => showSuccessToast(t("users.featureFlags.bulkNoChange")),
     onDone: async (failedRows) => {
-      await queryClient.invalidateQueries({ queryKey: ["users"] });
+      await refreshQueriesAfterMutation(queryClient, ["users"]);
       // A partial failure renders from bulk.failed (names + Retry) below — no toast then.
       if (failedRows.length === 0) showSuccessToast(t("users.toast.featuresSaved"));
     },
@@ -143,7 +144,7 @@ export default function FeatureFlags() {
     setPendingId(row.id);
     try {
       await updateUserFeatures(row.id, next);
-      await queryClient.invalidateQueries({ queryKey: ["users"] });
+      await refreshQueriesAfterMutation(queryClient, ["users"]);
       showSuccessToast(t("users.toast.featuresSaved"));
     } catch (err) {
       setError(

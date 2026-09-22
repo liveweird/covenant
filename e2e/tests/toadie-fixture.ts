@@ -3,7 +3,9 @@ import { randomUUID } from "node:crypto";
 
 // A test-owned HTTP upstream: the browser talks only to Covenant, whose real GraphQL client
 // reads this fixture through Docker's host gateway. No live Toadie architecture is modified.
-export async function startToadieFixture({ datasets = false }: { datasets?: boolean } = {}) {
+export async function startToadieFixture({ datasets = false, adoptions = false }: { datasets?: boolean; adoptions?: boolean } = {}) {
+  datasets = datasets || adoptions;
+  const adoptionProperties = { status: { type: "string" }, declared_by: { type: "string" }, verified_at: { type: "string", format: "date-time" }, notes: { type: "string" } };
   const key = `e2e-${randomUUID()}`;
   let fail = false;
   let revisionNumber = 1;
@@ -29,12 +31,15 @@ export async function startToadieFixture({ datasets = false }: { datasets?: bool
     ...(datasets ? [
       { id: "6", identifier: "dataset", relations: { stored_in: { target: "resource", many: false } } },
       { id: "7", identifier: "resource", relations: {} },
-      { id: "8", identifier: "api_adoption", relations: {
-        consumer: { target: "service", many: false }, api: { target: "api", many: false },
+      { id: "8", identifier: "api_adoption", schema: { properties: { ...adoptionProperties, major_line: { type: "string" } } }, relations: {
+        consumer: { target: "service", many: false, required: true }, api: { target: "api", many: false, required: true },
+        environment: { target: "environment", many: false, required: false },
       } },
-      { id: "9", identifier: "dataset_adoption", relations: {
-        consumer: { target: "service", many: false }, dataset: { target: "dataset", many: false },
+      { id: "9", identifier: "dataset_adoption", schema: { properties: { ...adoptionProperties, contract_version: { type: "string" } } }, relations: {
+        consumer: { target: "service", many: false, required: true }, dataset: { target: "dataset", many: false, required: true },
+        environment: { target: "environment", many: false, required: false },
       } },
+      { id: "10", identifier: "environment", relations: {} },
     ] : []),
   ];
   const entities = [
@@ -58,9 +63,21 @@ export async function startToadieFixture({ datasets = false }: { datasets?: bool
         relations: { depends_on: ["warehouse"], system: "commerce" } },
       { id: "14", blueprint: "resource", identifier: "warehouse", title: "Warehouse", relations: {} },
       { id: "15", blueprint: "api_adoption", identifier: "storefront-orders", title: "Declared API adoption",
-        properties: { major_line: "1", status: "active" }, relations: { consumer: "storefront", api: "orders" } },
+        properties: { major_line: "v1", status: "current", declared_by: "architecture.team", verified_at: "2026-08-01T09:00:00Z" }, relations: { consumer: "storefront", api: "orders" } },
       { id: "16", blueprint: "dataset_adoption", identifier: "pipeline-orders", title: "Declared dataset adoption",
-        properties: { contract_version: "1.0.0", status: "active" }, relations: { consumer: "pipeline", dataset: "orders" } },
+        properties: { contract_version: "1.0.0", status: "current", declared_by: "data.team", verified_at: "2026-08-02T09:00:00Z", notes: "Keep `orders` compatible <script>not executable</script>" }, relations: { consumer: "pipeline", dataset: "orders" } },
+    ] : []),
+    ...(adoptions ? [
+      { id: "17", blueprint: "environment", identifier: "production", title: "Production", relations: {} },
+      { id: "18", blueprint: "api_adoption", identifier: "storefront-orders-v2", title: "Parallel API adoption",
+        properties: { major_line: "v2", status: "migrating", notes: "Keep v1 until rollout completes" },
+        relations: { consumer: "storefront", api: "orders", environment: "production" } },
+      { id: "19", blueprint: "api_adoption", identifier: "storefront-events-unknown", title: "Undeclared API line",
+        properties: { status: "current" }, relations: { consumer: "storefront", api: "events" } },
+      { id: "20", blueprint: "api_adoption", identifier: "database-only-orders", title: "Unmatched API declaration",
+        properties: { major_line: "v3", status: "retiring" }, relations: { consumer: "database-only", api: "orders" } },
+      { id: "21", blueprint: "dataset_adoption", identifier: "pipeline-settlements", title: "Undeclared dataset version",
+        properties: { status: "migrating" }, relations: { consumer: "pipeline", dataset: "settlements", environment: "production" } },
     ] : []),
   ].map((entity) => ({ team: null, updatedAt: 1, properties: { description: `Description of ${entity.title}` }, ...entity }));
   const server: Server = createServer(async (req, res) => {

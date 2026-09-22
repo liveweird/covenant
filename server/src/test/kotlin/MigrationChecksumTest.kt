@@ -43,6 +43,7 @@ class MigrationChecksumTest {
         "V21__semver_prerelease_order.sql" to 1326345492,
         "V22__toadie_remote_revision.sql" to 534570132,
         "V23__toadie_registry_sync.sql" to -620322693,
+        "V24__toadie_declared_adoption.sql" to -1787468587,
     )
 
     @Test

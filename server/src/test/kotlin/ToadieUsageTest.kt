@@ -162,6 +162,26 @@ class ToadieUsageTest {
         )
         validateToadieRequest(mapped, apiKeyRequired = true, allowHttp = true)
         assertFailsWith<io.ktor.server.plugins.BadRequestException> {
+            validateToadieRequest(
+                mapped.copy(adoptionMapping = ToadieAdoptionMapping(
+                    blueprint = mapped.mapping.apiBlueprint,
+                    environmentRelation = "consumer",
+                )),
+                true,
+                true,
+            )
+        }
+        assertFailsWith<io.ktor.server.plugins.BadRequestException> {
+            validateToadieRequest(
+                mapped.copy(
+                    registryMapping = ToadieRegistryMapping(domainBlueprint = "domain", flattenDomains = true),
+                    adoptionMapping = ToadieAdoptionMapping(blueprint = "domain"),
+                ),
+                true,
+                true,
+            )
+        }
+        assertFailsWith<io.ktor.server.plugins.BadRequestException> {
             validateToadieRequest(mapped.copy(baseUrl = "http://169.254.10.20/graphql"), true, true)
         }
         assertFailsWith<io.ktor.server.plugins.BadRequestException> {
@@ -173,6 +193,88 @@ class ToadieUsageTest {
         assertFailsWith<io.ktor.server.plugins.BadRequestException> {
             validateToadieRequest(mapped.copy(baseUrl = "http://toadie.internal/graphql"), true, false)
         }
+    }
+
+    @Test
+    fun `connection sanitization and validation cover optional adoption and registry mapping fields`() {
+        val raw = request().copy(
+            name = "  mapped  ",
+            baseUrl = "  http://toadie.internal/  ",
+            browserUrl = " http://toadie-browser.internal/// ",
+            apiKey = "   ",
+            mapping = ToadieMapping(" service ", " api ", " provides ", " consumes ", " system "),
+            registryMapping = ToadieRegistryMapping(
+                domainBlueprint = " domain ", flattenDomains = true, systemDomainRelation = " ",
+                domainParentRelation = " ", domainDescriptionProperty = " ",
+                systemDescriptionProperty = " ", teamDescriptionProperty = " ",
+            ),
+            adoptionMapping = ToadieAdoptionMapping(
+                blueprint = " adoption ", consumerRelation = " consumer ", targetRelation = " target ",
+                environmentRelation = " ", valueProperty = " value ", statusProperty = " ",
+                declaredByProperty = " ", verifiedAtProperty = " ", notesProperty = " ",
+            ),
+        )
+        val sanitized = sanitizeToadieRequest(raw)
+        assertEquals("mapped", sanitized.name)
+        assertEquals("http://toadie.internal", sanitized.baseUrl)
+        assertEquals("http://toadie-browser.internal", sanitized.browserUrl)
+        assertNull(sanitized.apiKey)
+        assertEquals(ToadieMapping("service", "api", "provides", "consumes", "system"), sanitized.mapping)
+        assertEquals("domain", sanitized.registryMapping?.domainBlueprint)
+        assertNull(sanitized.registryMapping?.systemDomainRelation)
+        assertNull(sanitized.registryMapping?.domainParentRelation)
+        assertNull(sanitized.registryMapping?.domainDescriptionProperty)
+        assertNull(sanitized.registryMapping?.systemDescriptionProperty)
+        assertNull(sanitized.registryMapping?.teamDescriptionProperty)
+        assertEquals("adoption", sanitized.adoptionMapping?.blueprint)
+        assertNull(sanitized.adoptionMapping?.environmentRelation)
+        assertNull(sanitized.adoptionMapping?.statusProperty)
+        assertNull(sanitized.adoptionMapping?.declaredByProperty)
+        assertNull(sanitized.adoptionMapping?.verifiedAtProperty)
+        assertNull(sanitized.adoptionMapping?.notesProperty)
+
+        val populated = sanitizeToadieRequest(raw.copy(
+            apiKey = " key ",
+            registryMapping = raw.registryMapping?.copy(
+                systemDomainRelation = " system_domain ", domainParentRelation = " parent ",
+                domainDescriptionProperty = " domain_description ",
+                systemDescriptionProperty = " system_description ", teamDescriptionProperty = " team_description ",
+            ),
+            adoptionMapping = raw.adoptionMapping?.copy(
+                environmentRelation = " environment ", statusProperty = " status ",
+                declaredByProperty = " declared_by ", verifiedAtProperty = " verified_at ",
+                notesProperty = " notes ",
+            ),
+        ))
+        assertEquals("key", populated.apiKey)
+        assertEquals("system_domain", populated.registryMapping?.systemDomainRelation)
+        assertEquals("parent", populated.registryMapping?.domainParentRelation)
+        assertEquals("domain_description", populated.registryMapping?.domainDescriptionProperty)
+        assertEquals("system_description", populated.registryMapping?.systemDescriptionProperty)
+        assertEquals("team_description", populated.registryMapping?.teamDescriptionProperty)
+        assertEquals("environment", populated.adoptionMapping?.environmentRelation)
+        assertEquals("status", populated.adoptionMapping?.statusProperty)
+        assertEquals("declared_by", populated.adoptionMapping?.declaredByProperty)
+        assertEquals("verified_at", populated.adoptionMapping?.verifiedAtProperty)
+        assertEquals("notes", populated.adoptionMapping?.notesProperty)
+
+        fun invalid(request: ToadieConnectionRequest) = assertFailsWith<io.ktor.server.plugins.BadRequestException> {
+            validateToadieRequest(request, apiKeyRequired = true, allowHttp = true)
+        }
+        val valid = request()
+        invalid(valid.copy(mapping = valid.mapping.copy(serviceBlueprint = "bad value")))
+        invalid(valid.copy(registryMapping = ToadieRegistryMapping(
+            domainBlueprint = "bad value", flattenDomains = true,
+        )))
+        invalid(valid.copy(registryMapping = ToadieRegistryMapping(
+            domainBlueprint = valid.mapping.apiBlueprint, flattenDomains = true,
+        )))
+        invalid(valid.copy(adoptionMapping = ToadieAdoptionMapping(blueprint = "bad value")))
+        invalid(valid.copy(adoptionMapping = ToadieAdoptionMapping(blueprint = "_team")))
+        invalid(valid.copy(adoptionMapping = ToadieAdoptionMapping(statusProperty = "major_line")))
+        invalid(valid.copy(apiKey = "x".repeat(1001)))
+        invalid(valid.copy(refreshIntervalMinutes = 0))
+        invalid(valid.copy(name = "bad\u0000name"))
     }
 
     @Test

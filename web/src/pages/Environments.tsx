@@ -1,3 +1,4 @@
+import { refreshQueriesAfterMutation } from "../utils/queryRefresh";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Badge, Button, Group, Menu, Select, Stack, Table, Text } from "@mantine/core";
@@ -54,15 +55,10 @@ export default function Environments() {
   });
 
   const [editorTarget, setEditorTarget] = useState<EnvironmentResponse | "new" | null>(null);
-  async function refreshEnvironments() {
-    // A newly keyed query can show observer placeholder data while its cache has no data yet.
-    // Cancel that first fetch explicitly so invalidation cannot reuse a pre-mutation response.
-    await queryClient.cancelQueries({ queryKey: ["environments"] });
-    await queryClient.invalidateQueries({ queryKey: ["environments"] });
-  }
+
   const remove = useDeleteConfirm<EnvironmentResponse>({
     mutationFn: (row) => deleteEnvironment(row.id),
-    onSuccess: refreshEnvironments,
+    onSuccess: () => refreshQueriesAfterMutation(queryClient, ["environments"]),
     successMessage: t("environments.toast.deleted"),
   });
   const columnCount = admin ? 5 : 4;
@@ -167,7 +163,7 @@ export default function Environments() {
           onClose={() => setEditorTarget(null)}
           onSaved={async () => {
             setEditorTarget(null);
-            await refreshEnvironments();
+            await refreshQueriesAfterMutation(queryClient, ["environments"]);
           }}
         />
       )}

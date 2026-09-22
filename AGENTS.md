@@ -22,7 +22,7 @@ and password reset, admin-managed users and per-user feature flags, the synced u
 shared paging, and the React shell (nav model, command palette, theme, changelog). The catalog
 and its SPA are implemented: flat teams with rosters; the Domain → System → Contract → Version
 hierarchy; team/user ownership; SemVer and lifecycle rules; parallel major release lines with
-independent support policies, deprecation/migration plans, deadline reminders and stable recommendations; read-only provider/consumer usage from
+independent support policies, deprecation/migration plans, deadline reminders and stable recommendations; read-only provider/consumer usage and optional declared adoption from
 Toadie's Port ontology; optional one-way domain/system/team metadata synchronization from
 Toadie with explicit admin linking and local memberships; validation, lint, and breaking-change
 detection; import with dry run, guarded URL fetch, source references and sync, diff, download,
@@ -76,6 +76,9 @@ This is a Kotlin/Gradle backend plus three standalone npm workspaces:
   projections. Toadie 2.12+ revisions guard every scan with one bounded restart; scheduled
   refreshes can reconfirm an unchanged graph, while manual refreshes always scan fully.
   Read `.claude/docs/toadie-integration.md` before changing this boundary.
+  Optional API major-line and dataset version declarations use a separate paged reader and
+  report projection; `.claude/docs/toadie-adoption.md` defines unknowns, environment scope
+  and discrepancy handling. Declarations never alter architecture counts or prove runtime use.
   Registry metadata sync is documented in `.claude/docs/toadie-registry-sync.md`; imported
   teams never grant permissions, and upstream disappearance never deletes local dependents.
 - `server/src/main/resources/application.yaml` declaratively registers application modules.
@@ -236,6 +239,11 @@ tokens, guarded by `theme.test.ts`), and `web/src/theme.module.css`: the brand p
 reintroduce stock-blue actions or stock-green success states (success is teal, a blocking error
 is red, a waived finding is orange). Keep accessibility roles, labels, and semantic tables stable
 because tests and Playwright use them as contracts.
+
+After successful mutations while a list remains mounted, use `utils/queryRefresh.ts` to cancel
+pending reads before invalidating all affected query prefixes. This prevents an initial filtered
+fetch from restoring pre-mutation rows while `keepPreviousData` displays the previous page;
+see `web/CLAUDE.md` for the shared refresh convention.
 
 All user-facing strings must use react-i18next. Keep English and Polish resources in parity
 (enforced by `locales/parity.test.ts`); Polish uses inclusive slash forms. Errors render inline

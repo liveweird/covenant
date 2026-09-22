@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders, screen, waitFor, within } from "../test/render";
+import { jsonResponse } from "../test/http";
 import Contracts from "./Contracts";
 import { calledUrl, CONTRACT, CONTRACT_PAGE, findCall, serve, signIn, type FetchMock } from "../test/contractsFixtures";
 
@@ -89,4 +90,35 @@ describe("Contracts page", () => {
     expect(await screen.findByText("Could not load the contracts")).toBeInTheDocument();
     expect(screen.getByText("Load failed (500)")).toBeInTheDocument();
   });
+
+  test("a pending initial search cannot restore a contract deleted from placeholder rows", async () => {
+    serve(mockFetch, { "GET /api/v1/contracts?": { status: 200, body: CONTRACT_PAGE } });
+    const fallback = mockFetch.getMockImplementation()!;
+    let release!: (response: Response) => void;
+    const stale = new Promise<Response>((resolve) => { release = resolve; });
+    let reads = 0;
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if ((init?.method ?? "GET") === "GET" && url.startsWith("/api/v1/contracts?") && url.includes("q=orders")) {
+        reads += 1;
+        return reads === 1 ? stale : Promise.resolve(jsonResponse(200, { ...CONTRACT_PAGE, items: [], total: 0 }));
+      }
+      if (init?.method === "DELETE" && url === "/api/v1/contracts/5") return Promise.resolve(new Response(null, { status: 204 }));
+      return fallback(url, init);
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<Contracts />);
+    await screen.findByText("orders-api");
+    await user.click(screen.getByRole("button", { name: /filters/i }));
+    await user.type(screen.getByLabelText("Search"), "orders");
+    await waitFor(() => expect(reads).toBe(1));
+    await user.click(screen.getByRole("button", { name: "Operations for orders-api" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Delete orders-api" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^delete$/i }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    release(jsonResponse(200, CONTRACT_PAGE));
+    await waitFor(() => expect(reads).toBe(2));
+    await waitFor(() => expect(screen.queryByRole("link", { name: "Open contract orders-api" })).not.toBeInTheDocument());
+    expect(screen.getByLabelText("Search")).toHaveValue("orders");
+  });
+
 });

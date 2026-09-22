@@ -1,6 +1,6 @@
 # Product backlog
 
-Updated 2026-09-22. These are proposals, not delivery commitments. Implemented behavior is
+Updated 2026-09-23. These are proposals, not delivery commitments. Implemented behavior is
 documented in [README.md](README.md) and the release changelog.
 
 ## Open defects and operational gaps
@@ -20,10 +20,24 @@ Verification passed: **645 frontend tests** with coverage, build/lint/dead-code 
 **74 browser tests without retries**, browser static/scenario/setup gates, and independent
 review. The Compose verification build is healthy and all test-owned records were removed.
 
-Follow-up: assess the same initial-fetch invalidation pattern in other paged registries
-(Users, Teams, Domains, Systems, Contracts and Toadie connections). They use similar query
-patterns, but this reproduction and fix are scoped to Environments; those pages have not
-been demonstrated failing by this regression.
+**Other list stale-response fixes (1.1.0).** Shipped together with the declared adoption reader
+as the combined 1.1.0 release; the targeted check reproduced the same failure
+in Users, Teams, Domains, Systems, Contracts and Toadie connections, both in deterministic
+page tests and against deployed 1.0.6 with a real response held until after DELETE 204 / GET 404.
+All six lists now use the shared `refreshQueriesAfterMutation` helper after successful mutations;
+Environments uses the same helper. It cancels every affected group before invalidating active
+and inactive queries, preserves related prefixes and leaves unrelated pending reads alone.
+List-page editor saves, registry detach and Toadie registry synchronization use the same path.
+The adjacent Feature Flags users list also reproduced a saved toggle reverting, in both a
+page-level test and the browser; single and bulk refreshes now use the helper, retaining partial
+failure/retry behavior. Separate create/detail routes were inspected but do not mount these
+lists during their mutations.
+
+Verification passed: **653 frontend tests** with coverage, build/lint/dead-code gates,
+**10 targeted browser tests without retries** (seven new races and three Environments cases),
+browser static/scenario/setup gates, and independent review. Every new browser regression
+failed against 1.0.6 and passed against the corrected Compose build. The pre-test catalog
+inventory was restored. The full browser suite was not rerun for this targeted follow-up.
 
 **Nightly logout regression fixed in 1.0.2.** The failed
 2026-09-21 and 2026-09-22 runs were investigated using their Playwright attachments. The
@@ -159,9 +173,23 @@ and 50 changelog/locale tests, eight browser journeys, an unchanged-revision int
 API conformance and independent review. Version and bilingual changelog are updated.
 No changes are required in Toadie.
 
-Remaining Toadie proposal: design a reader for optional declared adoption entities. Toadie's
-narrower key scopes and incremental change feed were declined upstream; they are not pending Covenant prerequisites. Adoption
-blueprints are importable ontology definitions, so absence must remain valid.
+**Declared adoption reader (1.1.0).** Optional per-connection mapping reads API major-line
+and dataset contract-version declarations through Toadie's Port ontology. The separate paged
+reader and lifecycle impact/report sections retain parallel declarations, environment scope,
+status, provenance, verification time and discrepancies with architecture consumption. Missing
+values remain unknown; runtime adoption and retirement safety are never inferred. Existing
+architecture counts and default connection behavior remain unchanged. See
+[the operating rules](.claude/docs/toadie-adoption.md).
+
+Verification passed: 482 backend tests with build/static/coverage gates, 657 frontend tests
+with build/lint/dead-code/coverage gates, and all 85 browser journeys. Backend branch coverage
+is 77.20%; its floor is raised to 77%. OpenAPI conformance, schema generation, scenario parity
+and independent backend/API/frontend reviews passed. Local Compose was rebuilt and test-owned
+catalog data was cleaned up; no Toadie changes are required.
+
+Toadie's narrower key scopes and incremental change feed were declined upstream; they are not
+pending Covenant prerequisites. Adoption blueprints are importable ontology definitions, so
+absence remains valid.
 
 Toadie **2.13.0** has since shipped both ontology extensions, so neither is blocked upstream
 any more. Names to map: the blueprint `dataset`, with the service-side relations
@@ -177,7 +205,7 @@ explicit API/dataset presets, bilingual setup guidance, and backend/browser regr
 Use two connections to the same instance, one per mapping; each ODCS contract can link multiple
 datasets from its dataset connection. Database dependencies never imply dataset usage.
 See [the setup instructions](.claude/docs/toadie-integration.md#configure-odcs-dataset-usage).
-The optional adoption reader remains future work; no Toadie code changes were required.
+The optional adoption reader is implemented in 1.1.0; no Toadie code changes are required.
 
 ## Registry synchronization from Toadie
 

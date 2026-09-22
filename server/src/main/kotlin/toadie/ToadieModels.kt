@@ -32,6 +32,29 @@ data class ToadieRegistryMapping(
 )
 
 @Serializable
+enum class ToadieAdoptionKind { API_MAJOR_LINE, DATASET_CONTRACT_VERSION }
+
+@Serializable
+data class ToadieAdoptionMapping(
+    val blueprint: String = "api_adoption",
+    val kind: ToadieAdoptionKind = ToadieAdoptionKind.API_MAJOR_LINE,
+    val consumerRelation: String = "consumer",
+    val targetRelation: String = "api",
+    val environmentRelation: String? = "environment",
+    val valueProperty: String = "major_line",
+    val statusProperty: String? = "status",
+    val declaredByProperty: String? = "declared_by",
+    val verifiedAtProperty: String? = "verified_at",
+    val notesProperty: String? = "notes",
+)
+
+@Serializable
+enum class ToadieAdoptionAvailability { NOT_CONFIGURED, NOT_SCANNED, BLUEPRINT_MISSING, AVAILABLE }
+
+@Serializable
+enum class ToadieAdoptionEnvironmentScope { ALL, SPECIFIC, UNKNOWN }
+
+@Serializable
 enum class ToadieCacheState { UNLINKED, NEVER_SYNCED, CURRENT, STALE, DISABLED, DISCONNECTED }
 
 @Serializable
@@ -162,6 +185,7 @@ data class ToadieConnectionRequest(
     val refreshIntervalMinutes: Int,
     val mapping: ToadieMapping = ToadieMapping(),
     val registryMapping: ToadieRegistryMapping? = null,
+    val adoptionMapping: ToadieAdoptionMapping? = null,
 )
 
 @Serializable
@@ -174,6 +198,7 @@ data class ToadieConnectionResponse(
     val refreshIntervalMinutes: Int,
     val mapping: ToadieMapping,
     val registryMapping: ToadieRegistryMapping?,
+    val adoptionMapping: ToadieAdoptionMapping?,
     val hasApiKey: Boolean,
     val createdAt: Long,
     val updatedAt: Long,
@@ -245,11 +270,48 @@ data class ToadieUsageResponse(
     val cache: ToadieCacheStatus,
 )
 
+@Serializable
+data class ToadieAdoptionRow(
+    val id: String,
+    val identifier: String,
+    val title: String,
+    val url: String?,
+    val consumer: ToadieEntityRef,
+    val target: ToadieEntityRef,
+    val environment: ToadieEntityRef?,
+    val environmentScope: ToadieAdoptionEnvironmentScope,
+    val kind: ToadieAdoptionKind,
+    val value: String?,
+    val status: String?,
+    val declaredBy: String?,
+    val verifiedAt: Long?,
+    val notes: String?,
+    val matchesConsumption: Boolean,
+)
+
+@Serializable
+data class ToadieAdoptionsProjection(
+    val availability: ToadieAdoptionAvailability,
+    val items: List<ToadieAdoptionRow>,
+)
+
+@Serializable
+data class ToadieAdoptionResponse(
+    val items: List<ToadieAdoptionRow>,
+    val page: Int,
+    val pageSize: Int,
+    val total: Long,
+    val connection: ToadieConnectionRef?,
+    val cache: ToadieCacheStatus,
+    val availability: ToadieAdoptionAvailability,
+)
+
 data class ToadieFetchConfig(
     val baseUrl: String,
     val apiKey: String,
     val mapping: ToadieMapping,
     val registryMapping: ToadieRegistryMapping? = null,
+    val adoptionMapping: ToadieAdoptionMapping? = null,
     val knownRevision: Long? = null,
 )
 
@@ -264,6 +326,7 @@ data class ToadieEntitySnapshot(
     val updatedAt: Long,
     val registryDescription: String? = null,
     val registryErrorCode: String? = null,
+    val scalarProperties: Map<String, String?> = emptyMap(),
 )
 
 sealed interface ToadieFetchResult
@@ -274,6 +337,8 @@ data class ToadieSnapshot(
     val systemBlueprint: String?,
     val fetchedAt: Long,
     val revision: Long,
+    val adoptionAvailability: ToadieAdoptionAvailability = ToadieAdoptionAvailability.NOT_CONFIGURED,
+    val adoptionEnvironmentBlueprint: String? = null,
 ) : ToadieFetchResult
 
 data class ToadieUnchanged(val revision: Long, val checkedAt: Long) : ToadieFetchResult

@@ -29,6 +29,7 @@ class ReleaseLineMigrationReportTest {
         apiKey = "migration-secret-key",
         enabled = enabled,
         refreshIntervalMinutes = 60,
+        adoptionMapping = ToadieAdoptionMapping(),
     )
 
     @Test
@@ -116,11 +117,23 @@ class ReleaseLineMigrationReportTest {
         assertEquals("API Two", report.linkedApis.single { it.apiEntityId == "2" }.title)
         assertFalse(raw.contains("migration-secret-key"))
         assertFalse(raw.contains("baseUrl"))
+        assertEquals(2, report.adoptions.items.size)
+        assertEquals(ToadieAdoptionAvailability.AVAILABLE, report.adoptions.availability)
+        assertTrue(report.adoptions.items.all { !it.matchesConsumption })
+        assertEquals(
+            setOf(ToadieAdoptionEnvironmentScope.ALL, ToadieAdoptionEnvironmentScope.SPECIFIC),
+            report.adoptions.items.map { it.environmentScope }.toSet(),
+        )
+        assertEquals("v2", report.adoptions.items.first().value, "the selected Covenant major does not reinterpret raw adoption")
 
         val paged = reader.get("/api/v1/contracts/${contract.id}/toadie-usage?pageSize=100")
             .body<ToadieUsageResponse>()
         assertEquals(101, paged.total)
         assertEquals(100, paged.items.size)
+        val adoptionPage = reader.get("/api/v1/contracts/${contract.id}/toadie-adoptions?pageSize=1")
+            .body<ToadieAdoptionResponse>()
+        assertEquals(2, adoptionPage.total)
+        assertEquals(1, adoptionPage.items.size)
         suspendTransaction(sharedDatabaseForTests()) {
             assertFailsWith<ConflictException> {
                 service.fullUsageInTransaction(contract.id, maxProjectedBytes = 1)
@@ -161,14 +174,19 @@ class ReleaseLineMigrationReportTest {
         assertTrue(
             service.publish(
                 service.claimRefresh(connectionId, false).second!!,
-                amplifiedSnapshot(),
+                combinedBudgetSnapshot(),
             ),
         )
         assertEquals(HttpStatusCode.Conflict, reader.get(path).status)
         val amplifiedPage = reader.get("/api/v1/contracts/${contract.id}/toadie-usage?pageSize=100")
             .body<ToadieUsageResponse>()
-        assertEquals(2000, amplifiedPage.total)
+        assertEquals(1000, amplifiedPage.total)
         assertEquals(100, amplifiedPage.items.size)
+        assertEquals(
+            800,
+            reader.get("/api/v1/contracts/${contract.id}/toadie-adoptions?pageSize=100")
+                .body<ToadieAdoptionResponse>().total,
+        )
         assertEquals(HttpStatusCode.NotFound, reader.get("/api/v1/contracts/${contract.id}/release-lines/9/migration-report").status)
         assertEquals(HttpStatusCode.BadRequest, reader.get("/api/v1/contracts/${contract.id}/release-lines/-1/migration-report").status)
         assertEquals(HttpStatusCode.NotFound, reader.get("/api/v1/contracts/2147483647/release-lines/1/migration-report").status)
@@ -251,21 +269,60 @@ class ReleaseLineMigrationReportTest {
                 1,
             )
         }
-        return ToadieSnapshot(apis + services, "system", System.currentTimeMillis(), 1)
+        val environment = ToadieEntitySnapshot(
+            "9000", "environment", "production", "Production", emptyList(), emptyMap(), 1,
+        )
+        val unmatched = ToadieEntitySnapshot(
+            "9001", "service", "declared-only", "Declared only", emptyList(),
+            mapOf("consumes_apis" to emptyList()), 1,
+        )
+        val adoptions = listOf(
+            ToadieEntitySnapshot(
+                "9002", "api_adoption", "declared-production", "Declared production", emptyList(),
+                mapOf("consumer" to listOf("declared-only"), "api" to listOf("api-one"),
+                    "environment" to listOf("production")), 1,
+                scalarProperties = mapOf("major_line" to "v2"),
+            ),
+            ToadieEntitySnapshot(
+                "9003", "api_adoption", "declared-all", "Declared all", emptyList(),
+                mapOf("consumer" to listOf("declared-only"), "api" to listOf("api-one"),
+                    "environment" to emptyList()), 1,
+                scalarProperties = mapOf("major_line" to "v2"),
+            ),
+        )
+        return ToadieSnapshot(
+            apis + services + environment + unmatched + adoptions, "system", System.currentTimeMillis(), 1,
+            ToadieAdoptionAvailability.AVAILABLE, "environment",
+        )
     }
 
-    private fun amplifiedSnapshot(): ToadieSnapshot {
+    private fun combinedBudgetSnapshot(): ToadieSnapshot {
         val teams = (1..50).map { index ->
             ToadieEntitySnapshot("${3000 + index}", "_team", "team-$index", "Team $index", emptyList(), emptyMap(), 1)
         }
         val teamIdentifiers = teams.map { it.identifier }
-        val services = (1..2000).map { index ->
+        val services = (1..1000).map { index ->
             ToadieEntitySnapshot(
                 "${4000 + index}", "service", "amplified-$index", "Amplified $index", teamIdentifiers,
                 mapOf("provides_apis" to listOf("api-one")), 1,
             )
         }
         val api = ToadieEntitySnapshot("1", "api", "api-one", "API One", emptyList(), emptyMap(), 1)
-        return ToadieSnapshot(listOf(api) + teams + services, "system", System.currentTimeMillis(), 1)
+        val scalar = "x".repeat(2000)
+        val adoptions = (1..800).map { index ->
+            ToadieEntitySnapshot(
+                "${7000 + index}", "api_adoption", "large-$index", "Large $index", emptyList(),
+                mapOf("consumer" to listOf("amplified-1"), "api" to listOf("api-one"),
+                    "environment" to emptyList()), 1,
+                scalarProperties = mapOf(
+                    "major_line" to scalar, "status" to scalar, "declared_by" to scalar, "notes" to scalar,
+                    "verified_at" to null,
+                ),
+            )
+        }
+        return ToadieSnapshot(
+            listOf(api) + teams + services + adoptions, "system", System.currentTimeMillis(), 1,
+            ToadieAdoptionAvailability.AVAILABLE, "environment",
+        )
     }
 }

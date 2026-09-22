@@ -57,13 +57,13 @@ after the login page commits, so a suspended or retried render cannot discard th
 
 Every list page composes the same ported Lettuce blocks — copy `pages/Users.tsx` (and, for a filter-heavy catalog list, Toadie's `pages/CatalogFiles.tsx` + `hooks/useCatalogFileFilterState.ts` + `components/CatalogFileFilterControls.tsx`), don't re-derive:
 
-- **State**: filters in `useStoredState` (persisted under `covenant.viewSettings.<viewKey>.filter.*`, text filters debounced 300 ms — the DEBOUNCED value goes into the query key, and any action reading the filters reads the DEBOUNCED value too, so a click never operates on a slice the table isn't showing), sort/page/pageSize from `usePagedSort(initialSort, filterDeps, { key, sortFields })` with `SORT_FIELDS ... as const`. Every query derived from one area keys under that area's prefix (`["users", …]`; `["contracts", …]` for the list, tree, detail, versions, version, live checks and the palette search), so one `invalidateQueries([<area>])` after any mutation refreshes them all.
+- **State**: filters in `useStoredState` (persisted under `covenant.viewSettings.<viewKey>.filter.*`, text filters debounced 300 ms — the DEBOUNCED value goes into the query key, and any action reading the filters reads the DEBOUNCED value too, so a click never operates on a slice the table isn't showing), sort/page/pageSize from `usePagedSort(initialSort, filterDeps, { key, sortFields })` with `SORT_FIELDS ... as const`. Every query derived from one area keys under that area's prefix (`["users", …]`; `["contracts", …]` for the list, tree, detail, versions, version, live checks and the palette search), so refreshing an area prefix after a mutation refreshes all its active queries and invalidates inactive cached data.
 - **Query**: `useQuery({ queryKey: ["<area>", page, pageSize, sortParam, ...filters], queryFn: list<Area>(...), placeholderData: keepPreviousData })`.
 - **Chrome**: `FilterPanel` (collapsed by default, persisted, active-count badge) + `ClearableTextInput` for freetext filters (debounced) and Selects for closed value spaces (undebounced: Select changes are discrete); `SortHeader` renders its OWN `Table.Th` (so the sort state lands as `aria-sort` on the header cell — don't wrap it in another Th); `TableLoadingRow` (`isLoading && !data`) / rows / `EmptyState` (`!isError`) triage in the tbody; a `color="red" variant="light"` Alert with `loadErrorMessage` ABOVE the table on error; `PaginationBar` below. A shared filter set (one hook for the persisted slots + normalized `values`/`deps`, one controls component rendered inside `FilterPanel`) is extended in the hook + controls (and every endpoint that takes the params), never on one page. The contracts controls take the server's **facets** (`getContractFacets(filters.values)` under `["contracts","facets",…]`, `keepPreviousData`) and write the counts into the option labels — `OpenAPI (12)`, `Active (9)`, `Payments (13)` — a zero-count value stays offered (a selected value must remain selectable); without facets the labels are plain.
 - **Reusing a filter set for a different row shape**: `useContractFilterState(viewKey, { latestVersion?: boolean })` (default `true`) gates the two fields that read a contract's LATEST version (lifecycle, hasErrors) out of `values`/`deps`/`activeCount` — `hooks/useErrorFilterState.ts` composes it with `{ latestVersion: false }` for the Errors report (`/errors`, `pages/Errors.tsx`), whose rows are VERSIONS, not contracts, and adds its own three persisted chip slots (the version's own lifecycle, finding severity, finding source — `utils/findings.ts` holds the shared `SEVERITIES`/`SEVERITY_COLOR`/`STORED_SOURCES` constants). `components/ErrorFilterControls.tsx` wraps `ContractFilterControls` (which hides the now-inapplicable Lifecycle/only-with-errors controls via `filters.latestVersion === false`) and adds the version-lifecycle `MultiSelect`. The severity/source chips (`components/ErrorsSummaryStrip.tsx`) are **SERVER filters**, not Toadie's client-side pills — toggling one changes the request and refetches both the rows and the facets; since the server's empty-list idiom means "any" while an empty CHIP set here means "show nothing", the page tracks a `noSelection` flag (every severity or every source off) and sets both queries `enabled: !noSelection` rather than firing a request no filter value could express.
 - **The colour vocabulary is app-wide, not per-page**: red = hard/blocking (validation errors, destructive confirm buttons, a failed row), orange = a soft finding that saves through a waiver (Save-anyway, `*_WITH_FINDINGS` rows), teal = success, gray = neutral state. Lifecycle pills follow it too: DRAFT gray, PROPOSED yellow, ACTIVE teal, DEPRECATED orange, RETIRED gray outline. A new status colour goes through that vocabulary, not a page-local pick.
 - **Two kinds of problem, two colours.** Hard client validation BLOCKS the save and stays Mantine's red; a live-check FINDING does not block it (it routes through Save-anyway), so it shows ORANGE. Findings are **presentational only, never `form.setFieldError`** — Mantine replaces the whole error map on every submit, so a form-state finding would flicker away, and form state must stay the sole province of the rules that actually block saving.
-- **Delete**: `useDeleteConfirm` + `ConfirmDeleteModal` — the hook owns modal state and the success toast, the page owns `invalidateQueries`. Environments cancels its pending queries before invalidating after successful mutations: a newly keyed initial fetch has no cached data even when `keepPreviousData` displays rows, so default invalidation alone may reuse a pre-mutation response.
+- **Delete**: `useDeleteConfirm` + `ConfirmDeleteModal` — the hook owns modal state and the success toast, the page owns cache refresh. For mutations while a list remains mounted, use `refreshQueriesAfterMutation(queryClient, ["area"], ...)` from `utils/queryRefresh.ts` after success. It cancels all affected query groups before invalidating them: a newly keyed initial fetch has no cached data even when `keepPreviousData` displays rows, so default invalidation alone may reuse a pre-mutation response. Preserve related prefixes (for example Systems also refreshes Domains); keep refresh out of failed mutation paths.
 - **An entity's NAME is the way into its detail page** — a `RouterLink` `Anchor` with an interpolated accessible name (`common.action.editAria` = "Edit {{name}}", or an area-specific `openAria`), which is what tests and e2e locate. A real link, not an onClick: cmd/middle-click opens a tab and it takes keyboard focus. Route families are spelled out ONCE in `utils/<area>Links.ts` — never hand-assemble a URL.
 - Row action buttons carry interpolated aria-labels (`<area>.editAria` etc.) — unit tests and e2e locate by them; table tests query cells by **text**, not `cell` role names. **Row actions**: a row with more than two actions bundles them under `components/RowActionsMenu.tsx` — an icon-only kebab whose accessible name is `common.table.operationsAria` ("Operations for {{name}}"; items are plain `menuitem`s, only one row's menu is open at a time, and the e2e `rowOperation`/`deleteUserRow` helpers drive it by that name and the trigger's `aria-controls`). Two always-available actions stay visible as neutral `ActionIcon`s with tooltips (Toadie's `RowEditDelete.tsx` was superseded — every registry row has three actions and takes the kebab); a per-row `Switch` (Feature flags) is state, not an action.
 
@@ -188,11 +188,27 @@ version exists. Preserve explicitly edited values and seeded documents. Policy d
 advisory, END_OF_LIFE clears the explicit recommendation, and an empty/UNSPECIFIED line must
 not imply support or deployment. Shared domain rules live in `.claude/docs/release-lines.md`.
 
+## Declared Toadie adoption (1.1.0)
+
+The optional `adoptionMapping` is edited separately from architecture mapping; opening a form
+or choosing an ordinary API/dataset preset never enables it. The shared usage/impact surface
+includes a separately paged declaration reader. Distinguish mapping disabled, not scanned,
+blueprint missing and available from connection freshness; stale records remain visible.
+Preserve every declaration's target, consumer, value, environment scope, status and provenance.
+Show discrepancies with architecture consumption without excluding the declaration or changing
+architecture counts. An unmapped environment is unknown; an empty mapped relation means all
+environments. Null declared values remain unknown. Source status is not Covenant lifecycle.
+
+Impact readiness waits for the declaration read as well as plan and architecture reads. Reports
+serialize the complete server projection, independent of either visible table's filters/pages;
+escape metadata and notes and keep source verification time distinct from cache/report time.
+See `.claude/docs/toadie-adoption.md` for the API and consistency contract.
+
 ## Toadie usage (0.10.0)
 
 Connection administration uses the existing registry/editor patterns. API keys are write-only;
 leaving the key blank on update retains it. Server and browser URLs are separate. The contract
-usage panel renders cached provider/consumer roles, systems and teams, explicitly unknown
+usage panel renders cached provider/consumer roles, systems and teams, explicitly unknown runtime
 version/line, and per-connection freshness. Link editing and contract refresh require canWrite.
 Keep selected APIs across picker pages/searches, and preserve removable missing selections.
 A 202 refresh is accepted work: poll for completion and render failure/staleness without erasing
@@ -208,7 +224,7 @@ references so unrelated policy edits remain possible. `ReleaseLinePlan` clamps g
 summary cards and displays the complete text in `RetirementImpactModal`. That modal precedes
 RETIRED transitions and a change to END_OF_LIFE, with an explicit acknowledgment; it also opens
 read-only from each line. It reuses `ContractToadieUsage` in consumer-only mode. Missing or stale
-usage is a visible warning, while a failed Covenant plan read must be retried. Keep version/line
+usage is a visible warning, while a failed Covenant plan read must be retried. Keep runtime version/line
 adoption explicitly unknown and never present empty usage as retirement approval. Deadline
 notifications translate structural stages; the server supplies no invented actor.
 
@@ -222,5 +238,5 @@ visible usage table's filters/paging and any unsaved policy form. Preserve compl
 guidance with safe Markdown escaping; never turn stored content into executable HTML or
 untrusted links. Generation, plan-update and cache-observation timestamps are separate UTC
 instants. Include missing/stale/unavailable warnings and always state contract-level usage,
-unknown version/line adoption and the limits of an empty observation. A failed read produces an
+unknown runtime version/line adoption and the limits of an empty observation. A failed read produces an
 inline error and no partial file; downloading never confirms retirement or modifies a policy.

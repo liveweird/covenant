@@ -783,7 +783,7 @@ export interface paths {
         get: operations["getToadieConnection"];
         /**
          * Replace a Toadie connection
-         * @description ADMIN only. Full replacement except an omitted API key retains the encrypted value. The base URL is immutable; usage or registry mapping changes invalidate the snapshot. Omitting registryMapping disables registry sync while retaining bindings and source-owned field protection until explicit detach.
+         * @description ADMIN only. Full replacement except an omitted API key retains the encrypted value. The base URL is immutable; usage, registry, or adoption mapping changes invalidate the complete cached graph and verified revision. Omitting/null adoptionMapping disables adoption scanning; omitting/null registryMapping disables registry sync while retaining bindings and source-owned field protection until explicit detach.
          */
         put: operations["updateToadieConnection"];
         post?: never;
@@ -878,6 +878,28 @@ export interface paths {
          * @description Any authenticated user. `q` searches service identifier and title case- and accent-insensitively; `role` is exact. Sortable: `id`, `title`; default `id` ascending.
          */
         get: operations["getContractToadieUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts/{contractId}/toadie-adoptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contractId: number;
+            };
+            cookie?: never;
+        };
+        /**
+         * Get cached declared adoption for a contract's linked APIs or datasets
+         * @description Any authenticated user. `q` searches adoption, consumer, and target identifier/title case- and accent-insensitively. Sortable: `id`, `title`; default `id` ascending. Declarations are upstream metadata, never runtime evidence.
+         */
+        get: operations["getContractToadieAdoptions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2649,7 +2671,33 @@ export interface components {
             /** @default system */
             systemRelation: string;
         };
+        /** @enum {string} */
+        ToadieAdoptionKind: "API_MAJOR_LINE" | "DATASET_CONTRACT_VERSION";
+        /** @description Optional read-only declared-adoption mapping. API preset uses api_adoption/consumer/api/environment/major_line; dataset preset uses dataset_adoption/consumer/dataset/environment/contract_version. */
+        ToadieAdoptionMapping: {
+            /** @default api_adoption */
+            blueprint: string;
+            kind: components["schemas"]["ToadieAdoptionKind"];
+            /** @default consumer */
+            consumerRelation: string;
+            /** @default api */
+            targetRelation: string;
+            /** @default environment */
+            environmentRelation: string | null;
+            /** @default major_line */
+            valueProperty: string;
+            /** @default status */
+            statusProperty: string | null;
+            /** @default declared_by */
+            declaredByProperty: string | null;
+            /** @default verified_at */
+            verifiedAtProperty: string | null;
+            /** @default notes */
+            notesProperty: string | null;
+        };
         ToadieConnectionRequest: {
+            /** @description Opt-in declared adoption projection; omitted/null disables it and performs no adoption requests. */
+            adoptionMapping?: components["schemas"]["ToadieAdoptionMapping"] | null;
             /** @description Opt-in registry projection; omitted/null on replace disables sync while preserving bindings and managed fields until detach. */
             registryMapping?: components["schemas"]["ToadieRegistryMapping"] | null;
             name: string;
@@ -2666,6 +2714,7 @@ export interface components {
             apiKey: string;
         };
         ToadieConnectionResponse: {
+            adoptionMapping: components["schemas"]["ToadieAdoptionMapping"] | null;
             /** @description Opt-in registry projection; omitted/null on replace disables sync while preserving bindings and managed fields until detach. */
             registryMapping?: components["schemas"]["ToadieRegistryMapping"] | null;
             /** Format: int32 */
@@ -2770,9 +2819,9 @@ export interface components {
             consumedApiEntityIds: string[];
             systems: components["schemas"]["ToadieEntityRef"][];
             teams: components["schemas"]["ToadieEntityRef"][];
-            /** @description Not read by this connector; always null, even if Toadie has adoption declarations. */
+            /** @description Runtime version adoption is not observed; always null. Optional upstream declarations are exposed separately by the adoption collection. */
             version: string | null;
-            /** @description Not read by this connector; always null, even if Toadie has adoption declarations. */
+            /** @description Runtime major-line adoption is not observed; always null. Optional upstream declarations are exposed separately by the adoption collection. */
             releaseLine: string | null;
         };
         ToadieUsageResponse: {
@@ -2783,6 +2832,47 @@ export interface components {
             total: number;
             connection: components["schemas"]["ToadieConnectionRef"] | null;
             cache: components["schemas"]["ToadieCacheStatus"];
+        };
+        /** @enum {string} */
+        ToadieAdoptionAvailability: "NOT_CONFIGURED" | "NOT_SCANNED" | "BLUEPRINT_MISSING" | "AVAILABLE";
+        /** @enum {string} */
+        ToadieAdoptionEnvironmentScope: "ALL" | "SPECIFIC" | "UNKNOWN";
+        ToadieAdoptionRow: {
+            id: string;
+            identifier: string;
+            title: string;
+            url: string | null;
+            consumer: components["schemas"]["ToadieEntityRef"];
+            target: components["schemas"]["ToadieEntityRef"];
+            environment: components["schemas"]["ToadieEntityRef"] | null;
+            environmentScope: components["schemas"]["ToadieAdoptionEnvironmentScope"];
+            kind: components["schemas"]["ToadieAdoptionKind"];
+            /** @description Verbatim upstream declaration; null means undeclared. */
+            value: string | null;
+            status: string | null;
+            declaredBy: string | null;
+            /**
+             * Format: int64
+             * @description Parsed from an RFC 3339 date-time with a four-digit year and returned as epoch milliseconds.
+             */
+            verifiedAt: number | null;
+            notes: string | null;
+            /** @description Whether the consumer also has the configured architecture consumes edge to this target. */
+            matchesConsumption: boolean;
+        };
+        ToadieAdoptionsProjection: {
+            availability: components["schemas"]["ToadieAdoptionAvailability"];
+            items: components["schemas"]["ToadieAdoptionRow"][];
+        };
+        ToadieAdoptionResponse: {
+            items: components["schemas"]["ToadieAdoptionRow"][];
+            page: number;
+            pageSize: number;
+            /** Format: int64 */
+            total: number;
+            connection: components["schemas"]["ToadieConnectionRef"] | null;
+            cache: components["schemas"]["ToadieCacheStatus"];
+            availability: components["schemas"]["ToadieAdoptionAvailability"];
         };
         SystemResponse: {
             /** @description Linked Port source; null for a local registry record. Source ownership never grants permissions. */
@@ -3935,6 +4025,7 @@ export interface components {
             cache: components["schemas"]["ToadieCacheStatus"];
             linkedApis: components["schemas"]["ToadieLinkResponse"][];
             services: components["schemas"]["ToadieUsageRow"][];
+            adoptions: components["schemas"]["ToadieAdoptionsProjection"];
         };
         ReleaseLinePage: {
             items: components["schemas"]["ReleaseLineResponse"][];
@@ -6181,6 +6272,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ToadieUsageResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getContractToadieAdoptions: {
+        parameters: {
+            query?: {
+                /** @description 1-based page index. Defaults to 1. */
+                page?: components["parameters"]["Page"];
+                /** @description Rows per page. Defaults to 20, maximum 100. */
+                pageSize?: components["parameters"]["PageSize"];
+                /**
+                 * @description Sort spec. Format: `field` (ascending) or `-field` (descending). Multiple fields are
+                 *     comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
+                 *     sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
+                 *     always appended as a deterministic tiebreaker.
+                 */
+                sort?: components["parameters"]["Sort"];
+                /** @description Case- and accent-insensitive free-text search; each endpoint documents the fields searched. */
+                q?: components["parameters"]["Q"];
+            };
+            header?: never;
+            path: {
+                contractId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cached adoption projection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToadieAdoptionResponse"];
                 };
             };
             400: components["responses"]["BadRequest"];

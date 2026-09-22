@@ -1,9 +1,10 @@
 import { describe, expect, test } from "vitest";
 import i18n from "../i18n";
 import { ApiError } from "../api/http";
-import { applyToadieMappingPreset, EMPTY_TOADIE_FORM, fromToadieConnection, TOADIE_MAPPING_PRESETS, toadieFormValidation, toadieSaveErrorMessage, toToadieRequest } from "./toadieForm";
+import { applyToadieAdoptionMappingPreset, applyToadieMappingPreset, EMPTY_TOADIE_FORM, fromToadieConnection, TOADIE_ADOPTION_MAPPING_PRESETS, TOADIE_MAPPING_PRESETS, toadieFormValidation, toadieSaveErrorMessage, toToadieRequest } from "./toadieForm";
 
 const CONNECTION = {
+  adoptionMapping: null,
   id: 1,
   name: "Architecture",
   baseUrl: "https://toadie.internal",
@@ -54,6 +55,7 @@ describe("Toadie connection form", () => {
       enabled: true,
       refreshIntervalMinutes: 60,
       mapping: CONNECTION.mapping,
+      adoptionMapping: null,
       registryMapping: null,
     });
     expect(toToadieRequest({ ...values, apiKey: " replacement " })).toHaveProperty("apiKey", "replacement");
@@ -75,7 +77,28 @@ describe("Toadie connection form", () => {
     expect(dataset).toEqual({ ...custom, ...TOADIE_MAPPING_PRESETS.dataset });
     expect(dataset.apiKey).toBe("secret");
     expect(dataset.registryMapping).toBe(custom.registryMapping);
+    expect(dataset.adoptionEnabled).toBe(false);
+    expect(dataset.adoptionMapping).toBe(custom.adoptionMapping);
     expect(applyToadieMappingPreset(dataset, "api")).toEqual({ ...custom, ...TOADIE_MAPPING_PRESETS.api });
+  });
+
+  test("adoption is opt-in, preserves custom mappings, and serializes optional fields as null", () => {
+    const saved = { ...CONNECTION, adoptionMapping: {
+      blueprint: "custom-adoption", kind: "API_MAJOR_LINE" as const, consumerRelation: "used_by", targetRelation: "targets",
+      environmentRelation: null, valueProperty: "line", statusProperty: null, declaredByProperty: "owner_id", verifiedAtProperty: null, notesProperty: null,
+    } };
+    const values = fromToadieConnection(saved);
+    expect(values.adoptionEnabled).toBe(true);
+    expect(values.adoptionMapping.blueprint).toBe("custom-adoption");
+    expect(values.adoptionMapping.environmentRelation).toBe("");
+    expect(toToadieRequest(values).adoptionMapping).toEqual(saved.adoptionMapping);
+
+    const disabledDataset = applyToadieMappingPreset(EMPTY_TOADIE_FORM, "dataset");
+    expect(disabledDataset.adoptionEnabled).toBe(false);
+    expect(toToadieRequest(disabledDataset).adoptionMapping).toBeNull();
+    const adoptionDataset = applyToadieAdoptionMappingPreset({ ...values, adoptionEnabled: false }, "dataset");
+    expect(adoptionDataset.adoptionEnabled).toBe(false);
+    expect(adoptionDataset.adoptionMapping).toEqual(TOADIE_ADOPTION_MAPPING_PRESETS.dataset);
   });
 
   test("requires explicit flattening acknowledgement and serializes optional registry mapping fields", () => {

@@ -142,7 +142,7 @@ test.describe.serial("release-line lifecycle plans", () => {
     await expect(dialog).toContainText("Storefront website");
     await expect(dialog).toContainText("Commerce system");
     await expect(dialog).toContainText("Retail team");
-    await expect(dialog).toContainText(/whole contract.*version and release line are unknown/);
+    await expect(dialog).toContainText(/whole contract.*runtime adoption remains unknown/);
     await expect(dialog.getByText("Unknown", { exact: true })).toHaveCount(2);
     await expect(dialog.getByRole("button", { name: "Retire", exact: true })).toBeDisabled();
     const scan = await new AxeBuilder({ page }).include('[role="dialog"]').withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();

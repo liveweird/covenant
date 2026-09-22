@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { screen, waitFor, within } from "@testing-library/react";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { notifications } from "@mantine/notifications";
+import { QueryClient } from "@tanstack/react-query";
 import FeatureFlags from "./FeatureFlags";
 import { jsonResponse } from "../test/http";
 import { renderWithProviders } from "../test/render";
@@ -11,6 +12,14 @@ const TOKEN_KEY = "covenant.auth.token";
 const ROLES_KEY = "covenant.auth.roles";
 
 type FetchMock = ReturnType<typeof vi.fn>;
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
 
 function PathProbe() {
   const location = useLocation();
@@ -27,12 +36,20 @@ function renderPage() {
   );
 }
 
-const ROWS = [
+type TestUser = {
+  id: number;
+  name: string;
+  email: string;
+  roles: "ADMIN"[];
+  disabledFeatures: "MFA"[];
+};
+
+const ROWS: TestUser[] = [
   { id: 1, name: "Alice Admin", email: "alice@example.com", roles: ["ADMIN"], disabledFeatures: [] },
   { id: 2, name: "Bob Basic", email: "bob@example.com", roles: [], disabledFeatures: ["MFA"] },
 ];
 
-function usersPage(items: typeof ROWS, total = items.length) {
+function usersPage(items: TestUser[], total = items.length) {
   return jsonResponse(200, { items, page: 1, pageSize: 20, total });
 }
 
@@ -110,6 +127,50 @@ describe("FeatureFlags page", () => {
     expect(showSpy).toHaveBeenCalledWith(
       expect.objectContaining({ message: "Feature flags saved" }),
     );
+  });
+
+  test("a successful toggle cannot be overwritten by a pending first filtered response", async () => {
+    const filtered = deferred<Response>();
+    const updatedRows: TestUser[] = [{ ...ROWS[0], disabledFeatures: ["MFA"] }, ROWS[1]];
+    let filteredReads = 0;
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      if (method === "PUT" && url === "/api/v1/users/1/features") {
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      if (method === "GET" && url.startsWith("/api/v1/users?")) {
+        const name = new URL(url, "http://test").searchParams.get("name");
+        if (name === "Alice Admin") {
+          filteredReads++;
+          if (filteredReads === 1) return filtered.promise;
+          return Promise.resolve(usersPage(updatedRows));
+        }
+        return Promise.resolve(usersPage(ROWS));
+      }
+      return Promise.resolve(jsonResponse(404, {}));
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidate = queryClient.invalidateQueries.bind(queryClient);
+    vi.spyOn(queryClient, "invalidateQueries").mockImplementation((filters, options) => {
+      const result = invalidate(filters, options);
+      // Deliver the pre-toggle response precisely when the successful mutation refreshes.
+      filtered.resolve(usersPage(ROWS));
+      return result;
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<FeatureFlags />, { queryClient });
+
+    const toggle = await screen.findByRole("switch", { name: "Toggle Email MFA for Alice Admin" });
+    expect(toggle).toBeChecked();
+    await user.click(screen.getByRole("button", { name: /filters/i }));
+    await user.type(screen.getByLabelText("Name"), "Alice Admin");
+    await waitFor(() => expect(filteredReads).toBe(1));
+
+    await user.click(toggle);
+
+    await waitFor(() => expect(toggle).not.toBeDisabled());
+    await waitFor(() => expect(toggle).not.toBeChecked());
+    expect(filteredReads).toBe(2);
   });
 
   test("the state filter sends the feature+featureEnabled pair; 'any' sends neither", async () => {

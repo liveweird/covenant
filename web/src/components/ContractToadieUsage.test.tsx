@@ -23,6 +23,7 @@ describe("Contract Toadie usage", () => {
     mockFetch = vi.fn((url: string) => {
       if (url === "/api/v1/contracts/5/toadie-links") return Promise.resolve(jsonResponse(200, LINKS));
       if (url.startsWith("/api/v1/contracts/5/toadie-usage?")) return Promise.resolve(jsonResponse(200, USAGE));
+      if (url.startsWith("/api/v1/contracts/5/toadie-adoptions?")) return Promise.resolve(jsonResponse(200, { ...USAGE, items: [], total: 0, availability: "NOT_CONFIGURED" }));
       return Promise.resolve(jsonResponse(404, { title: "Not Found", status: 404 }));
     });
     vi.stubGlobal("fetch", mockFetch);
@@ -49,6 +50,56 @@ describe("Contract Toadie usage", () => {
     });
     renderWithProviders(<ContractToadieUsage contractId={5} canWrite={false} />);
     expect(await screen.findByText("This contract is not linked to a Toadie API or dataset")).toBeInTheDocument();
+  });
+
+  test("keeps multi-environment declarations and unmatched raw values as independent rows", async () => {
+    const ref = (entityId: string, title: string) => ({ entityId, identifier: entityId, title, url: null });
+    mockFetch.mockImplementation((url: string) => {
+      if (url === "/api/v1/contracts/5/toadie-links") return Promise.resolve(jsonResponse(200, LINKS));
+      if (url.startsWith("/api/v1/contracts/5/toadie-usage?")) return Promise.resolve(jsonResponse(200, USAGE));
+      if (url.startsWith("/api/v1/contracts/5/toadie-adoptions?")) return Promise.resolve(jsonResponse(200, {
+        page: 1, pageSize: 20, total: 3, connection: LINKS.connection, cache: { ...CACHE, state: "CURRENT", lastErrorCode: null }, availability: "AVAILABLE",
+        items: [
+          { id: "adoption-1", identifier: "checkout-prod", title: "Checkout production", url: null, consumer: ref("checkout", "Checkout"), target: ref("api-9", "Orders API"), environment: ref("production", "Production"), environmentScope: "SPECIFIC", kind: "API_MAJOR_LINE", value: "1", status: "current", declaredBy: "portfolio/team-a", verifiedAt: 1_700_000_000_000, notes: null, matchesConsumption: true },
+          { id: "adoption-2", identifier: "checkout-all", title: "Checkout default", url: null, consumer: ref("checkout", "Checkout"), target: ref("api-9", "Orders API"), environment: null, environmentScope: "ALL", kind: "API_MAJOR_LINE", value: "2.x-preview", status: "awaiting approval", declaredBy: null, verifiedAt: null, notes: "Coordinate both environments", matchesConsumption: true },
+          { id: "adoption-3", identifier: "legacy", title: "Legacy declaration", url: null, consumer: ref("legacy", "Legacy"), target: ref("api-9", "Orders API"), environment: null, environmentScope: "UNKNOWN", kind: "API_MAJOR_LINE", value: null, status: null, declaredBy: null, verifiedAt: null, notes: null, matchesConsumption: false },
+        ],
+      }));
+      return Promise.resolve(jsonResponse(404, { title: "Not Found", status: 404 }));
+    });
+    renderWithProviders(<ContractToadieUsage contractId={5} canWrite={false} />);
+    const table = await screen.findByRole("table", { name: "Declared adoption from Toadie" });
+    const region = table.closest("[role=region]") as HTMLElement;
+    expect(within(region).getByText("All environments")).toBeInTheDocument();
+    expect(within(region).getByText("Unknown environment scope")).toBeInTheDocument();
+    expect(within(region).getByText("2.x-preview")).toBeInTheDocument();
+    expect(within(region).getByText("awaiting approval")).toBeInTheDocument();
+    expect(within(region).queryByText("Migrating")).not.toBeInTheDocument();
+    expect(within(region).getByText("No consumption relationship")).toBeInTheDocument();
+  });
+
+  test("review readiness waits for the adoption request after usage has settled", async () => {
+    let resolveAdoptions!: (response: Response) => void;
+    const pendingAdoptions = new Promise<Response>((resolve) => { resolveAdoptions = resolve; });
+    mockFetch.mockImplementation((url: string) => {
+      if (url === "/api/v1/contracts/5/toadie-links") return Promise.resolve(jsonResponse(200, LINKS));
+      if (url.startsWith("/api/v1/contracts/5/toadie-usage?")) return Promise.resolve(jsonResponse(200, USAGE));
+      if (url.startsWith("/api/v1/contracts/5/toadie-adoptions?")) return pendingAdoptions;
+      return Promise.resolve(jsonResponse(404, { title: "Not Found", status: 404 }));
+    });
+    const onReviewReady = vi.fn();
+    renderWithProviders(<ContractToadieUsage contractId={5} canWrite={false} onReviewReady={onReviewReady} />);
+    await screen.findByText("Checkout");
+    expect(onReviewReady).toHaveBeenCalledWith(false);
+    expect(onReviewReady).not.toHaveBeenCalledWith(true);
+    const adoptionRegion = screen.getByRole("region", { name: "Declared adoption from Toadie" });
+    expect(within(adoptionRegion).getByRole("status", { name: "Loading…" })).toBeInTheDocument();
+
+    resolveAdoptions(jsonResponse(200, { ...USAGE, items: [], total: 0, availability: "NOT_CONFIGURED" }));
+    await waitFor(() => expect(onReviewReady).toHaveBeenLastCalledWith(true));
+    expect(within(adoptionRegion).queryByRole("status", { name: "Loading…" })).not.toBeInTheDocument();
+    const usageRegion = screen.getByRole("region", { name: "Usage from Toadie" });
+    expect(within(usageRegion).getByText("Stale", { exact: true })).toBeInTheDocument();
   });
 
   test("selected APIs survive result paging, and a missing existing API remains removable", async () => {

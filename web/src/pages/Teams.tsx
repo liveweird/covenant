@@ -23,6 +23,7 @@ import { usePagedSort } from "../hooks/usePagedSort";
 import { isString, useStoredState } from "../hooks/useStoredState";
 import { loadErrorMessage, saveErrorMessage } from "../utils/saveError";
 import { teamPath } from "../utils/teamLinks";
+import { refreshQueriesAfterMutation } from "../utils/queryRefresh";
 
 const SORT_FIELDS = ["name", "updatedAt"] as const;
 type SortField = (typeof SORT_FIELDS)[number];
@@ -62,7 +63,7 @@ export default function Teams() {
 
   const remove = useDeleteConfirm<TeamListItem>({
     mutationFn: (row) => deleteTeam(row.id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["teams"] }),
+    onSuccess: () => refreshQueriesAfterMutation(queryClient, ["teams"]),
     successMessage: t("teams.toast.deleted"),
   });
 
@@ -131,7 +132,7 @@ export default function Teams() {
                 </Table.Td>
                 <Table.Td><ToadieRegistrySourceStatus source={source} compact={!admin} onDetach={admin && source ? async () => {
                   await detachTeamToadieSource(team.id);
-                  await Promise.all([queryClient.invalidateQueries({ queryKey: ["teams"] }), queryClient.invalidateQueries({ queryKey: ["toadie"] })]);
+                  await refreshQueriesAfterMutation(queryClient, ["teams"], ["toadie"]);
                 } : undefined} /></Table.Td>
                 {admin && (
                   <Table.Td style={{ width: 1 }} ta="right">
@@ -178,7 +179,7 @@ export default function Teams() {
           onClose={() => setEditorTarget(null)}
           onSaved={async (saved) => {
             setEditorTarget(null);
-            await queryClient.invalidateQueries({ queryKey: ["teams"] });
+            await refreshQueriesAfterMutation(queryClient, ["teams"]);
             // A NEW team lands on its roster page, where the members get added.
             if (saved) navigate(teamPath(saved.id));
           }}

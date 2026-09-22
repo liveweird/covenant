@@ -111,7 +111,7 @@
     "reviewImpact": "Sprawdź skutki wycofania {{line}}",
     "impactTitle": "Skutki wycofania {{line}}",
     "endSupport": "Zakończ wsparcie",
-    "usageScope": "To zadeklarowani odbiorcy całego kontraktu. Ich wersja i linia wydań są nieznane. Brak zadeklarowanych odbiorców nie potwierdza, że wycofanie jest bezpieczne.",
+    "usageScope": "To relacje architektury dla całego kontraktu. Jawne deklaracje wersji i głównej linii są pokazane osobno; użycie w działających systemach pozostaje nieznane. Brak zadeklarowanych konsumentów nie dowodzi, że wycofanie jest bezpieczne.",
     "incompleteUsage": "Informacje o wykorzystaniu są niepełne, nieaktualne lub niedostępne. Sprawdź znanych odbiorców i uzgodnij migrację przed kontynuowaniem.",
     "acknowledgeImpact": "Zapoznałem/zapoznałam się z zadeklarowanym wykorzystaniem i ograniczeniami tych danych. Decyduję się kontynuować.",
     "endSupportHint": "Ta operacja kończy wsparcie linii wydań. Nie wycofuje poszczególnych wersji.",
@@ -133,13 +133,14 @@
       "plan": "Plan wsparcia i migracji",
       "replacement": "Zastępstwo",
       "usage": "Zadeklarowane użycie z Toadie",
-      "scopeWarning": "Ten raport zawiera zadeklarowane użycie na poziomie całego kontraktu. Dokładna wersja i linia główna są nieznane.",
+      "scopeWarning": "Ten raport zawiera zapisane w pamięci podręcznej relacje użycia całego kontraktu. Wersja i główna linia używana w działających systemach pozostają nieznane; jawne deklaracje ze źródła znajdują się osobno poniżej.",
       "emptyWarning": "Brak zaobserwowanego zadeklarowanego użycia nie dowodzi, że kontrakt jest nieużywany ani że można go bezpiecznie wycofać.",
       "incompleteWarning": "Dane o użyciu są niepełne, nieaktualne, odświeżane lub niedostępne; zachowane wiersze mogą pochodzić z ostatniej udanej obserwacji.",
       "scope": "Zakres użycia",
       "contractScope": "Cały kontrakt",
       "versionAdoption": "Używana wersja i linia główna",
       "unknown": "Nieznane",
+      "runtimeUnknown": "Nieznane z użycia w czasie działania",
       "cacheState": "Stan pamięci podręcznej",
       "refreshing": "Odświeżanie w toku",
       "lastSuccessAt": "Ostatnie udane odświeżenie (UTC)",
@@ -147,6 +148,28 @@
       "lastError": "Kod błędu ostatniego odświeżenia",
       "linkedApis": "Powiązane mapowania API lub zbiorów danych",
       "services": "Zadeklarowane usługi dostawców i odbiorców",
+      "adoptions": "Jawne deklaracje adopcji",
+      "adoptionWarning": "To deklaracje ze źródła, a nie dowody użycia w czasie działania. Równoległe, sprzeczne i niedopasowane deklaracje pozostają bez wyboru wartości rozstrzygającej.",
+      "adoptionKind": "Rodzaj deklaracji",
+      "consumer": "Odbiorca",
+      "target": "API lub zbiór danych",
+      "environment": "Zakres środowisk",
+      "declaredValue": "Zadeklarowana wartość",
+      "declarationStatus": "Stan deklaracji",
+      "declaredBy": "Osoba deklarująca (identyfikator źródłowy)",
+      "verifiedAt": "Weryfikacja w źródle (UTC)",
+      "matchesConsumption": "Pasuje do zaobserwowanej relacji użycia",
+      "notes": "Uwagi do deklaracji",
+      "adoptionKinds": {
+        "API_MAJOR_LINE": "Linia główna API",
+        "DATASET_CONTRACT_VERSION": "Wersja kontraktu zbioru danych"
+      },
+      "adoptionAvailability": {
+        "NOT_CONFIGURED": "Zadeklarowana adopcja nie była skonfigurowana dla tej migawki.",
+        "NOT_SCANNED": "Zadeklarowana adopcja była skonfigurowana, ale nie została przeskanowana dla tej migawki.",
+        "BLUEPRINT_MISSING": "W tej migawce brakowało skonfigurowanego blueprintu adopcji.",
+        "AVAILABLE": "W tej migawce nie było jawnych deklaracji adopcji."
+      },
       "noObservedUsage": "W tej migawce nie zaobserwowano zadeklarowanego użycia. Nie dowodzi to, że kontrakt jest nieużywany ani że można go bezpiecznie wycofać.",
       "usageUnavailable": "Ta niepełna migawka nie pozwala wyciągnąć liczbowego wniosku o użyciu. Nieznane użycie nie oznacza zerowego użycia.",
       "identifier": "Identyfikator",
@@ -164,8 +187,15 @@
       "none": "Brak",
       "yes": "Tak",
       "no": "Nie",
-      "role": { "PROVIDER": "Dostawca", "CONSUMER": "Odbiorca" },
-      "linkStatus": { "AVAILABLE": "Dostępne", "MISSING": "Brak", "DISCONNECTED": "Rozłączone" }
+      "role": {
+        "PROVIDER": "Dostawca",
+        "CONSUMER": "Odbiorca"
+      },
+      "linkStatus": {
+        "AVAILABLE": "Dostępne",
+        "MISSING": "Brak",
+        "DISCONNECTED": "Rozłączone"
+      }
     }
   },
   "validation": {

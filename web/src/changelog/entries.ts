@@ -17,6 +17,32 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "1.1.0",
+    date: "2026-09-23",
+    en: `**Read declared adoption from Toadie.**
+
+- Opt into API major-line or dataset contract-version declarations on each Toadie connection.
+- View parallel declarations with their consumer, target, environment, status, provenance and verification time. Missing values remain unknown, and discrepancies with architecture relationships stay visible.
+- Include declarations in lifecycle impact views and downloadable migration reports. Declared adoption remains separate from runtime evidence.
+
+**Lists stay current after changes.**
+
+- Deleting users, teams, domains, systems, contracts or Toadie connections while a filter or sort is loading no longer lets an older response restore deleted rows.
+- Registry edits and Toadie synchronization refresh affected lists without reusing responses started before the change. Your filters and sorting stay in place.
+- Feature Flags also keeps the saved switch state when an older filtered response arrives.`,
+    pl: `**Odczyt deklarowanego użycia z Toadie.**
+
+- Włącz odczyt deklaracji głównej linii API lub wersji kontraktu zbioru danych dla wybranego połączenia z Toadie.
+- Przeglądaj równoległe deklaracje wraz z konsumentem, obiektem, środowiskiem, statusem, źródłem i czasem weryfikacji. Brakujące wartości pozostają nieznane, a rozbieżności z relacjami architektury są widoczne.
+- Uwzględniaj deklaracje w przeglądzie wpływu zmian cyklu życia i pobieranych raportach migracji. Deklarowane użycie pozostaje odrębne od dowodów z działających systemów.
+
+**Listy pozostają aktualne po zmianach.**
+
+- Usuwanie użytkowników, zespołów, domen, systemów, kontraktów lub połączeń z Toadie podczas ładowania filtra lub sortowania nie pozwala już starszej odpowiedzi przywrócić usuniętych wierszy.
+- Edycja rejestrów i synchronizacja z Toadie odświeżają odpowiednie listy bez ponownego użycia odpowiedzi rozpoczętych przed zmianą. Filtry i sortowanie pozostają zachowane.
+- Lista flag funkcji zachowuje zapisany stan przełącznika także po nadejściu starszej odpowiedzi z filtrowania.`,
+  },
+  {
     version: "1.0.6",
     date: "2026-09-22",
     en: `**Environment lists stay current after changes.**

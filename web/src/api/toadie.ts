@@ -13,6 +13,8 @@ export type ToadieEntityRef = ToadieEntityPage["items"][number];
 export type ToadieLinks = paths["/api/v1/contracts/{contractId}/toadie-links"]["get"]["responses"]["200"]["content"]["application/json"];
 export type ToadieLinksBody = paths["/api/v1/contracts/{contractId}/toadie-links"]["put"]["requestBody"]["content"]["application/json"];
 export type ToadieUsage = paths["/api/v1/contracts/{contractId}/toadie-usage"]["get"]["responses"]["200"]["content"]["application/json"];
+export type ToadieAdoptionKind = components["schemas"]["ToadieAdoptionKind"];
+export type ToadieAdoptionResponse = paths["/api/v1/contracts/{contractId}/toadie-adoptions"]["get"]["responses"]["200"]["content"]["application/json"];
 export type ToadieRegistryKind = components["schemas"]["ToadieRegistryKind"];
 export type ToadieRegistrySource = components["schemas"]["ToadieRegistrySource"];
 export type ToadieRegistryCandidate = components["schemas"]["ToadieRegistryCandidate"];
@@ -59,6 +61,11 @@ export async function updateContractToadieLinks(contractId: number, body: Toadie
 export async function getContractToadieUsage(contractId: number, q: { page: number; pageSize: number; q?: string; role?: "PROVIDER" | "CONSUMER"; sort?: string }): Promise<ToadieUsage> {
   const params = buildQuery(q);
   return jsonRequest<ToadieUsage>(`/api/v1/contracts/${contractId}/toadie-usage?${params}`);
+}
+
+export async function getContractToadieAdoptions(contractId: number, q: { page: number; pageSize: number; q?: string; sort?: string }): Promise<ToadieAdoptionResponse> {
+  const params = buildQuery(q);
+  return jsonRequest<ToadieAdoptionResponse>(`/api/v1/contracts/${contractId}/toadie-adoptions?${params}`);
 }
 
 export async function refreshContractToadieUsage(contractId: number): Promise<void> {
