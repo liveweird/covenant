@@ -30,7 +30,7 @@
     "VERSION_REVIEW_APPROVED": "{{actor}} approved the review of {{contractName}} {{version}}.",
     "VERSION_REVIEW_CHANGES_REQUESTED": "{{actor}} requested changes in the review of {{contractName}} {{version}}.",
     "RELEASE_LINE_UPDATED": "{{actor}} updated the support policy for {{contractName}} {{major}}.x ({{supportStatus}}).",
-    "TOADIE_LINKS_UPDATED": "{{actor}} updated the Toadie API links for {{contractName}}.",
+    "TOADIE_LINKS_UPDATED": "{{actor}} updated the Toadie API or dataset links for {{contractName}}.",
     "RELEASE_LINE_DEPRECATION_DUE": "Release line {{major}}.x of {{contractName}}: planned deprecation {{deadline}} ({{stage}}).",
     "RELEASE_LINE_SUPPORT_END_DUE": "Release line {{major}}.x of {{contractName}}: support ends {{deadline}} ({{stage}})."
   },

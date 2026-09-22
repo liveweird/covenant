@@ -234,15 +234,15 @@ async function createdId(response: APIResponse): Promise<number> {
   return ((await response.json()) as { id: number }).id;
 }
 
-/** A domain → system → team-owned OPENAPI contract with one DRAFT version holding `document`, all uniquely named. */
-export async function seedContractViaApi(api: APIRequestContext, prefix: string, document: string): Promise<SeededContract> {
+/** A domain → system → team-owned contract with one DRAFT version holding `document`, all uniquely named. */
+export async function seedContractViaApi(api: APIRequestContext, prefix: string, document: string, type: "OPENAPI" | "ASYNCAPI" | "ODCS" = "OPENAPI"): Promise<SeededContract> {
   const domainId = await createdId(await api.post("/api/v1/domains", { data: { name: uniqueText(`${prefix}-dom`) } }));
   const systemId = await createdId(await api.post("/api/v1/systems", { data: { domainId, name: uniqueText(`${prefix}-sys`) } }));
   const teamName = uniqueText(`${prefix}-team`);
   const teamId = await createdId(await api.post("/api/v1/teams", { data: { name: teamName } }));
   const contractName = uniqueText(`${prefix}-api`);
   const contractId = await createdId(
-    await api.post("/api/v1/contracts", { data: { systemId, type: "OPENAPI", name: contractName, ownerTeamId: teamId } }),
+    await api.post("/api/v1/contracts", { data: { systemId, type, name: contractName, ownerTeamId: teamId } }),
   );
   const versionId = await createdId(
     await api.post(`/api/v1/contracts/${contractId}/versions`, { data: { version: "1.0.0", content: document } }),

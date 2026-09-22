@@ -53,6 +53,8 @@ describe("ToadieLinksModal", () => {
 
     const user = userEvent.setup();
     renderWithProviders(<ToadieLinksModal contractId={5} links={EMPTY_LINKS} onClose={vi.fn()} onSaved={vi.fn()} />);
+    expect(screen.getByRole("textbox", { name: "Search APIs or datasets" })).toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "Available APIs or datasets" })).toBeInTheDocument();
     expect(await screen.findByRole("checkbox", { name: "Orders A" })).toBeInTheDocument();
     await user.click(screen.getByRole("combobox", { name: "Connection" }));
     await user.click(await screen.findByRole("option", { name: "Toadie B" }));

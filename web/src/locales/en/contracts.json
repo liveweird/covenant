@@ -143,14 +143,14 @@
       "lastSuccessAt": "Last successful refresh at (UTC)",
       "lastAttemptAt": "Last refresh attempt at (UTC)",
       "lastError": "Last refresh error code",
-      "linkedApis": "Linked API mappings",
+      "linkedApis": "Linked API or dataset mappings",
       "services": "Declared provider and consumer services",
       "noObservedUsage": "No declared usage was observed in this snapshot. This does not prove that the contract is unused or that retirement is safe.",
       "usageUnavailable": "No numeric usage conclusion is available from this incomplete snapshot. Unknown usage is not zero usage.",
       "identifier": "Identifier",
-      "apiId": "API entity ID",
-      "providedApiIds": "Provided API entity IDs",
-      "consumedApiIds": "Consumed API entity IDs",
+      "apiId": "Entity ID",
+      "providedApiIds": "Provided entity IDs",
+      "consumedApiIds": "Consumed entity IDs",
       "serviceId": "Service entity ID",
       "entityId": "Entity ID",
       "mappingStatus": "Mapping status",
@@ -244,7 +244,7 @@
       "versionReviewApproved": "Version {{version}}: review approved",
       "versionReviewChangesRequested": "Version {{version}}: changes requested in review",
       "releaseLineUpdated": "Release line {{major}}.x support policy updated ({{status}})",
-      "toadieLinksUpdated": "Toadie API links updated"
+      "toadieLinksUpdated": "Toadie API or dataset links updated"
     },
     "detail": {
       "name": "Name: {{name}}",

@@ -217,7 +217,7 @@ E2E: `cd e2e && npm ci && npx playwright install chromium && npm test`.
 
 ## Contract usage from Toadie
 
-Covenant can read the existing Port ontology from Toadie: link a contract to one or more API
+Covenant can read the existing Port ontology from Toadie: link a contract to one or more API or dataset
 entities and see provider/consumer services, systems and teams. Administrators configure the
 connection under **Toadie connections**; contract writers manage links and request refresh.
 Toadie must be **2.12.0 or newer**, with GraphQL integration enabled and a dedicated integration client key. Its
@@ -232,6 +232,14 @@ Scheduled refresh skips the full scan when the revision is unchanged; manual ref
 reads the complete mapped graph. The last-successful-refresh time includes successful
 same-revision freshness checks. See [the integration reference](.claude/docs/toadie-integration.md)
 for compatibility and operational details.
+
+For ODCS, create a second connection to the same instance and choose **Advanced mapping →
+Use dataset mapping**. It reads Toadie 2.13's `dataset` blueprint through service relations
+`produces_datasets` and `consumes_datasets`; those ontology definitions must be present in
+Toadie. Keep the API connection for OpenAPI/AsyncAPI. Link one or more datasets explicitly
+from the ODCS contract's **Edit Toadie links** dialog. Database dependencies do not imply
+dataset consumption, and optional adoption entities are not read. See the
+[ODCS setup instructions](.claude/docs/toadie-integration.md#configure-odcs-dataset-usage).
 
 ## Registry metadata from Toadie
 

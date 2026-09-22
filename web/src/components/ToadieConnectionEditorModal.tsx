@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Accordion, Alert, Button, Checkbox, Group, Modal, NumberInput, PasswordInput, Stack, Switch, Text, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { createToadieConnection, updateToadieConnection, type ToadieConnection } from "../api/toadie";
-import { EMPTY_TOADIE_FORM, fromToadieConnection, MAX_TOADIE_NAME_LENGTH, toadieFormValidation, toadieSaveErrorMessage, toToadieRequest, type ToadieFormValues } from "../utils/toadieForm";
+import { applyToadieMappingPreset, EMPTY_TOADIE_FORM, fromToadieConnection, MAX_TOADIE_NAME_LENGTH, toadieFormValidation, toadieSaveErrorMessage, toToadieRequest, type ToadieFormValues } from "../utils/toadieForm";
 import { showSuccessToast } from "../utils/toast";
 
 export default function ToadieConnectionEditorModal({ target, expandRegistryMapping = false, onClose, onSaved }: {
@@ -53,6 +53,11 @@ export default function ToadieConnectionEditorModal({ target, expandRegistryMapp
               <Accordion.Control>{t("toadie.field.advanced")}</Accordion.Control>
               <Accordion.Panel>
                 <Stack gap="sm">
+                  <Text size="sm" c="dimmed">{t("toadie.field.mappingHelp")}</Text>
+                  <Group gap="xs">
+                    <Button type="button" variant="default" size="compact-sm" onClick={() => form.setValues(applyToadieMappingPreset(form.getValues(), "api"))}>{t("toadie.field.useApiMapping")}</Button>
+                    <Button type="button" variant="default" size="compact-sm" onClick={() => form.setValues(applyToadieMappingPreset(form.getValues(), "dataset"))}>{t("toadie.field.useDatasetMapping")}</Button>
+                  </Group>
                   <TextInput label={t("toadie.field.serviceBlueprint")} {...form.getInputProps("serviceBlueprint")} />
                   <TextInput label={t("toadie.field.apiBlueprint")} {...form.getInputProps("apiBlueprint")} />
                   <TextInput label={t("toadie.field.providesRelation")} {...form.getInputProps("providesRelation")} />

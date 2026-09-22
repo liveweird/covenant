@@ -32,6 +32,70 @@ class ToadieUsageTest {
     )
 
     @Test
+    fun `ODCS dataset usage and API usage remain isolated on connections to the same instance`() = testApplication {
+        usePostgresTestcontainer()
+        val userId = TestUsers.seed(uniqueEmail("dataset-owner"), "pw")
+        val caller = CallerPrincipal(userId, "owner@test", emptySet())
+        val contracts = ContractService(sharedDatabaseForTests(), TestTeams.service)
+        val service = ToadieService(sharedDatabaseForTests(), FieldCipher(TestEnvironments.TEST_DATA_ENCRYPTION_KEY), contracts)
+        val systemId = TestContracts.seedSystem("dataset-usage")
+        val odcs = contracts.create(
+            ContractCreateRequest(systemId, ContractType.ODCS, "dataset-${System.nanoTime()}", ownerUserId = userId), caller,
+        )
+        val api = contracts.create(
+            ContractCreateRequest(systemId, ContractType.OPENAPI, "api-${System.nanoTime()}", ownerUserId = userId), caller,
+        )
+        val connectionIds = mutableListOf<UInt>()
+        try {
+            val apiConnection = service.create(request("api-${System.nanoTime()}")).also(connectionIds::add)
+            val datasetConnection = service.create(request("dataset-${System.nanoTime()}").copy(mapping = ToadieMapping(
+                apiBlueprint = "dataset", providesRelation = "produces_datasets", consumesRelation = "consumes_datasets",
+            ))).also(connectionIds::add)
+            fun entity(id: String, blueprint: String, identifier: String, relations: Map<String, List<String>> = emptyMap()) =
+                ToadieEntitySnapshot(id, blueprint, identifier, identifier, emptyList(), relations, 1)
+            val apiSnapshot = ToadieSnapshot(listOf(
+                entity("10", "api", "orders"),
+                entity("20", "service", "api-provider", mapOf("provides_apis" to listOf("orders"))),
+            ), "system", System.currentTimeMillis(), revision = 1)
+            val datasetSnapshot = ToadieSnapshot(listOf(
+                entity("10", "dataset", "orders"),
+                entity("11", "dataset", "settlements"),
+                entity("20", "service", "pipeline", mapOf(
+                    "produces_datasets" to listOf("orders", "settlements"),
+                    "consumes_datasets" to listOf("orders"),
+                )),
+                entity("21", "service", "database-only", mapOf("depends_on" to listOf("warehouse"))),
+            ), "system", System.currentTimeMillis(), revision = 1)
+            assertTrue(service.publish(assertNotNull(service.claimRefresh(apiConnection, force = false).second), apiSnapshot))
+            assertTrue(service.publish(assertNotNull(service.claimRefresh(datasetConnection, force = false).second), datasetSnapshot))
+            assertTrue(service.replaceLinks(api, ToadieLinksRequest(apiConnection, listOf("10")), caller))
+            assertTrue(service.replaceLinks(odcs, ToadieLinksRequest(datasetConnection, listOf("10", "11")), caller))
+            val page = PageRequest(1, 20, listOf(SortField("id", false)))
+            val usage = assertNotNull(service.usage(odcs, null, null, page))
+            assertEquals(1, usage.total)
+            val pipeline = usage.items.single()
+            assertEquals("pipeline", pipeline.identifier)
+            assertEquals(setOf(ToadieUsageRole.PROVIDER, ToadieUsageRole.CONSUMER), pipeline.roles.toSet())
+            assertEquals(setOf("10", "11"), pipeline.providedApiEntityIds.toSet())
+            assertEquals(listOf("10"), pipeline.consumedApiEntityIds)
+            assertNull(pipeline.version)
+            assertNull(pipeline.releaseLine)
+            assertEquals("api-provider", assertNotNull(service.usage(api, null, null, page)).items.single().identifier)
+            service.fail(assertNotNull(service.claimRefresh(datasetConnection, force = false).second), "fixture failure")
+            assertEquals(ToadieCacheState.STALE, assertNotNull(service.usage(odcs, null, null, page)).cache.state)
+            assertEquals(ToadieCacheState.CURRENT, assertNotNull(service.usage(api, null, null, page)).cache.state)
+            assertEquals("pipeline", assertNotNull(service.usage(odcs, null, null, page)).items.single().identifier)
+            assertTrue(service.publish(assertNotNull(service.claimRefresh(datasetConnection, force = false).second),
+                datasetSnapshot.copy(entities = datasetSnapshot.entities.filter { it.id != "11" }, revision = 2)))
+            val links = assertNotNull(service.links(odcs))
+            assertEquals(ToadieLinkStatus.MISSING, links.items.single { it.apiEntityId == "11" }.status)
+            assertEquals(ToadieLinkStatus.AVAILABLE, assertNotNull(service.links(api)).items.single().status)
+        } finally {
+            connectionIds.forEach { service.delete(it) }
+        }
+    }
+
+    @Test
     fun `connection registry is admin curated and never returns the API key`() = testApplication {
         usePostgresTestcontainer()
         val admin = seededClient("toadie-admin", UserRole.ADMIN)

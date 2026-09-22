@@ -17,6 +17,20 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "1.0.5",
+    date: "2026-09-22",
+    en: `**Easier ODCS dataset setup with Toadie.**
+
+- Choose an API or dataset mapping preset when configuring a Toadie connection.
+- Link ODCS contracts to multiple datasets and view declared producers and consumers. API and dataset connections can share one Toadie instance.
+- Clarified setup guidance and labels. Exact version and release-line adoption remain unknown.`,
+    pl: `**Łatwiejsza konfiguracja zbiorów danych ODCS z Toadie.**
+
+- Wybierz gotowe mapowanie API lub zbiorów danych podczas konfiguracji połączenia z Toadie.
+- Połącz kontrakty ODCS z wieloma zbiorami danych i przeglądaj zadeklarowanych producentów oraz konsumentów. Połączenia API i zbiorów danych mogą korzystać z jednej instancji Toadie.
+- Doprecyzowano instrukcje konfiguracji i etykiety. Używana wersja i linia wydań nadal pozostają nieznane.`,
+  },
+  {
     version: "1.0.4",
     date: "2026-09-22",
     en: `**Maintenance updates for the interface and contract editor.**

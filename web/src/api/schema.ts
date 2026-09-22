@@ -829,7 +829,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List cached API entities for a connection
+         * List cached API or dataset entities for a connection
          * @description Any authenticated user. `q` searches identifier and title case- and accent-insensitively. Sortable: `id`, `title`; default `id` ascending.
          */
         get: operations["listToadieApis"];
@@ -850,11 +850,11 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Get a contract's explicit Toadie API links */
+        /** Get a contract's explicit Toadie API or dataset links */
         get: operations["getContractToadieLinks"];
         /**
-         * Replace a contract's explicit Toadie API links
-         * @description Contract writer only. At most 100 unique API entity IDs, all present in the current snapshot. A null connection with an empty list clears links.
+         * Replace a contract's explicit Toadie API or dataset links
+         * @description Contract writer only. At most 100 unique API or dataset entity IDs from one connection, all present in the current snapshot. A null connection with an empty list clears links.
          */
         put: operations["replaceContractToadieLinks"];
         post?: never;
@@ -874,7 +874,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get cached providers and consumers for a contract's linked APIs
+         * Get cached providers and consumers for a contract's linked APIs or datasets
          * @description Any authenticated user. `q` searches service identifier and title case- and accent-insensitively; `role` is exact. Sortable: `id`, `title`; default `id` ascending.
          */
         get: operations["getContractToadieUsage"];
@@ -2633,10 +2633,14 @@ export interface components {
             kind: components["schemas"]["ToadieRegistryKind"];
             items: components["schemas"]["ToadieRegistryApplyItem"][];
         };
+        /** @description One target blueprint per connection. Use separate connections to the same instance for API and dataset mappings. */
         ToadieMapping: {
             /** @default service */
             serviceBlueprint: string;
-            /** @default api */
+            /**
+             * @description Target blueprint; api for API contracts or dataset for ODCS. The field name is retained for compatibility.
+             * @default api
+             */
             apiBlueprint: string;
             /** @default provides_apis */
             providesRelation: string;
@@ -2731,6 +2735,7 @@ export interface components {
         ToadieLinksRequest: {
             /** Format: int32 */
             connectionId: number | null;
+            /** @description IDs of API or dataset entities from the selected connection target blueprint. */
             apiEntityIds: string[];
         };
         /** @enum {string} */
@@ -2931,7 +2936,7 @@ export interface components {
             /** @description Current Covenant writer permission; Toadie ownership never grants access. */
             canWrite: boolean;
         };
-        /** @description Distinct services across linked APIs for the WHOLE contract, repeated on each major. Counts are null for unlinked, never-synced, disconnected or incomplete mappings. Stale/disabled observations may retain last-known counts; zero never proves safe retirement. */
+        /** @description Distinct services across linked APIs or datasets for the WHOLE contract, repeated on each major. Counts are null for unlinked, never-synced, disconnected or incomplete mappings. Stale/disabled observations may retain last-known counts; zero never proves safe retirement. */
         ToadieUsageSummary: {
             /** Format: int64 */
             consumerCount: number | null;
@@ -2963,7 +2968,7 @@ export interface components {
             supportEnded: boolean;
             /** @description Non-END_OF_LIFE line with a date, replacement or guide, but without guidance or an available replacement. Advisory only; a replacement is not mandatory for saving a policy. */
             migrationIncomplete: boolean;
-            /** @description Cache is not CURRENT or at least one selected API mapping is unavailable. */
+            /** @description Cache is not CURRENT or at least one selected API or dataset mapping is unavailable. */
             usageUncertain: boolean;
             usage: components["schemas"]["ToadieUsageSummary"];
         };
@@ -6072,7 +6077,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Cached API page */
+            /** @description Cached API or dataset page */
             200: {
                 headers: {
                     [name: string]: unknown;

@@ -145,14 +145,14 @@
       "lastSuccessAt": "Ostatnie udane odświeżenie (UTC)",
       "lastAttemptAt": "Ostatnia próba odświeżenia (UTC)",
       "lastError": "Kod błędu ostatniego odświeżenia",
-      "linkedApis": "Powiązane mapowania API",
+      "linkedApis": "Powiązane mapowania API lub zbiorów danych",
       "services": "Zadeklarowane usługi dostawców i odbiorców",
       "noObservedUsage": "W tej migawce nie zaobserwowano zadeklarowanego użycia. Nie dowodzi to, że kontrakt jest nieużywany ani że można go bezpiecznie wycofać.",
       "usageUnavailable": "Ta niepełna migawka nie pozwala wyciągnąć liczbowego wniosku o użyciu. Nieznane użycie nie oznacza zerowego użycia.",
       "identifier": "Identyfikator",
-      "apiId": "ID encji API",
-      "providedApiIds": "ID dostarczanych encji API",
-      "consumedApiIds": "ID używanych encji API",
+      "apiId": "ID encji",
+      "providedApiIds": "ID dostarczanych encji",
+      "consumedApiIds": "ID używanych encji",
       "serviceId": "ID encji usługi",
       "entityId": "ID encji",
       "mappingStatus": "Stan mapowania",
@@ -246,7 +246,7 @@
       "versionReviewApproved": "Wersja {{version}}: zatwierdzono recenzję",
       "versionReviewChangesRequested": "Wersja {{version}}: poproszono o zmiany w recenzji",
       "releaseLineUpdated": "Zaktualizowano zasady wsparcia linii {{major}}.x ({{status}})",
-      "toadieLinksUpdated": "Zaktualizowano powiązania API w Toadie"
+      "toadieLinksUpdated": "Zaktualizowano powiązania API lub zbiorów danych w Toadie"
     },
     "detail": {
       "name": "Nazwa: {{name}}",

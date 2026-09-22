@@ -32,12 +32,23 @@ describe("Contract Toadie usage", () => {
   test("a stale refresh error preserves usage and marks unknown version fields explicitly", async () => {
     renderWithProviders(<ContractToadieUsage contractId={5} canWrite={false} />);
     expect(await screen.findByText("Checkout")).toBeInTheDocument();
+    expect(screen.getByText("Linked APIs or datasets:")).toBeInTheDocument();
     expect(screen.getByText(/last refresh failed.*UPSTREAM_UNAVAILABLE/i)).toBeInTheDocument();
     expect(screen.getByText(/Last successful refresh:/)).toBeInTheDocument();
     expect(screen.getAllByText("Unknown")).toHaveLength(2);
     expect(screen.getByRole("link", { name: "Open Checkout in Toadie" })).toHaveAttribute("href", "https://toadie.example.com/entities/service-1/edit");
     expect(screen.queryByRole("button", { name: "Edit Toadie links" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Refresh usage" })).not.toBeInTheDocument();
+  });
+
+  test("an unlinked contract describes both supported mapping targets", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url === "/api/v1/contracts/5/toadie-links") return Promise.resolve(jsonResponse(200, { ...LINKS, connection: null, items: [] }));
+      if (url.startsWith("/api/v1/contracts/5/toadie-usage?")) return Promise.resolve(jsonResponse(200, { ...USAGE, connection: null, items: [], total: 0 }));
+      return Promise.resolve(jsonResponse(404, { title: "Not Found", status: 404 }));
+    });
+    renderWithProviders(<ContractToadieUsage contractId={5} canWrite={false} />);
+    expect(await screen.findByText("This contract is not linked to a Toadie API or dataset")).toBeInTheDocument();
   });
 
   test("selected APIs survive result paging, and a missing existing API remains removable", async () => {
