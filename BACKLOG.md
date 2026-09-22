@@ -23,11 +23,17 @@ the older inference case. All **638 frontend tests**, coverage, build/static gat
 static/scenario/setup gates passed. Test-created records were removed and the original catalog
 inventory was preserved. Independent review found no actionable issues.
 
-**Releases and tags stopped at v0.8.0.** The app version is 1.0.2 and the changelog covers
+**Sign-out notice follow-up (1.0.3).** The main CI run after 1.0.2 exposed an intermittent
+missing confirmation banner: the login page consumed a one-time flag during render, so a
+suspended and abandoned render could discard it. Rendering now reads the flag without
+mutation; the committed page acknowledges it in an effect. A deterministic suspended-render
+regression covers this path and a fresh mount verifies the notice is shown only once.
+
+**Releases and tags stopped at v0.8.0.** The app version is 1.0.3 and the changelog covers
 every release, but the repository holds four tags (`v0.6.0`, `v0.6.1`,
-`v0.7.0`, `v0.8.0`) and four GitHub releases, the newest v0.8.0. The fifteen versions from
-0.8.1 to 1.0.2 have neither. Decide between backfilling tags from their release commits,
-tagging only the current 1.0.2, and recording that tagging was deliberately dropped after
+`v0.7.0`, `v0.8.0`) and four GitHub releases, the newest v0.8.0. The sixteen versions from
+0.8.1 to 1.0.3 have neither. Decide between backfilling tags from their release commits,
+tagging only the current 1.0.3, and recording that tagging was deliberately dropped after
 v0.8.0. Until then the published release history understates what is deployed.
 
 ## Dependency updates

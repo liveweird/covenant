@@ -38,6 +38,8 @@ Explicit sign-out opens `/login` without a saved return destination, so the next
 the Hierarchy even when a different account signs in. Anonymous access to a protected link
 still preserves its path, query and hash. Test logout navigation with the real route guards
 from a non-home page; a root-only menu test cannot detect a stale return destination.
+Reading the signed-out notice during render must be side-effect free. Acknowledge it only
+after the login page commits, so a suspended or retried render cannot discard the notice.
 
 `openapi-typescript` is installed with `--legacy-peer-deps` because its declared peer is TS `^5` while the scaffold uses TS 6; the generated output is compatible. If you re-`npm install` from scratch, use `npm install --legacy-peer-deps`.
 

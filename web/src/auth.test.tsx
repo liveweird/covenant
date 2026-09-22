@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { renderWithProviders, screen } from "./test/render";
-import { RedirectIfAuthed, RequireAdmin, RequireAuth, consumeSignedOut, flagSignedOut } from "./auth";
+import { RedirectIfAuthed, RequireAdmin, RequireAuth, consumeSignedOut, flagSignedOut, hasPendingSignedOut } from "./auth";
 
 const TOKEN_KEY = "covenant.auth.token";
 
@@ -87,7 +87,10 @@ describe("route guards", () => {
 
   test("the signed-out flag is one-shot", () => {
     flagSignedOut();
+    expect(hasPendingSignedOut()).toBe(true);
+    expect(hasPendingSignedOut()).toBe(true);
     expect(consumeSignedOut()).toBe(true);
+    expect(hasPendingSignedOut()).toBe(false);
     expect(consumeSignedOut()).toBe(false);
   });
 });

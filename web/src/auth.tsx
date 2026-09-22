@@ -28,6 +28,10 @@ export function flagSignedOut(): void {
   pendingSignedOutBanner = true;
 }
 
+export function hasPendingSignedOut(): boolean {
+  return pendingSignedOutBanner;
+}
+
 export function consumeSignedOut(): boolean {
   const v = pendingSignedOutBanner;
   pendingSignedOutBanner = false;
