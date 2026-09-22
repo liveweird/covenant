@@ -265,6 +265,7 @@ ch.nokillswit
 @.claude/docs/observability.md
 @.claude/docs/testing.md
 @.claude/docs/dependencies.md
+@.claude/docs/app-releases.md
 @.claude/docs/contract-standards.md
 @.claude/docs/release-lines.md
 @.claude/docs/checker.md

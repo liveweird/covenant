@@ -40,12 +40,13 @@ Global timeouts are unchanged. Browser-test lint, typecheck, dead-code, scenario
 checks passed; independent review found no actionable issues. These are test-only changes;
 the app version remains **1.0.3**.
 
-**Releases and tags stopped at v0.8.0.** The app version is 1.0.3 and the changelog covers
-every release, but the repository holds four tags (`v0.6.0`, `v0.6.1`,
-`v0.7.0`, `v0.8.0`) and four GitHub releases, the newest v0.8.0. The sixteen versions from
-0.8.1 to 1.0.3 have neither. Decide between backfilling tags from their release commits,
-tagging only the current 1.0.3, and recording that tagging was deliberately dropped after
-v0.8.0. Until then the published release history understates what is deployed.
+**Release/tag consistency restored (2026-09-22).** The sixteen missing versions from 0.8.1
+through 1.0.3 now have annotated tags at their original main release commits and bilingual
+GitHub releases copied from the corresponding changelog snapshots. The four existing
+tags/releases remain intact; only v1.0.3 is Latest. Backfilled notes distinguish the original
+changelog date from the actual publication date. The
+[application release process](.claude/docs/app-releases.md) requires tag/release verification
+for future publication; later documentation/test-only commits never move existing tags.
 
 ## Dependency updates
 
