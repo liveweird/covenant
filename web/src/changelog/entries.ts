@@ -17,6 +17,18 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "1.0.2",
+    date: "2026-09-22",
+    en: `**Predictable navigation after signing out.**
+
+- Signing in after an explicit sign-out opens the Hierarchy instead of returning to the previous account's page.
+- Signing in to open a protected link still preserves its destination, query parameters and anchor.`,
+    pl: `**Przewidywalna nawigacja po wylogowaniu.**
+
+- Gdy wylogujesz się i zalogujesz ponownie, otworzysz Hierarchię zamiast strony poprzedniego konta.
+- Gdy zalogujesz się, aby otworzyć chroniony link, zachowasz jego adres docelowy, parametry zapytania i kotwicę.`,
+  },
+  {
     version: "1.0.1",
     date: "2026-09-22",
     en: `**Clearer setup for Toadie registry synchronization.**

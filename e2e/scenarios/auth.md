@@ -5,14 +5,21 @@
 - **Owns** (exclusive server-side state): nothing — read-only (sessions only; no seeded account
   is ever mutated)
 
-## Scenario: admin can log in and log out
+## Scenario: signing out from a protected route starts the next login at home
 
 1. The admin signs in through the real login form — email, password, "Sign in".
-   - *Expected*: the app shell is up — the **Home** heading and the header account-menu button are
+   - *Expected*: the app shell is up — the **Hierarchy** heading and the header account-menu button are
      visible.
-2. The admin opens the header account menu and clicks **Sign out**.
+2. The admin opens the **Contracts** page, then opens the header account menu and clicks **Sign out**
+   while the server response is held pending.
    - *Expected*: they are back on the login screen — the **Sign in** button and the
      "You've been signed out." banner are visible.
+3. Without reloading the page or clearing browser storage, the admin signs in again through the
+   displayed form.
+   - *Expected*: the new session starts at the **Hierarchy** home page. The protected route from
+     before the explicit sign-out is not restored.
+4. The delayed server response is allowed to finish.
+   - *Expected*: the new session remains signed in.
 
 ## Scenario: invalid credentials are rejected
 

@@ -34,6 +34,11 @@ The OpenAPI spec at `server/src/main/resources/openapi/documentation.yaml` is th
 - **`auth.ts`**: login + the MFA exchange, self-service password reset, and logout (`logout()` is best-effort — local credentials are cleared immediately, before awaiting the revoke POST for the captured token pair; a delayed completion never clears a later login, and the function never throws).
 - The types come from the generated `schema.ts`; a new endpoint's wrapper goes into its feature's module (a new feature area gets a new module — never a catch-all file). Avoid heavyweight client generators (Orval/Kiota) — the lightweight pairing of `openapi-typescript` (types only) + hand-written fetch is intentional.
 
+Explicit sign-out opens `/login` without a saved return destination, so the next sign-in opens
+the Hierarchy even when a different account signs in. Anonymous access to a protected link
+still preserves its path, query and hash. Test logout navigation with the real route guards
+from a non-home page; a root-only menu test cannot detect a stale return destination.
+
 `openapi-typescript` is installed with `--legacy-peer-deps` because its declared peer is TS `^5` while the scaffold uses TS 6; the generated output is compatible. If you re-`npm install` from scratch, use `npm install --legacy-peer-deps`.
 
 ## Error handling
