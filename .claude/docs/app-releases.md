@@ -38,5 +38,6 @@ Versions before 0.6.0 predate this reconciliation's release-history scope.
 
 Backfilled release notes retain the original changelog date and explicitly identify the later
 backfill date. GitHub's publication timestamp reflects actual publication; do not manufacture
-an earlier publication date or imply newly rerun historical tests. Only v1.0.3 is marked Latest.
+an earlier publication date or imply newly rerun historical tests. Only v1.0.3 was marked Latest
+at the backfill; later releases follow the highest-stable-version rule above.
 Later test-only fixes are available on `main` without changing the historical v1.0.3 tag.
