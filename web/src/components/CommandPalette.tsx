@@ -10,7 +10,7 @@ type SpotlightActions = SpotlightActionData | SpotlightActionGroupData;
 import { useQuery } from "@tanstack/react-query";
 import { IconFileImport, IconFileText, IconPlus, IconSearch, IconWand } from "@tabler/icons-react";
 import { listContracts } from "../api/contracts";
-import { isAdmin } from "../api/session";
+import { useAdmin } from "../auth";
 import { contractPath, importContractPath, inferContractPath, newContractPath } from "../utils/contractLinks";
 import { ACCOUNT_NAV, visibleSections } from "../utils/navigation";
 import { palette, paletteStore } from "../utils/commandPalette";
@@ -29,6 +29,7 @@ import classes from "../theme.module.css";
  */
 export default function CommandPalette() {
   const { t } = useTranslation();
+  const admin = useAdmin();
   const navigate = useNavigate();
   const os = useOs();
   const [query, setQuery] = useState("");
@@ -40,7 +41,7 @@ export default function CommandPalette() {
 
   const pages: SpotlightActionGroupData = {
     group: t("appShell.palette.groupPages"),
-    actions: [...visibleSections(isAdmin()).flatMap((section) => section.items), ...ACCOUNT_NAV].map(
+    actions: [...visibleSections(admin).flatMap((section) => section.items), ...ACCOUNT_NAV].map(
       (leaf) => {
         const Icon = leaf.icon;
         return {

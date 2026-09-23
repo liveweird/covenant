@@ -6,7 +6,7 @@ import { useDebouncedValue } from "@mantine/hooks";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconPencil, IconUserMinus, IconUserPlus, IconUsersGroup } from "@tabler/icons-react";
 import { ApiError } from "../api/http";
-import { isAdmin } from "../api/session";
+import { useAdmin } from "../auth";
 import { addTeamMember, detachTeamToadieSource, getTeam, removeTeamMember, type TeamMember } from "../api/teams";
 import { listUsers } from "../api/users";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
@@ -32,7 +32,7 @@ export default function TeamDetails() {
   const { id: idParam } = useParams();
   const id = Number(idParam);
   const queryClient = useQueryClient();
-  const admin = isAdmin();
+  const admin = useAdmin();
 
   const team = useQuery({ queryKey: ["teams", "detail", id], queryFn: () => getTeam(id), enabled: Number.isFinite(id) });
   const [editing, setEditing] = useState(false);

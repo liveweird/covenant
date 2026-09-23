@@ -8,8 +8,9 @@ import org.apache.avro.Schema as AvroSchema
  * (`asyncapi:` 2.6.0 / 3.0.0 / 3.1.0 — anything else is an unsupported-version SCHEMA error),
  * then the payload walk — every message payload is either an Avro schema (Apache Avro parses
  * it) or a JSON Schema (meta-validated against the 2020-12 meta-schema). Protobuf and other
- * formats are left unchecked with an INFO; a payload that is a `$ref` is skipped here (the
- * document-level pass already resolved internal refs, an external one is an INFO).
+ * formats are left unchecked with an INFO. Local payload `$ref`s are followed in-document so a
+ * reusable Multi Format Schema still reaches the Avro parser; external refs remain unresolved
+ * and are reported without any fetch.
  */
 object AsyncApiValidator {
     const val CODE_SCHEMA = "ASYNCAPI_SCHEMA"
@@ -59,36 +60,71 @@ object AsyncApiValidator {
 
     internal data class Payload(val pointer: String, val schema: JsonNode, val format: String?)
 
-    private fun payloadFindings(root: JsonNode, v3: Boolean): List<Finding> = payloads(root, v3).flatMap { p ->
-        val ref = p.schema.path("\$ref")
+    private fun payloadFindings(root: JsonNode, v3: Boolean): List<Finding> = payloads(root, v3).flatMap { declared ->
+        val resolution = resolve(root, declared)
+        val ref = resolution.externalRef
         when {
-            ref.isTextual && !ref.asText().startsWith("#") -> listOf(
+            ref != null -> listOf(
                 Finding(
                     Severity.INFO,
                     FindingSource.SEMANTIC,
                     CODE_EXTERNAL_REF,
-                    "External \$ref '${ref.asText()}' is not resolved — Covenant checks self-contained documents",
-                    p.pointer,
+                    "External \$ref '$ref' is not resolved — Covenant checks self-contained documents",
+                    resolution.pointer,
                 ),
             )
-            ref.isTextual -> emptyList() // an internal ref: the target is checked where it is declared
-            SchemaFormats.isJsonLike(p.format) ->
-                VendoredSchemas.validate(
-                    VendoredSchemas.jsonSchema202012,
-                    p.schema,
-                    CODE_PAYLOAD_SCHEMA,
-                ).map { it.copy(path = p.pointer + (it.path ?: "")) }
-            SchemaFormats.isAvro(p.format) -> avro(p)
-            else -> listOf(
-                Finding(
-                    Severity.INFO,
-                    FindingSource.SEMANTIC,
-                    CODE_PAYLOAD_UNCHECKED,
-                    "Payload schema format '${p.format}' is not validated by Covenant",
-                    p.pointer,
-                ),
-            )
+            resolution.payload == null -> emptyList()
+            else -> validatePayload(multiFormat(resolution.payload))
         }
+    }
+
+    /** A resolved Multi Format Schema contributes its nested schema and its own format. */
+    private fun multiFormat(payload: Payload): Payload = if (
+        payload.schema.isObject && payload.schema.path("schemaFormat").isTextual && payload.schema.has("schema")
+    ) {
+        Payload("${payload.pointer}/schema", payload.schema["schema"], payload.schema["schemaFormat"].asText())
+    } else {
+        payload
+    }
+
+    private fun validatePayload(p: Payload): List<Finding> = when {
+        SchemaFormats.isJsonLike(p.format) ->
+            VendoredSchemas.validate(
+                VendoredSchemas.jsonSchema202012,
+                p.schema,
+                CODE_PAYLOAD_SCHEMA,
+            ).map { it.copy(path = p.pointer + (it.path ?: "")) }
+        SchemaFormats.isAvro(p.format) -> avro(p)
+        else -> listOf(
+            Finding(
+                Severity.INFO,
+                FindingSource.SEMANTIC,
+                CODE_PAYLOAD_UNCHECKED,
+                "Payload schema format '${p.format}' is not validated by Covenant",
+                p.pointer,
+            ),
+        )
+    }
+
+    /** Follow only RFC 6901 fragment refs, with a small bound for hostile or cyclic chains. */
+    private fun resolve(root: JsonNode, declared: Payload): PayloadResolution {
+        var payload = declared
+        val seen = mutableSetOf<String>()
+        repeat(MAX_REF_DEPTH) {
+            val ref = payload.schema.path("\$ref").takeIf { it.isTextual }?.asText()
+                ?: return PayloadResolution(payload, payload.pointer)
+            if (ref != "#" && !ref.startsWith("#/")) return PayloadResolution(null, payload.pointer, ref)
+            val pointer = if (ref == "#") "" else ref.removePrefix("#")
+            if (!seen.add(pointer)) return PayloadResolution(null, payload.pointer)
+            val target = try {
+                root.at(pointer)
+            } catch (_: IllegalArgumentException) {
+                return PayloadResolution(null, payload.pointer)
+            }
+            if (target.isMissingNode) return PayloadResolution(null, payload.pointer)
+            payload = Payload(pointer, target, payload.format)
+        }
+        return PayloadResolution(null, payload.pointer)
     }
 
     private fun avro(p: Payload): List<Finding> = try {
@@ -108,4 +144,8 @@ object AsyncApiValidator {
     }
 
     private fun esc(segment: String) = segment.replace("~", "~0").replace("/", "~1")
+
+    private data class PayloadResolution(val payload: Payload?, val pointer: String, val externalRef: String? = null)
+
+    private const val MAX_REF_DEPTH = 64
 }

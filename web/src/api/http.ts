@@ -94,6 +94,7 @@ async function doRefresh(session: SessionSnapshot): Promise<RefreshOutcome> {
     return { kind: "unavailable" };
   }
   const refreshed = persistRefreshedSession(data, session);
+  if (refreshed) notifyAuthChange();
   return refreshed ? { kind: "ok", session: refreshed } : { kind: "stale" };
 }
 

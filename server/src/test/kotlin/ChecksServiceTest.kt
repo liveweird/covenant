@@ -2,10 +2,14 @@ package ch.nokillswit
 
 import ch.nokillswit.contracts.ContractType
 import ch.nokillswit.contracts.Lifecycle
+import ch.nokillswit.contracts.SemVer
+import ch.nokillswit.contracts.checks.Baseline
+import ch.nokillswit.contracts.checks.BreakingChanges
 import ch.nokillswit.contracts.checks.CheckerClient
 import ch.nokillswit.contracts.checks.CheckerResponse
 import ch.nokillswit.contracts.checks.CheckerUnavailableException
 import ch.nokillswit.contracts.checks.ChecksService
+import ch.nokillswit.contracts.checks.CompatibilityVerdict
 import ch.nokillswit.contracts.checks.DocumentFormat
 import ch.nokillswit.contracts.checks.Finding
 import ch.nokillswit.contracts.checks.FindingSource
@@ -100,5 +104,79 @@ class ChecksServiceTest {
         assertEquals(501, report.findings.size)
         assertEquals("FINDINGS_TRUNCATED", report.findings.last().code)
         assertEquals(1, report.errors)
+    }
+
+    @Test
+    fun `an incomplete AsyncAPI baseline diff neither blocks a save nor claims full compatibility`() = runBlocking {
+        val skip = Finding(
+            Severity.INFO,
+            FindingSource.BREAKING,
+            BreakingChanges.CODE_ASYNCAPI_DIFF_SKIPPED,
+            "Breaking changes could not be computed — the previous document contains external references",
+        )
+        val service = ChecksService(StubChecker(listOf(skip)))
+        val baseline = Baseline(SemVer.parse("1.0.0"), ContractFixtures.asyncApi3)
+
+        val report = service.check(
+            ContractType.ASYNCAPI,
+            ContractFixtures.asyncApi3.replace("version: 1.0.0", "version: 1.1.0"),
+            declaredVersion = "1.1.0",
+            baseline = baseline,
+        )
+        assertTrue(report.softErrors.isEmpty())
+        assertTrue(report.findings.any { it.code == BreakingChanges.CODE_ASYNCAPI_DIFF_SKIPPED })
+
+        val compatibility = service.compatibility(
+            ContractType.ASYNCAPI,
+            baseline,
+            SemVer.parse("1.1.0"),
+            ContractFixtures.asyncApi3.replace("version: 1.0.0", "version: 1.1.0"),
+        )
+        assertEquals(CompatibilityVerdict.UNKNOWN, compatibility.verdict)
+        assertEquals(null, compatibility.backward.compatible)
+        assertEquals(null, compatibility.forward.compatible)
+    }
+
+    @Test
+    fun `identical AsyncAPI text still checks baseline reference coverage`() = runBlocking {
+        val skip = Finding(
+            Severity.INFO,
+            FindingSource.BREAKING,
+            BreakingChanges.CODE_ASYNCAPI_DIFF_SKIPPED,
+            "Breaking changes could not be computed — the previous document contains external references",
+        )
+        val checker = StubChecker(listOf(skip))
+        val content = ContractFixtures.asyncApi3
+        val compatibility = ChecksService(checker).compatibility(
+            ContractType.ASYNCAPI,
+            Baseline(SemVer.parse("1.0.0"), content),
+            SemVer.parse("1.0.0"),
+            content,
+        )
+
+        assertEquals(CompatibilityVerdict.UNKNOWN, compatibility.verdict)
+        assertEquals(null, compatibility.backward.compatible)
+        assertEquals(null, compatibility.forward.compatible)
+        assertEquals(2, checker.calls)
+    }
+
+    @Test
+    fun `truncated checker results never prove full AsyncAPI compatibility`() = runBlocking {
+        val checker = StubChecker(listOf(
+            Finding(Severity.ERROR, FindingSource.SCHEMA, "external-ref-not-allowed", "unresolved reference"),
+            Finding(Severity.INFO, FindingSource.SYSTEM, "findings-truncated", "more findings were not returned"),
+        ))
+        val content = ContractFixtures.asyncApi3
+        val compatibility = ChecksService(checker).compatibility(
+            ContractType.ASYNCAPI,
+            Baseline(SemVer.parse("1.0.0"), content),
+            SemVer.parse("1.0.0"),
+            content,
+        )
+
+        assertEquals(CompatibilityVerdict.UNKNOWN, compatibility.verdict)
+        assertEquals(null, compatibility.backward.compatible)
+        assertEquals(null, compatibility.forward.compatible)
+        assertTrue(compatibility.backward.findings.any { it.code == BreakingChanges.CODE_SKIPPED })
     }
 }

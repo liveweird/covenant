@@ -15,7 +15,7 @@ export type SessionSnapshot = Readonly<{
 
 export const TOKEN_KEY = "covenant.auth.token";
 const REFRESH_TOKEN_KEY = "covenant.auth.refreshToken";
-const ROLES_KEY = "covenant.auth.roles";
+export const ROLES_KEY = "covenant.auth.roles";
 const USER_ID_KEY = "covenant.auth.userId";
 const DISABLED_FEATURES_KEY = "covenant.auth.disabledFeatures";
 const SESSION_IDENTITY_KEY = "covenant.auth.sessionIdentity";

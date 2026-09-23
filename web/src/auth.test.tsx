@@ -1,7 +1,10 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
-import { renderWithProviders, screen } from "./test/render";
-import { RedirectIfAuthed, RequireAdmin, RequireAuth, consumeSignedOut, flagSignedOut, hasPendingSignedOut } from "./auth";
+import { act, renderWithProviders, screen } from "./test/render";
+import { authedFetch } from "./api/http";
+import { persistSession } from "./api/session";
+import { jsonResponse } from "./test/http";
+import { RedirectIfAuthed, RequireAdmin, RequireAuth, consumeSignedOut, flagSignedOut, hasPendingSignedOut, useAdmin } from "./auth";
 
 const TOKEN_KEY = "covenant.auth.token";
 
@@ -31,6 +34,21 @@ function TestRoutes() {
       </Route>
     </Routes>
   );
+}
+
+const SESSION = {
+  token: "access-before",
+  refreshToken: "refresh-before",
+  expiresAt: 1,
+  refreshExpiresAt: 2,
+  userId: 7,
+  roles: ["ADMIN" as const],
+  disabledFeatures: [],
+  language: "en" as const,
+};
+
+function AdminProbe() {
+  return <div>{useAdmin() ? "admin role" : "regular role"}</div>;
 }
 
 describe("route guards", () => {
@@ -83,6 +101,34 @@ describe("route guards", () => {
     localStorage.setItem("covenant.auth.roles", JSON.stringify(["ADMIN"]));
     renderWithProviders(<TestRoutes />, { route: "/admin-only" });
     expect(screen.getByText("admin page")).toBeInTheDocument();
+  });
+
+  test("silent refresh removes admin access from mounted role consumers", async () => {
+    persistSession(SESSION);
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(jsonResponse(200, { ...SESSION, token: "access-after", refreshToken: "refresh-after", roles: [] }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    try {
+      renderWithProviders(<TestRoutes />, { route: "/admin-only" });
+      expect(screen.getByText("admin page")).toBeInTheDocument();
+      await act(async () => { await authedFetch("/api/v1/thing"); });
+      expect(screen.getByText("home page")).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test("role consumers react to promotions written by another tab", () => {
+    persistSession({ ...SESSION, roles: [] });
+    renderWithProviders(<AdminProbe />);
+    expect(screen.getByText("regular role")).toBeInTheDocument();
+    act(() => {
+      localStorage.setItem("covenant.auth.roles", JSON.stringify(["ADMIN"]));
+      window.dispatchEvent(new StorageEvent("storage", { key: "covenant.auth.roles" }));
+    });
+    expect(screen.getByText("admin role")).toBeInTheDocument();
   });
 
   test("the signed-out flag is one-shot", () => {

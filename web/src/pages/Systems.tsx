@@ -7,7 +7,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 import { IconPencil, IconPlus, IconServer2, IconTrash } from "@tabler/icons-react";
 import { listAllDomains } from "../api/domains";
 import { ApiError } from "../api/http";
-import { isAdmin } from "../api/session";
+import { useAdmin } from "../auth";
 import { createSystem, deleteSystem, detachSystemToadieSource, listSystems, updateSystem, type SystemResponse } from "../api/systems";
 import ClearableTextInput from "../components/ClearableTextInput";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
@@ -48,7 +48,7 @@ type SystemFormValues = { domainId: string | null; name: string; description: st
 export default function Systems() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const admin = isAdmin();
+  const admin = useAdmin();
   const [nameFilter, setNameFilter] = useStoredState(`${SETTINGS_KEY}.filter.name`, "", isString);
   const [domainFilter, setDomainFilter] = useStoredState(`${SETTINGS_KEY}.filter.domain`, "", isString);
   const [debouncedName] = useDebouncedValue(nameFilter, 300);

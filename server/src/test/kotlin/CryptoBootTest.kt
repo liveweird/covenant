@@ -1,7 +1,6 @@
 package ch.nokillswit
 
 import io.ktor.server.testing.testApplication
-import java.util.UUID
 import kotlin.test.Test
 
 /**
@@ -12,14 +11,14 @@ class CryptoBootTest {
 
     @Test
     fun `production mode refuses the committed dev default key`() = testApplication {
-        configureApp("jwt.secret" to "strong-${UUID.randomUUID()}", "mail.transport" to "disabled")
+        configureApp("jwt.secret" to strongJwtSecret(), "mail.transport" to "disabled")
         serverConfig { developmentMode = false }
         assertStartupFails("Data encryption key") { startApplication() }
     }
 
     @Test
     fun `production mode refuses a blank key`() = testApplication {
-        configureApp("jwt.secret" to "strong-${UUID.randomUUID()}", "mail.transport" to "disabled", "security.encryption.key" to "")
+        configureApp("jwt.secret" to strongJwtSecret(), "mail.transport" to "disabled", "security.encryption.key" to "")
         serverConfig { developmentMode = false }
         assertStartupFails("Data encryption key") { startApplication() }
     }

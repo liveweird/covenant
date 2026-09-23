@@ -4,7 +4,8 @@ import { Link as RouterLink, Navigate, useNavigate, useParams } from "react-rout
 import { Alert, Button, Group, Paper, Stack, Switch, Text } from "@mantine/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "../api/http";
-import { FEATURES, isAdmin, type Feature } from "../api/session";
+import { FEATURES, type Feature } from "../api/session";
+import { useAdmin } from "../auth";
 import { getUser, updateUserFeatures } from "../api/users";
 import EditPageLoadState from "../components/EditPageLoadState";
 import { showSuccessToast } from "../utils/toast";
@@ -19,6 +20,7 @@ import { FORM_MAX_WIDTH } from "../utils/layout";
  */
 export default function UserFeatures() {
   const { t } = useTranslation();
+  const admin = useAdmin();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const params = useParams<{ id: string }>();
@@ -34,7 +36,7 @@ export default function UserFeatures() {
   const { data, isLoading, isError, error: fetchError } = useQuery({
     queryKey: ["user", id],
     queryFn: () => getUser(id),
-    enabled: idIsValid && isAdmin(),
+    enabled: idIsValid && admin,
     retry: false,
   });
 

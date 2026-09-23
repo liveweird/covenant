@@ -3,7 +3,8 @@ import { useTranslation } from "react-i18next";
 import { Select, type ComboboxItemGroup } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
-import { getUserId, isAdmin } from "../api/session";
+import { getUserId } from "../api/session";
+import { useAdmin } from "../auth";
 import { listAllTeams } from "../api/teams";
 import { getUser, listUsers } from "../api/users";
 
@@ -31,7 +32,7 @@ export default function OwnerSelect({
   current?: { value: string; label: string } | null;
 }) {
   const { t } = useTranslation();
-  const admin = isAdmin();
+  const admin = useAdmin();
   const me = getUserId();
   const [search, setSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");

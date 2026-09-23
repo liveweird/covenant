@@ -25,7 +25,7 @@ test("the forgot-password link leads to the reset form; unknown emails get the n
   await page.getByRole("button", { name: "Send new password" }).click();
   await expect(page.getByText(/if an account with this address exists/i)).toBeVisible();
 
-  // A second request for the same address within a minute is throttled with a clear message.
+  // A second request for the same address within a minute gets the neutral limit message.
   const throttled = uniqueEmail("e2e-reset-throttle");
   await page.goto("/reset-password");
   await page.getByRole("textbox", { name: "Email" }).fill(throttled);
@@ -34,7 +34,7 @@ test("the forgot-password link leads to the reset form; unknown emails get the n
   await page.goto("/reset-password");
   await page.getByRole("textbox", { name: "Email" }).fill(throttled);
   await page.getByRole("button", { name: "Send new password" }).click();
-  await expect(page.getByText(/only one reset request per minute/i)).toBeVisible();
+  await expect(page.getByText(/password reset requests are temporarily limited/i)).toBeVisible();
 });
 
 test("a reset email delivers a working new password and kills the old one", async ({ page }) => {

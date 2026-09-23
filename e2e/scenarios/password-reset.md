@@ -18,8 +18,8 @@
      account existence is unobservable.
 3. They submit another unique address twice in a row.
    - *Expected*: the first answer is the same neutral confirmation; the second shows the
-     throttle message (one request per minute per address) — uniformly, even though the
-     account does not exist.
+     neutral temporary-limit message — uniformly, even though the account does not exist.
+     The server enforces one request per minute for that submitted address.
 
 ## Scenario: a reset email delivers a working new password and kills the old one
 

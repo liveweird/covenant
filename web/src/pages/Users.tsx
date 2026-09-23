@@ -5,7 +5,8 @@ import { useDebouncedValue } from "@mantine/hooks";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconKey, IconPencil, IconPlus, IconToggleLeft, IconTrash, IconUsers } from "@tabler/icons-react";
 import { deleteUser, listUsers, type UserResponse } from "../api/users";
-import { getUserId, isAdmin } from "../api/session";
+import { getUserId } from "../api/session";
+import { useAdmin } from "../auth";
 import ClearableTextInput from "../components/ClearableTextInput";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import EmptyState from "../components/EmptyState";
@@ -30,6 +31,7 @@ const SETTINGS_KEY = "users";
 
 export default function Users() {
   const { t } = useTranslation();
+  const admin = useAdmin();
   const queryClient = useQueryClient();
   const currentUserId = getUserId();
   const [nameFilter, setNameFilter] = useStoredState(`${SETTINGS_KEY}.filter.name`, "", isString);
@@ -59,7 +61,7 @@ export default function Users() {
         role: roleFilter || undefined,
       }),
     placeholderData: keepPreviousData,
-    enabled: isAdmin(),
+    enabled: admin,
   });
 
   const deleteConfirm = useDeleteConfirm<UserResponse>({

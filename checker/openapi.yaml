@@ -47,7 +47,7 @@ paths:
               $ref: '#/components/schemas/CheckRequest'
       responses:
         '200':
-          description: The findings (sorted by severity, line, code; capped at 500) and the engines that produced them.
+          description: Up to 500 findings (sorted by severity, line, code), plus a FINDINGS_TRUNCATED marker when the limit is exceeded, and the engines that produced them.
           content:
             application/json:
               schema:

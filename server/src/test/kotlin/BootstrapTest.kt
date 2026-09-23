@@ -2,11 +2,14 @@ package ch.nokillswit
 
 import ch.nokillswit.auth.LoginRequest
 import ch.nokillswit.auth.LoginResponse
+import ch.nokillswit.auth.hashPassword
 import ch.nokillswit.infra.db.SEED_ADMIN_EMAIL
+import ch.nokillswit.infra.db.SEED_PASSWORD_HASH
 import io.ktor.client.call.body
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.testApplication
 import java.util.UUID
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -66,7 +69,7 @@ class BootstrapTest {
     fun `production mode refuses to start while seed passwords are active`() = testApplication {
         // No ADMIN_INITIAL_PASSWORD; strong JWT secret so the failure is the seed check.
         configureApp(
-            "jwt.secret" to "strong-${UUID.randomUUID()}", "security.encryption.key" to strongEncryptionKey(),
+            "jwt.secret" to strongJwtSecret(), "security.encryption.key" to strongEncryptionKey(),
             // The dev-default `log` mail transport is refused in production (see infra/mail).
             "mail.transport" to "disabled",
         )
@@ -81,13 +84,76 @@ class BootstrapTest {
         val newPassword = "rotated-${UUID.randomUUID()}"
         configureApp(
             "bootstrap.adminInitialPassword" to newPassword,
-            "jwt.secret" to "strong-${UUID.randomUUID()}", "security.encryption.key" to strongEncryptionKey(),
+            "jwt.secret" to strongJwtSecret(), "security.encryption.key" to strongEncryptionKey(),
             // The dev-default `log` mail transport is refused in production (see infra/mail).
             "mail.transport" to "disabled",
         )
         serverConfig { developmentMode = false }
         withSeedRestored {
             startApplication() // must not throw: rotation happens before the fail-closed check
+        }
+    }
+
+    @Test
+    fun `production mode refuses a freshly hashed burned initial password`() = testApplication {
+        configureApp(
+            "bootstrap.adminInitialPassword" to "changeme",
+            "jwt.secret" to strongJwtSecret(), "security.encryption.key" to strongEncryptionKey(),
+            "mail.transport" to "disabled",
+        )
+        serverConfig { developmentMode = false }
+        withSeedRestored {
+            assertStartupFails("ADMIN_INITIAL_PASSWORD is a publicly known value") { startApplication() }
+        }
+    }
+
+    @Test
+    fun `production mode refuses the Kubernetes initial-password placeholder`() = testApplication {
+        configureApp(
+            "bootstrap.adminInitialPassword" to "CHANGE-ME",
+            "jwt.secret" to strongJwtSecret(), "security.encryption.key" to strongEncryptionKey(),
+            "mail.transport" to "disabled",
+        )
+        serverConfig { developmentMode = false }
+        withSeedRestored {
+            assertStartupFails("ADMIN_INITIAL_PASSWORD is a publicly known value") { startApplication() }
+        }
+    }
+
+    @Test
+    fun `production mode applies the account password length policy to bootstrap`() = testApplication {
+        configureApp(
+            "bootstrap.adminInitialPassword" to "short",
+            "jwt.secret" to strongJwtSecret(), "security.encryption.key" to strongEncryptionKey(),
+            "mail.transport" to "disabled",
+        )
+        serverConfig { developmentMode = false }
+        withSeedRestored {
+            assertStartupFails("ADMIN_INITIAL_PASSWORD must meet") { startApplication() }
+        }
+    }
+
+    @Test
+    fun `production mode detects legacy fresh hashes of burned admin passwords`() = runBlocking {
+        // Apply migrations in a development boot, then simulate the old bootstrap's fresh salt.
+        testApplication { usePostgresTestcontainer() }
+        for (burned in listOf("changeme", "CHANGE-ME", "change-me")) {
+            withSeedRestored {
+                val changed = TestUsers.service.rotatePasswordIfHashMatches(
+                    SEED_ADMIN_EMAIL,
+                    SEED_PASSWORD_HASH,
+                    hashPassword(burned, cost = 4),
+                )
+                assertEquals(1, changed)
+                testApplication {
+                    configureApp(
+                        "jwt.secret" to strongJwtSecret(), "security.encryption.key" to strongEncryptionKey(),
+                        "mail.transport" to "disabled",
+                    )
+                    serverConfig { developmentMode = false }
+                    assertStartupFails("seed admin still uses a publicly known password") { startApplication() }
+                }
+            }
         }
     }
 }

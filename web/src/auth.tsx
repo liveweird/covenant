@@ -2,13 +2,13 @@
 // -- the auth store helpers (signIn/signOut/useAuthed) live beside the route guards on purpose; a mixed file opts out of fast-refresh, which is fine for this rarely-edited module
 import { useSyncExternalStore, type ReactElement } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { getToken, isAdmin, TOKEN_KEY } from "./api/session";
+import { getToken, isAdmin, ROLES_KEY, TOKEN_KEY } from "./api/session";
 
 const listeners = new Set<() => void>();
 
 function subscribe(cb: () => void): () => void {
   const onStorage = (e: StorageEvent) => {
-    if (e.key === TOKEN_KEY || e.key === null) cb();
+    if (e.key === TOKEN_KEY || e.key === ROLES_KEY || e.key === null) cb();
   };
   window.addEventListener("storage", onStorage);
   listeners.add(cb);
@@ -43,6 +43,11 @@ function useAuth(): { token: string | null; isAuthenticated: boolean } {
   return { token, isAuthenticated: token !== null };
 }
 
+/** Subscribe to role updates published by silent refresh and other browser tabs. */
+export function useAdmin(): boolean {
+  return useSyncExternalStore(subscribe, isAdmin, () => false);
+}
+
 type LocationStateWithFrom = { from?: { pathname?: string; search?: string; hash?: string } } | null;
 
 function destination(state: LocationStateWithFrom): string {
@@ -65,7 +70,7 @@ export function RequireAuth(): ReactElement {
  * queries additionally stay `enabled: isAdmin()` so no request fires for a redirected caller.
  */
 export function RequireAdmin(): ReactElement {
-  if (!isAdmin()) return <Navigate to="/" replace />;
+  if (!useAdmin()) return <Navigate to="/" replace />;
   return <Outlet />;
 }
 
