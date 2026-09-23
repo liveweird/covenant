@@ -20,10 +20,23 @@ const USER_ID_KEY = "covenant.auth.userId";
 const DISABLED_FEATURES_KEY = "covenant.auth.disabledFeatures";
 const SESSION_IDENTITY_KEY = "covenant.auth.sessionIdentity";
 
+type SessionIdentityListener = () => void;
+const sessionIdentityListeners = new Set<SessionIdentityListener>();
+
 // Changes made through this module advance the generation. The persisted identity additionally
 // catches another tab replacing localStorage, while the token-pair comparison protects refresh
 // publication within one logical session.
 let sessionGeneration = 0;
+
+/** Subscribe to same-tab logical session replacements (login, logout, or definitive expiry). */
+export function subscribeSessionIdentityChange(listener: SessionIdentityListener): () => void {
+  sessionIdentityListeners.add(listener);
+  return () => sessionIdentityListeners.delete(listener);
+}
+
+function notifySessionIdentityChange(): void {
+  sessionIdentityListeners.forEach((listener) => listener());
+}
 
 function newSessionIdentity(): string {
   return crypto.randomUUID();
@@ -60,6 +73,7 @@ export function setToken(token: string | null): void {
     localStorage.setItem(SESSION_IDENTITY_KEY, newSessionIdentity());
   }
   sessionGeneration += 1;
+  notifySessionIdentityChange();
 }
 
 export function getRefreshToken(): string | null {
@@ -135,6 +149,7 @@ export function clearSession(): void {
   localStorage.removeItem(DISABLED_FEATURES_KEY);
   localStorage.removeItem(SESSION_IDENTITY_KEY);
   sessionGeneration += 1;
+  notifySessionIdentityChange();
 }
 
 function storeSession(data: LoginSuccess): void {
@@ -153,6 +168,7 @@ export function persistSession(data: LoginSuccess): void {
   storeSession(data);
   localStorage.setItem(SESSION_IDENTITY_KEY, newSessionIdentity());
   sessionGeneration += 1;
+  notifySessionIdentityChange();
   applySessionLanguage(data);
 }
 

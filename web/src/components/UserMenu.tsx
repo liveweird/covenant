@@ -1,6 +1,6 @@
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   Avatar,
   Badge,
@@ -51,7 +51,6 @@ function initials(name: string): string {
 export default function UserMenu() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const { colorScheme, setColorScheme } = useMantineColorScheme();
   const changelogUnseen = useChangelogUnseen();
   const userId = getUserId();
@@ -74,7 +73,6 @@ export default function UserMenu() {
 
   async function handleSignOut() {
     const revocation = logout();
-    queryClient.clear();
     flagSignedOut();
     // The explicit navigation commits the cleared session and /login together. Broadcasting the
     // clear here can rerender RequireAuth on the old protected URL and save it as a login return.
