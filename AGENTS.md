@@ -25,7 +25,8 @@ hierarchy; team/user ownership; SemVer and lifecycle rules; parallel major relea
 independent support policies, deprecation/migration plans, deadline reminders and stable recommendations; read-only provider/consumer usage and optional declared adoption from
 Toadie's Port ontology; optional one-way domain/system/team metadata synchronization from
 Toadie with explicit admin linking and local memberships; validation, lint, and breaking-change
-detection; import with dry run, guarded URL fetch, source references and sync, diff, download,
+detection including Apache Avro reader/writer compatibility for AsyncAPI payloads; import with
+dry run, guarded URL fetch, source references and sync, diff, download,
 and export; history, followers and in-app notifications; optional version reviews with a
 personal/catalog review inbox; lifecycle overview; shareable migration and impact reports; and catalog facets. ADMIN-curated
 Environments hold HTTP, Kafka, and PostgreSQL targets with passwords encrypted at rest. Try-it
@@ -53,6 +54,8 @@ clean, warning-only, and intentionally invalid examples). Its README describes t
 findings and the Python API loader. Keep sample expectations synchronized with validator changes;
 load them with `python3 samples/contracts/load.py` or validate without catalog writes using
 `--check-only`. Preserve sample records explicitly requested by the user as persistent demo data.
+The independent `samples/contracts/evolution/` files exercise a published AsyncAPI Avro baseline
+against compatible and incompatible candidates; they are not part of the DRAFT-only loader.
 
 ## Project Structure & Architecture
 
@@ -65,7 +68,8 @@ This is a Kotlin/Gradle backend plus three standalone npm workspaces:
   the small-registry template), `domains` and `systems` (the Domain → System registries),
   `environments` (per-system connection targets), `notifications` (recipient-scoped inbox), and
   `contracts` (the contract catalog — contracts, SemVer/lifecycle versions, the checks pipeline
-  under `contracts/checks`, import/export/sync, events/followers, facets, and the tree).
+  under `contracts/checks` (including `AvroBreaking`), import/export/sync, events/followers,
+  facets, and the tree).
   `contracts/tryit` owns live HTTP/Kafka/SQL conformance, `contracts/render` owns the reader's
   normalized view models, and `contracts/infer` derives draft documents from samples. Copy `contracts/` for a full feature with ownership and sub-collections;
   see `CLAUDE.md` "Package layout" for the detailed map. Cross-cutting wiring and policy live

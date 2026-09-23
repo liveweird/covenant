@@ -25,6 +25,7 @@ import ch.nokillswit.contracts.checks.CheckerClient
 import ch.nokillswit.contracts.checks.CheckerResponse
 import ch.nokillswit.contracts.checks.Finding
 import ch.nokillswit.contracts.checks.OpenApiBreaking
+import ch.nokillswit.contracts.checks.AvroBreaking
 import ch.nokillswit.contracts.checks.DocumentFormat
 import ch.nokillswit.contracts.checks.FindingSource
 import ch.nokillswit.contracts.checks.Severity
@@ -635,6 +636,34 @@ class ContractVersionTest {
         assertEquals(Severity.INFO, v2.findings.single { it.code == OpenApiBreaking.CODE_CHANGED_RESPONSE }.severity)
         assertFalse(v2.findings.any { it.code == BreakingChanges.CODE_WITHOUT_MAJOR_BUMP })
         assertEquals(0, v2.checkErrors)
+    }
+
+    @Test
+    fun `Avro reader incompatibility uses the ordinary strict save waiver and major bump rules`() = testApplication {
+        usePostgresTestcontainer()
+        val admin = seededClient("vavro-break", UserRole.ADMIN)
+        val contract = admin.contract("vavro-break", ContractType.ASYNCAPI)
+        admin.activate(contract, "1.0.0", ContractFixtures.asyncApiAvro)
+        val changed = ContractFixtures.asyncApiAvro.replace(
+            "                type: string",
+            "                type: string\n              - name: approvalCode\n                type: string",
+        ).also { check(it != ContractFixtures.asyncApiAvro) { "the Avro fixture edit did not apply" } }
+
+        val strict = admin.postJson(path(contract), VersionCreateRequest("1.1.0", changed))
+        assertEquals(HttpStatusCode.BadRequest, strict.status, strict.bodyAsText())
+        assertTrue(strict.body<ProblemDetail>().detail!!.contains(BreakingChanges.CODE_WITHOUT_MAJOR_BUMP))
+
+        val waived = admin.postJson("${path(contract)}?allowInvalid=true", VersionCreateRequest("1.1.0", changed))
+        assertEquals(HttpStatusCode.Created, waived.status, waived.bodyAsText())
+        val minor = waived.body<VersionResponse>()
+        assertEquals(Severity.WARN, minor.findings.single { it.code == AvroBreaking.CODE_INCOMPATIBLE }.severity)
+        assertEquals(Severity.ERROR, minor.findings.single { it.code == BreakingChanges.CODE_WITHOUT_MAJOR_BUMP }.severity)
+
+        val major = admin.postJson(path(contract), VersionCreateRequest("2.0.0", changed))
+        assertEquals(HttpStatusCode.Created, major.status, major.bodyAsText())
+        val v2 = major.body<VersionResponse>()
+        assertEquals(Severity.INFO, v2.findings.single { it.code == AvroBreaking.CODE_INCOMPATIBLE }.severity)
+        assertFalse(v2.findings.any { it.code == BreakingChanges.CODE_WITHOUT_MAJOR_BUMP })
     }
 
     @Test

@@ -67,7 +67,7 @@ class ChecksService(private val checkerProvider: () -> CheckerClient) {
                 log.warn("checker unavailable: {}", e.message)
                 findings += Finding(
                     Severity.WARN, FindingSource.SYSTEM, CODE_CHECKER_UNAVAILABLE,
-                    "The lint/semantic checker was unavailable — only the built-in syntax and schema checks ran; re-check later",
+                    "The lint/semantic checker was unavailable — only the built-in checks ran; re-check later",
                 )
             }
         }
@@ -151,17 +151,36 @@ class ChecksService(private val checkerProvider: () -> CheckerClient) {
                 val isSkipped = facts.any { it.code == BreakingChanges.CODE_SKIPPED }
                 DirectionResult(CompatibilityDirection(if (isSkipped) null else facts.isEmpty(), facts), true)
             }
-            ContractType.ASYNCAPI -> try {
-                val breaking = checkerProvider().check(type, newContent, previousContent = oldContent).findings
-                    .filter { it.source == FindingSource.BREAKING }
-                val isSkipped = breaking.any { it.code == CODE_ASYNCAPI_DIFF_SKIPPED }
-                DirectionResult(CompatibilityDirection(if (isSkipped) null else breaking.isEmpty(), breaking), true)
-            } catch (e: CheckerUnavailableException) {
-                log.warn("checker unavailable: {}", e.message)
-                val note = Finding(Severity.WARN, FindingSource.SYSTEM, CODE_CHECKER_UNAVAILABLE, CHECKER_UNAVAILABLE_DIRECTION_MESSAGE)
-                DirectionResult(CompatibilityDirection(null, listOf(note)), false)
+            ContractType.ASYNCAPI -> {
+                val nativeFacts = BreakingChanges.facts(type, Baseline(oldVersion, oldContent), newContent, parsedNew.root)
+                try {
+                    val checkerFacts = checkerProvider().check(type, newContent, previousContent = oldContent).findings
+                        .filter { it.source == FindingSource.BREAKING }
+                    val breaking = checkerFacts + nativeFacts
+                    DirectionResult(asyncApiDirection(breaking, unavailable = false), true)
+                } catch (e: CheckerUnavailableException) {
+                    log.warn("checker unavailable: {}", e.message)
+                    val note = Finding(
+                        Severity.WARN,
+                        FindingSource.SYSTEM,
+                        CODE_CHECKER_UNAVAILABLE,
+                        CHECKER_UNAVAILABLE_DIRECTION_MESSAGE,
+                    )
+                    DirectionResult(asyncApiDirection(nativeFacts + note, unavailable = true), false)
+                }
             }
         }
+    }
+
+    /** A proven fact wins over incomplete coverage; uncertainty matters only when no break was established. */
+    private fun asyncApiDirection(findings: List<Finding>, unavailable: Boolean): CompatibilityDirection {
+        val hasFact = findings.any { it.source == FindingSource.BREAKING && !BreakingChanges.isSkipped(it) }
+        val compatible = when {
+            hasFact -> false
+            unavailable || findings.any(BreakingChanges::isSkipped) -> null
+            else -> true
+        }
+        return CompatibilityDirection(compatible, findings)
     }
 
     private fun skippedFinding(reason: String) = Finding(
@@ -206,8 +225,6 @@ class ChecksService(private val checkerProvider: () -> CheckerClient) {
         const val CODE_VERSION_MISMATCH = "VERSION_MISMATCH"
         const val CODE_STATUS_MISMATCH = "STATUS_MISMATCH"
 
-        /** The checker's `@asyncapi/diff` skip code (`checker/src/engines/asyncapi.ts`) — an uncomparable AsyncAPI pair. */
-        private const val CODE_ASYNCAPI_DIFF_SKIPPED = "asyncapi-diff-skipped"
         private const val CHECKER_UNAVAILABLE_DIRECTION_MESSAGE =
             "The lint/semantic checker was unavailable — this direction's breaking changes could not be computed"
     }

@@ -1144,7 +1144,9 @@ export interface paths {
          *     cross-check; pass `contractId` too and the document is compared against that contract's
          *     highest ACTIVE or DEPRECATED version below `version` (the report's `baselineVersion`): each breaking
          *     change is a `BREAKING` finding — INFO once `version` carries the MAJOR bump, otherwise
-         *     WARN plus one soft ERROR `BREAKING_WITHOUT_MAJOR_BUMP`. Nothing stored, no audit.
+         *     WARN plus one soft ERROR `BREAKING_WITHOUT_MAJOR_BUMP`. AsyncAPI Avro payloads use
+         *     reader/writer compatibility in the message operation's direction; unresolved comparisons
+         *     are reported as skipped. Nothing stored, no audit.
          */
         post: operations["checkDocument"];
         delete?: never;
@@ -1921,7 +1923,9 @@ export interface paths {
          *     against `to`?) and forward (do `to`'s consumers already work against `from`?), the same raw
          *     breaking-change facts the check pipeline draws on, and names the two-way `verdict` plus the
          *     SemVer `bump` between them. With no published predecessor and no `against`, the report answers
-         *     `200` with `from: null` and `verdict: UNKNOWN`.
+         *     `200` with `from: null` and `verdict: UNKNOWN`. AsyncAPI Avro payloads follow the
+         *     send/receive direction; a proven incompatibility remains incompatible even when another
+         *     comparison is skipped or the checker is unavailable.
          */
         get: operations["getVersionCompatibility"];
         put?: never;
@@ -3888,7 +3892,8 @@ export interface components {
          * @description `FULL` (both directions compatible), `BACKWARD` (consumers of `from` still work against
          *     `to`), `FORWARD` (consumers of `to` already worked against `from`), `NONE` (neither), or
          *     `UNKNOWN` (a direction could not be computed — no published predecessor, an unparseable side,
-         *     a differ skip, the checker down for AsyncAPI).
+         *     an unresolved Avro comparison, a differ skip, or the checker down for AsyncAPI without
+         *     a proven incompatibility).
          * @enum {string}
          */
         CompatibilityVerdict: "FULL" | "BACKWARD" | "FORWARD" | "NONE" | "UNKNOWN";
@@ -3906,7 +3911,7 @@ export interface components {
             lifecycle: components["schemas"]["Lifecycle"];
         };
         CompatibilityDirection: {
-            /** @description Null when not computable — `findings` then holds the SKIPPED / CHECKER_UNAVAILABLE note, never facts. */
+            /** @description Null when not computable and no incompatibility is proven. Findings may include both breaking facts and SKIPPED / CHECKER_UNAVAILABLE notes; a proven incompatibility makes this false. */
             compatible?: boolean | null;
             findings: components["schemas"]["Finding"][];
         };

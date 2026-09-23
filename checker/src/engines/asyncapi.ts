@@ -57,13 +57,41 @@ export async function breakingAsyncApi(previous: string, current: string): Promi
   if (!before.document || !after.document) return [skipped("one of the documents does not parse as AsyncAPI")];
   let changes: unknown;
   try {
-    changes = diff(before.document.json(), after.document.json(), DIFF_CONFIG).breaking();
+    // Apache Avro's reader/writer rules are checked by the JVM. The generic differ sees
+    // Avro fields as ordinary JSON and would otherwise report compatible promotions or
+    // defaulted additions as breaks. Keep the message, format and surrounding document in
+    // the diff, but replace each Avro schema subtree with the same opaque marker.
+    changes = diff(maskAvroSchemas(before.document.json()), maskAvroSchemas(after.document.json()), DIFF_CONFIG).breaking();
   } catch (error) {
     // "diff between different AsyncAPI version is not allowed" — a 2.x baseline under a 3.x candidate.
     return [skipped(error instanceof Error ? error.message : String(error))];
   }
   if (!Array.isArray(changes)) return [];
   return (changes as Change[]).filter((c) => !c.path.includes("x-parser-")).map(toFinding);
+}
+
+const AVRO_SCHEMA_MARKER = "<Apache Avro schema checked by Covenant>";
+
+/** Mask both inline and dereferenced copies, including 2.x message-level schemaFormat. */
+function maskAvroSchemas(document: unknown): unknown {
+  const visited = new WeakSet<object>();
+  const stack: unknown[] = [document];
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (node === null || typeof node !== "object" || visited.has(node)) continue;
+    visited.add(node);
+    if (Array.isArray(node)) {
+      for (const item of node) stack.push(item);
+      continue;
+    }
+    const object = node as Record<string, unknown>;
+    if (typeof object.schemaFormat === "string" && /avro/i.test(object.schemaFormat)) {
+      if ("schema" in object) object.schema = AVRO_SCHEMA_MARKER;
+      if ("payload" in object) object.payload = AVRO_SCHEMA_MARKER;
+    }
+    for (const value of Object.values(object)) stack.push(value);
+  }
+  return document;
 }
 
 const VERBS: Record<Change["action"], string> = { add: "Added", remove: "Removed", edit: "Changed" };

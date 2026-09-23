@@ -77,7 +77,9 @@ not exact counts or wording. INFO findings are allowed for every expectation.
 Open [the catalog](http://localhost:8082/contracts), find `Sample -`, then open a contract's
 1.0.0 version. Compare the Reader and Source views; the findings panel shows the intentional
 issues. The manifest's descriptions also explain them. These DRAFT-only samples do not
-exercise published-baseline breaking-change detection.
+exercise published-baseline breaking-change detection. For that workflow, use the separate
+[Avro evolution examples](evolution/README.md), which include a published baseline and
+compatible and incompatible candidate documents.
 
 ## Repeat runs, edits, and cleanup
 

@@ -17,6 +17,20 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "1.2.0",
+    date: "2026-09-23",
+    en: `**Avro changes get a format-aware compatibility check.**
+
+- AsyncAPI Avro payloads are compared using reader and writer rules for the message's direction. Defaults, type promotion, enums, unions and logical types are assessed as Avro schemas.
+- The result appears in live checks and the two-way compatibility report. A breaking change in the same major line needs Save anyway; a major bump keeps it as an informational finding.
+- When a message's role or schema cannot be resolved, the comparison reports that uncertainty instead of claiming compatibility.`,
+    pl: `**Zmiany Avro są sprawdzane zgodnie z regułami tego formatu.**
+
+- Ładunki Avro w AsyncAPI są porównywane według reguł odczytu i zapisu właściwych dla kierunku wiadomości. Wartości domyślne, promocja typów, wyliczenia, unie i typy logiczne są oceniane jako schematy Avro.
+- Wynik jest widoczny podczas sprawdzania dokumentu i w dwukierunkowym raporcie zgodności. Zmiana łamiąca zgodność w tej samej głównej linii wymaga użycia opcji „Zapisz mimo to”; przy zmianie głównej wersji pozostaje informacją.
+- Gdy nie można ustalić roli wiadomości lub rozwiązać schematu, raport wskazuje niepewność zamiast potwierdzać zgodność.`,
+  },
+  {
     version: "1.1.0",
     date: "2026-09-23",
     en: `**Read declared adoption from Toadie.**

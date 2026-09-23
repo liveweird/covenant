@@ -106,6 +106,23 @@ describe("check — ASYNCAPI breaking changes (previousContent)", () => {
     ]);
   });
 
+  test("Avro schema edits are reserved for the JVM reader/writer compatibility pass", async () => {
+    const previousContent = fixture("asyncapi/avro-payload-3.0.yaml");
+    const changed = previousContent.replace("type: string", "type: long");
+    const added = previousContent.replace("              type: string", "              type: string\n            - name: note\n              type: string\n              default: ''");
+    for (const content of [changed, added]) {
+      const { findings } = await check({ type: "ASYNCAPI", content, previousContent });
+      expect(breaking(findings)).toEqual([]);
+    }
+  });
+
+  test("Avro schema edits in an AsyncAPI 2.x message are also reserved for the JVM", async () => {
+    const previousContent = `asyncapi: 2.6.0\ninfo: {title: Orders, version: 1.0.0}\nchannels:\n  orders.placed:\n    publish:\n      message:\n        schemaFormat: application/vnd.apache.avro;version=1.9.0\n        payload:\n          type: record\n          name: OrderPlaced\n          fields:\n            - {name: orderId, type: string}\n`;
+    const content = previousContent.replace("type: string", "type: long");
+    const { findings } = await check({ type: "ASYNCAPI", content, previousContent });
+    expect(breaking(findings)).toEqual([]);
+  });
+
   test("a baseline of another AsyncAPI major version is a single INFO skip, never a failure", async () => {
     const { findings } = await check({ type: "ASYNCAPI", content: current, previousContent: fixture("asyncapi/streetlights-2.6.yaml") });
     expect(breaking(findings)).toEqual([expect.objectContaining({ severity: "INFO", source: "BREAKING", code: "asyncapi-diff-skipped" })]);
