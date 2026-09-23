@@ -9,8 +9,8 @@ data class Baseline(val version: SemVer, val content: String)
 
 /**
  * The breaking-change step of the pipeline (milestone 2). The engines — openapi-diff-core for
- * OPENAPI, the checker's `@asyncapi/diff` pass for ASYNCAPI (its BREAKING findings arrive with
- * the sidecar's response), `OdcsBreaking` for ODCS — report the FACTS as `BREAKING` findings;
+ * OPENAPI, the checker's `@asyncapi/diff` plus Apache Avro for ASYNCAPI, `OdcsBreaking` for
+ * ODCS — report the FACTS as `BREAKING` findings;
  * this step settles their severity against the SemVer rule: with the MAJOR bump the baseline
  * demands they are INFO (the change log of a deliberate break), without it they stay WARN and
  * ONE soft `ERROR` `BREAKING_WITHOUT_MAJOR_BUMP` blocks the strict save — waivable like every
@@ -19,11 +19,15 @@ data class Baseline(val version: SemVer, val content: String)
 object BreakingChanges {
     const val CODE_WITHOUT_MAJOR_BUMP = "BREAKING_WITHOUT_MAJOR_BUMP"
     const val CODE_SKIPPED = "BREAKING_CHECK_SKIPPED"
+    const val CODE_ASYNCAPI_DIFF_SKIPPED = "asyncapi-diff-skipped"
 
-    /** The JVM-side facts for the type; the ASYNCAPI facts come from the checker instead. */
+    /** The JVM-side facts for the type; generic ASYNCAPI facts still come from the checker. */
     fun facts(type: ContractType, baseline: Baseline, content: String, root: JsonNode): List<Finding> = when (type) {
         ContractType.OPENAPI -> OpenApiBreaking.compare(baseline.content, content) ?: listOf(skipped(baseline))
-        ContractType.ASYNCAPI -> emptyList()
+        ContractType.ASYNCAPI -> when (val old = DocumentParser.parse(baseline.content)) {
+            is ParseOutcome.Parsed -> AvroBreaking.compare(old.root, root)
+            is ParseOutcome.Failed -> listOf(skipped(baseline))
+        }
         ContractType.ODCS -> when (val old = DocumentParser.parse(baseline.content)) {
             is ParseOutcome.Parsed -> OdcsBreaking.compare(old.root, root)
             is ParseOutcome.Failed -> listOf(skipped(baseline))
@@ -35,7 +39,7 @@ object BreakingChanges {
      * document is (to be) stored as; unknown or unparseable, the facts stay WARN and nothing blocks.
      */
     fun settle(findings: List<Finding>, baseline: Baseline, candidate: String?): List<Finding> {
-        val facts = findings.filter { it.source == FindingSource.BREAKING && it.code != CODE_SKIPPED }
+        val facts = findings.filter { it.source == FindingSource.BREAKING && !isSkipped(it) }
         if (facts.isEmpty()) return findings
         val version = candidate?.let { SemVer.parseOrNull(it) }
         val majorBumped = version != null && version.major > baseline.version.major
@@ -54,4 +58,7 @@ object BreakingChanges {
         Severity.INFO, FindingSource.BREAKING, CODE_SKIPPED,
         "Breaking changes against published version ${baseline.version} could not be computed — that document does not compare",
     )
+
+    fun isSkipped(finding: Finding): Boolean = finding.code == CODE_SKIPPED ||
+        finding.code == CODE_ASYNCAPI_DIFF_SKIPPED || finding.code == AvroBreaking.CODE_SKIPPED
 }

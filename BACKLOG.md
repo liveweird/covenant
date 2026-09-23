@@ -241,13 +241,6 @@ to the existing integration and have their own implementation scope.
   source summaries and conflict states to those same pages, so the shape to factor out has
   grown since the estimate.
 
-- **Apache Avro schema-evolution pass.** An Avro payload inside an AsyncAPI document is
-  compared structurally by the checker's `@asyncapi/diff` pass today. A dedicated Avro
-  `SchemaCompatibility` pass would judge reader and writer compatibility on the format's own
-  terms: added fields with defaults, removed defaulted fields, type promotion, enum symbol
-  supersets and union branch matching. Recorded as a later add in
-  [contract-standards.md](.claude/docs/contract-standards.md).
-
 - **Web building blocks not yet ported.** Listed at the bottom of [web/CLAUDE.md](web/CLAUDE.md)
   and confirmed absent from `web/src`: Toadie's URL-carried view-state hook and row quick-view
   drawer, and Lettuce's `safeBackParam` open-redirect guard, `StatusPill`, `MetaStrip`,
@@ -257,6 +250,15 @@ to the existing integration and have their own implementation scope.
   `pages/TeamDetails.tsx` since the teams registry landed.
 
 ## Recently completed
+
+- **Apache Avro schema evolution (1.2.0).** Matched AsyncAPI Avro messages use Apache Avro's
+  reader/writer compatibility rules in the direction of the application's send or receive
+  operation, including replies. The JVM reports incompatible fields, promotions, enums,
+  unions and logical-type changes in live checks and both directions of the compatibility
+  report. The checker still compares channel, message and transport changes while treating
+  Avro schema subtrees as opaque. Unresolved or ambiguous comparisons remain unknown; no
+  database migration or Toadie change is required. Reusable examples live in
+  [samples/contracts/evolution](samples/contracts/evolution/README.md).
 
 - Validation fixes (0.14.2): OpenAPI
   breaking detection is independent of JSON formatting and preserves YAML anchors; the checker

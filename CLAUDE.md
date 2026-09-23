@@ -190,7 +190,8 @@ ch.nokillswit
 │                       detection, Jackson YAML with the alias/size caps, the type gate), Metadata.kt,
 │                       OpenApiValidator/AsyncApiValidator/OdcsValidator.kt, BreakingChanges.kt (the baseline +
 │                       the WARN/INFO/gate settlement) with OpenApiBreaking.kt (openapi-diff-core, 3.1 through the
-│                       3.0 model) and OdcsBreaking.kt (hand-written; the ASYNCAPI facts come from the checker's
+│                       3.0 model), AvroBreaking.kt (AsyncAPI Avro reader/writer compatibility),
+│                       and OdcsBreaking.kt (hand-written; other ASYNCAPI facts come from the checker's
 │                       @asyncapi/diff pass), VendoredSchemas.kt (offline
 │                       networknt registries over resources/schemas), CheckerClient.kt (the sidecar
 │                       client + its AttributeKey test seam), ChecksService.kt (the pipeline plus
