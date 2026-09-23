@@ -6,6 +6,8 @@ import io.ktor.server.testing.testApplication
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 
 /**
  * The per-account lockout (auth/LoginThrottle.kt wired in AuthRoutes): after `threshold`
@@ -13,6 +15,42 @@ import kotlin.test.assertEquals
  * answer 429 for the lockout window. Independent of the per-IP rate limit.
  */
 class LoginLockoutTest {
+
+    @Test
+    fun `a full lockout store rejects unseen identities while retaining existing state`() = testApplication {
+        configureApp(
+            "security.lockout.threshold" to "2",
+            "security.lockout.maxTracked" to "1",
+        )
+        startApplication()
+        val client = jsonClient()
+        val tracked = uniqueEmail("capacity-tracked")
+        val rejected = " ${"x".repeat(100_000)}@invalid "
+        val auditEvents = LogCapture("ch.nokillswit.audit")
+        try {
+            assertEquals(HttpStatusCode.Unauthorized, client.login(tracked, "wrong").status)
+            assertEquals(HttpStatusCode.TooManyRequests, client.login(rejected, "wrong").status)
+            val capacityEvent = assertNotNull(
+                auditEvents.awaitEvent { it.message == "login.capacity_rejected" },
+                "capacity rejection should be audited",
+            )
+            val auditFields = capacityEvent.keyValuePairs.orEmpty()
+            val digest = auditFields.single { it.key == "emailDigest" }.value as String
+            assertEquals(64, digest.length)
+            assertFalse(auditFields.any { it.key == "email" })
+            // The fresh tracked counter survived: its next failure still trips its lock.
+            assertEquals(HttpStatusCode.Unauthorized, client.login(tracked, "wrong").status)
+            assertNotNull(
+                auditEvents.awaitEvent {
+                    it.message == "login.lockout" && it.hasKeyValue("email", tracked)
+                },
+                "ordinary login identities should keep the email audit field",
+            )
+            assertEquals(HttpStatusCode.TooManyRequests, client.login(tracked, "wrong").status)
+        } finally {
+            auditEvents.detach()
+        }
+    }
 
     @Test
     fun `threshold consecutive failures lock the account - even the right password answers 429`() = testApplication {

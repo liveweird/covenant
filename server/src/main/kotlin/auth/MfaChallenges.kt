@@ -2,7 +2,7 @@ package ch.nokillswit.auth
 
 import java.security.MessageDigest
 import java.security.SecureRandom
-import java.util.concurrent.ConcurrentHashMap
+import java.util.TreeMap
 
 /**
  * In-memory store of pending email-MFA challenges (Lettuce's, ported): a login with correct
@@ -20,8 +20,15 @@ import java.util.concurrent.ConcurrentHashMap
 class MfaChallenges(
     private val ttlMillis: Long,
     private val maxAttempts: Int,
+    private val maxTracked: Int = 10_000,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
+    init {
+        require(maxTracked > 0) { "maxTracked must be positive" }
+    }
+
+    class CapacityExceededException : RuntimeException()
+
     data class IssuedChallenge(val challengeId: String, val code: String, val expiresAt: Long)
 
     sealed interface Outcome {
@@ -39,58 +46,67 @@ class MfaChallenges(
         val attempts: Int,
     )
 
-    private val challenges = ConcurrentHashMap<String, Challenge>()
+    private val challenges = mutableMapOf<String, Challenge>()
+    private val expiryIndex = TreeMap<Long, MutableSet<String>>()
+    private val lock = Any()
 
-    fun issue(userId: UInt, credentialRevision: Long): IssuedChallenge {
-        pruneIfOversized()
+    fun issue(userId: UInt, credentialRevision: Long): IssuedChallenge = synchronized(lock) {
+        val now = clock()
+        pruneExpired(now)
+        if (challenges.size >= maxTracked) throw CapacityExceededException()
         val id = generateChallengeId()
         val code = generateMfaCode()
-        val expiresAt = clock() + ttlMillis
+        val expiresAt = now + ttlMillis
         challenges[id] = Challenge(userId, credentialRevision, code, expiresAt, attempts = 0)
-        return IssuedChallenge(id, code, expiresAt)
+        expiryIndex.getOrPut(expiresAt) { mutableSetOf() }.add(id)
+        IssuedChallenge(id, code, expiresAt)
     }
 
-    fun verify(challengeId: String, code: String): Outcome {
+    fun verify(challengeId: String, code: String): Outcome = synchronized(lock) {
         val challenge = challenges[challengeId]
-            ?: return Outcome.Failure("unknown_challenge")
+            ?: return@synchronized Outcome.Failure("unknown_challenge")
         if (challenge.expiresAt <= clock()) {
-            challenges.remove(challengeId, challenge)
-            return Outcome.Failure("expired")
+            removeChallenge(challengeId)
+            return@synchronized Outcome.Failure("expired")
         }
         if (MessageDigest.isEqual(challenge.code.toByteArray(), code.toByteArray())) {
-            // Single-use is a CAS, not a courtesy: only the submission that actually removes
-            // the entry wins — a concurrent duplicate with the same correct code loses.
-            return if (challenges.remove(challengeId, challenge)) {
-                Outcome.Success(challenge.userId, challenge.credentialRevision)
-            } else {
-                Outcome.Failure("unknown_challenge")
-            }
+            removeChallenge(challengeId)
+            return@synchronized Outcome.Success(challenge.userId, challenge.credentialRevision)
         }
-        // The attempt bump is atomic (computeIfPresent) so parallel wrong guesses can never
-        // lose an increment and sneak past the cap; reaching the cap drops the entry.
-        var capped = false
-        challenges.computeIfPresent(challengeId) { _, current ->
-            val attempts = current.attempts + 1
-            if (attempts >= maxAttempts) {
-                capped = true
-                null
-            } else {
-                current.copy(attempts = attempts)
-            }
+        val attempts = challenge.attempts + 1
+        if (attempts >= maxAttempts) {
+            removeChallenge(challengeId)
+            Outcome.Failure("too_many_attempts")
+        } else {
+            challenges[challengeId] = challenge.copy(attempts = attempts)
+            Outcome.Failure("wrong_code")
         }
-        return Outcome.Failure(if (capped) "too_many_attempts" else "wrong_code")
     }
 
-    // Memory bound: unauthenticated logins mint challenges, so the map must not grow without
-    // limit. Cheap opportunistic prune of expired entries once it gets large.
-    private fun pruneIfOversized() {
-        if (challenges.size <= MAX_TRACKED) return
-        val now = clock()
-        challenges.entries.removeIf { it.value.expiresAt <= now }
+    /** Drops an issued challenge when its delivery fails, immediately releasing its slot. */
+    fun discard(challengeId: String) = synchronized(lock) {
+        removeChallenge(challengeId)
+    }
+
+    private fun pruneExpired(now: Long) {
+        while (expiryIndex.firstEntry()?.key?.let { it <= now } == true) {
+            val (expiresAt, ids) = expiryIndex.pollFirstEntry()
+            ids.forEach { id ->
+                if (challenges[id]?.expiresAt == expiresAt) challenges.remove(id)
+            }
+        }
+    }
+
+    private fun removeChallenge(id: String): Boolean {
+        val removed = challenges.remove(id) ?: return false
+        expiryIndex[removed.expiresAt]?.let { ids ->
+            ids.remove(id)
+            if (ids.isEmpty()) expiryIndex.remove(removed.expiresAt)
+        }
+        return true
     }
 
     private companion object {
-        const val MAX_TRACKED = 10_000
         val secureRandom = SecureRandom()
 
         /** 128 bits of opaque, unguessable challenge identity. */

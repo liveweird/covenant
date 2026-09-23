@@ -16,6 +16,10 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
+import java.net.ServerSocket
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -30,6 +34,53 @@ import kotlin.test.assertTrue
  * FeatureFlagsTest/AuditTest.
  */
 class MfaLoginTest {
+
+    /** One-message SMTP sink used to prove recovery after a real transport failure. */
+    private class SmtpSink(port: Int) : AutoCloseable {
+        private val server = ServerSocket(port)
+        private val executor = Executors.newSingleThreadExecutor()
+        private val delivered = CountDownLatch(1)
+
+        init {
+            executor.submit {
+                server.accept().use { socket ->
+                    val reader = socket.getInputStream().bufferedReader()
+                    val writer = socket.getOutputStream().bufferedWriter()
+                    fun reply(line: String) {
+                        writer.write("$line\r\n")
+                        writer.flush()
+                    }
+                    reply("220 localhost")
+                    while (true) {
+                        val line = reader.readLine() ?: break
+                        when {
+                            line.startsWith("DATA") -> {
+                                reply("354 end with dot")
+                                while (true) {
+                                    val dataLine = reader.readLine() ?: break
+                                    if (dataLine == ".") break
+                                }
+                                reply("250 queued")
+                                delivered.countDown()
+                            }
+                            line.startsWith("QUIT") -> {
+                                reply("221 bye")
+                                break
+                            }
+                            else -> reply("250 ok")
+                        }
+                    }
+                }
+            }
+        }
+
+        fun awaitDelivery(): Boolean = delivered.await(5, TimeUnit.SECONDS)
+
+        override fun close() {
+            server.close()
+            executor.shutdownNow()
+        }
+    }
 
     /** Enable MFA for [userId] — an empty disabled set removes the default MFA row. */
     private suspend fun HttpClient.enableMfa(userId: UInt) =
@@ -172,6 +223,76 @@ class MfaLoginTest {
             )
         } finally {
             mail.detach()
+            auditEvents.detach()
+        }
+    }
+
+    @Test
+    fun `a full MFA store rejects issuance without email and keeps the existing challenge valid`() = testApplication {
+        configureApp("security.mfa.maxTracked" to "1")
+        startApplication()
+        val firstEmail = uniqueEmail("mfa-capacity-first")
+        val secondEmail = uniqueEmail("mfa-capacity-second")
+        seedMfaUser(firstEmail, "pw-123456789")
+        seedMfaUser(secondEmail, "pw-123456789")
+        val mail = LogCapture("ch.nokillswit.mail")
+        val auditEvents = LogCapture("ch.nokillswit.audit")
+        try {
+            val client = jsonClient()
+            val first = client.login(firstEmail, "pw-123456789").body<MfaChallengeResponse>()
+            val firstCode = mail.codeFor(firstEmail)
+
+            assertEquals(HttpStatusCode.TooManyRequests, client.login(secondEmail, "pw-123456789").status)
+            assertNotNull(
+                auditEvents.awaitEvent {
+                    it.message == "login.mfa_capacity_rejected" && it.hasKeyValue("email", secondEmail)
+                },
+            )
+            assertEquals(
+                null,
+                mail.events.firstOrNull { "To: $secondEmail" in it.formattedMessage },
+                "a rejected challenge must not schedule email delivery",
+            )
+            assertEquals(HttpStatusCode.OK, client.verify(first.challengeId, firstCode).status)
+        } finally {
+            mail.detach()
+            auditEvents.detach()
+        }
+    }
+
+    @Test
+    fun `failed MFA delivery releases capacity so a recovered mail transport can retry`() = testApplication {
+        val port = ServerSocket(0).use { it.localPort }
+        configureApp(
+            "security.mfa.maxTracked" to "1",
+            "mail.transport" to "smtp",
+            "mail.smtp.host" to "127.0.0.1",
+            "mail.smtp.port" to port.toString(),
+            "mail.smtp.startTls" to "false",
+        )
+        startApplication()
+        val email = uniqueEmail("mfa-delivery-recovery")
+        seedMfaUser(email, "pw-123456789")
+        val auditEvents = LogCapture("ch.nokillswit.audit")
+        try {
+            val client = jsonClient()
+            assertEquals(HttpStatusCode.OK, client.login(email, "pw-123456789").status)
+            assertNotNull(
+                auditEvents.awaitEvent {
+                    it.message == "login.mfa_send_failed" && it.hasKeyValue("email", email)
+                },
+                "the closed SMTP port should fail the first delivery",
+            )
+
+            SmtpSink(port).use { smtp ->
+                assertEquals(
+                    HttpStatusCode.OK,
+                    client.login(email, "pw-123456789").status,
+                    "the failed challenge must release the only capacity slot",
+                )
+                assertTrue(smtp.awaitDelivery(), "the retry should reach the recovered SMTP transport")
+            }
+        } finally {
             auditEvents.detach()
         }
     }

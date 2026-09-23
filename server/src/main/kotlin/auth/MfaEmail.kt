@@ -1,6 +1,7 @@
 package ch.nokillswit.auth
 
 import ch.nokillswit.audit.audit
+import ch.nokillswit.authz.TooManyRequestsException
 import ch.nokillswit.infra.mail.LocalizedText
 import ch.nokillswit.infra.mail.Mailer
 import ch.nokillswit.infra.mail.respondMailUnavailable
@@ -66,7 +67,14 @@ internal suspend fun issueMfaChallenge(
         call.respondMailUnavailable("multi-factor login")
         return
     }
-    val challenge = challenges.issue(userId, user.credentialRevision)
+    val challenge = try {
+        challenges.issue(userId, user.credentialRevision)
+    } catch (_: MfaChallenges.CapacityExceededException) {
+        audit("login.mfa_capacity_rejected", "email" to user.email, "userId" to userId.toLong())
+        throw TooManyRequestsException(
+            "Too many sign-in challenges are pending — try again later",
+        )
+    }
     audit("login.mfa_challenge", "email" to user.email, "userId" to userId.toLong())
     // Challenge stored BEFORE responding (the user submits the code right away);
     // only the delivery is fire-and-forget, like the password-reset email.
@@ -79,8 +87,10 @@ internal suspend fun issueMfaChallenge(
                 body = mfaEmailBody(user.name, challenge.code, codeTtlMinutes, user.language),
             )
         } catch (e: CancellationException) {
+            challenges.discard(challenge.challengeId)
             throw e
         } catch (e: Exception) {
+            challenges.discard(challenge.challengeId)
             audit("login.mfa_send_failed", "email" to user.email, "error" to e.message)
             app.log.error("MFA code email delivery failed for ${user.email}", e)
         }

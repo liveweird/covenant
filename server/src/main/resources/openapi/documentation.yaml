@@ -88,14 +88,19 @@ paths:
         consecutive failures for one email (default 5, `LOGIN_LOCKOUT_THRESHOLD`), further
         attempts for that account — even with the correct password — are rejected with `429`
         for a lockout window (default 15 min, `LOGIN_LOCKOUT_DURATION_SECONDS`). A successful
-        login resets the counter.
+        login resets the counter. The in-memory lockout store admits at most
+        `LOGIN_LOCKOUT_MAX_TRACKED` identities (default 10,000). At capacity a new identity
+        receives `429` before password verification; existing tracked identities continue,
+        and expired state frees capacity. This applies equally to existing and unknown emails.
 
         **Email MFA (opt-in via the `MFA` feature flag):** when the account has MFA enabled,
         correct credentials answer `200` with an `MfaChallengeResponse` instead of tokens — a
         6-digit code is emailed to the account, and the client exchanges it together with the
         `challengeId` at `POST /api/v1/login/mfa` for the ordinary `LoginResponse`. On a
         deployment without outbound email (`MAIL_TRANSPORT=disabled`) an MFA-enabled login
-        fails closed with `503`.
+        fails closed with `503`. The pending challenge store admits at most
+        `MFA_MAX_TRACKED` challenges (default 10,000); new issuance at capacity receives
+        `429` without sending a code, while existing challenges remain verifiable.
       security: []
       requestBody:
         required: true
@@ -216,14 +221,17 @@ paths:
       operationId: requestPasswordReset
       summary: Request a self-service password reset
       description: |
-        Always answers `202` for a well-formed request, whether or not an account with that
+        Normally answers `202` for a well-formed request, whether or not an account with that
         email exists (no account enumeration; the actual work happens asynchronously). If the
-        account exists, a new password is generated, its hash replaces the old one (which stops
-        working, and all outstanding refresh tokens are invalidated), and the password is sent
-        to the account's email address. Throttled per submitted email — one request per interval
+        account exists, a new password is generated and emailed first; only after delivery does
+        its hash replace the old one (which stops working, and outstanding refresh tokens are
+        invalidated). Throttled per submitted email — one request per interval
         (default 60 s, `PASSWORD_RESET_MIN_INTERVAL_SECONDS`) — uniformly for existing and
-        unknown addresses, and rate-limited per client IP. A soft-deleted account is unknown
-        here (no password is minted, no email sent; the `202` stays uniform). Answers `503` on
+        unknown addresses, and rate-limited per client IP. The in-memory cooldown store admits
+        at most `PASSWORD_RESET_MAX_TRACKED` identities (default 10,000). At capacity a new
+        identity receives `429` and no reset email is scheduled; elapsed cooldowns free space.
+        A soft-deleted account is unknown here (no password is minted or email sent, and the
+        response follows the same acceptance and throttling rules). Answers `503` on
         deployments without outbound email (`MAIL_TRANSPORT=disabled`).
       security: []
       requestBody:

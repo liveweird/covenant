@@ -17,6 +17,18 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "1.2.1",
+    date: "2026-09-23",
+    en: `**Sign-in safeguards now have firm capacity limits.**
+
+- Login lockouts, password-reset cooldowns and pending email sign-in codes retain a bounded amount of in-memory state. When a limit is reached, new requests receive a temporary rate-limit response instead of displacing active protections.
+- Existing sign-in codes and tracked accounts keep working; expired state frees capacity automatically.`,
+    pl: `**Zabezpieczenia logowania mają teraz ścisłe limity pojemności.**
+
+- Blokady logowania, odstępy między resetami hasła i oczekujące kody e-mail zajmują ograniczoną ilość pamięci. Po osiągnięciu limitu nowe żądania otrzymują tymczasową odpowiedź o ograniczeniu liczby żądań zamiast usuwać aktywne zabezpieczenia.
+- Istniejące kody logowania i śledzone konta nadal działają; wygasłe dane automatycznie zwalniają miejsce.`,
+  },
+  {
     version: "1.2.0",
     date: "2026-09-23",
     en: `**Avro changes get a format-aware compatibility check.**

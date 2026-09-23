@@ -17,8 +17,9 @@ remain in the shared references rather than being copied here.
 
 Covenant deliberately mirrors [Toadie](https://github.com/liveweird/toadie) and
 [Lettuce](https://github.com/liveweird/lettuce). The implemented surface includes
-authentication/session handling (JWT pair, revocation blocklist, lockout, rate limits), email MFA
-and password reset, admin-managed users and per-user feature flags, the synced user language,
+authentication/session handling (JWT pair, revocation blocklist, capacity-bounded lockout,
+rate limits), capacity-bounded email MFA and password reset, admin-managed users and per-user
+feature flags, the synced user language,
 shared paging, and the React shell (nav model, command palette, theme, changelog). The catalog
 and its SPA are implemented: flat teams with rosters; the Domain → System → Contract → Version
 hierarchy; team/user ownership; SemVer and lifecycle rules; parallel major release lines with

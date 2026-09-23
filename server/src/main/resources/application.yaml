@@ -59,6 +59,7 @@ security:
   lockout:
     threshold: "$LOGIN_LOCKOUT_THRESHOLD:5"
     durationSeconds: "$LOGIN_LOCKOUT_DURATION_SECONDS:900"
+    maxTracked: "$LOGIN_LOCKOUT_MAX_TRACKED:10000"
   # Per-IP token bucket on POST /api/v1/login. The per-account lockout above is the
   # actual brute-force defence and is unaffected by this. Blank FOLLOWS THE MODE:
   # 10/min in production, 1000/min in development — the e2e suite drives many logins
@@ -84,6 +85,7 @@ security:
   # uniformly whether or not the account exists. In-memory, per-instance, like the lockout.
   passwordReset:
     minIntervalSeconds: "$PASSWORD_RESET_MIN_INTERVAL_SECONDS:60"
+    maxTracked: "$PASSWORD_RESET_MAX_TRACKED:10000"
   # Email MFA (opt-in per user via the MFA feature flag): a login with correct credentials
   # mints a challenge and emails a 6-digit code; the code must come back to
   # POST /api/v1/login/mfa within the TTL and attempt cap. Challenges are in-memory,
@@ -91,6 +93,7 @@ security:
   mfa:
     codeTtlSeconds: "$MFA_CODE_TTL_SECONDS:300"
     maxAttempts: "$MFA_MAX_ATTEMPTS:5"
+    maxTracked: "$MFA_MAX_TRACKED:10000"
   # Application-level encryption at rest (infra/crypto/): an AES-256-GCM key (64 hex chars,
   # `openssl rand -hex 32`) for the try-it environments' stored credentials
   # (environments.kafka_password / pg_password). The default is a committed dev-only key

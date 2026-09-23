@@ -151,9 +151,10 @@ ch.nokillswit
 │                       HTTP exceptions (401/403/404/409/429/502)
 ├── auth/               PasswordResetEmail.kt (the async reset worker) + POST /api/v1/login (+ the email-MFA branch and /login/mfa second
 │                       step — MfaChallenges/MfaEmail), /refresh, /logout + the self-service
-│                       POST /api/v1/password-reset (uniform 202, async send-before-store,
+│                       POST /api/v1/password-reset (uniform acceptance/throttling, async send-before-store,
 │                       PasswordResetThrottle) + token minting + password hashing/generation
-│                       + LoginThrottle + the revoked-token blocklist
+│                       + LoginThrottle + the revoked-token blocklist; login/reset/MFA in-memory
+│                       state has strict configurable capacities and audited 429 saturation paths
 ├── users/              the user domain: ADMIN-only management CRUD (/api/v1/users list/create
 │                       + {id} get/put/delete with the self-delete 403 and last-admin 409
 │                       protections) + PUT /api/v1/users/{id}/password + the per-user feature
