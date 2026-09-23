@@ -16,14 +16,17 @@ import "./index.css";
 import "./i18n";
 import App from "./App.tsx";
 import ErrorBoundary from "./components/ErrorBoundary";
+import SessionBoundary from "./components/SessionBoundary";
 import { shouldRetryQuery } from "./api/http";
 import { theme } from "./theme";
 import { cssVariablesResolver } from "./themeVariables";
+import { bindSessionQueryCache } from "./utils/sessionQueryCache";
 
 const queryClient = new QueryClient({
   // Never retry a 4xx; up to two retries for transient failures (see shouldRetryQuery).
   defaultOptions: { queries: { retry: shouldRetryQuery } },
 });
+bindSessionQueryCache(queryClient);
 
 // A redeploy invalidates the hashed lazy chunks — the first failed dynamic import reloads the
 // page once to pick up the new index.html. Rate-limited via sessionStorage (at most one
@@ -53,7 +56,9 @@ createRoot(document.getElementById("root")!).render(
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>
-            <App />
+            <SessionBoundary>
+              <App />
+            </SessionBoundary>
           </BrowserRouter>
         </QueryClientProvider>
       </ErrorBoundary>

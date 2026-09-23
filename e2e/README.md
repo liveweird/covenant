@@ -66,7 +66,8 @@ from Lettuce, that any new or edited spec must satisfy:
   PostgreSQL environment and the contracts each journey creates (`e2e-infer-*`); `users` owns its throwaway accounts; `teams` owns its throwaway teams (unique `e2e-team-*` names) and users; `registries` owns its throwaway domains/systems (`e2e-dom-*`/`e2e-sys-*`) and user; `i18n` owns its
   throwaway user (and ONLY that user's language — **seeded accounts must stay English**: every
   login applies the stored language to that session's UI, so a Polish seed admin would flip
-  parallel specs mid-run); `password-reset` owns its throwaway account (its reset requests use
+  parallel specs mid-run); `session-cache` owns two throwaway users and mocks only its own
+  browser's notification reads; `password-reset` owns its throwaway account (its reset requests use
   unique per-run emails against the in-memory per-email throttle, and both tests together stay
   under the per-IP 5/min reset bucket); `mfa` owns its throwaway accounts and toggles ONLY their
   MFA flags (the seed admin's MFA flag is never touched — enabling it would make every spec's
@@ -106,6 +107,9 @@ the same commit** — this list is the coverage map, the scenario file is the de
 - [`auth.spec.ts`](scenarios/auth.md) — login / logout / invalid credentials / guarded deep link with query and hash;
   explicit sign-out from a non-home protected page returns the next sign-in to the Hierarchy,
   including while server revocation is delayed.
+- [`session-cache.spec.ts`](scenarios/session-cache.md) — automatic sign-out followed by a different
+  account keeps the previous account's cached notification count hidden while the new read waits;
+  a cross-tab switch also discards a delayed inference result and its open form state.
 - [`changelog.spec.ts`](scenarios/changelog.md) — the what's-new dot on a fresh device
   leads to the changelog via the version stamp and clears once read (no language switching
   — it runs as the seed admin; see `i18n.spec.ts`).

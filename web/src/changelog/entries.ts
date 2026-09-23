@@ -17,6 +17,18 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "1.2.2",
+    date: "2026-09-24",
+    en: `**Account switches keep each person's data separate.**
+
+- Signing out or switching accounts clears data loaded for the previous account, including notifications, catalog views and open form results. A response from an earlier session cannot restore that data after another account signs in.
+- Renewing a session's tokens keeps the current account's data in place.`,
+    pl: `**Zmiana konta oddziela dane każdej osoby.**
+
+- Wylogowanie lub zmiana konta usuwa dane wczytane dla poprzedniego konta, w tym powiadomienia, widoki katalogu i wyniki otwartych formularzy. Odpowiedź z wcześniejszej sesji nie może przywrócić tych danych po zalogowaniu na inne konto.
+- Odnowienie tokenów sesji zachowuje dane bieżącego konta.`,
+  },
+  {
     version: "1.2.1",
     date: "2026-09-23",
     en: `**Sign-in safeguards now have firm capacity limits.**
