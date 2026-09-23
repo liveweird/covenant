@@ -56,6 +56,35 @@ class ValidatorsTest {
     }
 
     @Test
+    fun `AsyncAPI - a referenced reusable Multi Format Schema is parsed as Avro`() {
+        val document = """
+            asyncapi: 3.0.0
+            info: {title: Orders, version: 1.0.0}
+            channels:
+              orders:
+                address: orders
+                messages:
+                  placed:
+                    payload:
+                      ${'$'}ref: "#/components/schemas/OrderPlaced"
+            operations: {}
+            components:
+              schemas:
+                OrderPlaced:
+                  schemaFormat: application/vnd.apache.avro;version=1.9.0
+                  schema:
+                    type: recordz
+                    name: OrderPlaced
+                    fields:
+                      - {name: orderId, type: string}
+        """.trimIndent()
+        val findings = AsyncApiValidator.validate(root(document))
+        val avro = findings.single { it.code == AsyncApiValidator.CODE_AVRO }
+        assertEquals("/components/schemas/OrderPlaced/schema", avro.path)
+        assertEquals(Severity.ERROR, avro.severity)
+    }
+
+    @Test
     fun `ODCS - a valid contract passes, a required violation is a SCHEMA error, v2 is unsupported`() {
         assertEquals(emptyList(), OdcsValidator.validate(root(ContractFixtures.odcs)))
         // ODCS 3.x keeps `status` a free string (no enum) — the missing required `id` is the schema violation.

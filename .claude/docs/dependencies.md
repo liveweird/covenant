@@ -3,8 +3,9 @@
 Dependency declarations and lockfiles are the source of truth. Keep Gradle and the three npm
 workspaces independent; do not upgrade to the newest major merely because it is available.
 
-The [2026-09-22 triage](dependency-triage-2026-09-22.md) records the eleven reviewed major-version
-PRs, their deferral conditions, compatible npm updates and advisory/image-pin observations.
+Outstanding coordinated major-version migrations are tracked in the
+[product backlog](../../BACKLOG.md). Recheck current upstream compatibility and advisory data
+before acting on a dated triage decision.
 
 ## Update automation
 

@@ -6,7 +6,6 @@ import ch.nokillswit.infra.mail.mailer
 import io.ktor.server.application.Application
 import io.ktor.server.testing.testApplication
 import jakarta.mail.MessagingException
-import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
@@ -33,7 +32,7 @@ class MailTransportTest {
     fun `production mode refuses to start with the log transport`() = testApplication {
         // Strong JWT secret so the earlier configureSecurity check passes; configureMail runs
         // at the top of the infrastructure group, before Flyway/Bootstrap.
-        configureApp("jwt.secret" to "strong-${UUID.randomUUID()}", "security.encryption.key" to strongEncryptionKey())
+        configureApp("jwt.secret" to strongJwtSecret(), "security.encryption.key" to strongEncryptionKey())
         serverConfig { developmentMode = false }
         assertStartupFails("mail.transport") { startApplication() }
     }

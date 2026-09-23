@@ -4,9 +4,9 @@ import io.ktor.server.testing.testApplication
 import kotlin.test.Test
 
 /**
- * The JWT-secret fail-closed check (plugins/Security.kt): a blank, placeholder, or
- * repo-committed (burned) secret is tolerated in development but refuses to start in
- * production mode. The check runs before Flyway/Bootstrap, so no seed handling is needed.
+ * The JWT-secret fail-closed check (plugins/Security.kt): a production secret must be a
+ * private 64-hex key. Development keeps the demo/placeholder behavior. The check runs
+ * before Flyway/Bootstrap, so no seed handling is needed.
  */
 class SecurityConfigTest {
 
@@ -25,6 +25,12 @@ class SecurityConfigTest {
     @Test
     fun `production mode refuses a blank secret`() {
         assertRefusedInProduction("jwt.secret" to "")
+    }
+
+    @Test
+    fun `production mode refuses one-character and repeated hex keys`() {
+        assertRefusedInProduction("jwt.secret" to "x")
+        assertRefusedInProduction("jwt.secret" to "0".repeat(64))
     }
 
     @Test

@@ -141,7 +141,7 @@ describe("check — ASYNCAPI breaking changes (previousContent)", () => {
 
     const cyclicPrevious = await check({ type: "ASYNCAPI", content: current, previousContent: CYCLIC });
     expect(cyclicPrevious.findings).toEqual([
-      expect.objectContaining({ code: "cyclic-alias-not-allowed", path: "/x-cycle/self" }),
+      expect.objectContaining({ code: "asyncapi-diff-skipped", source: "BREAKING" }),
     ]);
   });
 
@@ -157,17 +157,19 @@ describe("check — ASYNCAPI breaking changes (previousContent)", () => {
     ]);
   });
 
-  test("a baseline file ref is refused before the diff parser can read it", async () => {
+  test("a baseline file ref makes only the diff incomplete before the parser can read it", async () => {
     const fileRef = new URL("./fixtures/asyncapi/streetlights-3.0.yaml", import.meta.url).href;
     const previousContent = current.replace(
       '$ref: "#/components/schemas/lightMeasuredPayload"',
       `$ref: "${fileRef}"`,
     );
     const { findings } = await check({ type: "ASYNCAPI", content: current, previousContent });
-    expect(findings).toEqual([
+    expect(findings.some((finding) => finding.code === "external-ref-not-allowed")).toBe(false);
+    expect(breaking(findings)).toEqual([
       expect.objectContaining({
-        code: "external-ref-not-allowed",
-        path: "/components/messages/lightMeasured/payload/$ref",
+        severity: "INFO",
+        code: "asyncapi-diff-skipped",
+        message: expect.stringContaining("previous document contains external references"),
       }),
     ]);
   });
@@ -187,11 +189,24 @@ describe("check — ASYNCAPI breaking changes (previousContent)", () => {
         `$ref: "http://127.0.0.1:${port}/schema.json"`,
       );
       const { findings } = await check({ type: "ASYNCAPI", content: current, previousContent });
-      expect(findings.map((finding) => finding.code)).toEqual(["external-ref-not-allowed"]);
+      expect(findings.some((finding) => finding.code === "external-ref-not-allowed")).toBe(false);
+      expect(breaking(findings).map((finding) => finding.code)).toEqual(["asyncapi-diff-skipped"]);
       expect(requests).toBe(0);
     } finally {
       await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
     }
+  });
+
+  test("an external ref in the current AsyncAPI document also marks the comparison incomplete", async () => {
+    const externalContent = current.replace(
+      '$ref: "#/components/schemas/lightMeasuredPayload"',
+      '$ref: "https://example.invalid/schema.json"',
+    );
+    const { findings } = await check({ type: "ASYNCAPI", content: externalContent, previousContent: externalContent });
+    expect(findings).toContainEqual(expect.objectContaining({ severity: "ERROR", code: "external-ref-not-allowed" }));
+    expect(breaking(findings)).toEqual([
+      expect.objectContaining({ severity: "INFO", code: "asyncapi-diff-skipped" }),
+    ]);
   });
 
   test("OPENAPI ignores previousContent — the JVM computes its breaking changes", async () => {

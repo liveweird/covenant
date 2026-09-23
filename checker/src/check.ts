@@ -36,11 +36,23 @@ async function collect(request: CheckRequest): Promise<Finding[]> {
   try {
     root = parsed.toJS() as unknown;
   } catch {
-    return [unsafeExpansionFinding()];
+    const unsafe = unsafeExpansionFinding();
+    return request.type === "ASYNCAPI" && request.previousContent !== undefined
+      ? [unsafe, skippedBaselineFinding("the current document exceeds safe YAML alias expansion")]
+      : [unsafe];
+  }
+  const external = externalRefFindings(root);
+  if (external.length > 0) {
+    return request.type === "ASYNCAPI" && request.previousContent !== undefined
+      ? [...external, skippedBaselineFinding("the current document contains unresolved references or exceeds the safe reference-scan limit")]
+      : external;
   }
   const previous = request.type === "ASYNCAPI" ? parseForRefScan(request.previousContent) : undefined;
-  const external = [...externalRefFindings(root), ...externalRefFindings(previous?.root)];
-  if (external.length > 0) return external;
+  const previousRefFindings = externalRefFindings(previous?.root);
+  const previousExternalRefs = previousRefFindings.filter((finding) => finding.code === "external-ref-not-allowed");
+  if (previousRefFindings.length > previousExternalRefs.length) {
+    return [skippedBaselineFinding("the previous document exceeds safe reference-scan limits")];
+  }
 
   switch (request.type) {
     case "OPENAPI":
@@ -59,9 +71,17 @@ async function collect(request: CheckRequest): Promise<Finding[]> {
     case "ASYNCAPI": {
       let breakingWork: Promise<Finding[]> = Promise.resolve([]);
       if (request.previousContent !== undefined) {
-        breakingWork = previous?.malformed || previous?.unsafe
-          ? Promise.resolve([skippedBaselineFinding(previous.unsafe ? "unsafe YAML alias expansion" : "the previous document does not parse")])
-          : breakingAsyncApi(request.previousContent, request.content);
+        let skipReason: string | undefined;
+        if (previous?.unsafe) {
+          skipReason = "unsafe YAML alias expansion";
+        } else if (previous?.malformed) {
+          skipReason = "the previous document does not parse";
+        } else if (previousExternalRefs.length > 0) {
+          skipReason = "the previous document contains external references that Covenant does not resolve";
+        }
+        breakingWork = skipReason === undefined
+          ? breakingAsyncApi(request.previousContent, request.content)
+          : Promise.resolve([skippedBaselineFinding(skipReason)]);
       }
       const [semantic, lint, breaking] = await Promise.all([
         validateAsyncApi(request.content),

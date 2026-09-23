@@ -6,7 +6,7 @@ import { useDebouncedValue } from "@mantine/hooks";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconFolders, IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
 import { ApiError } from "../api/http";
-import { isAdmin } from "../api/session";
+import { useAdmin } from "../auth";
 import { createDomain, deleteDomain, detachDomainToadieSource, listDomains, updateDomain, type DomainResponse } from "../api/domains";
 import ClearableTextInput from "../components/ClearableTextInput";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
@@ -47,7 +47,7 @@ const SETTINGS_KEY = "domains";
 export default function Domains() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const admin = isAdmin();
+  const admin = useAdmin();
   const [nameFilter, setNameFilter] = useStoredState(`${SETTINGS_KEY}.filter.name`, "", isString);
   const [debouncedName] = useDebouncedValue(nameFilter, 300);
 

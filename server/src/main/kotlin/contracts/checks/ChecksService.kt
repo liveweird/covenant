@@ -84,15 +84,16 @@ class ChecksService(private val checkerProvider: () -> CheckerClient) {
      * `backward` = the facts of comparing old=`from` → new=`to`, `forward` = old=`to` → new=`from` —
      * the same raw facts `BreakingChanges`/`settle` draw on, kept at their WARN severity (no
      * MAJOR-bump flip here; that sentence is the SPA's). `from == null` (no published predecessor)
-     * answers UNKNOWN without touching any engine; identical text on both sides short-circuits to
-     * `compatible = true` twice, likewise without an engine call.
+     * answers UNKNOWN without touching any engine. Identical OPENAPI/ODCS text short-circuits to
+     * `compatible = true` twice; ASYNCAPI still needs the checker to detect unresolved external
+     * references in a historical baseline.
      */
     suspend fun compatibility(type: ContractType, from: Baseline?, toVersion: SemVer, toContent: String): CompatibilityOutcome {
         if (from == null) {
             val note = CompatibilityDirection(null, listOf(skippedFinding("no published version to compare against")))
             return CompatibilityOutcome(CompatibilityVerdict.UNKNOWN, null, note, note, checkerAvailable = true)
         }
-        if (from.content == toContent) {
+        if (from.content == toContent && type != ContractType.ASYNCAPI) {
             val same = CompatibilityDirection(true, emptyList())
             val bump = Compatibility.bump(from.version, toVersion)
             return CompatibilityOutcome(CompatibilityVerdict.FULL, bump, same, same, checkerAvailable = true)
@@ -154,8 +155,15 @@ class ChecksService(private val checkerProvider: () -> CheckerClient) {
             ContractType.ASYNCAPI -> {
                 val nativeFacts = BreakingChanges.facts(type, Baseline(oldVersion, oldContent), newContent, parsedNew.root)
                 try {
-                    val checkerFacts = checkerProvider().check(type, newContent, previousContent = oldContent).findings
-                        .filter { it.source == FindingSource.BREAKING }
+                    val checkerFindings = checkerProvider().check(type, newContent, previousContent = oldContent).findings
+                    // The checker sorts by severity before capping. Its INFO skip (or even a
+                    // BREAKING fact) can fall past 500 earlier errors, so truncation is unknown.
+                    val checkerFacts = checkerFindings.filter { it.source == FindingSource.BREAKING } +
+                        if (checkerFindings.any { it.code == "findings-truncated" && it.source == FindingSource.SYSTEM }) {
+                            listOf(skippedFinding("the checker result was truncated"))
+                        } else {
+                            emptyList()
+                        }
                     val breaking = checkerFacts + nativeFacts
                     DirectionResult(asyncApiDirection(breaking, unavailable = false), true)
                 } catch (e: CheckerUnavailableException) {

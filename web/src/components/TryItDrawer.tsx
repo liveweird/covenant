@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
 import type { ContractResponse } from "../api/contracts";
 import { listEnvironments } from "../api/environments";
-import { isAdmin } from "../api/session";
+import { useAdmin } from "../auth";
 import { getTryCatalog } from "../api/tryIt";
 import type { VersionResponse } from "../api/versions";
 import { useStoredState } from "../hooks/useStoredState";
@@ -37,6 +37,7 @@ export default function TryItDrawer({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const admin = useAdmin();
   const target = tryTargetOf(contract.type);
   const catalog = useQuery({
     queryKey: ["contracts", "try-catalog", contract.id, version.id, version.contentSha256],
@@ -67,7 +68,7 @@ export default function TryItDrawer({
     body = (
       <Stack align="center" gap="xs" py="xl">
         <EmptyState icon={IconPlugConnected} label={t("tryIt.noEnvironments", { target: t(`tryIt.target.${target}`) })} />
-        {isAdmin() && (
+        {admin && (
           <Anchor component={RouterLink} to={environmentsPath} size="sm">
             {t("tryIt.noEnvironmentsAdmin")}
           </Anchor>

@@ -6,7 +6,7 @@ import { useForm } from "@mantine/form";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getContract, transferContractOwner, updateContract } from "../api/contracts";
 import { ApiError } from "../api/http";
-import { isAdmin } from "../api/session";
+import { useAdmin } from "../auth";
 import { listAllSystems } from "../api/systems";
 import ContractFormFields from "../components/ContractFormFields";
 import EditPageLoadState from "../components/EditPageLoadState";
@@ -36,7 +36,7 @@ export default function EditContract() {
   const queryClient = useQueryClient();
   const { id: idParam } = useParams();
   const id = Number(idParam);
-  const admin = isAdmin();
+  const admin = useAdmin();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

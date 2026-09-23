@@ -5,7 +5,7 @@ import { Alert, Anchor, Button, Menu, Stack, Table, Text } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconPencil, IconPlus, IconTrash, IconUsersGroup } from "@tabler/icons-react";
-import { isAdmin } from "../api/session";
+import { useAdmin } from "../auth";
 import { deleteTeam, detachTeamToadieSource, getTeam, listTeams, type TeamListItem, type TeamResponse } from "../api/teams";
 import ClearableTextInput from "../components/ClearableTextInput";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
@@ -39,7 +39,7 @@ export default function Teams() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const admin = isAdmin();
+  const admin = useAdmin();
   const [nameFilter, setNameFilter] = useStoredState(`${SETTINGS_KEY}.filter.name`, "", isString);
   const [debouncedName] = useDebouncedValue(nameFilter, 300);
   const activeFilterCount = nameFilter.trim() ? 1 : 0;

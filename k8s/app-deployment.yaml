@@ -83,9 +83,9 @@ spec:
             # limiting keys on the real client IP and the HTTPS redirect sees the real scheme.
             - name: HTTP_BEHIND_PROXY
               value: "true"
-            # Outbound email (no consumer feature yet — password reset / MFA arrive with
-            # their Lettuce ports). Ships disabled — set "smtp" plus real SMTP_HOST/
-            # MAIL_FROM/MAIL_APP_URL to enable (production refuses the `log` transport).
+            # Password reset and email MFA need outbound mail. This deployment ships with
+            # mail disabled — set "smtp" plus real SMTP_HOST/MAIL_FROM/MAIL_APP_URL to enable
+            # those flows (production refuses the `log` transport).
             # SMTP credentials come from the Secret.
             - name: MAIL_TRANSPORT
               value: "disabled"

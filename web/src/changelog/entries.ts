@@ -17,6 +17,22 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "1.2.3",
+    date: "2026-09-24",
+    en: `**Contract checks give clearer answers, and production setup is safer.**
+
+- AsyncAPI compatibility reports say when external references prevent a comparison. A reference in an older version no longer blocks saving a valid new version.
+- Reusable Avro payload schemas reached through local references are validated before save.
+- Admin navigation and controls follow role changes received during session renewal, without another sign-in.
+- Production startup rejects known initial admin passwords and weak JWT secrets.`,
+    pl: `**Sprawdzanie kontraktów daje jaśniejsze wyniki, a konfiguracja produkcyjna jest bezpieczniejsza.**
+
+- Raporty zgodności AsyncAPI informują, gdy zewnętrzne odwołania uniemożliwiają porównanie. Odwołanie w starszej wersji nie blokuje już zapisu poprawnej nowej wersji.
+- Schematy Avro wielokrotnego użytku, wskazane lokalnymi odwołaniami, są sprawdzane przed zapisem.
+- Nawigacja i kontrolki administracyjne uwzględniają zmiany uprawnień otrzymane podczas odnowienia sesji bez ponownego logowania.
+- Uruchomienie w trybie produkcyjnym odrzuca znane hasła początkowe administratora i słabe klucze JWT.`,
+  },
+  {
     version: "1.2.2",
     date: "2026-09-24",
     en: `**Account switches keep each person's data separate.**

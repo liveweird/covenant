@@ -5,7 +5,7 @@ import { Alert, Badge, Button, Menu, Stack, Table, Text, Tooltip } from "@mantin
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconBrandDatabricks, IconDatabaseImport, IconPencil, IconPlus, IconRefresh, IconTrash } from "@tabler/icons-react";
 import { deleteToadieConnection, listToadieConnections, refreshToadieConnection, type ToadieConnection } from "../api/toadie";
-import { isAdmin } from "../api/session";
+import { useAdmin } from "../auth";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import EmptyState from "../components/EmptyState";
 import PageHeader from "../components/PageHeader";
@@ -36,7 +36,7 @@ function connectionStatus(row: ToadieConnection) {
 export default function ToadieConnections() {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
-  const admin = isAdmin();
+  const admin = useAdmin();
   const paging = usePagedSort<SortField>("name", [], { key: SETTINGS_KEY, sortFields: SORT_FIELDS });
   const query = useQuery({
     queryKey: ["toadie", "connections", paging.page, paging.pageSize, paging.sortParam],

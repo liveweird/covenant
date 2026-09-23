@@ -15,7 +15,8 @@ import SortHeader from "../components/SortHeader";
 import { useBulkFeatureUpdate } from "../hooks/useBulkFeatureUpdate";
 import { usePagedSort } from "../hooks/usePagedSort";
 import { isOneOf, isOneOfOrNull, isString, useStoredState } from "../hooks/useStoredState";
-import { FEATURES, isAdmin, type Feature } from "../api/session";
+import { FEATURES, type Feature } from "../api/session";
+import { useAdmin } from "../auth";
 import { listUsers, updateUserFeatures, type UserPage } from "../api/users";
 import { showSuccessToast } from "../utils/toast";
 import { loadErrorMessage, saveErrorMessage } from "../utils/saveError";
@@ -40,6 +41,7 @@ const SETTINGS_KEY = "featureFlags";
  */
 export default function FeatureFlags() {
   const { t } = useTranslation();
+  const admin = useAdmin();
   const queryClient = useQueryClient();
   const [feature, setFeature] = useStoredState<Feature>(
     `${SETTINGS_KEY}.feature`,
@@ -93,7 +95,7 @@ export default function FeatureFlags() {
     ],
     queryFn: () => listQuery(page, pageSize),
     placeholderData: keepPreviousData,
-    enabled: isAdmin(),
+    enabled: admin,
   });
 
   // The bulk state machine lives in the hook; this page supplies the fetch (every row

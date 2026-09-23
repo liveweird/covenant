@@ -47,9 +47,9 @@ fun Application.configureSecurity() {
         accessExpiresInSeconds = environment.config.property("jwt.accessExpiresInSeconds").getString().toLong(),
         refreshExpiresInSeconds = environment.config.property("jwt.refreshExpiresInSeconds").getString().toLong(),
     )
-    // Fail closed: a blank secret, the placeholder "secret", or the repo-committed demo key lets
-    // anyone forge tokens for any user/role. Allowed (with a loud warning) only in development;
-    // rejected at startup in production.
+    // Production uses a private 32-byte key encoded as 64 hex characters (the documented
+    // `openssl rand -hex 32` format). The structural check cannot prove entropy; operators
+    // must generate the key randomly. Development keeps its committed demo-key behavior.
     val burnedSecrets = setOf(
         "secret",
         // Committed to docker-compose.yaml for the local clone-&-run demo — public, thus burned.
@@ -57,8 +57,10 @@ fun Application.configureSecurity() {
         // The k8s/secret.yaml template placeholder — applying the template verbatim must not boot.
         "CHANGE-ME-openssl-rand-hex-32",
     )
-    if (jwtConfig.secret.isBlank() || jwtConfig.secret in burnedSecrets) {
-        val message = "JWT secret is unset or a publicly known value — set a strong, private JWT_SECRET."
+    val validKeyShape = jwtConfig.secret.matches(Regex("[0-9a-fA-F]{64}")) &&
+        jwtConfig.secret.lowercase().toSet().size > 1
+    if (jwtConfig.secret in burnedSecrets || !validKeyShape) {
+        val message = "JWT secret must be a private 64-character hex key (openssl rand -hex 32)."
         if (developmentMode) log.warn("$message (permitted in development only)")
         else error(message)
     }

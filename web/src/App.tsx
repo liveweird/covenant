@@ -4,8 +4,7 @@ import { useDisclosure } from "@mantine/hooks";
 import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand } from "@tabler/icons-react";
 import { Link as RouterLink, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { isAdmin } from "./api/session";
-import { RedirectIfAuthed, RequireAdmin, RequireAuth } from "./auth";
+import { RedirectIfAuthed, RequireAdmin, RequireAuth, useAdmin } from "./auth";
 import BrandLogo from "./components/BrandLogo";
 import CommandPalette from "./components/CommandPalette";
 import NotificationsButton from "./components/NotificationsButton";
@@ -55,6 +54,7 @@ function RouteFallback() {
 
 function Shell() {
   const { t } = useTranslation();
+  const admin = useAdmin();
   const [opened, { toggle, close }] = useDisclosure();
   const { pathname } = useLocation();
   // Desktop navbar collapse — device-level, persisted like the other view settings; the
@@ -65,7 +65,7 @@ function Shell() {
   // The nav model lives in utils/navigation.ts (shared with the command palette): sections
   // of always-present leaves, admin-only ones filtered per session (the routes are guarded
   // too), an empty section disappearing with them.
-  const sections = visibleSections(isAdmin());
+  const sections = visibleSections(admin);
   const activeTo = activeNavPath(
     pathname,
     sections.flatMap((section) => section.items),

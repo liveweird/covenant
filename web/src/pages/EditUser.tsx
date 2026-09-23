@@ -6,7 +6,8 @@ import { useForm } from "@mantine/form";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getUser, setUserLanguage, updateUser } from "../api/users";
 import { ApiError } from "../api/http";
-import { getUserId, isAdmin } from "../api/session";
+import { getUserId } from "../api/session";
+import { useAdmin } from "../auth";
 import i18n, { asSupportedLanguage } from "../i18n";
 import EditPageLoadState from "../components/EditPageLoadState";
 import UserFormFields from "../components/UserFormFields";
@@ -18,6 +19,7 @@ import { FORM_MAX_WIDTH } from "../utils/layout";
 
 export default function EditUser() {
   const { t } = useTranslation();
+  const admin = useAdmin();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const params = useParams<{ id: string }>();
@@ -35,7 +37,7 @@ export default function EditUser() {
   const { data, isLoading, isError, error: fetchError } = useQuery({
     queryKey: ["user", id],
     queryFn: () => getUser(id),
-    enabled: idIsValid && isAdmin(),
+    enabled: idIsValid && admin,
     retry: false,
   });
 

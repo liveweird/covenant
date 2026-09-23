@@ -95,6 +95,9 @@ fun uniqueEmail(prefix: String) = "$prefix-${java.util.UUID.randomUUID()}@test"
 fun strongEncryptionKey(): String =
     java.util.UUID.randomUUID().toString().replace("-", "") + java.util.UUID.randomUUID().toString().replace("-", "")
 
+/** Test-only private JWT key in the production-required 64-hex format. */
+fun strongJwtSecret(): String = strongEncryptionKey()
+
 /** POSTs [body] as JSON — the contentType+setBody ceremony, owned once. */
 suspend inline fun <reified T> HttpClient.postJson(path: String, body: T): HttpResponse =
     post(path) {

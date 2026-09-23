@@ -6,7 +6,7 @@ import { useDebouncedValue } from "@mantine/hooks";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconPencil, IconPlugConnected, IconPlus, IconTrash } from "@tabler/icons-react";
 import { deleteEnvironment, listEnvironments, type EnvironmentResponse } from "../api/environments";
-import { isAdmin } from "../api/session";
+import { useAdmin } from "../auth";
 import { listAllSystems } from "../api/systems";
 import ClearableTextInput from "../components/ClearableTextInput";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
@@ -36,7 +36,7 @@ const SETTINGS_KEY = "environments";
 export default function Environments() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const admin = isAdmin();
+  const admin = useAdmin();
   const [nameFilter, setNameFilter] = useStoredState(`${SETTINGS_KEY}.filter.name`, "", isString);
   const [systemFilter, setSystemFilter] = useStoredState(`${SETTINGS_KEY}.filter.system`, "", isString);
   const [debouncedName] = useDebouncedValue(nameFilter, 300);

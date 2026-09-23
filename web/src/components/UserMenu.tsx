@@ -15,9 +15,9 @@ import {
 } from "@mantine/core";
 import { IconCheck, IconChevronDown, IconHistory, IconKey, IconLogout } from "@tabler/icons-react";
 import { logout } from "../api/auth";
-import { getUserId, isAdmin } from "../api/session";
+import { getUserId } from "../api/session";
 import { getUser, setUserLanguage } from "../api/users";
-import { flagSignedOut } from "../auth";
+import { flagSignedOut, useAdmin } from "../auth";
 import { asSupportedLanguage, NATIVE_LANGUAGE_NAMES, SUPPORTED_LANGUAGES } from "../i18n";
 import { useChangelogUnseen } from "../hooks/useChangelogSeen";
 
@@ -50,6 +50,7 @@ function initials(name: string): string {
  */
 export default function UserMenu() {
   const { t, i18n } = useTranslation();
+  const admin = useAdmin();
   const navigate = useNavigate();
   const { colorScheme, setColorScheme } = useMantineColorScheme();
   const changelogUnseen = useChangelogUnseen();
@@ -116,7 +117,7 @@ export default function UserMenu() {
             <Text size="xs" c="dimmed" truncate>
               {identity.data?.email ?? "—"}
             </Text>
-            {isAdmin() && (
+            {admin && (
               <Badge size="xs" variant="outline" color="gray">
                 {t("common.role.ADMIN")}
               </Badge>
