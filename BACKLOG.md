@@ -138,9 +138,8 @@ parents in the affected relationships.
 
 Additional hardening notes:
 
-- Consider explicit hard capacities for login/reset/MFA maps. Their current pruning removes
-  expired entries but does not bound fresh entries. This is a hardening/test-gap note, not a
-  demonstrated resource-exhaustion incident.
+- The login/reset/MFA map-capacity hardening note is addressed in 1.2.1; it was a preventive
+  resource-bound change, not a demonstrated resource-exhaustion incident.
 - Do not reintroduce rejected findings: Kafka password retention follows the documented PUT
   contract; negative path segments are intentionally rejected globally. Chunked checker error
   delivery was unconfirmed and is not counted.
@@ -250,6 +249,14 @@ to the existing integration and have their own implementation scope.
   `pages/TeamDetails.tsx` since the teams registry landed.
 
 ## Recently completed
+
+- **Bounded auth state (1.2.1).** Login failure/lockout identities, password-reset cooldowns
+  and pending email-MFA challenges each have a strict configurable in-memory capacity. Expired
+  entries free space; fresh protections are not evicted. New identities or challenges receive
+  an audited 429 when saturated, without starting a reset or sending a rejected MFA code.
+  Existing tracked logins and pending challenges retain their normal behavior. Login identities
+  use fixed-size retained keys, including for malformed submitted addresses. No database
+  migration is required.
 
 - **Apache Avro schema evolution (1.2.0).** Matched AsyncAPI Avro messages use Apache Avro's
   reader/writer compatibility rules in the direction of the application's send or receive

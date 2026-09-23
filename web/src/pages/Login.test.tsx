@@ -107,11 +107,11 @@ describe("Login", () => {
     expect(await screen.findByText("Invalid email or password")).toBeInTheDocument();
   });
 
-  test("429 shows the lockout message", async () => {
+  test("429 shows a neutral temporary sign-in limit", async () => {
     fetchMock().mockResolvedValueOnce(jsonResponse(429, { title: "Too Many Requests", status: 429 }));
     renderWithProviders(<Login />, { route: "/login" });
     await submit();
-    expect(await screen.findByText(/Too many failed login attempts/)).toBeInTheDocument();
+    expect(await screen.findByText(/Sign-in is temporarily limited/)).toBeInTheDocument();
   });
 
   test("an unexpected status shows the generic status message", async () => {

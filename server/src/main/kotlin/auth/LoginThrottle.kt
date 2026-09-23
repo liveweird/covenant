@@ -1,6 +1,7 @@
 package ch.nokillswit.auth
 
-import java.util.concurrent.ConcurrentHashMap
+import java.security.MessageDigest
+import java.util.TreeMap
 
 /**
  * Per-account login throttle: after [threshold] consecutive failures for the same submitted
@@ -15,52 +16,125 @@ import java.util.concurrent.ConcurrentHashMap
 class LoginThrottle(
     private val threshold: Int,
     private val lockoutMillis: Long,
+    private val maxTracked: Int = 10_000,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
-    private data class State(val failures: Int, val lockedUntil: Long, val lastTouched: Long)
+    init {
+        require(maxTracked > 0) { "maxTracked must be positive" }
+    }
 
-    private val states = ConcurrentHashMap<String, State>()
+    enum class Preflight {
+        ALLOWED,
+        LOCKED,
+        CAPACITY_EXCEEDED,
+    }
 
-    private fun key(email: String) = email.trim().lowercase()
+    enum class FailureResult {
+        RECORDED,
+        LOCKED_NOW,
+        ALREADY_LOCKED,
+        CAPACITY_EXCEEDED,
+    }
 
-    /** True while the account is locked out (expired locks are pruned on the way). */
-    fun isLocked(email: String): Boolean {
+    enum class SuccessResult {
+        CLEARED,
+        LOCKED,
+    }
+
+    private data class State(val failures: Int, val lockedUntil: Long, val expiresAt: Long)
+
+    private val states = mutableMapOf<String, State>()
+    private val expiryIndex = TreeMap<Long, MutableSet<String>>()
+    private val lock = Any()
+
+    private fun key(email: String) = loginIdentityKey(email)
+
+    /**
+     * Checks an identity before the account lookup and bcrypt work. Existing identities may
+     * continue at capacity; a new identity is rejected until stale state can be reclaimed.
+     */
+    fun preflight(email: String): Preflight {
         val k = key(email)
-        val s = states[k] ?: return false
-        // One clock read for both branches — re-reading could straddle the expiry instant.
-        val now = clock()
-        if (s.lockedUntil in 1..now) {
-            states.remove(k, s) // lock expired — fresh start
-            return false
+        return synchronized(lock) {
+            val now = clock()
+            pruneExpired(now)
+            val state = states[k]
+            when {
+                state?.lockedUntil?.let { it > now } == true -> Preflight.LOCKED
+                state != null || states.size < maxTracked -> Preflight.ALLOWED
+                else -> Preflight.CAPACITY_EXCEEDED
+            }
         }
-        return s.lockedUntil > now
     }
 
-    /** Record a failed attempt; returns true when this failure trips the lockout. */
-    fun recordFailure(email: String): Boolean {
-        pruneIfOversized()
-        val now = clock()
-        val next = states.compute(key(email)) { _, cur ->
-            val failures = (cur?.failures ?: 0) + 1
-            if (failures >= threshold) State(0, now + lockoutMillis, now)
-            else State(failures, 0, now)
+    /** Records a failure, atomically rechecking capacity after the password work. */
+    fun recordFailure(email: String): FailureResult {
+        val k = key(email)
+        return synchronized(lock) {
+            val now = clock()
+            pruneExpired(now)
+            val current = states[k]
+            if (current == null && states.size >= maxTracked) {
+                return@synchronized FailureResult.CAPACITY_EXCEEDED
+            }
+            // A request that passed preflight just before another request tripped the lock must
+            // never replace that active lock with a fresh counter.
+            if (current != null && current.lockedUntil > now) {
+                return@synchronized FailureResult.ALREADY_LOCKED
+            }
+            val failures = (current?.failures ?: 0) + 1
+            if (failures >= threshold) {
+                putState(k, State(0, now + lockoutMillis, now + lockoutMillis))
+                FailureResult.LOCKED_NOW
+            } else {
+                putState(k, State(failures, 0, now + lockoutMillis))
+                FailureResult.RECORDED
+            }
         }
-        return next != null && next.lockedUntil > now
     }
 
-    fun recordSuccess(email: String) {
-        states.remove(key(email))
+    fun recordSuccess(email: String): SuccessResult {
+        val key = key(email)
+        return synchronized(lock) {
+            val now = clock()
+            pruneExpired(now)
+            val current = states[key]
+            if (current != null && current.lockedUntil > now) {
+                SuccessResult.LOCKED
+            } else {
+                removeState(key)
+                SuccessResult.CLEARED
+            }
+        }
     }
 
-    // Memory bound: an attacker spraying distinct emails must not grow the map without limit.
-    // Cheap opportunistic prune of stale entries once the map gets large.
-    private fun pruneIfOversized() {
-        if (states.size <= MAX_TRACKED) return
-        val cutoff = clock() - lockoutMillis
-        states.entries.removeIf { it.value.lastTouched < cutoff && it.value.lockedUntil <= clock() }
+    private fun putState(key: String, state: State) {
+        removeState(key)
+        states[key] = state
+        expiryIndex.getOrPut(state.expiresAt) { mutableSetOf() }.add(key)
     }
 
-    private companion object {
-        const val MAX_TRACKED = 10_000
+    private fun removeState(key: String) {
+        val removed = states.remove(key) ?: return
+        expiryIndex[removed.expiresAt]?.let { keys ->
+            keys.remove(key)
+            if (keys.isEmpty()) expiryIndex.remove(removed.expiresAt)
+        }
     }
+
+    private fun pruneExpired(now: Long) {
+        while (expiryIndex.firstEntry()?.key?.let { it <= now } == true) {
+            val (expiresAt, keys) = expiryIndex.pollFirstEntry()
+            keys.forEach { key ->
+                if (states[key]?.expiresAt == expiresAt) states.remove(key)
+            }
+        }
+    }
+
+}
+
+/** Fixed-size, non-reversible key so an arbitrarily long submitted identity is never retained. */
+internal fun loginIdentityKey(email: String): String {
+    val canonical = email.trim().lowercase().toByteArray(Charsets.UTF_8)
+    return MessageDigest.getInstance("SHA-256").digest(canonical).joinToString("") { "%02x".format(it) }
 }

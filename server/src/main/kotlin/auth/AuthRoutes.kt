@@ -165,11 +165,13 @@ fun Application.configureAuthRoutes() {
         loginThrottle = LoginThrottle(
             threshold = environment.config.property("security.lockout.threshold").getString().toInt(),
             lockoutMillis = environment.config.property("security.lockout.durationSeconds").getString().toLong() * 1000,
+            maxTracked = environment.config.property("security.lockout.maxTracked").getString().toInt(),
         ),
         // Self-service password reset: one request per submitted email per interval, uniformly
         // whether or not the account exists (the 429 carries no enumeration signal).
         resetThrottle = PasswordResetThrottle(
             minIntervalMillis = environment.config.property("security.passwordReset.minIntervalSeconds").getString().toLong() * 1000,
+            maxTracked = environment.config.property("security.passwordReset.maxTracked").getString().toInt(),
         ),
         mailer = mailer(),
         mailAppUrl = mailAppUrl(),
@@ -178,6 +180,7 @@ fun Application.configureAuthRoutes() {
         mfaChallenges = MfaChallenges(
             ttlMillis = mfaTtlSeconds * 1000,
             maxAttempts = environment.config.property("security.mfa.maxAttempts").getString().toInt(),
+            maxTracked = environment.config.property("security.mfa.maxTracked").getString().toInt(),
         ),
         mfaTtlMinutes = (mfaTtlSeconds + 59) / 60,
         refreshVerifier = JWT.require(Algorithm.HMAC256(jwtConfig.secret))
@@ -195,6 +198,9 @@ fun Application.configureAuthRoutes() {
     }
 }
 
+private fun loginAuditIdentity(email: String): Pair<String, Any?> =
+    if (email.length <= 254) "email" to email else "emailDigest" to loginIdentityKey(email)
+
 private fun Route.login(deps: AuthDeps) {
     val jwtConfig = deps.jwtConfig
     val userService = deps.userService
@@ -208,13 +214,21 @@ private fun Route.login(deps: AuthDeps) {
         // lookup folds the same way — a padded or case-variant submission matches its
         // account (and keeps sharing one lockout bucket).
         val email = canonicalEmail(req.email)
-        if (loginThrottle.isLocked(email)) {
-            audit("login.rejected_locked", "email" to email)
-            // Thrown (not respondProblem) so StatusPages marks the call handled and its
-            // generic 429 status handler cannot replace this specific detail.
-            throw TooManyRequestsException(
-                "Too many failed login attempts for this account — try again later",
-            )
+        val auditIdentity = loginAuditIdentity(email)
+        when (loginThrottle.preflight(email)) {
+            LoginThrottle.Preflight.ALLOWED -> Unit
+            LoginThrottle.Preflight.LOCKED -> {
+                audit("login.rejected_locked", auditIdentity)
+                // Thrown (not respondProblem) so StatusPages marks the call handled and its
+                // generic 429 status handler cannot replace this specific detail.
+                throw TooManyRequestsException(
+                    "Too many failed login attempts for this account — try again later",
+                )
+            }
+            LoginThrottle.Preflight.CAPACITY_EXCEEDED -> {
+                audit("login.capacity_rejected", auditIdentity)
+                throw TooManyRequestsException("Too many sign-in identities are being tracked — try again later")
+            }
         }
         val record = userService.findWithIdByEmail(email)
         // The unknown-email branch pays a full (discarded) bcrypt verify so its latency
@@ -228,17 +242,39 @@ private fun Route.login(deps: AuthDeps) {
                 verifyPassword(req.password, record.second.passwordHash)
             }
         if (record == null || !credentialsValid) {
-            val tripped = loginThrottle.recordFailure(email)
+            val failureResult = loginThrottle.recordFailure(email)
+            when (failureResult) {
+                LoginThrottle.FailureResult.CAPACITY_EXCEEDED -> {
+                    audit("login.capacity_rejected", auditIdentity)
+                    throw TooManyRequestsException("Too many sign-in identities are being tracked — try again later")
+                }
+                LoginThrottle.FailureResult.ALREADY_LOCKED -> {
+                    audit("login.rejected_locked", auditIdentity)
+                    throw TooManyRequestsException(
+                        "Too many failed login attempts for this account — try again later",
+                    )
+                }
+                LoginThrottle.FailureResult.RECORDED,
+                LoginThrottle.FailureResult.LOCKED_NOW,
+                -> Unit
+            }
             audit(
                 "login.failure",
-                "email" to email,
+                auditIdentity,
                 "reason" to if (record == null) "unknown_email" else "wrong_password",
             )
-            if (tripped) audit("login.lockout", "email" to email)
+            if (failureResult == LoginThrottle.FailureResult.LOCKED_NOW) {
+                audit("login.lockout", auditIdentity)
+            }
             throw UnauthorizedException("Unknown email or wrong password")
         }
         val (userId, user) = record
-        loginThrottle.recordSuccess(email)
+        if (loginThrottle.recordSuccess(email) == LoginThrottle.SuccessResult.LOCKED) {
+            audit("login.rejected_locked", auditIdentity)
+            throw TooManyRequestsException(
+                "Too many failed login attempts for this account — try again later",
+            )
+        }
         // Email MFA (opt-in via the MFA feature flag, read straight off the DB record —
         // no JWT exists yet): correct credentials answer with a challenge, not tokens.
         if (Feature.MFA !in user.disabledFeatures) {
@@ -362,11 +398,18 @@ private fun Route.passwordReset(deps: AuthDeps) {
             call.respondMailUnavailable("password reset")
             return@post
         }
-        if (!resetThrottle.tryAcquire(email)) {
-            audit("password_reset.throttled", "email" to email)
-            throw TooManyRequestsException(
-                "Only one password reset per minute per address — try again shortly",
-            )
+        when (resetThrottle.tryAcquire(email)) {
+            PasswordResetThrottle.AcquireResult.ACQUIRED -> Unit
+            PasswordResetThrottle.AcquireResult.COOLDOWN -> {
+                audit("password_reset.throttled", "email" to email)
+                throw TooManyRequestsException(
+                    "Only one password reset per minute per address — try again shortly",
+                )
+            }
+            PasswordResetThrottle.AcquireResult.CAPACITY_EXCEEDED -> {
+                audit("password_reset.capacity_rejected", "email" to email)
+                throw TooManyRequestsException("Too many password reset identities are being tracked — try again later")
+            }
         }
         audit("password_reset.requested", "email" to email)
         // The worker (auth/PasswordResetEmail.kt) runs after the uniform 202.

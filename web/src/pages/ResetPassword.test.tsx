@@ -45,7 +45,7 @@ describe("ResetPassword page", () => {
 
     await submit("someone@example.com");
 
-    expect(await screen.findByText(/only one reset request per minute/i)).toBeInTheDocument();
+    expect(await screen.findByText(/password reset requests are temporarily limited/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /send new password/i })).toBeInTheDocument();
   });
 

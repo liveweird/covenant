@@ -1,9 +1,10 @@
 package ch.nokillswit
 
 import ch.nokillswit.auth.PasswordResetThrottle
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import kotlin.test.Test
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.assertEquals
 
 /** Unit tests for the per-email password-reset throttle (deterministic via an injected clock). */
 class PasswordResetThrottleTest {
@@ -15,35 +16,73 @@ class PasswordResetThrottleTest {
     @Test
     fun `the first request acquires, an immediate second one does not`() {
         val t = throttle()
-        assertTrue(t.tryAcquire("a@x"))
-        assertFalse(t.tryAcquire("a@x"))
+        assertEquals(PasswordResetThrottle.AcquireResult.ACQUIRED, t.tryAcquire("a@x"))
+        assertEquals(PasswordResetThrottle.AcquireResult.COOLDOWN, t.tryAcquire("a@x"))
     }
 
     @Test
     fun `the slot frees up after the interval`() {
         val t = throttle(minIntervalMillis = 60_000)
-        assertTrue(t.tryAcquire("a@x"))
+        assertEquals(PasswordResetThrottle.AcquireResult.ACQUIRED, t.tryAcquire("a@x"))
         now += 59_999
-        assertFalse(t.tryAcquire("a@x"), "still inside the interval")
+        assertEquals(PasswordResetThrottle.AcquireResult.COOLDOWN, t.tryAcquire("a@x"))
         now += 1
-        assertTrue(t.tryAcquire("a@x"), "interval elapsed")
+        assertEquals(PasswordResetThrottle.AcquireResult.ACQUIRED, t.tryAcquire("a@x"))
     }
 
     @Test
     fun `a rejected attempt does not extend the wait`() {
         val t = throttle(minIntervalMillis = 60_000)
-        assertTrue(t.tryAcquire("a@x"))
+        assertEquals(PasswordResetThrottle.AcquireResult.ACQUIRED, t.tryAcquire("a@x"))
         now += 30_000
-        assertFalse(t.tryAcquire("a@x"))
+        assertEquals(PasswordResetThrottle.AcquireResult.COOLDOWN, t.tryAcquire("a@x"))
         now += 30_000 // 60s after the ORIGINAL acquire, not the rejected retry
-        assertTrue(t.tryAcquire("a@x"))
+        assertEquals(PasswordResetThrottle.AcquireResult.ACQUIRED, t.tryAcquire("a@x"))
     }
 
     @Test
     fun `emails are tracked independently and the key is normalized`() {
         val t = throttle()
-        assertTrue(t.tryAcquire("a@x"))
-        assertTrue(t.tryAcquire("b@x"), "different email is unaffected")
-        assertFalse(t.tryAcquire("  A@X  "), "same email spelled differently shares the slot")
+        assertEquals(PasswordResetThrottle.AcquireResult.ACQUIRED, t.tryAcquire("a@x"))
+        assertEquals(PasswordResetThrottle.AcquireResult.ACQUIRED, t.tryAcquire("b@x"))
+        assertEquals(PasswordResetThrottle.AcquireResult.COOLDOWN, t.tryAcquire("  A@X  "))
+    }
+
+    @Test
+    fun `capacity preserves cooldowns and expiry frees a slot`() {
+        val t = PasswordResetThrottle(60_000, clock = { now }, maxTracked = 1)
+        assertEquals(PasswordResetThrottle.AcquireResult.ACQUIRED, t.tryAcquire("a@x"))
+        assertEquals(PasswordResetThrottle.AcquireResult.CAPACITY_EXCEEDED, t.tryAcquire("b@x"))
+        assertEquals(PasswordResetThrottle.AcquireResult.COOLDOWN, t.tryAcquire("a@x"))
+        now += 60_000
+        assertEquals(PasswordResetThrottle.AcquireResult.ACQUIRED, t.tryAcquire("b@x"))
+    }
+
+    @Test
+    fun `concurrent new identities cannot exceed capacity`() {
+        val t = PasswordResetThrottle(60_000, clock = { now }, maxTracked = 1)
+        val ready = CountDownLatch(2)
+        val go = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val results = listOf("a@x", "b@x").map { email ->
+                executor.submit<PasswordResetThrottle.AcquireResult> {
+                    ready.countDown()
+                    go.await()
+                    t.tryAcquire(email)
+                }
+            }
+            ready.await()
+            go.countDown()
+            assertEquals(
+                setOf(
+                    PasswordResetThrottle.AcquireResult.ACQUIRED,
+                    PasswordResetThrottle.AcquireResult.CAPACITY_EXCEEDED,
+                ),
+                results.map { it.get() }.toSet(),
+            )
+        } finally {
+            executor.shutdownNow()
+        }
     }
 }

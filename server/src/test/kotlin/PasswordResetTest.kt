@@ -155,6 +155,45 @@ class PasswordResetTest {
     }
 
     @Test
+    fun `a full reset store rejects a new identity without scheduling reset work`() = testApplication {
+        configureApp("security.passwordReset.maxTracked" to "1")
+        startApplication()
+        val client = jsonClient()
+        val tracked = uniqueEmail("reset-capacity-tracked")
+        val rejected = uniqueEmail("reset-capacity-rejected")
+        val auditEvents = LogCapture("ch.nokillswit.audit")
+        try {
+            suspend fun request(email: String) = client.post("/api/v1/password-reset") {
+                contentType(ContentType.Application.Json)
+                setBody(PasswordResetRequest(email))
+            }
+
+            assertEquals(HttpStatusCode.Accepted, request(tracked).status)
+            assertNotNull(
+                auditEvents.awaitEvent {
+                    it.message == "password_reset.unknown_email" && it.hasKeyValue("email", tracked)
+                },
+            )
+            assertEquals(HttpStatusCode.TooManyRequests, request(rejected).status)
+            assertNotNull(
+                auditEvents.awaitEvent {
+                    it.message == "password_reset.capacity_rejected" && it.hasKeyValue("email", rejected)
+                },
+            )
+            assertFalse(
+                auditEvents.events.any {
+                    it.hasKeyValue("email", rejected) &&
+                        it.message in setOf("password_reset.requested", "password_reset.unknown_email")
+                },
+                "a capacity rejection must not schedule the reset worker",
+            )
+            assertEquals(HttpStatusCode.TooManyRequests, request(tracked).status)
+        } finally {
+            auditEvents.detach()
+        }
+    }
+
+    @Test
     fun `malformed emails are 400`() = testApplication {
         usePostgresTestcontainer()
         val client = jsonClient()

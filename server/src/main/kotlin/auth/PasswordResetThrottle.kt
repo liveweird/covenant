@@ -1,6 +1,6 @@
 package ch.nokillswit.auth
 
-import java.util.concurrent.ConcurrentHashMap
+import java.util.TreeMap
 
 /**
  * Per-email throttle for the self-service password reset: at most one request per submitted
@@ -10,37 +10,52 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class PasswordResetThrottle(
     private val minIntervalMillis: Long,
+    private val maxTracked: Int = 10_000,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
-    private val lastRequestAt = ConcurrentHashMap<String, Long>()
+    init {
+        require(maxTracked > 0) { "maxTracked must be positive" }
+    }
+
+    enum class AcquireResult {
+        ACQUIRED,
+        COOLDOWN,
+        CAPACITY_EXCEEDED,
+    }
+
+    private data class Entry(val expiresAt: Long)
+
+    private val entries = mutableMapOf<String, Entry>()
+    private val expiryIndex = TreeMap<Long, MutableSet<String>>()
+    private val lock = Any()
 
     private fun key(email: String) = email.trim().lowercase()
 
-    /** Atomically claims a slot for this email; false while the previous one is still fresh. */
-    fun tryAcquire(email: String): Boolean {
-        pruneIfOversized()
+    /** Atomically claims a slot without evicting another identity's fresh cooldown. */
+    fun tryAcquire(email: String): AcquireResult = synchronized(lock) {
         val now = clock()
-        var acquired = false
-        lastRequestAt.compute(key(email)) { _, last ->
-            if (last != null && now - last < minIntervalMillis) {
-                last // still throttled — keep the original timestamp
-            } else {
-                acquired = true
-                now
+        pruneExpired(now)
+        val key = key(email)
+        val last = entries[key]
+        when {
+            last != null -> AcquireResult.COOLDOWN
+            entries.size >= maxTracked -> AcquireResult.CAPACITY_EXCEEDED
+            else -> {
+                val expiresAt = now + minIntervalMillis
+                entries[key] = Entry(expiresAt)
+                expiryIndex.getOrPut(expiresAt) { mutableSetOf() }.add(key)
+                AcquireResult.ACQUIRED
             }
         }
-        return acquired
     }
 
-    // Memory bound: spraying distinct emails must not grow the map without limit (same
-    // opportunistic prune as LoginThrottle).
-    private fun pruneIfOversized() {
-        if (lastRequestAt.size <= MAX_TRACKED) return
-        val cutoff = clock() - minIntervalMillis
-        lastRequestAt.entries.removeIf { it.value < cutoff }
+    private fun pruneExpired(now: Long) {
+        while (expiryIndex.firstEntry()?.key?.let { it <= now } == true) {
+            val (expiresAt, keys) = expiryIndex.pollFirstEntry()
+            keys.forEach { key ->
+                if (entries[key]?.expiresAt == expiresAt) entries.remove(key)
+            }
+        }
     }
 
-    private companion object {
-        const val MAX_TRACKED = 10_000
-    }
 }
