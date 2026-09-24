@@ -67,11 +67,19 @@ describe("finalizeFindings", () => {
     expect(sorted.map((x) => x.code)).toEqual(["first", "later"]);
   });
 
-  test("caps at MAX_FINDINGS and appends the truncation marker", () => {
+  test("includes the truncation marker within MAX_FINDINGS", () => {
     const many = Array.from({ length: MAX_FINDINGS + 7 }, (_, i) => f("WARN", `w${i}`, i, `/p/${i}`));
     const out = finalizeFindings(many);
-    expect(out).toHaveLength(MAX_FINDINGS + 1);
+    expect(out).toHaveLength(MAX_FINDINGS);
     expect(out.at(-1)).toMatchObject({ source: "SYSTEM", code: "findings-truncated", severity: "INFO" });
-    expect(out.at(-1)?.message).toContain("7 further findings");
+    expect(out.at(-1)?.message).toContain("8 further findings");
+    expect(out.at(-1)?.message).toContain("including this marker");
+  });
+
+  test("returns MAX_FINDINGS real findings without a marker when nothing was omitted", () => {
+    const exact = Array.from({ length: MAX_FINDINGS }, (_, i) => f("WARN", `w${i}`, i, `/p/${i}`));
+    const out = finalizeFindings(exact);
+    expect(out).toHaveLength(MAX_FINDINGS);
+    expect(out).not.toContainEqual(expect.objectContaining({ code: "findings-truncated" }));
   });
 });

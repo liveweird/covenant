@@ -79,6 +79,36 @@ class ContractImportTest {
     }
 
     @Test
+    fun `import waives unsupported AsyncAPI and ODCS version findings`() = testApplication {
+        usePostgresTestcontainer()
+        val admin = seededClient("impunsupported", UserRole.ADMIN)
+        val systemId = TestContracts.seedSystem("impunsupported")
+        val teamId = TestTeams.seed(name("t"))
+        val items = listOf(
+            ImportItem(
+                systemId,
+                ContractType.ASYNCAPI,
+                name("async"),
+                ownerTeamId = teamId,
+                version = "1.0.0",
+                content = ContractFixtures.asyncApi3.replace("asyncapi: 3.0.0", "asyncapi: 3.0.1"),
+            ),
+            ImportItem(
+                systemId,
+                ContractType.ODCS,
+                name("odcs"),
+                ownerTeamId = teamId,
+                version = "1.0.0",
+                content = ContractFixtures.odcsOldVersion,
+            ),
+        )
+        val results = admin.postJson("/api/v1/contracts/import", ImportRequest(items)).body<ImportResponse>().results
+        assertEquals(listOf(ImportStatus.CREATED_WITH_FINDINGS, ImportStatus.CREATED_WITH_FINDINGS), results.map { it.status })
+        assertTrue(results.all { it.errors > 0 && it.message!!.contains("UNSUPPORTED_SPEC_VERSION") })
+        assertTrue(results.all { it.contractId != null && it.versionId != null })
+    }
+
+    @Test
     fun `contract and first version roll back together when insertion fails after parent creation`() = testApplication {
         usePostgresTestcontainer()
         val database = sharedDatabaseForTests()

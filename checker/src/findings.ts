@@ -16,7 +16,7 @@ export interface Finding {
   column?: number;
 }
 
-/** At most this many findings leave the checker; a final INFO marks the cut. */
+/** At most this many entries leave the checker; a final INFO occupies one slot when truncated. */
 export const MAX_FINDINGS = 500;
 
 const SEVERITY_ORDER: Record<Severity, number> = { ERROR: 0, WARN: 1, INFO: 2 };
@@ -75,13 +75,14 @@ export function finalizeFindings(findings: readonly Finding[]): Finding[] {
       a.code.localeCompare(b.code),
   );
   if (unique.length <= MAX_FINDINGS) return unique;
+  const retained = MAX_FINDINGS - 1;
   return [
-    ...unique.slice(0, MAX_FINDINGS),
+    ...unique.slice(0, retained),
     {
       severity: "INFO",
       source: "SYSTEM",
       code: "findings-truncated",
-      message: `${unique.length - MAX_FINDINGS} further findings were not returned (cap ${MAX_FINDINGS})`,
+      message: `${unique.length - retained} further findings were not returned (cap ${MAX_FINDINGS}, including this marker)`,
     },
   ];
 }

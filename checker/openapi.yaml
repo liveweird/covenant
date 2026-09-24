@@ -47,7 +47,7 @@ paths:
               $ref: '#/components/schemas/CheckRequest'
       responses:
         '200':
-          description: Up to 500 findings (sorted by severity, line, code), plus a FINDINGS_TRUNCATED marker when the limit is exceeded, and the engines that produced them.
+          description: Up to 500 total finding entries (sorted by severity, line, code). When truncated, the last entry is the `findings-truncated` marker. Also returns the engines that produced them.
           content:
             application/json:
               schema:
@@ -100,6 +100,7 @@ components:
       properties:
         findings:
           type: array
+          maxItems: 500
           items:
             $ref: '#/components/schemas/Finding'
         engine:

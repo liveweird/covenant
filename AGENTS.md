@@ -214,8 +214,10 @@ cannot be waived. Schema, semantic, and lint findings are
 soft: an `ERROR` blocks a strict save, `WARN`/`INFO` never block, and create/replace may
 explicitly use `allowInvalid=true`. The editor exposes that waiver as Save anyway; import always
 waives soft findings, while the `/check` endpoints perform the same classification without
-storing anything. Findings merge the JVM's verdicts with the checker sidecar's schema, semantic,
-lint, and breaking-change verdicts; an unreachable checker degrades to a report-only
+storing anything. Unsupported AsyncAPI/ODCS versions remain soft SCHEMA errors in API v1 for
+compatibility; they cannot be validated completely but can be explicitly waived. Findings merge
+the JVM's verdicts with the checker sidecar's schema, semantic, lint, and breaking-change
+verdicts; an unreachable checker degrades to a report-only
 `CHECKER_UNAVAILABLE` finding. The document text is stored byte-exact and never rewritten.
 
 Breaking changes use the highest ACTIVE or DEPRECATED predecessor strictly below the candidate

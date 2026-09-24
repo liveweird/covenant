@@ -60,6 +60,22 @@ class ChecksServiceTest {
     }
 
     @Test
+    fun `unsupported AsyncAPI and ODCS versions remain soft schema findings`() = runBlocking {
+        val asyncApi = ChecksService(StubChecker()).check(
+            ContractType.ASYNCAPI,
+            ContractFixtures.asyncApi3.replace("asyncapi: 3.0.0", "asyncapi: 3.0.1"),
+        )
+        val asyncFinding = asyncApi.findings.single { it.code == "UNSUPPORTED_SPEC_VERSION" }
+        assertEquals(FindingSource.SCHEMA, asyncFinding.source)
+        assertFalse(asyncFinding.hard)
+
+        val odcs = ChecksService(StubChecker()).check(ContractType.ODCS, ContractFixtures.odcsOldVersion)
+        val odcsFinding = odcs.findings.single { it.code == "UNSUPPORTED_SPEC_VERSION" }
+        assertEquals(FindingSource.SCHEMA, odcsFinding.source)
+        assertFalse(odcsFinding.hard)
+    }
+
+    @Test
     fun `an unavailable checker degrades to one SYSTEM warning and flags the report`() = runBlocking {
         val report = ChecksService(StubChecker(fail = true)).check(ContractType.ASYNCAPI, ContractFixtures.asyncApi3)
         assertFalse(report.checkerAvailable)
@@ -96,14 +112,67 @@ class ChecksServiceTest {
     }
 
     @Test
-    fun `findings are sorted by severity then line and the store cap appends a marker`() = runBlocking {
+    fun `findings are sorted and the truncation marker occupies one store-cap slot`() = runBlocking {
         val many = (1..600).map { Finding(Severity.WARN, FindingSource.LINT, "w$it", "w", null, 601 - it, 1) } +
             Finding(Severity.ERROR, FindingSource.LINT, "e", "e", null, 999, 1)
         val report = ChecksService(StubChecker(many)).check(ContractType.OPENAPI, ContractFixtures.openApi)
         assertEquals("e", report.findings.first().code, "ERROR sorts first regardless of line")
-        assertEquals(501, report.findings.size)
+        assertEquals(500, report.findings.size)
         assertEquals("FINDINGS_TRUNCATED", report.findings.last().code)
+        assertEquals(
+            "102 further findings were not stored (cap 500, including this marker)",
+            report.findings.last().message,
+        )
         assertEquals(1, report.errors)
+    }
+
+    @Test
+    fun `exactly the store cap needs no truncation marker`() = runBlocking {
+        val exact = (1..500).map { Finding(Severity.WARN, FindingSource.LINT, "w$it", "w", null, it, 1) }
+        val report = ChecksService(StubChecker(exact)).check(ContractType.OPENAPI, ContractFixtures.openApi)
+        assertEquals(500, report.findings.size)
+        assertTrue(report.findings.none { it.code == "FINDINGS_TRUNCATED" })
+    }
+
+    @Test
+    fun `the store cap preserves evidence that the checker was already truncated`() = runBlocking {
+        val checkerFindings = (1..499).map {
+            Finding(Severity.WARN, FindingSource.LINT, "w$it", "w", null, it, 1)
+        } + Finding(
+            Severity.INFO,
+            FindingSource.SYSTEM,
+            "findings-truncated",
+            "8 further findings were not returned (cap 500, including this marker)",
+        )
+        val report = ChecksService(StubChecker(checkerFindings)).check(
+            ContractType.OPENAPI,
+            ContractFixtures.openApi,
+            declaredVersion = "2.0.0",
+        )
+        assertEquals(500, report.findings.size)
+        val marker = report.findings.single { it.code == "FINDINGS_TRUNCATED" }
+        assertTrue(marker.message.contains("earlier truncation also omitted findings"))
+    }
+
+    @Test
+    fun `lifecycle refresh cannot grow a capped stored snapshot`() {
+        val stored = (1..499).map {
+            Finding(Severity.WARN, FindingSource.SCHEMA, "w$it", "w", null, it, 1)
+        } + Finding(
+            Severity.INFO,
+            FindingSource.SYSTEM,
+            "FINDINGS_TRUNCATED",
+            "10 further findings were not stored (cap 500, including this marker)",
+        )
+        val refreshed = ChecksService(StubChecker()).refreshLifecycleFinding(
+            ContractType.ODCS,
+            ContractFixtures.odcs,
+            Lifecycle.DRAFT,
+            stored,
+        )
+        assertEquals(500, refreshed.size)
+        assertEquals(1, refreshed.count { it.code == "FINDINGS_TRUNCATED" })
+        assertTrue(refreshed.last().message.contains("earlier truncation also omitted findings"))
     }
 
     @Test

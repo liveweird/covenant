@@ -1148,8 +1148,9 @@ export interface paths {
          * @description Any authenticated user. The same pipeline every store path runs — syntax → type gate →
          *     schema/semantic (JVM) → lint/semantic (the checker sidecar) → breaking changes →
          *     cross-checks — returned as findings-so-far: a broken document is a `200` whose report
-         *     carries the HARD finding, never a `400`. Pass `version` to get the declared-version
-         *     cross-check; pass `contractId` too and the document is compared against that contract's
+         *     carries the HARD finding, never a `400`. Unsupported AsyncAPI/ODCS versions are reported
+         *     as soft SCHEMA errors, consistent with the v1 store policy. Pass `version` to get the
+         *     declared-version cross-check; pass `contractId` too and the document is compared against that contract's
          *     highest ACTIVE or DEPRECATED version below `version` (the report's `baselineVersion`): each breaking
          *     change is a `BREAKING` finding — INFO once `version` carries the MAJOR bump, otherwise
          *     WARN plus one soft ERROR `BREAKING_WITHOUT_MAJOR_BUMP`. AsyncAPI Avro payloads use
@@ -1177,8 +1178,9 @@ export interface paths {
          * @description Any authenticated user, at most 20 items. Each item is one document landing as a new
          *     version of a contract that may or may not exist yet — a new contract needs an assignable
          *     owner, an existing one must match the item's type and be writable by the caller. Import
-         *     ALWAYS waives soft findings (`*_WITH_FINDINGS`); only HARD findings, the SemVer rules, a
-         *     type mismatch and the writer rule skip an item. Nothing rethrows: the rows ARE the outcome.
+         *     ALWAYS waives soft findings (`*_WITH_FINDINGS`), including unsupported AsyncAPI/ODCS
+         *     versions; only HARD findings, the SemVer rules and the writer rule skip
+         *     an item. Nothing rethrows: the rows ARE the outcome.
          */
         post: operations["importContracts"];
         delete?: never;
@@ -1422,7 +1424,8 @@ export interface paths {
          *     (`409`; build metadata does not distinguish versions). The document must pass the HARD gate — parseable,
          *     the contract's standard (`400`, never waivable); a SOFT `ERROR` finding blocks unless
          *     `allowInvalid=true` (the editor's Save-anyway; the findings are re-obtainable through
-         *     `POST /contracts/versions/check`). The check report is stored with the text; the
+         *     `POST /contracts/versions/check`). Unsupported AsyncAPI/ODCS versions are soft SCHEMA
+         *     errors under this v1 policy. The check report is stored with the text; the
          *     response carries content and findings. Documents above 2 MiB are `413`.
          *     A changed ACTIVE baseline during checking returns `409`; retry with fresh state.
          */

@@ -5,17 +5,6 @@ release history belong in [README.md](README.md), the
 [application changelog](web/src/changelog/entries.ts), and the topic guides under
 `.claude/docs/`. Entries are proposals, not delivery commitments.
 
-## Contract-check follow-ups
-
-These findings from the 2026-09-23 contract review still need a decision or implementation:
-
-- **Unsupported AsyncAPI/ODCS versions:** unsupported spec versions currently produce
-  waivable findings rather than a hard rejection. Decide and document the supported-version
-  gate; see `server/src/main/kotlin/contracts/checks/DocumentParser.kt`.
-- **Finding limit:** the stated 500-finding cap can return or store 501 entries after adding
-  the truncation marker. Align response, storage and documentation; see
-  `checker/src/findings.ts` and `server/src/main/kotlin/contracts/checks/Finding.kt`.
-
 ## Verification gap
 
 The 2026-09-23 check-up's web `npm audit` was not completed: automatic approval review
