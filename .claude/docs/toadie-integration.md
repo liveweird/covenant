@@ -131,6 +131,9 @@ This is change detection, not a server-held historical snapshot or evidence of r
 The source can change after the final read. There is no webhook/subscription/delta protocol and
 no automatic retirement gate. Optional adoption declarations share this same scan and revision
 boundary when enabled; they are source claims, not observed runtime adoption.
+Toadie has no ontology event log to support replayable deltas or tombstones; revision probes
+and bounded full scans are the integration protocol unless Toadie introduces history for its
+own needs.
 
 ## Credentials and transport
 
@@ -139,6 +142,10 @@ demo already does) and an ADMIN-created integration client. Its API key is separ
 JWTs and grants read access to the whole Port ontology. Store it only in Covenant's encrypted
 connection field; absent/null on update retains it, and responses expose `hasApiKey` only.
 The service participates in the shared encryption-key rotation/bootstrap registry.
+Toadie deliberately offers no per-key blueprint allowlist or ownership-based row scope.
+Consistent remote scoping would have to cover lists, lookups, errors and relation traversal,
+including new blueprints and cross-blueprint references. Covenant selects and persists only
+mapped fields, but that local projection does not narrow the key's remote read permissions.
 
 The trust boundary is the ADMIN-curated endpoint, analogous to Environments: private service
 addresses are intentional. URL credentials, query strings, fragments and link-local literals
@@ -174,6 +181,9 @@ An additive database migration alone does not make older binaries understand new
 Test boundaries include real HTTP pagination/error/cancellation handling; encrypted persistence
 and rotation; role/writer guards; revision races; identity-preserving rename and missing IDs;
 schema conformance; read-only and editable SPA states; translations; and browser accessibility.
+Toadie guards additive SDL evolution under its GraphQL compatibility rules; Covenant owns
+`ToadieGraphqlClientTest` fixtures for the selections and semantics it relies on. Toadie's
+tests do not pin Covenant's query text.
 
 ## Migration report exports (0.15.0)
 
