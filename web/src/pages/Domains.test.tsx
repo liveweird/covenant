@@ -27,12 +27,19 @@ const PAGE = {
   total: 2,
 };
 
-function serve(mockFetch: FetchMock, mutations: Record<string, { status: number; body?: unknown }> = {}) {
+const SOURCE = {
+  connectionId: 3, connectionName: "Architecture", entityId: "domain-7", identifier: "payments",
+  title: "Payments in Toadie", url: "https://toadie.example/domains/payments", status: "MISSING",
+  lastSyncedAt: 10, lastErrorCode: null, descriptionSynced: true, fallbackDomainId: null,
+  cache: { state: "STALE", lastAttemptAt: 10, lastSuccessAt: 10, refreshing: false, lastErrorCode: null },
+};
+
+function serve(mockFetch: FetchMock, mutations: Record<string, { status: number; body?: unknown }> = {}, page: unknown = PAGE) {
   mockFetch.mockImplementation((url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
     const m = mutations[`${method} ${url}`];
     if (m) return Promise.resolve(m.body === undefined ? new Response(null, { status: m.status }) : jsonResponse(m.status, m.body));
-    if (method === "GET" && url.startsWith("/api/v1/domains?")) return Promise.resolve(jsonResponse(200, PAGE));
+    if (method === "GET" && url.startsWith("/api/v1/domains?")) return Promise.resolve(jsonResponse(200, page));
     return Promise.resolve(jsonResponse(404, { title: "x", status: 404 }));
   });
 }
@@ -109,6 +116,18 @@ describe("Domains page", () => {
     await user.click(await screen.findByRole("menuitem", { name: "Delete Payments" }));
     await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: /^delete$/i }));
     expect(await screen.findByText(/still holds systems/)).toBeInTheDocument();
+  });
+
+  test("a missing Toadie source still locks linked metadata in the editor", async () => {
+    serve(mockFetch, {}, { ...PAGE, items: [{ ...PAGE.items[0], source: SOURCE }] });
+    const user = userEvent.setup();
+    renderWithProviders(<Domains />);
+    await user.click(await screen.findByRole("button", { name: "Operations for Payments" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Edit Payments" }));
+    const modal = await screen.findByRole("dialog");
+    expect(within(modal).getByText(/synchronized from Toadie/i)).toBeInTheDocument();
+    expect(within(modal).getByLabelText("Name")).toBeDisabled();
+    expect(within(modal).getByLabelText("Description")).toBeDisabled();
   });
 
   test("deleting while the first filtered request is pending cannot restore its stale row", async () => {

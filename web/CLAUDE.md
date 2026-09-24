@@ -68,6 +68,15 @@ Every list page composes the same ported Lettuce blocks — copy `pages/Users.ts
 - **An entity's NAME is the way into its detail page** — a `RouterLink` `Anchor` with an interpolated accessible name (`common.action.editAria` = "Edit {{name}}", or an area-specific `openAria`), which is what tests and e2e locate. A real link, not an onClick: cmd/middle-click opens a tab and it takes keyboard focus. Route families are spelled out ONCE in `utils/<area>Links.ts` — never hand-assemble a URL.
 - Row action buttons carry interpolated aria-labels (`<area>.editAria` etc.) — unit tests and e2e locate by them; table tests query cells by **text**, not `cell` role names. **Row actions**: a row with more than two actions bundles them under `components/RowActionsMenu.tsx` — an icon-only kebab whose accessible name is `common.table.operationsAria` ("Operations for {{name}}"; items are plain `menuitem`s, only one row's menu is open at a time, and the e2e `rowOperation`/`deleteUserRow` helpers drive it by that name and the trigger's `aria-controls`). Two always-available actions stay visible as neutral `ActionIcon`s with tooltips (Toadie's `RowEditDelete.tsx` was superseded — every registry row has three actions and takes the kebab); a per-row `Switch` (Feature flags) is state, not an action.
 
+The small Domains, Systems, Teams and Environments registries compose `useRegistryListControls`
+for their persisted name filter, debounce and paged sort, and `RegistryListTable` for the common
+load/error/empty/pagination states. Each page owns its query key and parameters, extra filters,
+columns, row actions and mutation refresh prefixes. Their editors share the
+`RegistryMetadataFields` and `RegistryEditorActions` components; form rules,
+submit/conflict handling and parent or target fields stay local. Linked Toadie names remain
+locked regardless of source availability, while descriptions lock only when
+`descriptionSynced` is true. Keep each registry's field limits and source behavior explicit.
+
 ## Forms (the CreateUser/EditUser template)
 
 - Shared vocabulary in `utils/<area>Form.ts`: the `<Area>FormValues` type, length constants mirroring the server's, a `<area>FormValidation(t)` factory (rules identical to the server's — keep them in sync), and `toRequest`/`fromResponse` mappers. The field block lives in `components/<Area>FormFields.tsx`; the pages own submit/error/navigation.

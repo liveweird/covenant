@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Alert, Button, Group, Modal, Stack, Textarea, TextInput } from "@mantine/core";
+import { Modal, Stack } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "../api/http";
 import { createTeam, updateTeam, type TeamResponse } from "../api/teams";
-import { charCountDescription } from "../utils/charCount";
+import RegistryEditorActions from "./RegistryEditorActions";
+import RegistryMetadataFields from "./RegistryMetadataFields";
 import {
   EMPTY_TEAM_FORM,
   MAX_TEAM_DESCRIPTION_LENGTH,
@@ -68,37 +69,15 @@ export default function TeamEditorModal({
     <Modal closeButtonProps={{ "aria-label": t("common.action.close") }} opened onClose={onClose} title={target ? t("teams.editTitle") : t("teams.createTitle")} centered>
       <form onSubmit={form.onSubmit(save)} noValidate>
         <Stack>
-          {source && <Alert color="gray" variant="light">{t("toadie.registry.metadataLocked")}{!source.descriptionSynced && ` ${t("toadie.registry.descriptionLocal")}`}</Alert>}
-          <TextInput
-            label={t("common.field.name")}
-            maxLength={MAX_TEAM_NAME_LENGTH}
-            data-autofocus
-            disabled={Boolean(source)}
-            {...form.getInputProps("name")}
+          <RegistryMetadataFields
+            source={source}
+            nameMaxLength={MAX_TEAM_NAME_LENGTH}
+            descriptionMaxLength={MAX_TEAM_DESCRIPTION_LENGTH}
+            descriptionLength={form.values.description.length}
+            nameInputProps={form.getInputProps("name")}
+            descriptionInputProps={form.getInputProps("description")}
           />
-          <Textarea
-            label={t("common.field.description")}
-            autosize
-            minRows={2}
-            maxLength={MAX_TEAM_DESCRIPTION_LENGTH}
-            description={charCountDescription(form.values.description.length, MAX_TEAM_DESCRIPTION_LENGTH)}
-            inputWrapperOrder={["label", "input", "description", "error"]}
-            disabled={source?.descriptionSynced === true}
-            {...form.getInputProps("description")}
-          />
-          {error && (
-            <Alert color="red" variant="light">
-              {error}
-            </Alert>
-          )}
-          <Group justify="flex-end" gap="sm">
-            <Button type="button" variant="default" onClick={onClose} disabled={submitting}>
-              {t("common.action.cancel")}
-            </Button>
-            <Button type="submit" loading={submitting}>
-              {target ? t("common.action.save") : t("common.action.create")}
-            </Button>
-          </Group>
+          <RegistryEditorActions error={error} submitting={submitting} isEdit={Boolean(target)} onClose={onClose} gap="sm" />
         </Stack>
       </form>
     </Modal>

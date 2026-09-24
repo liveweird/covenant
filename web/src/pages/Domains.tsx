@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, Button, Group, Menu, Modal, Stack, Table, Text, Textarea, TextInput } from "@mantine/core";
+import { Button, Menu, Modal, Stack, Table, Text } from "@mantine/core";
 import { useForm } from "@mantine/form";
-import { useDebouncedValue } from "@mantine/hooks";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconFolders, IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
 import { ApiError } from "../api/http";
@@ -10,18 +9,16 @@ import { useAdmin } from "../auth";
 import { createDomain, deleteDomain, detachDomainToadieSource, listDomains, updateDomain, type DomainResponse } from "../api/domains";
 import ClearableTextInput from "../components/ClearableTextInput";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
-import EmptyState from "../components/EmptyState";
 import FilterPanel from "../components/FilterPanel";
 import PageHeader from "../components/PageHeader";
-import PaginationBar from "../components/PaginationBar";
+import RegistryEditorActions from "../components/RegistryEditorActions";
+import RegistryListTable from "../components/RegistryListTable";
+import RegistryMetadataFields from "../components/RegistryMetadataFields";
 import RowActionsMenu from "../components/RowActionsMenu";
 import SortHeader from "../components/SortHeader";
-import TableLoadingRow from "../components/TableLoadingRow";
 import ToadieRegistrySourceStatus from "../components/ToadieRegistrySourceStatus";
 import { useDeleteConfirm } from "../hooks/useDeleteConfirm";
-import { usePagedSort } from "../hooks/usePagedSort";
-import { isString, useStoredState } from "../hooks/useStoredState";
-import { charCountDescription } from "../utils/charCount";
+import { useRegistryListControls } from "../hooks/useRegistryListControls";
 import {
   EMPTY_REGISTRY_FORM,
   MAX_REGISTRY_DESCRIPTION_LENGTH,
@@ -31,7 +28,7 @@ import {
   registrySaveErrorMessage,
   type RegistryFormValues,
 } from "../utils/registryForm";
-import { loadErrorMessage, saveErrorMessage } from "../utils/saveError";
+import { saveErrorMessage } from "../utils/saveError";
 import { showSuccessToast } from "../utils/toast";
 import { refreshQueriesAfterMutation } from "../utils/queryRefresh";
 
@@ -48,11 +45,8 @@ export default function Domains() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const admin = useAdmin();
-  const [nameFilter, setNameFilter] = useStoredState(`${SETTINGS_KEY}.filter.name`, "", isString);
-  const [debouncedName] = useDebouncedValue(nameFilter, 300);
-
-  const { page, setPage, pageSize, setPageSize, sortField, sortDir, sortParam, toggleSort } =
-    usePagedSort<SortField>("name", [debouncedName], { key: SETTINGS_KEY, sortFields: SORT_FIELDS });
+  const { nameFilter, setNameFilter, debouncedName, nameFilterActive, page, setPage, pageSize, setPageSize, sortField, sortDir, sortParam, toggleSort } =
+    useRegistryListControls<SortField>({ settingsKey: SETTINGS_KEY, sortFields: SORT_FIELDS, initialSortField: "name" });
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["domains", "list", page, pageSize, sortParam, debouncedName],
@@ -82,16 +76,20 @@ export default function Domains() {
           )
         }
       />
-      <FilterPanel activeFilterCount={nameFilter.trim() ? 1 : 0} storageKey={SETTINGS_KEY}>
+      <FilterPanel activeFilterCount={nameFilterActive ? 1 : 0} storageKey={SETTINGS_KEY}>
         <ClearableTextInput label={t("common.field.name")} value={nameFilter} onChange={setNameFilter} clearLabel={t("common.filter.clearName")} />
       </FilterPanel>
-      {isError && (
-        <Alert color="red" variant="light" title={t("domains.loadFailed")}>
-          {loadErrorMessage(error, t)}
-        </Alert>
-      )}
-      <Table>
-        <Table.Thead>
+      <RegistryListTable
+        errorTitle={t("domains.loadFailed")}
+        error={error}
+        isError={isError}
+        isLoading={isLoading}
+        hasData={Boolean(data)}
+        rowCount={data?.items.length ?? 0}
+        columnCount={columnCount}
+        emptyIcon={IconFolders}
+        emptyLabel={t("domains.empty")}
+        header={
           <Table.Tr>
             <SortHeader field="name" label={t("common.field.name")} activeField={sortField} activeDir={sortDir} onToggle={toggleSort} />
             <Table.Th>{t("common.field.description")}</Table.Th>
@@ -99,14 +97,11 @@ export default function Domains() {
             <Table.Th>{t("toadie.registry.source")}</Table.Th>
             {admin && <Table.Th aria-label={t("common.table.operations")} style={{ width: 1 }} />}
           </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {isLoading && !data ? (
-            <TableLoadingRow colSpan={columnCount} />
-          ) : data && data.items.length > 0 ? (
-            data.items.map((domain) => {
-              const source = domain.source;
-              return <Table.Tr key={domain.id}>
+        }
+        rows={data?.items.map((domain) => {
+          const source = domain.source;
+          return (
+            <Table.Tr key={domain.id}>
                 <Table.Td>
                   <Text size="sm" fw={500}>
                     {domain.name}
@@ -137,18 +132,15 @@ export default function Domains() {
                     </RowActionsMenu>
                   </Table.Td>
                 )}
-              </Table.Tr>;
-            })
-          ) : !isError ? (
-            <Table.Tr>
-              <Table.Td colSpan={columnCount}>
-                <EmptyState icon={IconFolders} label={t("domains.empty")} />
-              </Table.Td>
             </Table.Tr>
-          ) : null}
-        </Table.Tbody>
-      </Table>
-      <PaginationBar total={data?.total ?? 0} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} />
+          );
+        })}
+        total={data?.total ?? 0}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
 
       {editorTarget !== null && (
         <DomainEditorModal
@@ -208,31 +200,15 @@ function DomainEditorModal({ target, onClose, onSaved }: { target: DomainRespons
     <Modal closeButtonProps={{ "aria-label": t("common.action.close") }} opened onClose={onClose} title={target ? t("domains.editTitle") : t("domains.createTitle")} centered>
       <form onSubmit={form.onSubmit(save)} noValidate>
         <Stack>
-          {source && <Alert color="gray" variant="light">{t("toadie.registry.metadataLocked")}{!source.descriptionSynced && ` ${t("toadie.registry.descriptionLocal")}`}</Alert>}
-          <TextInput label={t("common.field.name")} maxLength={MAX_REGISTRY_NAME_LENGTH} data-autofocus disabled={Boolean(source)} {...form.getInputProps("name")} />
-          <Textarea
-            label={t("common.field.description")}
-            autosize
-            minRows={2}
-            maxLength={MAX_REGISTRY_DESCRIPTION_LENGTH}
-            description={charCountDescription(form.values.description.length, MAX_REGISTRY_DESCRIPTION_LENGTH)}
-            inputWrapperOrder={["label", "input", "description", "error"]}
-            disabled={source?.descriptionSynced === true}
-            {...form.getInputProps("description")}
+          <RegistryMetadataFields
+            source={source}
+            nameMaxLength={MAX_REGISTRY_NAME_LENGTH}
+            descriptionMaxLength={MAX_REGISTRY_DESCRIPTION_LENGTH}
+            descriptionLength={form.values.description.length}
+            nameInputProps={form.getInputProps("name")}
+            descriptionInputProps={form.getInputProps("description")}
           />
-          {error && (
-            <Alert color="red" variant="light">
-              {error}
-            </Alert>
-          )}
-          <Group justify="flex-end" gap="sm">
-            <Button type="button" variant="default" onClick={onClose} disabled={submitting}>
-              {t("common.action.cancel")}
-            </Button>
-            <Button type="submit" loading={submitting}>
-              {target ? t("common.action.save") : t("common.action.create")}
-            </Button>
-          </Group>
+          <RegistryEditorActions error={error} submitting={submitting} isEdit={Boolean(target)} onClose={onClose} gap="sm" />
         </Stack>
       </form>
     </Modal>

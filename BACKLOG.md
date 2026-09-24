@@ -19,9 +19,6 @@ release history belong in [README.md](README.md), the
   design can check a candidate against a selected contract/major line, return machine-readable
   validation and compatibility results, and provide a small CLI/workflow example with scoped
   automation credentials. Publication remains explicit.
-- **Registry page refactoring.** Domains, Systems, Environments and Teams duplicate list/form
-  behavior. Reassess the shared abstraction with the registry-source and conflict states added
-  in v1.0.0, then refactor only the common behavior that remains stable across those pages.
 
 ## Dependency migrations to revisit
 

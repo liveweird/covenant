@@ -33,13 +33,20 @@ const PAGE = {
   total: 1,
 };
 
-function serve(mockFetch: FetchMock, mutations: Record<string, { status: number; body?: unknown }> = {}, domains: unknown = DOMAINS) {
+const SOURCE = {
+  connectionId: 3, connectionName: "Architecture", entityId: "system-7", identifier: "gateway",
+  title: "Gateway in Toadie", url: "https://toadie.example/systems/gateway", status: "CONFLICT",
+  lastSyncedAt: 10, lastErrorCode: null, descriptionSynced: false, fallbackDomainId: 1,
+  cache: { state: "DISABLED", lastAttemptAt: 10, lastSuccessAt: 10, refreshing: false, lastErrorCode: null },
+};
+
+function serve(mockFetch: FetchMock, mutations: Record<string, { status: number; body?: unknown }> = {}, domains: unknown = DOMAINS, page: unknown = PAGE) {
   mockFetch.mockImplementation((url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
     const m = mutations[`${method} ${url}`];
     if (m) return Promise.resolve(m.body === undefined ? new Response(null, { status: m.status }) : jsonResponse(m.status, m.body));
     if (method === "GET" && url.startsWith("/api/v1/domains?")) return Promise.resolve(jsonResponse(200, domains));
-    if (method === "GET" && url.startsWith("/api/v1/systems?")) return Promise.resolve(jsonResponse(200, PAGE));
+    if (method === "GET" && url.startsWith("/api/v1/systems?")) return Promise.resolve(jsonResponse(200, page));
     return Promise.resolve(jsonResponse(404, { title: "x", status: 404 }));
   });
 }
@@ -107,6 +114,19 @@ describe("Systems page", () => {
     await waitFor(() => expect(findCall(mockFetch, "PUT", "/api/v1/systems/7")).toBeDefined());
     expect(JSON.parse((findCall(mockFetch, "PUT", "/api/v1/systems/7")![1] as RequestInit).body as string)).toEqual({ domainId: 2, name: "gateway", description: "the edge" });
     expect(await screen.findByText("A system with this name already exists in this domain")).toBeInTheDocument();
+  });
+
+  test("a conflicting source locks placement and name but leaves an unmapped description editable", async () => {
+    serve(mockFetch, {}, DOMAINS, { ...PAGE, items: [{ ...PAGE.items[0], source: SOURCE }] });
+    const user = userEvent.setup();
+    renderWithProviders(<Systems />);
+    await user.click(await screen.findByRole("button", { name: "Operations for gateway" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Edit gateway" }));
+    const modal = await screen.findByRole("dialog");
+    expect(within(modal).getByText(/description remains locally editable/i)).toBeInTheDocument();
+    expect(within(modal).getByLabelText("Domain", { selector: "input" })).toBeDisabled();
+    expect(within(modal).getByLabelText("Name")).toBeDisabled();
+    expect(within(modal).getByLabelText("Description")).toBeEnabled();
   });
 
   test("the domain filter refetches with domainId= and delete confirms", async () => {

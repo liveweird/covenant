@@ -1,27 +1,23 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
-import { Alert, Anchor, Button, Menu, Stack, Table, Text } from "@mantine/core";
-import { useDebouncedValue } from "@mantine/hooks";
+import { Anchor, Button, Menu, Stack, Table, Text } from "@mantine/core";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconPencil, IconPlus, IconTrash, IconUsersGroup } from "@tabler/icons-react";
 import { useAdmin } from "../auth";
 import { deleteTeam, detachTeamToadieSource, getTeam, listTeams, type TeamListItem, type TeamResponse } from "../api/teams";
 import ClearableTextInput from "../components/ClearableTextInput";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
-import EmptyState from "../components/EmptyState";
 import FilterPanel from "../components/FilterPanel";
 import PageHeader from "../components/PageHeader";
-import PaginationBar from "../components/PaginationBar";
+import RegistryListTable from "../components/RegistryListTable";
 import RowActionsMenu from "../components/RowActionsMenu";
 import SortHeader from "../components/SortHeader";
-import TableLoadingRow from "../components/TableLoadingRow";
 import TeamEditorModal from "../components/TeamEditorModal";
 import ToadieRegistrySourceStatus from "../components/ToadieRegistrySourceStatus";
 import { useDeleteConfirm } from "../hooks/useDeleteConfirm";
-import { usePagedSort } from "../hooks/usePagedSort";
-import { isString, useStoredState } from "../hooks/useStoredState";
-import { loadErrorMessage, saveErrorMessage } from "../utils/saveError";
+import { useRegistryListControls } from "../hooks/useRegistryListControls";
+import { saveErrorMessage } from "../utils/saveError";
 import { teamPath } from "../utils/teamLinks";
 import { refreshQueriesAfterMutation } from "../utils/queryRefresh";
 
@@ -40,12 +36,8 @@ export default function Teams() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const admin = useAdmin();
-  const [nameFilter, setNameFilter] = useStoredState(`${SETTINGS_KEY}.filter.name`, "", isString);
-  const [debouncedName] = useDebouncedValue(nameFilter, 300);
-  const activeFilterCount = nameFilter.trim() ? 1 : 0;
-
-  const { page, setPage, pageSize, setPageSize, sortField, sortDir, sortParam, toggleSort } =
-    usePagedSort<SortField>("name", [debouncedName], { key: SETTINGS_KEY, sortFields: SORT_FIELDS });
+  const { nameFilter, setNameFilter, debouncedName, nameFilterActive, page, setPage, pageSize, setPageSize, sortField, sortDir, sortParam, toggleSort } =
+    useRegistryListControls<SortField>({ settingsKey: SETTINGS_KEY, sortFields: SORT_FIELDS, initialSortField: "name" });
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["teams", "list", page, pageSize, sortParam, debouncedName],
@@ -84,7 +76,7 @@ export default function Teams() {
         }
       />
 
-      <FilterPanel activeFilterCount={activeFilterCount} storageKey={SETTINGS_KEY}>
+      <FilterPanel activeFilterCount={nameFilterActive ? 1 : 0} storageKey={SETTINGS_KEY}>
         <ClearableTextInput
           label={t("common.field.name")}
           value={nameFilter}
@@ -93,14 +85,17 @@ export default function Teams() {
         />
       </FilterPanel>
 
-      {isError && (
-        <Alert color="red" variant="light" title={t("teams.loadFailed")}>
-          {loadErrorMessage(error, t)}
-        </Alert>
-      )}
-
-      <Table>
-        <Table.Thead>
+      <RegistryListTable
+        errorTitle={t("teams.loadFailed")}
+        error={error}
+        isError={isError}
+        isLoading={isLoading}
+        hasData={Boolean(data)}
+        rowCount={data?.items.length ?? 0}
+        columnCount={columnCount}
+        emptyIcon={IconUsersGroup}
+        emptyLabel={t("teams.empty")}
+        header={
           <Table.Tr>
             <SortHeader field="name" label={t("common.field.name")} activeField={sortField} activeDir={sortDir} onToggle={toggleSort} />
             <Table.Th>{t("common.field.description")}</Table.Th>
@@ -108,14 +103,11 @@ export default function Teams() {
             <Table.Th>{t("toadie.registry.source")}</Table.Th>
             {admin && <Table.Th aria-label={t("common.table.operations")} style={{ width: 1 }} />}
           </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {isLoading && !data ? (
-            <TableLoadingRow colSpan={columnCount} />
-          ) : data && data.items.length > 0 ? (
-            data.items.map((team) => {
-              const source = team.source;
-              return <Table.Tr key={team.id}>
+        }
+        rows={data?.items.map((team) => {
+          const source = team.source;
+          return (
+            <Table.Tr key={team.id}>
                 <Table.Td>
                   {/* The name is the way into the roster — a real link (the detail-link rule). */}
                   <Anchor component={RouterLink} to={teamPath(team.id)} fw={500} size="sm" aria-label={t("teams.openAria", { name: team.name })}>
@@ -159,19 +151,15 @@ export default function Teams() {
                     </RowActionsMenu>
                   </Table.Td>
                 )}
-              </Table.Tr>;
-            })
-          ) : !isError ? (
-            <Table.Tr>
-              <Table.Td colSpan={columnCount}>
-                <EmptyState icon={IconUsersGroup} label={t("teams.empty")} />
-              </Table.Td>
             </Table.Tr>
-          ) : null}
-        </Table.Tbody>
-      </Table>
-
-      <PaginationBar total={total} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} />
+          );
+        })}
+        total={total}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
 
       {editorTarget !== null && (
         <TeamEditorModal

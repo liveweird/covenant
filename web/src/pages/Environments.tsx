@@ -1,8 +1,7 @@
 import { refreshQueriesAfterMutation } from "../utils/queryRefresh";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, Badge, Button, Group, Menu, Select, Stack, Table, Text } from "@mantine/core";
-import { useDebouncedValue } from "@mantine/hooks";
+import { Badge, Button, Group, Menu, Select, Stack, Table, Text } from "@mantine/core";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconPencil, IconPlugConnected, IconPlus, IconTrash } from "@tabler/icons-react";
 import { deleteEnvironment, listEnvironments, type EnvironmentResponse } from "../api/environments";
@@ -10,18 +9,16 @@ import { useAdmin } from "../auth";
 import { listAllSystems } from "../api/systems";
 import ClearableTextInput from "../components/ClearableTextInput";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
-import EmptyState from "../components/EmptyState";
 import EnvironmentEditorModal from "../components/EnvironmentEditorModal";
 import FilterPanel from "../components/FilterPanel";
 import PageHeader from "../components/PageHeader";
-import PaginationBar from "../components/PaginationBar";
+import RegistryListTable from "../components/RegistryListTable";
 import RowActionsMenu from "../components/RowActionsMenu";
 import SortHeader from "../components/SortHeader";
-import TableLoadingRow from "../components/TableLoadingRow";
 import { useDeleteConfirm } from "../hooks/useDeleteConfirm";
-import { usePagedSort } from "../hooks/usePagedSort";
+import { useRegistryListControls } from "../hooks/useRegistryListControls";
 import { isString, useStoredState } from "../hooks/useStoredState";
-import { loadErrorMessage, saveErrorMessage } from "../utils/saveError";
+import { saveErrorMessage } from "../utils/saveError";
 
 const SORT_FIELDS = ["name", "systemId", "updatedAt"] as const;
 type SortField = (typeof SORT_FIELDS)[number];
@@ -37,12 +34,15 @@ export default function Environments() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const admin = useAdmin();
-  const [nameFilter, setNameFilter] = useStoredState(`${SETTINGS_KEY}.filter.name`, "", isString);
   const [systemFilter, setSystemFilter] = useStoredState(`${SETTINGS_KEY}.filter.system`, "", isString);
-  const [debouncedName] = useDebouncedValue(nameFilter, 300);
-  const activeFilterCount = (nameFilter.trim() ? 1 : 0) + (systemFilter ? 1 : 0);
-  const { page, setPage, pageSize, setPageSize, sortField, sortDir, sortParam, toggleSort } =
-    usePagedSort<SortField>("name", [debouncedName, systemFilter], { key: SETTINGS_KEY, sortFields: SORT_FIELDS });
+  const { nameFilter, setNameFilter, debouncedName, nameFilterActive, page, setPage, pageSize, setPageSize, sortField, sortDir, sortParam, toggleSort } =
+    useRegistryListControls<SortField>({
+      settingsKey: SETTINGS_KEY,
+      sortFields: SORT_FIELDS,
+      initialSortField: "name",
+      extraFilterDeps: [systemFilter],
+    });
+  const activeFilterCount = (nameFilterActive ? 1 : 0) + (systemFilter ? 1 : 0);
 
   const systems = useQuery({ queryKey: ["systems", "all-pages"], queryFn: () => listAllSystems() });
   const systemOptions = (systems.data ?? []).map((s) => ({ value: String(s.id), label: `${s.domainName} / ${s.name}` }));
@@ -89,13 +89,17 @@ export default function Environments() {
           searchable
         />
       </FilterPanel>
-      {isError && (
-        <Alert color="red" variant="light" title={t("environments.loadFailed")}>
-          {loadErrorMessage(error, t)}
-        </Alert>
-      )}
-      <Table>
-        <Table.Thead>
+      <RegistryListTable
+        errorTitle={t("environments.loadFailed")}
+        error={error}
+        isError={isError}
+        isLoading={isLoading}
+        hasData={Boolean(data)}
+        rowCount={data?.items.length ?? 0}
+        columnCount={columnCount}
+        emptyIcon={IconPlugConnected}
+        emptyLabel={systemOptions.length === 0 && admin ? t("environments.emptyNoSystems") : t("environments.empty")}
+        header={
           <Table.Tr>
             <SortHeader field="name" label={t("common.field.name")} activeField={sortField} activeDir={sortDir} onToggle={toggleSort} />
             <SortHeader field="systemId" label={t("environments.field.system")} activeField={sortField} activeDir={sortDir} onToggle={toggleSort} />
@@ -103,13 +107,9 @@ export default function Environments() {
             <Table.Th>{t("common.field.description")}</Table.Th>
             {admin && <Table.Th aria-label={t("common.table.operations")} style={{ width: 1 }} />}
           </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {isLoading && !data ? (
-            <TableLoadingRow colSpan={columnCount} />
-          ) : data && data.items.length > 0 ? (
-            data.items.map((env) => (
-              <Table.Tr key={env.id}>
+        }
+        rows={data?.items.map((env) => (
+          <Table.Tr key={env.id}>
                 <Table.Td>
                   <Text size="sm" fw={500}>
                     {env.name}
@@ -143,18 +143,14 @@ export default function Environments() {
                     </RowActionsMenu>
                   </Table.Td>
                 )}
-              </Table.Tr>
-            ))
-          ) : !isError ? (
-            <Table.Tr>
-              <Table.Td colSpan={columnCount}>
-                <EmptyState icon={IconPlugConnected} label={systemOptions.length === 0 && admin ? t("environments.emptyNoSystems") : t("environments.empty")} />
-              </Table.Td>
-            </Table.Tr>
-          ) : null}
-        </Table.Tbody>
-      </Table>
-      <PaginationBar total={data?.total ?? 0} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} />
+          </Table.Tr>
+        ))}
+        total={data?.total ?? 0}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
       {editorTarget !== null && (
         <EnvironmentEditorModal
           target={editorTarget === "new" ? null : editorTarget}

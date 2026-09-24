@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Alert, Button, Divider, Group, Modal, PasswordInput, Select, Stack, Switch, Textarea, TextInput } from "@mantine/core";
+import { Divider, Modal, PasswordInput, Select, Stack, Switch, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { createEnvironment, updateEnvironment, type EnvironmentResponse } from "../api/environments";
 import { ApiError } from "../api/http";
-import { charCountDescription } from "../utils/charCount";
+import RegistryEditorActions from "./RegistryEditorActions";
+import RegistryMetadataFields from "./RegistryMetadataFields";
 import {
   EMPTY_ENVIRONMENT_FORM,
   environmentFormValidation,
@@ -71,15 +72,12 @@ export default function EnvironmentEditorModal({
       <form onSubmit={form.onSubmit(save)} noValidate>
         <Stack>
           <Select label={t("environments.field.system")} data={systemOptions} searchable allowDeselect={false} {...form.getInputProps("systemId")} />
-          <TextInput label={t("common.field.name")} maxLength={MAX_ENVIRONMENT_NAME_LENGTH} data-autofocus {...form.getInputProps("name")} />
-          <Textarea
-            label={t("common.field.description")}
-            autosize
-            minRows={2}
-            maxLength={MAX_ENVIRONMENT_DESCRIPTION_LENGTH}
-            description={charCountDescription(form.values.description.length, MAX_ENVIRONMENT_DESCRIPTION_LENGTH)}
-            inputWrapperOrder={["label", "input", "description", "error"]}
-            {...form.getInputProps("description")}
+          <RegistryMetadataFields
+            nameMaxLength={MAX_ENVIRONMENT_NAME_LENGTH}
+            descriptionMaxLength={MAX_ENVIRONMENT_DESCRIPTION_LENGTH}
+            descriptionLength={form.values.description.length}
+            nameInputProps={form.getInputProps("name")}
+            descriptionInputProps={form.getInputProps("description")}
           />
           <Divider label={t("environments.target.http")} />
           <Switch label={t("environments.field.httpEnabled")} {...form.getInputProps("httpEnabled", { type: "checkbox" })} />
@@ -125,19 +123,7 @@ export default function EnvironmentEditorModal({
               />
             </>
           )}
-          {error && (
-            <Alert color="red" variant="light">
-              {error}
-            </Alert>
-          )}
-          <Group justify="flex-end">
-            <Button variant="default" onClick={onClose} disabled={submitting}>
-              {t("common.action.cancel")}
-            </Button>
-            <Button type="submit" loading={submitting}>
-              {target ? t("common.action.save") : t("common.action.create")}
-            </Button>
-          </Group>
+          <RegistryEditorActions error={error} submitting={submitting} isEdit={Boolean(target)} onClose={onClose} />
         </Stack>
       </form>
     </Modal>
