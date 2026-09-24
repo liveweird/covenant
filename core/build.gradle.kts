@@ -4,6 +4,12 @@ plugins {
     alias(libs.plugins.detekt)
 }
 
+buildscript {
+    configurations.classpath {
+        resolutionStrategy.activateDependencyLocking()
+    }
+}
+
 // Static analysis, same config as :server. Detekt's default source roots are the plain-JVM
 // src/main|test/kotlin, so the KMP source set is listed explicitly.
 detekt {

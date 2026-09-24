@@ -20,6 +20,9 @@ WORKDIR /checker
 COPY --from=build /checker/node_modules ./node_modules
 COPY --from=build /checker/dist ./dist
 COPY checker/package.json ./
+# npm is needed to assemble the build stage, but the sidecar only invokes node at runtime.
+# Drop the unused global CLI and its bundled dependencies from the final image.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 # Unprivileged, read-only root filesystem (compose `read_only: true`, the k8s securityContext).
 USER node
 EXPOSE 9090

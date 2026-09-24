@@ -1,6 +1,10 @@
 rootProject.name = "covenant"
 
 pluginManagement {
+    val foojayResolverVersion = providers.gradleProperty("foojayResolverVersion").get()
+    plugins {
+        id("org.gradle.toolchains.foojay-resolver-convention") version foojayResolverVersion
+    }
     repositories {
         mavenCentral()
         gradlePluginPortal()
@@ -10,6 +14,13 @@ pluginManagement {
 dependencyResolutionManagement {
     repositories {
         mavenCentral()
+        maven {
+            url = uri("https://plugins.gradle.org/m2")
+            content {
+                includeGroup("org.gradle.toolchains.foojay-resolver-convention")
+                includeGroup("org.gradle.toolchains")
+            }
+        }
     }
     versionCatalogs {
         create("ktorLibs").from("io.ktor:ktor-version-catalog:3.6.0")
@@ -17,7 +28,7 @@ dependencyResolutionManagement {
 }
 
 plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+    id("org.gradle.toolchains.foojay-resolver-convention")
 }
 include(":core")
 include(":server")

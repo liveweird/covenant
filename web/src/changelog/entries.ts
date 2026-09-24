@@ -17,6 +17,20 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "1.2.5",
+    date: "2026-09-24",
+    en: `**Dependency and container security updates.**
+
+- Updated vulnerable transitive server dependencies and refreshed the app's Java base images.
+- Removed the unused npm command-line tools from the checker image and updated affected operating-system packages in the app image.
+- Added locked Gradle dependency inventories and a CI vulnerability check for build, test and runtime dependencies.`,
+    pl: `**Aktualizacje bezpieczeństwa zależności i kontenerów.**
+
+- Zaktualizowano podatne zależności pośrednie serwera i obrazy bazowe Javy dla aplikacji.
+- Usunięto nieużywane narzędzia wiersza poleceń npm z obrazu usługi sprawdzającej oraz zaktualizowano wybrane pakiety systemowe w obrazie aplikacji.
+- Dodano zablokowane wykazy zależności Gradle oraz sprawdzanie podatności zależności używanych podczas budowania, testowania i działania w CI.`,
+  },
+  {
     version: "1.2.4",
     date: "2026-09-24",
     en: `**Large contract-check reports stay within their limit.**

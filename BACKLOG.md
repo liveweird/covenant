@@ -5,12 +5,13 @@ release history belong in [README.md](README.md), the
 [application changelog](web/src/changelog/entries.ts), and the topic guides under
 `.claude/docs/`. Entries are proposals, not delivery commitments.
 
-## Verification gap
+## Security monitoring
 
-The 2026-09-23 check-up's web `npm audit` was not completed: automatic approval review
-rejected sending workspace dependency names and versions to the advisory service. Revisit
-that network check when authorized. The checker and E2E audits reported zero vulnerabilities
-at that time; no comprehensive JVM/container vulnerability scan was performed.
+- **Upstream image advisories.** The 2026-09-24 final app scan has 29 MEDIUM and four LOW
+  Ubuntu findings without listed fixes. Postgres `gosu` and Mailpit retain package-presence
+  findings with no affected call path identified in the current binaries. Reassess these
+  findings when upstream images or advisory details change; the scan and triage record is in
+  [dependency maintenance](.claude/docs/dependencies.md).
 
 ## Deferred product and engineering work
 

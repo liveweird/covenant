@@ -7,6 +7,25 @@ plugins {
     alias(libs.plugins.detekt)
 }
 
+buildscript {
+    configurations.classpath {
+        resolutionStrategy.activateDependencyLocking()
+    }
+    dependencies {
+        constraints {
+            // Ktor's Gradle plugin loads these via its Shadow and Jib integrations during the
+            // build. Keep the script classpath above the reviewed advisory floors too.
+            classpath("com.fasterxml.jackson.core:jackson-core:2.22.2")
+            classpath("com.fasterxml.jackson.core:jackson-databind:2.22.2")
+            classpath("com.fasterxml.jackson.core:jackson-annotations:2.22")
+            classpath("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.22.2")
+            classpath("org.apache.logging.log4j:log4j-api:2.25.5")
+            classpath("org.apache.logging.log4j:log4j-core:2.25.5")
+            classpath("org.codehaus.plexus:plexus-utils:4.0.3")
+        }
+    }
+}
+
 
 application {
     mainClass = "io.ktor.server.netty.EngineMain"
@@ -72,6 +91,14 @@ detekt {
     config.setFrom(rootProject.file("config/detekt/detekt.yml"))
 }
 dependencies {
+    constraints {
+        // Security floors for vulnerable runtime transitives. Keep these as constraints because
+        // server code does not consume their APIs directly; see the catalog notes for provenance.
+        implementation(libs.scram.client)
+        implementation(libs.scram.common)
+        implementation(libs.lz4.java)
+        implementation(libs.commons.configuration)
+    }
     implementation(project(":core"))
     implementation(ktorLibs.serialization.kotlinx.json)
     implementation(ktorLibs.server.auth)
