@@ -120,10 +120,10 @@ class ChecksService(private val checkerProvider: () -> CheckerClient) {
         findings: List<Finding>,
     ): List<Finding> {
         val retained = findings.filterNot { it.code == CODE_STATUS_MISMATCH }
-        if (type != ContractType.ODCS) return retained
-        val parsed = DocumentParser.parse(content) as? ParseOutcome.Parsed ?: return retained
-        val status = Metadata.declaredStatus(type, parsed.root) ?: return retained
-        return if (status.equals(lifecycle.name, ignoreCase = true)) {
+        if (type != ContractType.ODCS) return capStoredFindings(retained)
+        val parsed = DocumentParser.parse(content) as? ParseOutcome.Parsed ?: return capStoredFindings(retained)
+        val status = Metadata.declaredStatus(type, parsed.root) ?: return capStoredFindings(retained)
+        val refreshed = if (status.equals(lifecycle.name, ignoreCase = true)) {
             retained
         } else {
             retained + Finding(
@@ -131,6 +131,7 @@ class ChecksService(private val checkerProvider: () -> CheckerClient) {
                 "The document declares status '$status' but the version's lifecycle is ${lifecycle.name}", "/status",
             )
         }
+        return capStoredFindings(refreshed)
     }
 
     /** One direction: the facts of comparing `old` (`oldVersion`/`oldContent`) against `newContent`. */

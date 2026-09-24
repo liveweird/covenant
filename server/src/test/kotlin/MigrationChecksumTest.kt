@@ -44,6 +44,7 @@ class MigrationChecksumTest {
         "V22__toadie_remote_revision.sql" to 534570132,
         "V23__toadie_registry_sync.sql" to -620322693,
         "V24__toadie_declared_adoption.sql" to -1787468587,
+        "V25__cap_contract_version_findings.sql" to 1044594409,
     )
 
     @Test

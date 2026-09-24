@@ -17,6 +17,18 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "1.2.4",
+    date: "2026-09-24",
+    en: `**Large contract-check reports stay within their limit.**
+
+- Validation reports contain at most 500 findings, including the notice when more findings were omitted. Existing saved reports over that limit are corrected automatically.
+- Supported AsyncAPI and ODCS specification versions are now documented clearly. Documents using other versions still report a validation issue and can be saved explicitly with Save anyway.`,
+    pl: `**Duże raporty sprawdzania kontraktów mieszczą się w limicie.**
+
+- Raporty walidacji zawierają najwyżej 500 ustaleń, łącznie z informacją o pominiętych ustaleniach. Wcześniej zapisane raporty przekraczające ten limit są poprawiane automatycznie.
+- Obsługiwane wersje specyfikacji AsyncAPI i ODCS są teraz jasno opisane. Dokumenty w innych wersjach nadal zgłaszają problem walidacji i można je zapisać po wybraniu opcji „Zapisz mimo to”.`,
+  },
+  {
     version: "1.2.3",
     date: "2026-09-24",
     en: `**Contract checks give clearer answers, and production setup is safer.**

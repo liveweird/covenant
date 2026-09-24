@@ -34,8 +34,45 @@ data class Finding(
     val hard: Boolean get() = source == FindingSource.SYNTAX
 }
 
-/** At most this many findings are stored per version; a final INFO marks the cut. */
+/** At most this many entries are stored per version; a final INFO occupies one slot when truncated. */
 const val MAX_STORED_FINDINGS = 500
+
+private const val STORED_TRUNCATION_CODE = "FINDINGS_TRUNCATED"
+private const val CHECKER_TRUNCATION_CODE = "findings-truncated"
+private val truncationCodes = setOf(STORED_TRUNCATION_CODE, CHECKER_TRUNCATION_CODE)
+private val findingOrder = compareBy<Finding>({ it.severity.ordinal }, { it.line ?: Int.MAX_VALUE }, { it.code })
+
+/**
+ * Applies the persisted-response bound while retaining evidence that an upstream checker result
+ * was already incomplete. Existing markers do not consume a second slot or survive as duplicates.
+ */
+internal fun capStoredFindings(findings: List<Finding>): List<Finding> {
+    val sorted = findings.sortedWith(findingOrder)
+    val previousMarker = sorted.firstOrNull {
+        it.source == FindingSource.SYSTEM && it.code in truncationCodes
+    }
+    val substantive = sorted.filterNot {
+        it.source == FindingSource.SYSTEM && it.code in truncationCodes
+    }
+    if (previousMarker == null && substantive.size <= MAX_STORED_FINDINGS) return substantive
+
+    val retained = substantive.take(MAX_STORED_FINDINGS - 1)
+    val omittedHere = substantive.size - retained.size
+    val message = when {
+        previousMarker != null && omittedHere > 0 ->
+            "$omittedHere additional findings were not stored; earlier truncation also omitted findings " +
+                "(cap $MAX_STORED_FINDINGS, including this marker)"
+        previousMarker != null -> previousMarker.message
+        else -> "$omittedHere further findings were not stored " +
+            "(cap $MAX_STORED_FINDINGS, including this marker)"
+    }
+    return retained + Finding(
+        severity = Severity.INFO,
+        source = FindingSource.SYSTEM,
+        code = STORED_TRUNCATION_CODE,
+        message = message,
+    )
+}
 
 /**
  * The document's serialization format, detected from the first significant character. Lowercase
@@ -74,19 +111,7 @@ data class CheckReport(
             checkerAvailable: Boolean,
             baselineVersion: String? = null,
         ): CheckReport {
-            val sorted = findings.sortedWith(
-                compareBy<Finding>({ it.severity.ordinal }, { it.line ?: Int.MAX_VALUE }, { it.code }),
-            )
-            val capped = if (sorted.size <= MAX_STORED_FINDINGS) {
-                sorted
-            } else {
-                sorted.take(MAX_STORED_FINDINGS) + Finding(
-                    severity = Severity.INFO,
-                    source = FindingSource.SYSTEM,
-                    code = "FINDINGS_TRUNCATED",
-                    message = "${sorted.size - MAX_STORED_FINDINGS} further findings were not stored (cap $MAX_STORED_FINDINGS)",
-                )
-            }
+            val capped = capStoredFindings(findings)
             return CheckReport(
                 format = format,
                 specVersion = metadata?.specVersion,

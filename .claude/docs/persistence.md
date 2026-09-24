@@ -1,5 +1,9 @@
 ### Persistence
 
+Stored validation snapshots contain at most 500 total entries. When truncation is necessary,
+the final `FINDINGS_TRUNCATED` SYSTEM/INFO marker occupies one of those slots; lifecycle-only
+snapshot refreshes preserve the marker and cannot grow the snapshot past the same bound.
+
 **Version reviews (V19).** `contract_versions.content_revision` is a monotonic byte-change
 counter exposed on version detail. Review rounds capture it and the content hash, and immutable
 entries hold discussion/decisions. Rounds and entries are retained history/detail records
@@ -18,7 +22,7 @@ The `org.postgresql:postgresql` JDBC driver is on the classpath solely for Flywa
 
 **Cross-feature table reads (the service-layer rule, inherited from Lettuce).** A feature service MAY query another feature's Exposed table objects directly when the read must run **inside its own transaction** (SQL joins, atomic snapshots) — the transaction boundary must be explicit rather than relying on an unrelated service to preserve it. Exposed reuses an enclosing transaction for nested `suspendTransaction` calls on the same database; the importer deliberately uses that behavior to compose one atomic item. Route handlers never touch tables (services only). The reads in place: `TeamService` joins `UserService.Users` for the roster's display fields and the active-member counts, and checks member ids against active users inside the create/add transaction; `TeamService.activeTeamIdsOf` is written to be called from the contract write's transaction (the writer guard); `DomainService` counts active rows of `SystemService.Systems` per domain (the list caption and the holds-systems delete rule) and `SystemService` joins `DomainService.Domains` for the domain name and checks the domain id inside its write transaction. The contract catalog adds the creator/owner display-name joins and the Domain → System → Contract tree assembled from three reads in one transaction; `ContractService.facts` reads `ContractSubscriptionService.ContractSubscriptions` for the per-row follower counts and the caller's own follows (`subscribed`/`subscriberCount` on every contract response); `ContractSubscriptionService.subscribe` checks the contract row inside its insert transaction. `EnvironmentService` joins `SystemService.Systems` for the system name and checks the system id inside its write transaction; **`SystemService.delete` soft-deletes the system's rows in `EnvironmentService.Environments` in the same transaction** — a sanctioned cross-feature WRITE (an environment is configuration OF its system); the other two writes are intra-package — `ContractVersionService` recomputes `ContractService.Contracts.latest_version_id` inside every version write and `ContractService.delete` soft-deletes the contract's rows in `ContractVersionService.ContractVersions` (the pair frees its identities as one unit). `SystemService` counts active rows of `ContractService.Contracts` per system (`contractCount` on every response and the holds-contracts 409 on delete) and `TeamService.delete` counts the contracts the team still owns (the owns-contracts 409) — the hierarchy's delete rules run one level down, inside the deleting transaction. `infra/db/EventLog.kt` joins `UserService.Users` to resolve the acting user's display name on every history page. `ContractErrorService` (the Errors report) joins the shared `contracts/ContractJoins.kt` spine — `ContractService.Contracts` ⋈ `SystemService.Systems` ⋈ `DomainService.Domains` ⋈ the two owner OUTER joins — with `ContractVersionService.ContractVersions` (every ACTIVE version, not `ContractService`'s "latest" alias), a pure read with no write of its own. List each here as it lands — the list IS the permission.
 
-Current migrations are `V1`–`V24`. The foundation below covers `V1`–`V15`; `V16` adds major
+Current migrations are `V1`–`V25`. The foundation below covers `V1`–`V15`; `V16` adds major
 release lines (see `release-lines.md`), `V17` adds Toadie usage (see the section below), `V18`
 adds lifecycle planning/reminders, `V19` adds version reviews (see `version-reviews.md`), `V20`
 adds user credential revisions, and `V21` adds the immutable
@@ -27,7 +31,8 @@ encodes numeric prerelease identifiers at the stored maximum width of 100 digits
 data untouched, and callers apply explicit `C` collation to its text-array result. V22 adds nullable
 remote ontology revision metadata to the Toadie cache; V23 adds optional registry synchronization
 (see the sections below). V24 adds optional declared-adoption mapping and sanitized snapshot
-metadata; see [declared adoption](toadie-adoption.md).
+metadata; see [declared adoption](toadie-adoption.md). V25 repairs legacy validation snapshots
+that exceeded the corrected 500-total-entry cap and recomputes their denormalized severity counts.
 The foundation combines Toadie's auth/users migrations with the flat teams, registries and
 contract catalog:
 

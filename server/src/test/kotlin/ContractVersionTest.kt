@@ -379,6 +379,28 @@ class ContractVersionTest {
     }
 
     @Test
+    fun `unsupported AsyncAPI and ODCS versions are soft and can be explicitly waived`() = testApplication {
+        usePostgresTestcontainer()
+        val admin = seededClient("vunsupported", UserRole.ADMIN)
+        val cases = listOf(
+            admin.contract("vunsupported-async", ContractType.ASYNCAPI) to
+                ContractFixtures.asyncApi3.replace("asyncapi: 3.0.0", "asyncapi: 3.0.1"),
+            admin.contract("vunsupported-odcs", ContractType.ODCS) to ContractFixtures.odcsOldVersion,
+        )
+        for ((contract, content) in cases) {
+            val strict = admin.postJson(path(contract), VersionCreateRequest("1.0.0", content))
+            assertEquals(HttpStatusCode.BadRequest, strict.status)
+            assertTrue(strict.body<ProblemDetail>().detail!!.contains("blocking finding"))
+
+            val waived = admin.postJson("${path(contract)}?allowInvalid=true", VersionCreateRequest("1.0.0", content))
+            assertEquals(HttpStatusCode.Created, waived.status)
+            val finding = waived.body<VersionResponse>().findings.single { it.code == "UNSUPPORTED_SPEC_VERSION" }
+            assertEquals(FindingSource.SCHEMA, finding.source)
+            assertFalse(finding.hard)
+        }
+    }
+
+    @Test
     fun `the SOFT gate - a schema error blocks a strict save and stores with allowInvalid, findings ride the row`() = testApplication {
         usePostgresTestcontainer()
         val admin = seededClient("vsoft", UserRole.ADMIN)
@@ -564,6 +586,15 @@ class ContractVersionTest {
             DocumentCheckRequest(ContractType.OPENAPI, "openapi: 3.1.0\ninfo: [oops\n"),
         ).body<CheckReport>()
         assertEquals(1, broken.errors); assertTrue(broken.findings.single().hard)
+        val unsupported = user.postJson(
+            "/api/v1/contracts/versions/check",
+            DocumentCheckRequest(ContractType.ODCS, ContractFixtures.odcsOldVersion),
+        )
+        assertEquals(HttpStatusCode.OK, unsupported.status)
+        val unsupportedReport = unsupported.body<CheckReport>()
+        val unsupportedFinding = unsupportedReport.softErrors.single { it.code == "UNSUPPORTED_SPEC_VERSION" }
+        assertEquals(FindingSource.SCHEMA, unsupportedFinding.source)
+        assertTrue(unsupportedReport.hardFindings.isEmpty())
         val mismatch = user.postJson(
             "/api/v1/contracts/versions/check",
             DocumentCheckRequest(ContractType.OPENAPI, ContractFixtures.openApi, version = "2.0.0"),
