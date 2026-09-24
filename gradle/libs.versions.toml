@@ -34,6 +34,12 @@ testcontainers = "2.0.5"
 # OpenTelemetry on its transitive set (only slf4j + the zstd/lz4/snappy codecs, KEPT so a read of a
 # compressed topic decompresses); checkDependencyAlignment logs the runtime classpath after a bump.
 kafka-clients = "4.3.1"
+# Runtime security floors (Trivy scan, 2026-09-24). These remain transitive implementation
+# details of r2dbc-postgresql, Kafka and openapi-diff; server constraints select the first fixed
+# releases without forcing coordinated upgrades of those direct dependencies.
+scram = "3.3"
+lz4-java = "1.11.1"
+commons-configuration = "2.15.0"
 
 # Contract validation (2026-09-20). All three build against Jackson 2.22.2; the jackson-bom
 # platform pins the whole com.fasterxml.jackson family to it and checkDependencyAlignment guards
@@ -82,6 +88,10 @@ swagger-request-validator-core = { module = "com.atlassian.oai:openapi-request-v
 testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql", version.ref = "testcontainers" }
 testcontainers-kafka = { module = "org.testcontainers:testcontainers-kafka", version.ref = "testcontainers" }
 kafka-clients = { module = "org.apache.kafka:kafka-clients", version.ref = "kafka-clients" }
+scram-client = { module = "com.ongres.scram:scram-client", version.ref = "scram" }
+scram-common = { module = "com.ongres.scram:scram-common", version.ref = "scram" }
+lz4-java = { module = "at.yawk.lz4:lz4-java", version.ref = "lz4-java" }
+commons-configuration = { module = "org.apache.commons:commons-configuration2", version.ref = "commons-configuration" }
 
 [plugins]
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }

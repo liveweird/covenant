@@ -127,6 +127,8 @@ registered in `application.yaml`. `plugins/Routing.kt` is only the final SPA/sta
   Tune rules in `config/detekt/detekt.yml` with a documented rationale; never add an
   uncommented `@Suppress`.
 - `./gradlew :server:checkDependencyAlignment`: one version per aligned dependency family.
+- `./gradlew :verifySettingsPluginAudit :buildEnvironment :core:buildEnvironment :server:buildEnvironment :dependencies :core:dependencies :server:dependencies --write-locks`:
+  refresh the resolved project and plugin inventory for vulnerability scanning; review the locks.
 - `cd web && npm run dev`: start Vite on port 5175, proxying `/api` to Ktor on :8082.
 - `cd web && npm run build && npm run lint && npm test`: type-check, bundle, lint, and run Vitest.
 - `cd web && npm run test:coverage`: run frontend coverage gates. `npm run knip`: dead-code gate.
@@ -137,7 +139,7 @@ registered in `application.yaml`. `plugins/Routing.kt` is only the final SPA/sta
   against the full stack on port 8082. `npm run lint`, `npm run knip`, `npm run typecheck`, and
   `npm run check:scenarios`, and `npm run test:setup` are the Docker-free gates.
   Setup reuses or starts the default stack and leaves services and volumes intact.
-- `.github/workflows/ci.yml` runs the server, web, checker, sample-loader, and e2e-static gates on pushes to
+- `.github/workflows/ci.yml` runs the server, Gradle lockfile vulnerability scan, web, checker, sample-loader, and e2e-static gates on pushes to
   `main` and on pull requests
   (including server OpenAPI coverage and frontend spec → `schema.ts` drift, and builds both
   images on `main`); `e2e.yml` runs the blackbox suite nightly against `main` and on demand.

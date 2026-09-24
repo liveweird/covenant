@@ -19,15 +19,15 @@ RUN GIT_SHA=$(git rev-parse --short HEAD) \
     npm run build
 
 # ── Stage 2: build the server distribution ────────────────────────────────────
-FROM eclipse-temurin:21.0.12_8-jdk-noble@sha256:4d271cd5e0624598cf563342f47281b09cb364bc13acbbd7251f49f83470018d AS server
+FROM eclipse-temurin:21.0.12_8-jdk-noble@sha256:75ce56643243c3db632be2ef259625fb42ee3be1334389659f7a1a61acb78783 AS server
 WORKDIR /src
 # Copy build scripts + wrapper first so the Gradle distribution download caches.
-COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties ./
+COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties gradle.lockfile settings-gradle.lockfile buildscript-gradle.lockfile ./
 COPY gradle/ gradle/
 RUN ./gradlew --version --no-daemon
 # Module build files, then sources.
-COPY core/build.gradle.kts core/
-COPY server/build.gradle.kts server/
+COPY core/build.gradle.kts core/gradle.lockfile core/buildscript-gradle.lockfile core/
+COPY server/build.gradle.kts server/gradle.lockfile server/buildscript-gradle.lockfile server/
 COPY core/src/ core/src/
 COPY server/src/ server/src/
 # installDist keeps every dependency as its own JAR, so Flyway's ServiceLoader
@@ -37,7 +37,16 @@ RUN ./gradlew :server:installDist --no-daemon
 
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────
 # Same major as the toolchain (jvmToolchain(21)) and the test JVM — what is tested is what runs.
-FROM eclipse-temurin:21.0.12_8-jre-noble@sha256:7739f0ffce786528961eea6bf46d9610ee968ac6127c9b2e93494757bdecce9f AS runtime
+FROM eclipse-temurin:21.0.12_8-jre-noble@sha256:86883d2dc1d0e57d4fb2c539f5fd3a2155749c0bdcdccb9cb452828bdc8b0caf AS runtime
+# The reviewed Temurin index still ships older Noble revisions of these packages.
+# Upgrade them from Ubuntu's signed repositories and enforce the security floors; exact
+# revision pins would stop clean rebuilds when Ubuntu supersedes them in the live index.
+RUN apt-get update && apt-get install -y --no-install-recommends --only-upgrade \
+      libexpat1 libsqlite3-0 perl-base \
+    && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libexpat1)" ge 2.6.1-2ubuntu0.5 \
+    && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libsqlite3-0)" ge 3.45.1-1ubuntu2.8 \
+    && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' perl-base)" ge 5.38.2-3.2ubuntu0.6 \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=server /src/server/build/install/server/ ./
 COPY --from=web /web/dist web
