@@ -74,7 +74,7 @@ complete server suite, including concurrency cases. An Exposed stall investigati
 Build the application and checker images, verify health and representative sample contracts,
 and run the full Playwright journeys after cross-stack updates. Preserve the user's sample
 records and clean up only verification-owned data. Existing Dependabot PR checks are evidence
-for their recorded commit only; refresh against current main before merging. A version check
+for their recorded commit only; refresh against current master before merging. A version check
 or npm audit is not a comprehensive JVM/container vulnerability scan.
 
 ## Vulnerability scan record (2026-09-24)

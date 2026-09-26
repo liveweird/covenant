@@ -3,7 +3,7 @@ name: e2e
 # Blackbox Playwright suite: brings the full stack up via docker compose and drives a real browser.
 on:
   # Not on push/PR: the compose stack + Playwright on a runner takes ~10+ minutes — ci.yml
-  # (server/web/checker/e2e-static gates) is the PR gate. The suite runs NIGHTLY against main so a
+  # (server/web/checker/e2e-static gates) is the PR gate. The suite runs NIGHTLY against master so a
   # UI regression is caught within a day, and on demand from the Actions tab → "e2e" → "Run workflow".
   schedule:
     - cron: "17 3 * * *"

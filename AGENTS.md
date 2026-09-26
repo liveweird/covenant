@@ -140,9 +140,9 @@ registered in `application.yaml`. `plugins/Routing.kt` is only the final SPA/sta
   `npm run check:scenarios`, and `npm run test:setup` are the Docker-free gates.
   Setup reuses or starts the default stack and leaves services and volumes intact.
 - `.github/workflows/ci.yml` runs the server, Gradle lockfile vulnerability scan, web, checker, sample-loader, and e2e-static gates on pushes to
-  `main` and on pull requests
+  `master` and on pull requests
   (including server OpenAPI coverage and frontend spec → `schema.ts` drift, and builds both
-  images on `main`); `e2e.yml` runs the blackbox suite nightly against `main` and on demand.
+  images on `master`); `e2e.yml` runs the blackbox suite nightly against `master` and on demand.
 
 For a clean frontend install, use `cd web && npm install --legacy-peer-deps`;
 `openapi-typescript` declares a TypeScript 5 peer while the project uses TypeScript 6. Keep the
@@ -266,7 +266,7 @@ passwords. The selected UI language is also stored on the user and drives server
 `web/src/changelog/version.ts` (`APP_VERSION`) is the sole source of the displayed app version;
 the Gradle snapshot version is unrelated. A release adds the newest bilingual markdown entry to
 `web/src/changelog/entries.ts` and bumps `APP_VERSION` in the same change; tests pin their parity.
-Publication also requires an annotated version tag at the verified main release commit and
+Publication also requires an annotated version tag at the verified master release commit and
 matching bilingual GitHub release notes; follow `.claude/docs/app-releases.md`. Test-only or
 documentation changes can retain the app version and never move an existing release tag.
 
