@@ -10,6 +10,12 @@ buildscript {
     configurations.classpath {
         resolutionStrategy.activateDependencyLocking()
     }
+    dependencies {
+        constraints {
+            // Keep the root plugin classpath above the FreeMarker path-traversal advisory floor.
+            classpath("org.freemarker:freemarker:2.3.35")
+        }
+    }
 }
 
 // Keep resolved build, test, and runtime modules reproducible and visible to the
