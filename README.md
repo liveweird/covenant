@@ -79,7 +79,7 @@ export for the commit back.
   CodeMirror 6 editor for the documents (with the contracts feature).
 - **Quality gates**: detekt (zero findings), Kover coverage floors, dependency-family alignment,
   ESLint + sonarjs, knip, Vitest coverage floors, runtime OpenAPI conformance in the server test
-  suite, and Playwright e2e with axe accessibility scans. Pushes to `main` and pull requests run
+  suite, and Playwright e2e with axe accessibility scans. Pushes to `master` and pull requests run
   the server/web/checker gates, sample-loader tests and E2E static/setup checks; the full browser
   suite runs nightly and on demand.
 

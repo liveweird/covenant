@@ -8,9 +8,9 @@ the catalog are unrelated.
 
 ## Publishing a new version
 
-1. Merge the reviewed version/changelog change into `main` after its required checks pass.
+1. Merge the reviewed version/changelog change into `master` after its required checks pass.
    Record the full release commit SHA and verify that commit's `APP_VERSION` and newest
-   changelog entry match the intended version. Wait for CI on that exact main commit.
+   changelog entry match the intended version. Wait for CI on that exact master commit.
 2. Create an annotated `v<APP_VERSION>` tag at that explicit SHA, then push that tag only.
    Never let a moving branch name choose the release commit. Existing published tags are
    immutable by convention: do not move, replace or force-push them.
@@ -32,7 +32,7 @@ Release/tag verification is part of the publishing agent's completion checklist.
 ## Historical backfill
 
 The 2026-09-22 reconciliation covers the sixteen missing versions from 0.8.1 through 1.0.3.
-Use the first `main` commit introducing each version as the historical target, and verify its
+Use the first `master` commit introducing each version as the historical target, and verify its
 version/changelog snapshot. Existing v0.6.0, v0.6.1, v0.7.0 and v0.8.0 tags/releases stay intact.
 Versions before 0.6.0 predate this reconciliation's release-history scope.
 
@@ -40,4 +40,4 @@ Backfilled release notes retain the original changelog date and explicitly ident
 backfill date. GitHub's publication timestamp reflects actual publication; do not manufacture
 an earlier publication date or imply newly rerun historical tests. Only v1.0.3 was marked Latest
 at the backfill; later releases follow the highest-stable-version rule above.
-Later test-only fixes are available on `main` without changing the historical v1.0.3 tag.
+Later test-only fixes are available on `master` without changing the historical v1.0.3 tag.

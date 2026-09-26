@@ -7,7 +7,7 @@ name: ci
 # parity). The blackbox Playwright suite runs nightly and on demand (e2e.yml).
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
 
 concurrency:

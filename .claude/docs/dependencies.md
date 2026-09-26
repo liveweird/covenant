@@ -74,7 +74,7 @@ complete server suite, including concurrency cases. An Exposed stall investigati
 Build the application and checker images, verify health and representative sample contracts,
 and run the full Playwright journeys after cross-stack updates. Preserve the user's sample
 records and clean up only verification-owned data. Existing Dependabot PR checks are evidence
-for their recorded commit only; refresh against current main before merging. A version check
+for their recorded commit only; refresh against current master before merging. A version check
 or npm audit is not a comprehensive JVM/container vulnerability scan.
 
 ## Vulnerability scan record (2026-09-24)
@@ -144,3 +144,10 @@ Verification on the rebuilt local stack: the full Gradle build passed (527 serve
 detekt, coverage and alignment gates), both app and checker images built, `/api/v1/ready`
 returned OK, all seven sample documents passed check-only validation, and all 87 Playwright
 journeys passed. Compose retained the existing Postgres and Mailpit containers and data volume.
+
+## Buildscript advisory follow-up (2026-09-26)
+
+The next CI scan reported CVE-2026-84939 in the root plugin classpath's transitive
+`org.freemarker:freemarker` 2.3.32. A root buildscript constraint selects Apache FreeMarker
+2.3.35, and the regenerated root buildscript lockfile records that version. This is a
+build-time dependency; it is not packaged in the application runtime.

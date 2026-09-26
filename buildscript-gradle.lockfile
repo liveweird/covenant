@@ -4,7 +4,7 @@
 # To regenerate this file, run: ./gradlew dependencies --write-locks
 com.google.code.gson:gson:2.11.0=classpath
 com.google.errorprone:error_prone_annotations:2.27.0=classpath
-org.freemarker:freemarker:2.3.32=classpath
+org.freemarker:freemarker:2.3.35=classpath
 org.jetbrains.intellij.deps:coverage-report:1.0.25=classpath
 org.jetbrains.intellij.deps:intellij-coverage-agent:1.0.765=classpath
 org.jetbrains.intellij.deps:intellij-coverage-reporter:1.0.765=classpath
