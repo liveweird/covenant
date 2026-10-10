@@ -44,7 +44,7 @@ jobs:
           cache: gradle
       # `build` = compile + detekt + test + koverVerify + checkDependencyAlignment (`check`).
       - run: ./gradlew build --no-daemon --stacktrace
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
           name: server-reports
@@ -92,7 +92,7 @@ jobs:
           if counts["CRITICAL"] or counts["HIGH"]:
               raise SystemExit("HIGH or CRITICAL Gradle dependency advisory")
           PY
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ always() }}
         with:
           name: gradle-vulnerabilities
