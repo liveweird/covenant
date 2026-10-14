@@ -8,10 +8,10 @@ detekt = "1.23.8"
 # passed the full Docker-backed suite twice on 2026-09-20 (including the R2DBC
 # concurrency regressions); keep future upgrades gated on the same forced full-suite run.
 exposed = "1.5.0"
-flyway = "13.7.0"
-kotlin = "2.4.20"
-kover = "0.9.9"
-logback = "1.6.3"
+flyway = "13.10.0"
+kotlin = "2.4.21"
+kover = "0.9.11"
+logback = "1.6.5"
 opentelemetry = "1.65.0"
 # Netty alignment (2026-09-04, Lettuce): Ktor's engine ships Netty 4.2 while r2dbc-postgresql 1.1.2
 # asks for reactor-netty 1.1.22 (built on 4.1.112) — Gradle lifted the shared modules to 4.2 and left
@@ -30,7 +30,7 @@ r2dbc-pool = "1.0.2.RELEASE"
 # The Reactor BOM pairs core, pool and Netty versions; the alignment gate checks its constraints.
 # 2025.0.7 retains the existing reactor-core 3.8.7/reactor-netty 1.3.7 pairing.
 reactor-bom = "2025.0.7"
-r2dbc-postgresql = "1.1.2.RELEASE"
+r2dbc-postgresql = "1.1.3.RELEASE"
 swagger-request-validator = "3.0.0"
 testcontainers = "2.0.5"
 # The try-it Kafka leg (contracts/tryit/KafkaTry.kt): the KRaft-era client — no Jackson, Netty or
@@ -40,9 +40,9 @@ kafka-clients = "4.3.1"
 # Runtime security floors (Trivy scans, 2026-09-24 and 2026-10-14). These remain transitive implementation
 # details of r2dbc-postgresql, Kafka and openapi-diff; server constraints select the first fixed
 # releases without forcing coordinated upgrades of those direct dependencies.
-scram = "3.3"
-lz4-java = "1.11.4"
-commons-configuration = "2.15.0"
+scram = "3.4"
+lz4-java = "1.12.0"
+commons-configuration = "2.15.1"
 
 # Contract validation: these libraries build against Jackson 2.22.2. The 2026-10-14
 # security patch pins the family to 2.22.3 for parser/databind DoS fixes; the BOM and alignment gate guard
@@ -83,7 +83,7 @@ opentelemetry-logbackAppender = { module = "io.opentelemetry.instrumentation:ope
 opentelemetry-ktorInstrumentation = { module = "io.opentelemetry.instrumentation:opentelemetry-ktor-3.0", version.ref = "opentelemetry-ktor" }
 opentelemetry-sdkAutoconfigure = { module = "io.opentelemetry:opentelemetry-sdk-extension-autoconfigure", version.ref = "opentelemetry" }
 opentelemetry-semconv = { module = "io.opentelemetry.semconv:opentelemetry-semconv", version.ref = "opentelemetry-semconv" }
-postgresql = { module = "org.postgresql:postgresql", version = "42.7.13" }
+postgresql = { module = "org.postgresql:postgresql", version = "42.7.14" }
 netty-bom = { module = "io.netty:netty-bom", version.ref = "netty" }
 r2dbc-postgresql = { module = "org.postgresql:r2dbc-postgresql", version.ref = "r2dbc-postgresql" }
 reactor-netty-core = { module = "io.projectreactor.netty:reactor-netty-core" }
