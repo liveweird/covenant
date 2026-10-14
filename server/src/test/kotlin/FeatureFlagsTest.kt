@@ -23,7 +23,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * Per-user feature flags (V12) end to end: the PUT /users/{id}/features matrix, the
+ * Per-user feature flags (V5) end to end: the PUT /users/{id}/features matrix, the
  * login/refresh claim roundtrip, and the users-list feature/featureEnabled filter pair.
  * MFA is the only Feature today (login-scoped — its behavior lives in MfaLoginTest);
  * `requireFeatureEnabled` awaits its first area-gating consumer. The

@@ -134,8 +134,9 @@ private suspend fun ApplicationCall.respondDbFailure(cause: Throwable) = when {
     else -> respondInternalError(cause)
 }
 
-private suspend fun ApplicationCall.respondInternalError(cause: Throwable) {
-    application.log.error("Unhandled exception while processing ${request.local.method.value} ${request.local.uri}", cause)
+internal suspend fun ApplicationCall.respondInternalError(cause: Throwable) {
+    val path = request.local.uri.substringBefore('?')
+    application.log.error("Unhandled exception while processing ${request.local.method.value} $path", cause)
     respondProblem(HttpStatusCode.InternalServerError, "An unexpected error occurred")
 }
 

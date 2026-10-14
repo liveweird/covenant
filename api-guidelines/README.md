@@ -26,7 +26,14 @@ runs both.
 
 ### 1. Mechanical — run the linter
 
-Checks the structural rules tagged `[spectral]` / `[both]`:
+Checks the structural rules tagged `[spectral]` / `[both]`. Covenant pins the Spectral libraries in the web
+workspace and runs both public-server and internal-checker profiles in CI:
+
+```sh
+cd web && npm run lint:api && npm run check:api
+```
+
+For an arbitrary document, use the standalone command below:
 
 ```sh
 npx @stoplight/spectral-cli lint server/src/main/resources/openapi/documentation.yaml \

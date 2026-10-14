@@ -3,10 +3,10 @@
 # This file is expected to be part of source control.
 # To regenerate this file, run: ./gradlew dependencies --write-locks
 com.fasterxml.jackson.core:jackson-annotations:2.22=classpath
-com.fasterxml.jackson.core:jackson-core:2.22.2=classpath
-com.fasterxml.jackson.core:jackson-databind:2.22.2=classpath
-com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.22.2=classpath
-com.fasterxml.jackson:jackson-bom:2.22.2=classpath
+com.fasterxml.jackson.core:jackson-core:2.22.3=classpath
+com.fasterxml.jackson.core:jackson-databind:2.22.3=classpath
+com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.22.3=classpath
+com.fasterxml.jackson:jackson-bom:2.22.3=classpath
 com.fasterxml.woodstox:woodstox-core:7.1.0=classpath
 com.github.openjson:openjson:1.0.13=classpath
 com.google.auth:google-auth-library-credentials:1.10.0=classpath

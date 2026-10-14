@@ -10,7 +10,7 @@ fun requireAdmin(caller: CallerPrincipal) {
 }
 
 /**
- * The area gate for per-user feature flags (V12): run as the FIRST guard of a gated route,
+ * The area gate for per-user feature flags (V5): run as the FIRST guard of a gated route,
  * before any read, so a disabled caller gets a uniform 403 even for a missing id. No Covenant
  * route is gated yet — MFA (the only flag today) is login-scoped and read off the DB record;
  * the first gateable feature area brings the first call site. The set rides the JWT, so a

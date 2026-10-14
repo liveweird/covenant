@@ -2,6 +2,7 @@ package ch.nokillswit.auth
 
 import ch.nokillswit.audit.audit
 import ch.nokillswit.authz.TooManyRequestsException
+import ch.nokillswit.infra.catchingFailures
 import ch.nokillswit.infra.mail.LocalizedText
 import ch.nokillswit.infra.mail.Mailer
 import ch.nokillswit.infra.mail.respondMailUnavailable
@@ -15,7 +16,7 @@ import kotlinx.coroutines.launch
 /**
  * Content of the email-MFA sign-in-code email, rendered in the recipient's language.
  * Hand-rolled rather than reusing passwordEmail because a sign-in code needs no sign-in
- * link — the user is already mid-login. The route passes the recipient's stored language (V18).
+ * link — the user is already mid-login. The route passes the recipient's stored language (V1).
  */
 internal val MFA_EMAIL_SUBJECT: LocalizedText = LocalizedText(
     en = "Covenant: your sign-in code",
@@ -81,18 +82,24 @@ internal suspend fun issueMfaChallenge(
     val app = call.application
     app.launch {
         try {
-            challengeMailer.send(
-                to = user.email,
-                subject = MFA_EMAIL_SUBJECT.of(user.language),
-                body = mfaEmailBody(user.name, challenge.code, codeTtlMinutes, user.language),
+            catchingFailures(
+                {
+                    challengeMailer.send(
+                        to = user.email,
+                        subject = MFA_EMAIL_SUBJECT.of(user.language),
+                        body = mfaEmailBody(user.name, challenge.code, codeTtlMinutes, user.language),
+                    )
+                },
+                { cause ->
+                    challenges.discard(challenge.challengeId)
+                    val errorType = cause.javaClass.simpleName
+                    audit("login.mfa_send_failed", "email" to user.email, "errorType" to errorType)
+                    app.log.error("MFA code email delivery failed ({})", errorType)
+                },
             )
-        } catch (e: CancellationException) {
+        } catch (cause: CancellationException) {
             challenges.discard(challenge.challengeId)
-            throw e
-        } catch (e: Exception) {
-            challenges.discard(challenge.challengeId)
-            audit("login.mfa_send_failed", "email" to user.email, "error" to e.message)
-            app.log.error("MFA code email delivery failed for ${user.email}", e)
+            throw cause
         }
     }
     call.respond(

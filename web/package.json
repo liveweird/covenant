@@ -13,7 +13,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "gen:api": "openapi-typescript ../server/src/main/resources/openapi/documentation.yaml -o src/api/schema.ts"
+    "gen:api": "openapi-typescript ../server/src/main/resources/openapi/documentation.yaml -o src/api/schema.ts",
+    "check:api": "node scripts/check-api.mjs",
+    "lint:api": "node scripts/lint-api.mjs",
+    "test:api": "node --test scripts/lint-api.test.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.1",
@@ -45,6 +48,10 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@stoplight/spectral-core": "1.24.0",
+    "@stoplight/spectral-functions": "1.11.0",
+    "@stoplight/spectral-parsers": "1.0.5",
+    "@stoplight/spectral-rulesets": "1.23.0",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
@@ -54,6 +61,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.0.5",
     "@vitest/coverage-v8": "^5.0.1",
+    "ajv": "8.20.0",
     "eslint": "^10.11.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
@@ -68,6 +76,7 @@
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.70.1",
     "vite": "^8.3.0",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.1",
+    "yaml": "2.9.1"
   }
 }

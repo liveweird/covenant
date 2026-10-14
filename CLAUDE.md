@@ -12,14 +12,14 @@ Gradle wrapper is at `./gradlew` (use `gradlew.bat` on Windows). JDK 21 toolchai
 - Run server tests only: `./gradlew :server:test` (needs a Docker daemon — Testcontainers; with OrbStack and no `/var/run/docker.sock`, export `DOCKER_HOST=unix://$HOME/.orbstack/run/docker.sock` first)
 - Run a single test: `./gradlew :server:test --tests "ch.nokillswit.ServerTest.security headers are set on responses"`
 - Static analysis (detekt, both Kotlin modules): `./gradlew detekt` — rides `check`/`build`, zero-findings gate (no baseline file). Rule tuning lives in `config/detekt/detekt.yml` ONLY, one commented override per deliberate repo idiom; never add an uncommented `@Suppress`.
-- Dependency alignment: `./gradlew :server:checkDependencyAlignment` — one version per aligned family (Netty, OpenTelemetry, kotlin stdlib/reflect, Jackson 2) on the runtime classpath; rides `check`.
+- Dependency alignment: `./gradlew :server:checkDependencyAlignment` — one version per aligned family (Netty, OpenTelemetry, kotlin stdlib/reflect, Jackson 2), plus Reactor BOM constraint parity on the runtime classpath; rides `check`.
 - Package the server for deployment: `./gradlew :server:installDist`. **Never use `:server:buildFatJar`** — the fat JAR breaks Flyway's `ServiceLoader` discovery and NPEs at startup.
 - JVM memory flags are pre-tuned in `server/build.gradle.kts` (`applicationDefaultJvmArgs`) — the rationale is commented in place.
 - **Run the whole stack with one command: `docker compose up --build`** (only Docker required). See "Running the full stack" below.
-- Frontend: `cd web && npm install --legacy-peer-deps`, then `npm run dev|build|lint|test|test:coverage|knip|gen:api` (details in `web/CLAUDE.md`).
+- Frontend: `cd web && npm install --legacy-peer-deps`, then `npm run dev|build|lint|test|test:coverage|knip|gen:api|lint:api|check:api` (details in `web/CLAUDE.md`).
 - Checker sidecar: `cd checker && npm ci`, then `npm run dev|build|lint|knip|typecheck|test|test:coverage` (details in `.claude/docs/checker.md`).
 - E2E: `cd e2e && npm ci && npx playwright install chromium && npm test` (plus `npm run lint`, `npm run knip`, `npm run typecheck` and `npm run check:scenarios`).
-- CI: `.github/workflows/ci.yml` re-runs every gate above on push/PR (server — incl. the OpenAPI coverage gate, a HIGH/CRITICAL Gradle lockfile vulnerability scan, web — incl. the spec → `schema.ts` drift check, checker, e2e statics, image builds on `master`); the blackbox Playwright suite (`e2e.yml`) runs nightly and on demand. Dependabot (`.github/dependabot.yml`) checks every workspace, Actions and container manifests weekly; `.claude/docs/dependencies.md` describes grouping, compatibility pins and runtime verification.
+- CI: `.github/workflows/ci.yml` re-runs every gate above on push/PR (server — incl. the OpenAPI coverage gate, strict Gradle dependency verification and a HIGH/CRITICAL lockfile vulnerability scan, web — incl. API guideline lint and the spec → `schema.ts` drift check, checker, e2e statics, image builds on `master`); the blackbox Playwright suite (`e2e.yml`) runs nightly and on demand. Dependabot (`.github/dependabot.yml`) checks every workspace, Actions and container manifests weekly; `.claude/docs/dependencies.md` describes grouping, compatibility pins and runtime verification.
 
 ## Running the full stack
 

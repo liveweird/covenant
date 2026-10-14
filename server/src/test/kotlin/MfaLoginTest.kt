@@ -14,6 +14,7 @@ import io.ktor.client.request.header
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.log
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import java.net.ServerSocket
@@ -126,7 +127,7 @@ class MfaLoginTest {
             val challenge = client.login(email, "pw-123456789").body<MfaChallengeResponse>()
             val message = mail.awaitEvent { "To: $email" in it.formattedMessage }?.formattedMessage
             assertNotNull(message, "the sign-in code email should have been delivered (log transport)")
-            // The recipient's stored language (V18) drives the whole email.
+            // The recipient's stored language (V1) drives the whole email.
             assertTrue("Twój kod logowania" in message, "the PL code label")
             assertTrue("Covenant: twój kod logowania" in message, "the PL subject")
             val code = Regex("""(?m)^\d{6}$""").find(message)?.value
@@ -274,15 +275,25 @@ class MfaLoginTest {
         val email = uniqueEmail("mfa-delivery-recovery")
         seedMfaUser(email, "pw-123456789")
         val auditEvents = LogCapture("ch.nokillswit.audit")
+        val appEvents = LogCapture(application.log.name)
         try {
             val client = jsonClient()
             assertEquals(HttpStatusCode.OK, client.login(email, "pw-123456789").status)
-            assertNotNull(
+            val auditEvent = assertNotNull(
                 auditEvents.awaitEvent {
                     it.message == "login.mfa_send_failed" && it.hasKeyValue("email", email)
                 },
                 "the closed SMTP port should fail the first delivery",
             )
+            assertTrue(
+                auditEvent.keyValuePairs?.any { it.key == "errorType" && it.value is String } == true,
+                "the audit should retain only the exception type",
+            )
+            assertTrue(auditEvent.keyValuePairs.orEmpty().none { it.key == "error" })
+            val logEvent = assertNotNull(
+                appEvents.events.firstOrNull { it.formattedMessage.startsWith("MFA code email delivery failed (") },
+            )
+            assertTrue(logEvent.throwableProxy == null, "the mail exception must not be attached to the log event")
 
             SmtpSink(port).use { smtp ->
                 assertEquals(
@@ -294,6 +305,7 @@ class MfaLoginTest {
             }
         } finally {
             auditEvents.detach()
+            appEvents.detach()
         }
     }
 

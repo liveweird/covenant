@@ -172,7 +172,7 @@ private fun Route.userCreate(userService: UserService) {
         )
         call.response.header(HttpHeaders.Location, call.application.href(Users.Id(id = id)))
         // Re-read for the response: create() seeds the inverted-default MFA-disabled
-        // row (V13 semantics), which the in-memory `user` object doesn't carry.
+        // row (V5 semantics), which the in-memory `user` object doesn't carry.
         val stored = userService.read(id).orVanished("user", id)
         call.respond(HttpStatusCode.Created, stored.toResponse(id))
     }
@@ -307,7 +307,7 @@ private fun Route.userFeaturesAndLanguage(userService: UserService) {
         }
         call.respond(HttpStatusCode.NoContent)
     }
-    // Per-user language (V18, Lettuce's model verbatim): self or ADMIN — the header
+    // Per-user language (V1, Lettuce's model verbatim): self or ADMIN — the header
     // language switcher is the self-service writer (switching while signed in also
     // saves here); an admin may fix a mis-set language. Idempotent; guard before
     // receive/validate so 403 wins over 400.

@@ -23,7 +23,9 @@ ch.nokillswit
 │                       current + rotation key), configureCrypto (DATA_ENCRYPTION_KEY, the burned-key fail-closed
 │                       check — one check per concern file), EncryptedAtRest + reencryptRows (the boot backfill
 │                       registry in infra/db/Bootstrap.kt). Owners: environments/ (the try-it credentials)
-├── infra/db/           Flyway bootstrap + the R2DBC connection/composition root + the seed
+├── infra/config/       boot-time bounded numeric configuration helpers (requireConfigInt/Long)
+├── infra/Failures.kt   shared cancellation-safe exception handling
+├── infra/db/           Flyway bootstrap + bounded ConnectionPool + the R2DBC composition root + the seed
 │                       bootstrap + SoftDelete.kt (the SoftDeletable table trait — ONE active() predicate, nowMillis(),
 │                       activeCountsBy, requireActive — the checkup removed seven private copies) + …
 │                       bootstrap (admin rotation, prod fail-closed) + Sql.kt (containsNormalized,

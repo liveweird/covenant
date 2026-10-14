@@ -56,12 +56,12 @@ class UserService(private val database: R2dbcDatabase) {
         override val markedAsDeleted = bool("marked_as_deleted").default(false)
         val passwordChangedAt = long("password_changed_at").default(0)
         val credentialRevision = long("credential_revision").default(0)
-        // Per-user language (V18): sign-in UI language + the language of every email sent
+        // Per-user language (V1): sign-in UI language + the language of every email sent
         // to the user. No CHECK — SUPPORTED_LANGUAGES is the whitelist.
         val language = varchar("language", length = 10).default("en")
     }
 
-    // Per-user feature flags (V12) — the DISABLED set; no row = enabled.
+    // Per-user feature flags (V5) — the DISABLED set; no row = enabled.
     object UserDisabledFeatures : Table("user_disabled_features") {
         val userId = reference("user_id", Users)
         val feature = varchar("feature", length = 30)
@@ -82,7 +82,7 @@ class UserService(private val database: R2dbcDatabase) {
         }
         val id = newRecord[Users.id].value
         // MFA is the one inverted-default flag (opt-in): every new user starts with the
-        // disabled row present, mirroring the V13 seed for pre-existing users. All creation
+        // disabled row present, mirroring the V5 seed for pre-existing users. All creation
         // paths (admin create, test seeds) funnel through here.
         UserDisabledFeatures.insert {
             it[UserDisabledFeatures.userId] = id
@@ -122,7 +122,7 @@ class UserService(private val database: R2dbcDatabase) {
     }
 
     /**
-     * Set the per-user language (V18). Returns 1, or 0 when the id is unknown or
+     * Set the per-user language (V1). Returns 1, or 0 when the id is unknown or
      * soft-deleted (the route 404s). Idempotent.
      */
     suspend fun setLanguage(id: UInt, language: String): Int = suspendTransaction(database) {
@@ -150,7 +150,7 @@ class UserService(private val database: R2dbcDatabase) {
         }
 
     /**
-     * Wholesale-replace the user's disabled-feature set (V12). Returns 1, or 0 when the id is
+     * Wholesale-replace the user's disabled-feature set (V5). Returns 1, or 0 when the id is
      * unknown or soft-deleted (the route 404s). Idempotent — a same-set re-PUT is a no-op
      * replace, not a transition.
      */

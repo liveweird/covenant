@@ -15,13 +15,15 @@ buildscript {
         constraints {
             // Ktor's Gradle plugin loads these via its Shadow and Jib integrations during the
             // build. Keep the script classpath above the reviewed advisory floors too.
-            classpath("com.fasterxml.jackson.core:jackson-core:2.22.2")
-            classpath("com.fasterxml.jackson.core:jackson-databind:2.22.2")
+            classpath("com.fasterxml.jackson.core:jackson-core:2.22.3")
+            classpath("com.fasterxml.jackson.core:jackson-databind:2.22.3")
             classpath("com.fasterxml.jackson.core:jackson-annotations:2.22")
-            classpath("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.22.2")
+            classpath("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.22.3")
             classpath("org.apache.logging.log4j:log4j-api:2.25.5")
             classpath("org.apache.logging.log4j:log4j-core:2.25.5")
             classpath("org.codehaus.plexus:plexus-utils:4.0.3")
+            // Ktor requests an open commons-lang3 range. Keep regeneration on the reviewed lock version.
+            classpath("org.apache.commons:commons-lang3") { version { strictly("3.20.0") } }
         }
     }
 }
@@ -68,11 +70,11 @@ kover {
         }
         verify {
             rule {
-                // Line-coverage floor (actual 96.98% on 2026-09-21, measured with the @Serializable
+                // Line-coverage floor (actual 97.26% on 2026-10-14, measured with the @Serializable
                 // exclusion above — the floors were 88/66 before it; re-measure with
                 // `:server:koverXmlReport` and RAISE, never lower).
-                minBound(96)
-                // Branch-coverage floor (actual 77.20%, 2026-09-22). NOTE: `check` runs only
+                minBound(97)
+                // Branch-coverage floor (actual 77.41%, 2026-10-14). NOTE: `check` runs only
                 // koverVerify — run `:server:koverXmlReport` for fresh actuals.
                 minBound(77, coverageUnits = kotlinx.kover.gradle.plugin.dsl.CoverageUnit.BRANCH)
             }
@@ -128,6 +130,9 @@ dependencies {
     implementation(libs.bcrypt)
     implementation(libs.exposed.core)
     implementation(libs.exposed.r2dbc)
+    implementation(libs.r2dbc.pool)
+    implementation(platform(libs.reactor.bom))
+    implementation(libs.reactor.pool)
     implementation(libs.flyway.core)
     implementation(libs.flyway.database.postgresql)
     implementation(libs.logback.classic)
@@ -216,6 +221,35 @@ val checkDependencyAlignment = tasks.register("checkDependencyAlignment") {
     val runtimeClasspath = configurations.runtimeClasspath
     doLast {
         val ids = runtimeClasspath.get().resolvedConfiguration.resolvedArtifacts.map { it.moduleVersion.id }
+        // The Reactor modules are the exception to one-version-per-family (reactor-core, reactor-pool
+        // and reactor-netty legitimately carry different version numbers as ONE release train), so
+        // they are checked against the Reactor BOM's own constraints instead — upstream's pairing
+        // table. Read off the platform node of the resolution graph, so no extra artifact is fetched
+        // and the documented `--write-locks` command records all it needs.
+        val bomCoordinates = "io.projectreactor:reactor-bom"
+        val bomNode = runtimeClasspath.get().incoming.resolutionResult.allComponents.singleOrNull {
+            (it.id as? org.gradle.api.artifacts.component.ModuleComponentIdentifier)
+                ?.let { id -> "${id.group}:${id.module}" == bomCoordinates } == true
+        } ?: error("$bomCoordinates is not on the runtime classpath — is the Reactor check still needed?")
+        val managed = bomNode.dependencies
+            .filter { it.isConstraint }
+            .mapNotNull { it.requested as? org.gradle.api.artifacts.component.ModuleComponentSelector }
+            .associate { "${it.group}:${it.module}" to it.version }
+        val reactorIds = ids.filter { it.group.startsWith("io.projectreactor") }
+        check(reactorIds.isNotEmpty()) { "No io.projectreactor module on the runtime classpath — is the Reactor check still needed?" }
+        val reactorDrift = reactorIds.mapNotNull { id ->
+            when (val declared = managed["${id.group}:${id.name}"]) {
+                null -> "${id.group}:${id.name}:${id.version} is not in reactor-bom"
+                id.version -> null
+                else -> "${id.group}:${id.name} resolved ${id.version}, reactor-bom declares $declared"
+            }
+        }
+        if (reactorDrift.isEmpty()) {
+            logger.lifecycle(
+                "io.projectreactor aligned with reactor-bom ${libs.versions.reactor.bom.get()} (" +
+                    reactorIds.joinToString { "${it.name} ${it.version}" } + ")",
+            )
+        }
         // family label -> (member predicate, version normalizer)
         val families = mapOf(
             "io.netty" to Pair({ g: String, _: String -> g == "io.netty" }, { v: String -> v }),
@@ -244,7 +278,7 @@ val checkDependencyAlignment = tasks.register("checkDependencyAlignment") {
                 "$label: " + versions.entries.joinToString("; ") { (v, names) -> "$v -> ${names.sorted()}" }
             }
         }
-        check(drift.isEmpty()) { "Dependency families must resolve to ONE version each on the runtime classpath — " + drift.joinToString(" | ") }
+        check(drift.isEmpty() && reactorDrift.isEmpty()) { "Dependency families must align, including Reactor BOM constraints — " + (drift + reactorDrift).joinToString(" | ") }
         // Jackson 3 (tools.jackson, a different Java package from com.fasterxml.jackson) rides in
         // through Flyway 13 and coexists with the Jackson 2 line the validators use — the two never
         // share a type. Logged, not failed: what matters is that OUR libraries stay on ONE of them

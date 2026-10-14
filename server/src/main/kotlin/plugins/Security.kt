@@ -2,6 +2,8 @@ package ch.nokillswit.plugins
 
 import ch.nokillswit.auth.TOKEN_TYPE_ACCESS
 import ch.nokillswit.auth.TokenBlocklistServiceKey
+import ch.nokillswit.infra.catchingFailures
+import ch.nokillswit.infra.config.requireConfigLong
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import io.ktor.http.HttpStatusCode
@@ -20,7 +22,11 @@ data class JwtConfig(
     val refreshExpiresInSeconds: Long,
 )
 
+private val BlocklistFailureKey = AttributeKey<Exception>("BlocklistFailure")
+
 val JwtConfigKey = AttributeKey<JwtConfig>("JwtConfig")
+
+private const val MAX_TOKEN_LIFETIME_SECONDS = 365L * 24 * 3600
 
 fun Application.configureSecurity() {
     // Fail closed like the sibling gates (http.exposeOpenApi, http.behindProxy): a missing or
@@ -44,8 +50,18 @@ fun Application.configureSecurity() {
         issuer = environment.config.property("jwt.issuer").getString(),
         audience = environment.config.property("jwt.audience").getString(),
         realm = environment.config.property("jwt.realm").getString(),
-        accessExpiresInSeconds = environment.config.property("jwt.accessExpiresInSeconds").getString().toLong(),
-        refreshExpiresInSeconds = environment.config.property("jwt.refreshExpiresInSeconds").getString().toLong(),
+        accessExpiresInSeconds = requireConfigLong(
+            environment.config,
+            "jwt.accessExpiresInSeconds",
+            min = 1,
+            max = MAX_TOKEN_LIFETIME_SECONDS,
+        ),
+        refreshExpiresInSeconds = requireConfigLong(
+            environment.config,
+            "jwt.refreshExpiresInSeconds",
+            min = 1,
+            max = MAX_TOKEN_LIFETIME_SECONDS,
+        ),
     )
     // Production uses a private 32-byte key encoded as 64 hex characters (the documented
     // `openssl rand -hex 32` format). The structural check cannot prove entropy; operators
@@ -78,15 +94,29 @@ fun Application.configureSecurity() {
                 val audOk = credential.payload.audience.contains(jwtConfig.audience)
                 // Only access tokens authenticate API calls; a refresh token used as a bearer is rejected.
                 val typOk = credential.payload.getClaim("typ").asString() == TOKEN_TYPE_ACCESS
+                // Reject structurally invalid tokens before consulting the database. Besides being
+                // cheaper, this keeps malformed credentials as 401s during a blocklist outage.
+                if (!audOk || !typOk) return@validate null
                 // Every server-minted token carries a jti; one without it could never be
-                // blocklisted, so it is rejected outright rather than skipping the check.
-                val jti = credential.payload.id
-                val revocable = jti != null && !application.attributes[TokenBlocklistServiceKey].isRevoked(jti)
-                if (audOk && typOk && revocable) JWTPrincipal(credential.payload) else null
+                // blocklisted, so reject it before the database lookup too.
+                val jti = credential.payload.id ?: return@validate null
+                val revoked = catchingFailures(
+                    { application.attributes[TokenBlocklistServiceKey].isRevoked(jti) },
+                    { cause ->
+                        attributes.put(BlocklistFailureKey, cause)
+                        return@validate null
+                    },
+                )
+                if (!revoked) JWTPrincipal(credential.payload) else null
             }
             // The challenge runs outside StatusPages, so emit the RFC 7807 body here too.
             challenge { _, _ ->
-                call.respondProblem(HttpStatusCode.Unauthorized, "Missing or invalid bearer token")
+                val failure = call.attributes.getOrNull(BlocklistFailureKey)
+                if (failure == null) {
+                    call.respondProblem(HttpStatusCode.Unauthorized, "Missing or invalid bearer token")
+                } else {
+                    call.respondInternalError(failure)
+                }
             }
         }
     }

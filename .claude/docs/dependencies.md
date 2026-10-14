@@ -14,7 +14,8 @@ Kubernetes image references, and Compose weekly. Ordinary minor/patch updates ar
 workspace. Vitest and its coverage plugins form a separate group so their exact-version peers
 move together. The Gradle bulk group excludes Exposed and the Netty/Reactor/OpenTelemetry
 families: their pins need individual compatibility review before integration. Exclusion from a
-group does not ignore an update or exempt it from review.
+group does not ignore an update or exempt it from review. TypeScript major updates are explicitly
+ignored in all three npm workspaces until the coordinated migration is ready.
 
 Dependabot vulnerability alerts and security update PRs are enabled in the GitHub repository
 settings. These are separate from the version-update configuration. Security updates still need
@@ -42,6 +43,8 @@ used by cached images and local tools. Compare official release metadata, not ju
 - Read the current rationale in `gradle/libs.versions.toml` before moving Exposed,
   Netty/Reactor Netty, or OpenTelemetry. Inspect published BOMs/POMs as well as release notes.
   `:server:checkDependencyAlignment` must pass, but alignment alone does not prove compatibility.
+  Reactor core/pool/Netty carry different versions: the gate checks each against the Reactor BOM
+  constraints, rather than demanding identical version numbers.
 - The checker's AsyncAPI and Spectral packages share a mixed Stoplight type graph. Review their
   peer/transitive requirements and real fixture verdicts before changing the direct type major.
 
@@ -151,3 +154,88 @@ The next CI scan reported CVE-2026-84939 in the root plugin classpath's transiti
 `org.freemarker:freemarker` 2.3.32. A root buildscript constraint selects Apache FreeMarker
 2.3.35, and the regenerated root buildscript lockfile records that version. This is a
 build-time dependency; it is not packaged in the application runtime.
+
+
+## Integrity verification (2026-10-14)
+
+`gradle/verification-metadata.xml` pins SHA-256 checksums of resolved external artifacts and their
+POM/module metadata. Normal builds automatically enforce it; CI and the server Docker build also
+pass `--dependency-verification strict` explicitly. CI requires the verification file and all seven
+lockfiles and rejects a build that changes them. Lockfiles pin versions, verification pins bytes,
+and the existing advisory scan checks known vulnerabilities; all three checks remain necessary.
+No lenient/off mode or broad trusted-artifact exclusions are permitted in ordinary builds.
+The Ktor build plugin requests an open commons-lang3 range, so a strict buildscript constraint
+retains the previously reviewed 3.20.0 while regenerating locks.
+
+To change dependencies, review declarations and regenerate locks with the inventory command
+above. Generate new verification entries from an empty dependency cache: a warm cache can omit
+parent POMs required by clean CI or Docker builds. For example:
+
+```sh
+COVENANT_VERIFY_HOME=$(mktemp -d)
+GRADLE_USER_HOME="$COVENANT_VERIFY_HOME" ./gradlew \
+  :verifySettingsPluginAudit :buildEnvironment :core:buildEnvironment :server:buildEnvironment \
+  :dependencies :core:dependencies :server:dependencies build :server:installDist \
+  --write-verification-metadata sha256 --no-daemon
+```
+
+Review the generated checksum diff and its provenance before accepting it. The initial inventory
+was generated from an empty Gradle home; checksum pinning detects later changes to accepted bytes
+but does not independently authenticate publisher identity. Missing metadata or a mismatch must be
+investigated rather than accepted by rerunning the writer blindly. Validate the accepted file from
+another empty Gradle home with the same commands, replacing the writer flag with
+`--dependency-verification strict`. Include `buildEnvironment` and dependency-inventory tasks so
+plugin graphs and parent/BOM metadata are exercised, as well as actual compilation, tests and packaging.
+The wrapper distribution has its own SHA-256 in `gradle-wrapper.properties`; downloaded JDKs and
+locally produced project artifacts are outside dependency verification.
+
+`cd web && npm run lint:api` uses pinned Spectral libraries to enforce the server and checker
+guideline profiles (plus the conformant fixture);
+`npm run check:api` compares generated API types in memory against committed `schema.ts`.
+These are separate CI gates and do not rewrite a developer's generated file during a check.
+
+The API linter supports the checked-in YAML profile shape and fails closed on unsupported
+inheritance, functions or configuration keys. The library runner avoids the CLI's unused globbing
+and migration dependencies. An optional document path permits focused fixture checks; CI uses
+only the three fixed repository documents. Both CI and image installation disable Scarf analytics.
+
+The web workspace declares Spectral's AJV peer explicitly because its reviewed
+`--legacy-peer-deps` install does not automatically install peers. Knip lists that indirect tooling
+use in `ignoreDependencies`; it is unrelated to the bundled SPA runtime.
+
+
+The 2026-10-14 hardening also refreshed the existing parent-compatible transitive patches for
+brace-expansion, fast-uri, source-map-js and smol-toml in the three npm locks. Full and runtime
+npm audits then reported zero vulnerabilities in each workspace. No existing direct dependency major or
+runtime pin changed; the coordinated migrations in BACKLOG.md remain deferred.
+
+
+Hardening verification: a second empty Gradle home passed strict inventory resolution and a clean
+full build; the final reviewed build passed 560 backend tests, detekt, dependency alignment,
+OpenAPI coverage and the raised 97% line floor (actual 97.26%; branches 77.41%, floor 77%).
+The frontend passed 667 tests and coverage, plus eight API-tooling tests; the checker passed
+55 tests and coverage. Both images built; the app Docker build enforced strict Gradle verification. The rebuilt
+Compose stack passed all 87 Playwright journeys and seven check-only sample documents, and
+its existing PostgreSQL volume was preserved. An isolated production database/container proved
+health/readiness 200 with proxy trust disabled, normal-route 301 redirects, and readiness 503
+with liveness 200 during a database outage. Readiness recovered before those isolated resources
+were removed. Deployment/tag publication is a separate step from this local verification.
+
+
+The final fresh Trivy database also identified nine HIGH inventory findings (five unique advisories)
+plus three MEDIUM and one LOW in the existing Jackson 2.22.2 and lz4-java 1.11.1 artifacts.
+The patched Jackson 2.22.3 BOM and buildscript constraints cover parser/databind denial-of-service
+fixes (CVE-2026-89407, CVE-2026-89425, CVE-2026-91776, CVE-2026-91777); lz4-java 1.11.4 covers
+native-library extraction and compression fixes (CVE-2026-106449 through CVE-2026-106453).
+These are patch updates within the existing Jackson 2 and LZ4 families, with no Jackson 3 migration.
+See the [Jackson core advisory](https://github.com/advisories/GHSA-p6pp-m3f8-5c89),
+[Jackson databind advisory](https://github.com/FasterXML/jackson-databind/security/advisories/GHSA-wv8q-qhhj-9h54)
+and [LZ4 advisory](https://github.com/advisories/GHSA-mcr4-qmvw-px4g).
+
+After these patches, the same fresh Trivy database reported **zero findings across all seven
+Gradle inventories**. The patched backend suite retained all 560 passing tests and the strict
+build accepted the updated checksum file.
+
+The final patched Compose image again passed all 87 Playwright journeys and all seven sample
+checks. Production probe behavior and scoped-outage recovery were rechecked on that image,
+and the isolated verification database/container were removed afterward.

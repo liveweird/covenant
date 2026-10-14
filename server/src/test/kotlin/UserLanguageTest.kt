@@ -16,7 +16,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * The per-user language (V18, Lettuce's V61 model): the dedicated self-or-admin PUT, the
+ * The per-user language (V1, Lettuce's V61 model): the dedicated self-or-admin PUT, the
  * create-time default, and the whole-user PUT's deliberate hands-off. Email rendering in
  * the stored language is pinned by PasswordResetTest/MfaLoginTest; the login response's
  * `language` by LoginTest.
