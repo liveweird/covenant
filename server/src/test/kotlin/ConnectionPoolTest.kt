@@ -149,7 +149,7 @@ class ConnectionPoolTest {
             }
             try {
                 holderStarted.await()
-    
+
                 // ConnectionPool.kt pins defaultMaxAttempts = 1, so Exposed adds no attempts of its own; the pool itself
                 // retries a failed acquire once (r2dbc-pool's acquireRetry = 1, kept on purpose: the same retry
                 // replaces a connection that fails LOCAL validation), so a timed-out acquire surfaces after ~2x
