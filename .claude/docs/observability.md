@@ -5,9 +5,9 @@
 **Audit trail.** Security-relevant events are structured INFO logs on the dedicated `ch.nokillswit.audit` logger with the `AUDIT` marker, emitted via `audit("area.event", "key" to value, …)` (`audit/Audit.kt`) — they ride the same Logback→OTel pipeline, so shipping them to a collector/SIEM is env-only. Fields travel as SLF4J key/values, not in the message text (assert with `hasKeyValue` from `TestEnvironment.kt`). Emitted today:
 
 - `login.success` / `login.failure` (with `reason`: unknown_email/wrong_password) / `login.lockout` (the throttle tripping) / `login.rejected_locked` (an attempt against a locked account) / `login.capacity_rejected` (an unseen identity cannot be admitted into the full throttle); login audits use `email` for ordinary identities and a fixed-size `emailDigest` for oversized submissions,
-- `login.mfa_challenge` (email/userId — correct credentials, second factor pending) / `login.mfa_success` / `login.mfa_failure` (with `reason`: unknown_challenge/expired/wrong_code/too_many_attempts/user_gone/credential_changed) / `login.mfa_unavailable` (MFA enabled on a mail-less deployment → 503) / `login.mfa_capacity_rejected` (the pending challenge store is full → 429, no code sent) / `login.mfa_send_failed` (email/error),
+- `login.mfa_challenge` (email/userId — correct credentials, second factor pending) / `login.mfa_success` / `login.mfa_failure` (with `reason`: unknown_challenge/expired/wrong_code/too_many_attempts/user_gone/credential_changed) / `login.mfa_unavailable` (MFA enabled on a mail-less deployment → 503) / `login.mfa_capacity_rejected` (the pending challenge store is full → 429, no code sent) / `login.mfa_send_failed` (email/errorType),
 - `logout`,
-- `password_reset.requested` / `password_reset.unknown_email` / `password_reset.throttled` / `password_reset.capacity_rejected` (new identity at the full cooldown store, no worker started) / `password_reset.completed` (email/userId) / `password_reset.send_failed` (email/error — the email never left) / `password_reset.store_failed` (email/error — the email WAS delivered but the new hash was not stored, so the recipient holds a password that does not work) — the self-service reset trail; the async worker's events double as test barriers,
+- `password_reset.requested` / `password_reset.unknown_email` / `password_reset.throttled` / `password_reset.capacity_rejected` (new identity at the full cooldown store, no worker started) / `password_reset.completed` (email/userId) / `password_reset.send_failed` (email/errorType — the email never left) / `password_reset.store_failed` (email/errorType — the email WAS delivered but the new hash was not stored, so the recipient holds a password that does not work) — the self-service reset trail; the async worker's events double as test barriers,
 - `refresh.rejected` (with `reason`: invalid_or_expired/wrong_token_type/revoked/malformed/user_gone/credential_changed),
 - `password.changed` (targetUserId/byUserId/selfChange) / `password.change_denied` (wrong or missing current password),
 - `user.features_changed` (byUserId/targetUserId/featuresFrom/featuresTo — only on an actual change),
@@ -57,3 +57,14 @@ actor after successful publication commits; unchanged records emit nothing. Prev
 read-only and unaudited. No property values, descriptions, upstream documents or credentials
 belong in these logs. These operations do not change contract ownership or lifecycle and do
 not append contract product history or follower notifications.
+
+
+**Hardening log policy:** Flyway logs a JDBC target with userinfo, query parameters and semicolon
+parameters removed. Logout parsing/token failures, MFA delivery failures and password-reset failures log only the
+exception type; delivery-failure audit events record `errorType`, never the exception message.
+Generic request-failure logs omit the query string, whose values may contain credentials. Exception text can
+contain token claims, credentials or delivery content and must not become a security audit field.
+The public health/readiness routes run over pod-local HTTP in production as well as behind TLS
+termination. Kubernetes has a startup probe, a 4-second readiness timeout (above the app's
+3-second database budget) and six failed readiness attempts before removing the pod from service.
+Docker's healthcheck requires an actual 200 response instead of accepting a redirect as healthy.

@@ -7,11 +7,14 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # The Ktor catalog is declared in settings.gradle.kts and pinned independently in
+    # settings-gradle.lockfile. Dependabot may refresh project locks without refreshing that
+    # settings lock, so catalog bumps need the full documented --write-locks command before CI.
     groups:
       gradle-minor-patch:
         update-types: [minor, patch]
         # These families carry compatibility pins; review their updates independently.
-        exclude-patterns: ["io.opentelemetry:*", "io.opentelemetry.instrumentation:*", "io.netty:*", "io.projectreactor.netty:*", "org.jetbrains.exposed:*"]
+        exclude-patterns: ["io.opentelemetry:*", "io.opentelemetry.instrumentation:*", "io.netty:*", "io.projectreactor*:*", "org.jetbrains.exposed:*"]
   - package-ecosystem: npm
     directory: /web
     schedule:
@@ -22,6 +25,12 @@ updates:
         exclude-patterns: ["vitest", "@vitest/*"]
       vitest:
         patterns: ["vitest", "@vitest/*"]
+    # TypeScript majors are a coordinated web/checker/E2E migration. In web, openapi-typescript
+    # still relies on compiler APIs and declares a TypeScript 5 peer (TS 6 is the reviewed
+    # --legacy-peer-deps exception).
+    ignore:
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: npm
     directory: /checker
     schedule:
@@ -32,6 +41,9 @@ updates:
         exclude-patterns: ["vitest", "@vitest/*"]
       vitest:
         patterns: ["vitest", "@vitest/*"]
+    ignore:
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: npm
     directory: /e2e
     schedule:
@@ -39,6 +51,9 @@ updates:
     groups:
       e2e-minor-patch:
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:

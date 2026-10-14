@@ -42,8 +42,29 @@ jobs:
           distribution: temurin
           java-version: 21
           cache: gradle
+      - name: Verify dependency-control artifacts exist
+        run: |
+          test -f gradle/verification-metadata.xml
+          test -f gradle.lockfile
+          test -f settings-gradle.lockfile
+          test -f buildscript-gradle.lockfile
+          test -f core/gradle.lockfile
+          test -f core/buildscript-gradle.lockfile
+          test -f server/gradle.lockfile
+          test -f server/buildscript-gradle.lockfile
       # `build` = compile + detekt + test + koverVerify + checkDependencyAlignment (`check`).
-      - run: ./gradlew build --no-daemon --stacktrace
+      - run: ./gradlew build --no-daemon --stacktrace --dependency-verification strict
+      - name: Check dependency-control artifact drift
+        run: |
+          git diff --exit-code -- \
+            gradle/verification-metadata.xml \
+            gradle.lockfile \
+            settings-gradle.lockfile \
+            buildscript-gradle.lockfile \
+            core/gradle.lockfile \
+            core/buildscript-gradle.lockfile \
+            server/gradle.lockfile \
+            server/buildscript-gradle.lockfile
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() }}
         with:
@@ -114,13 +135,12 @@ jobs:
           cache-dependency-path: web/package-lock.json
       # --legacy-peer-deps per web/README.md (openapi-typescript declares TS ^5, the repo uses TS 6).
       - run: npm ci --legacy-peer-deps
-      # The same-commit rule made mechanical: a spec change must land with its regenerated
-      # src/api/schema.ts, or the SPA type-checks against a stale client surface.
-      - name: OpenAPI → schema.ts drift
-        run: |
-          npm run gen:api
-          git diff --exit-code -- src/api/schema.ts \
-            || { echo "::error::web/src/api/schema.ts is stale — run 'cd web && npm run gen:api' and commit the result"; exit 1; }
+      # Enforce the API guidelines and generate types in memory so this gate never edits the
+      # checkout. A spec change must still land with its matching src/api/schema.ts.
+      - name: Check API contracts and generated types
+        run: npm run lint:api && npm run check:api
+      - name: Test API lint gate
+        run: npm run test:api
       - run: npm run lint
       - run: npm run knip
       - run: npm run test:coverage

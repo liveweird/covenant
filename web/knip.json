@@ -3,5 +3,6 @@
   "ignore": [
     "public/color-scheme.js",
     "src/api/schema.ts"
-  ]
+  ],
+  "ignoreDependencies": ["ajv"]
 }

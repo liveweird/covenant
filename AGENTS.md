@@ -75,7 +75,7 @@ This is a Kotlin/Gradle backend plus three standalone npm workspaces:
   normalized view models, and `contracts/infer` derives draft documents from samples. Copy `contracts/` for a full feature with ownership and sub-collections;
   see `CLAUDE.md` "Package layout" for the detailed map. Cross-cutting wiring and policy live
   in `plugins/`, `audit/`, and `authz/`; database, mail, encryption at rest (`infra/crypto`),
-  paging, and shared validation infrastructure live in `infra/`.
+  paging, and shared validation infrastructure live in `infra/`; `infra/config` validates numeric startup settings and `infra/Failures.kt` preserves cancellation.
 - `toadie/` under the server feature packages owns ADMIN-curated encrypted connections,
   contract-to-Port API/dataset links, bounded GraphQL reads and refresh, and cached provider/consumer
   projections. Toadie 2.12+ revisions guard every scan with one bounded restart; scheduled
@@ -90,8 +90,8 @@ This is a Kotlin/Gradle backend plus three standalone npm workspaces:
   `main.kt` only starts `EngineMain`; do not wire features from it. Module order matters because
   modules publish and consume Ktor application attributes.
 - PostgreSQL is the only database. Flyway migrations under
-  `server/src/main/resources/db/migration/` are the schema source of truth; Exposed over R2DBC is
-  used for runtime queries. Never introduce runtime DDL such as `SchemaUtils.create`, and never
+  `server/src/main/resources/db/migration/` are the schema source of truth; Exposed over a bounded R2DBC pool is
+  used for runtime queries (see `.claude/docs/persistence.md` for sizing and acquire budgets). Never introduce runtime DDL such as `SchemaUtils.create`, and never
   edit an applied migration, including its comments: Flyway checksums are pinned by
   `MigrationChecksumTest`; add a new migration instead.
 - `server/src/main/resources/openapi/documentation.yaml` is the hand-maintained API contract.
@@ -132,6 +132,7 @@ registered in `application.yaml`. `plugins/Routing.kt` is only the final SPA/sta
 - `cd web && npm run dev`: start Vite on port 5175, proxying `/api` to Ktor on :8082.
 - `cd web && npm run build && npm run lint && npm test`: type-check, bundle, lint, and run Vitest.
 - `cd web && npm run test:coverage`: run frontend coverage gates. `npm run knip`: dead-code gate.
+- `cd web && npm run lint:api && npm run check:api && npm run test:api`: lint both API guideline profiles, verify type parity without writes, and test the lint gate.
 - `cd web && npm run gen:api`: regenerate `web/src/api/schema.ts` from the OpenAPI contract.
 - `cd checker && npm ci && npm run lint && npm run knip && npm run typecheck && npm run test:coverage && npm run build`:
   the checker's gates; `npm run dev` runs it on :9090.
@@ -139,7 +140,7 @@ registered in `application.yaml`. `plugins/Routing.kt` is only the final SPA/sta
   against the full stack on port 8082. `npm run lint`, `npm run knip`, `npm run typecheck`, and
   `npm run check:scenarios`, and `npm run test:setup` are the Docker-free gates.
   Setup reuses or starts the default stack and leaves services and volumes intact.
-- `.github/workflows/ci.yml` runs the server, Gradle lockfile vulnerability scan, web, checker, sample-loader, and e2e-static gates on pushes to
+- `.github/workflows/ci.yml` runs the server, strict Gradle dependency integrity and lockfile vulnerability scan, web, checker, sample-loader, and e2e-static gates on pushes to
   `master` and on pull requests
   (including server OpenAPI coverage and frontend spec → `schema.ts` drift, and builds both
   images on `master`); `e2e.yml` runs the blackbox suite nightly against `master` and on demand.

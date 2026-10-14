@@ -17,6 +17,24 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "1.2.6",
+    date: "2026-10-14",
+    en: `**More reliable sessions and production health checks.**
+
+- Database connection limits protect the service during bursts of activity. Temporary authentication database failures report a server error instead of expiring your session.
+- Hardened client-IP handling behind proxies and improved production startup and health checks.
+- Removed sensitive exception details from authentication logs and added startup validation for authentication settings.
+- Added dependency integrity verification and automated API guideline checks to the build.
+- Updated vulnerable document-parsing and message-compression dependencies.`,
+    pl: `**Niezawodniejsze sesje i sprawdzanie stanu w produkcji.**
+
+- Limity połączeń z bazą danych chronią usługę podczas wzmożonej aktywności. Przejściowe awarie bazy uwierzytelniania zgłaszają błąd serwera zamiast wygaszać sesję.
+- Wzmocniono obsługę adresów IP klientów za proxy oraz sprawdzanie uruchomienia i stanu aplikacji w produkcji.
+- Usunięto poufne szczegóły wyjątków z logów uwierzytelniania i dodano walidację ustawień uwierzytelniania przy uruchomieniu.
+- Dodano weryfikację integralności zależności i automatyczne sprawdzanie wytycznych API podczas budowania.
+- Zaktualizowano podatne zależności parsowania dokumentów i kompresji wiadomości.`,
+  },
+  {
     version: "1.2.5",
     date: "2026-09-24",
     en: `**Dependency and container security updates.**

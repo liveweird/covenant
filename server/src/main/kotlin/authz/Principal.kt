@@ -11,7 +11,7 @@ data class CallerPrincipal(
     val email: String,
     /** Additional roles — every caller is implicitly a regular user; empty = no extra privileges. */
     val roles: Set<UserRole>,
-    /** Per-user feature flags (V12) — the DISABLED set; empty = full access. */
+    /** Per-user feature flags (V5) — the DISABLED set; empty = full access. */
     val disabledFeatures: Set<Feature> = emptySet(),
 )
 
@@ -28,7 +28,7 @@ fun ApplicationCall.caller(): CallerPrincipal {
         runCatching { UserRole.valueOf(name) }
             .getOrElse { throw UnauthorizedException("Unknown role $name") }
     }.toSet()
-    // Missing claim = token minted before feature flags (V12) → empty set (all enabled).
+    // Missing claim = token minted before feature flags (V5) → empty set (all enabled).
     // Deliberately permissive, unlike the required roles claim: outstanding tokens must stay
     // valid across the deploy. A present-but-unknown value is still a forged/foreign token → 401.
     val featureNames = principal.payload.getClaim("disabledFeatures").asList(String::class.java)

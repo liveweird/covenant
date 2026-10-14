@@ -12,13 +12,14 @@ given; otherwise `server/src/main/resources/openapi/documentation.yaml`.
 ## Pass 1 — mechanical (Spectral)
 
 ```sh
-npx --yes @stoplight/spectral-cli lint <target-spec> \
-  --ruleset api-guidelines/api-guidelines.spectral.yaml
+cd web && npm run lint:api && npm run check:api
 ```
 
-For `checker/openapi.yaml`, use `--ruleset api-guidelines/checker.spectral.yaml` instead.
-This records the internal sidecar's deliberate unversioned-path exception without suppressing
-any other rule.
+This checks Covenant's server, checker and conformant fixture using pinned Spectral libraries.
+The checker profile records the internal sidecar's deliberate unversioned-path exception.
+For an arbitrary public API document, run `cd web && npm run lint:api -- /absolute/path/spec.yaml`.
+The programmatic runner rejects unsupported ruleset inheritance, keys and functions; extend it
+explicitly when changing the profile format.
 
 Interpret by severity (the model is documented in `api-guidelines/README.md`):
 

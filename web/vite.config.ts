@@ -59,6 +59,8 @@ export default defineConfig({
     },
   },
   test: {
+    // Node's API-tooling tests have their own test:api gate and do not use happy-dom/Vitest.
+    include: ["src/**/*.test.{ts,tsx}"],
     globals: true,
     environment: 'happy-dom',
     setupFiles: ['./src/test/setup.ts'],

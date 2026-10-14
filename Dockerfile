@@ -4,6 +4,8 @@
 FROM node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS web
 RUN apk add --no-cache git
 WORKDIR /web
+# Spectral's transitive install analytics are disabled in every build environment.
+ENV SCARF_ANALYTICS=false
 # Install deps first for layer caching. --legacy-peer-deps per web/ README
 # (openapi-typescript declares TS ^5 while the scaffold uses TS 6).
 COPY web/package.json web/package-lock.json ./
@@ -33,7 +35,7 @@ COPY server/src/ server/src/
 # installDist keeps every dependency as its own JAR, so Flyway's ServiceLoader
 # plugin discovery works exactly as under `:server:run` (a fat JAR collapses the
 # duplicate META-INF/services descriptors and breaks Flyway at startup).
-RUN ./gradlew :server:installDist --no-daemon
+RUN ./gradlew :server:installDist --no-daemon --dependency-verification strict
 
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────
 # Same major as the toolchain (jvmToolchain(21)) and the test JVM — what is tested is what runs.
@@ -66,6 +68,10 @@ RUN groupadd --system --gid 10001 covenant \
 USER 10001
 EXPOSE 8082
 # /api/v1/health is the liveness probe (process up); /api/v1/ready adds the database round trip.
+# Production excludes these two public, status-only probe routes from HTTPS redirect, so this
+# reaches the actual handler even with the image default HTTP_BEHIND_PROXY=false. Keep the
+# canonical proxy header aligned with the Kubernetes probe contract; it is trusted only when a
+# deployment explicitly enables proxy handling.
 HEALTHCHECK --interval=15s --timeout=3s --start-period=45s --retries=3 \
-    CMD curl -fsS http://127.0.0.1:8082/api/v1/health >/dev/null || exit 1
+    CMD test "$(curl -fsS -o /dev/null -w '%{http_code}' -H 'X-Forwarded-Proto: https' http://127.0.0.1:8082/api/v1/health)" = 200 || exit 1
 ENTRYPOINT ["/app/bin/server"]

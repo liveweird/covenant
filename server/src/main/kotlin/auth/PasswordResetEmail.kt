@@ -12,7 +12,7 @@ import kotlinx.coroutines.CancellationException
 /**
  * Content of the password-reset email, rendered in the recipient's language. Thin wrapper
  * over the shared scaffold (infra/mail/PasswordEmail.kt) — only the intro copy, the password
- * label, and the subject live here. The route passes the recipient's stored language (V18).
+ * label, and the subject live here. The route passes the recipient's stored language (V1).
  */
 internal val PASSWORD_RESET_EMAIL_SUBJECT: LocalizedText = LocalizedText(
     en = "Your new Covenant password",
@@ -49,7 +49,7 @@ internal fun passwordResetEmailBody(name: String, password: String, appUrl: Stri
  * generate, send-before-store, and the completion/failure audits. Launched fire-and-forget
  * by the handler. Soft-deleted accounts are unknown here by construction —
  * findWithIdByEmail filters active rows. The email renders in the recipient's stored
- * language (V18; see infra/mail/LocalizedText.kt).
+ * language (V1; see infra/mail/LocalizedText.kt).
  */
 internal suspend fun processPasswordReset(
     app: Application,
@@ -85,8 +85,8 @@ internal suspend fun processPasswordReset(
         audit(
             if (delivered) "password_reset.store_failed" else "password_reset.send_failed",
             "email" to email,
-            "error" to e.message,
+            "errorType" to e.javaClass.simpleName,
         )
-        app.log.error("Password reset failed for $email (delivered=$delivered)", e)
+        app.log.error("Password reset failed (delivered={}, errorType={})", delivered, e.javaClass.simpleName)
     }
 }

@@ -1,9 +1,12 @@
 package ch.nokillswit.plugins
 
+import ch.nokillswit.infra.config.requireConfigInt
 import io.ktor.server.application.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.server.plugins.cachingheaders.*
+import io.ktor.server.plugins.mutableOriginConnectionPoint
+import io.ktor.server.request.path
 import io.ktor.server.response.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.compression.*
@@ -64,7 +67,27 @@ fun Application.configureHttp() {
     // (rate-limit buckets) and scheme (HTTPS redirect) are the real client's, not the proxy's.
     // Off by default: honoring these headers from direct clients would let them spoof both.
     if (environment.config.propertyOrNull("http.behindProxy")?.getString()?.toBoolean() == true) {
-        install(XForwardedHeaders)
+        val proxyHops = requireConfigInt(environment.config, "http.proxyHops", min = 1)
+        // A proxy may append its own X-Forwarded-For line instead of merging it with one the
+        // client sent. Ktor reads only the first physical line, so fold all lines before choosing
+        // the trusted hop from the end of the chain.
+        intercept(ApplicationCallPipeline.Setup) {
+            resolveForwardedForOrigin(call, proxyHops)
+        }
+        install(XForwardedHeaders) {
+            // Trust only the canonical headers the proxy contract overwrites. Ktor's aliases may
+            // otherwise pass through from an untrusted client.
+            hostHeaders.clear()
+            hostHeaders.add(HttpHeaders.XForwardedHost)
+            protoHeaders.clear()
+            protoHeaders.add(HttpHeaders.XForwardedProto)
+            httpsFlagHeaders.clear()
+            // The redirect uses its configured HTTPS port. Ignoring forwarded ports also avoids
+            // Ktor throwing on a client-supplied non-numeric value.
+            portHeaders.clear()
+            // Resolved above after folding every physical header line.
+            forHeaders.clear()
+        }
     }
     install(Compression)
     install(DefaultHeaders)
@@ -77,6 +100,11 @@ fun Application.configureHttp() {
             sslPort = 443
             // 301 Moved Permanently, or 302 Found redirect.
             permanentRedirect = true
+            // Probes are deliberately public and status-only. Let direct loopback/container
+            // checks reach the actual handlers even when no trusted proxy is configured.
+            exclude { call ->
+                call.request.path() == "/api/v1/health" || call.request.path() == "/api/v1/ready"
+            }
         }
     }
     // Swagger UI + the full spec are an API roadmap for anyone who can reach the host, so they
@@ -92,4 +120,24 @@ fun Application.configureHttp() {
             swaggerUI(path = "openapi")
         }
     }
+}
+
+/**
+ * Fold every physical X-Forwarded-For line and select the hop reported immediately before the
+ * configured number of trusted proxies. If the chain is shorter than configured, use its last
+ * value, matching Ktor's safe fallback rather than indexing outside the list.
+ */
+private fun resolveForwardedForOrigin(call: ApplicationCall, proxyHops: Int) {
+    val hops = call.request.headers.getAll(HttpHeaders.XForwardedFor)
+        ?.flatMap { it.split(',') }
+        ?.map { it.trim() }
+        ?.filter { it.isNotEmpty() }
+        ?.takeIf { it.isNotEmpty() }
+        ?: return
+    val chosen = hops.getOrNull(hops.size - proxyHops) ?: hops.last()
+    val origin = call.mutableOriginConnectionPoint
+    origin.remoteHost = chosen
+    // Match Ktor's distinction between a hostname and an address. The helper used by Ktor is
+    // internal, so retain the same observable rule here.
+    if (chosen.contains(':') || chosen.none { it.isLetter() }) origin.remoteAddress = chosen
 }

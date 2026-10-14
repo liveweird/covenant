@@ -162,13 +162,13 @@ automated updates, and runtime verification.
 |---|---|---|
 | `KTOR_DEVELOPMENT` | `true` | Development mode (`true`) vs production mode — HSTS/HTTPS redirect and the fail-closed startup checks. The image ships `false`. |
 | `LOGIN_LOCKOUT_THRESHOLD` | `5` | Consecutive failures per account before `/login` answers 429. |
-| `LOGIN_LOCKOUT_DURATION_SECONDS` | `900` | How long a locked account stays locked. |
+| `LOGIN_LOCKOUT_DURATION_SECONDS` | `900` | How long a locked account stays locked (1 second–30 days). |
 | `LOGIN_LOCKOUT_MAX_TRACKED` | `10000` | Maximum in-memory login identities; new identities receive 429 at capacity while active counters and locks remain. |
 | `LOGIN_RATE_LIMIT_PER_MINUTE` | *(blank)* | Per-IP login bucket; blank follows the mode (10 prod / 1000 dev). |
 | `REFRESH_RATE_LIMIT_PER_MINUTE` | *(blank)* | Per-IP refresh bucket (blank = 30). |
 | `PASSWORD_RESET_RATE_LIMIT_PER_MINUTE` | *(blank)* | Per-IP reset bucket; blank follows the mode (5 prod / 100 dev). |
 | `TRY_RATE_LIMIT_PER_MINUTE` | *(blank)* | Per-IP bucket shared by the four try-it POSTs (blank = 60). |
-| `PASSWORD_RESET_MIN_INTERVAL_SECONDS` | `60` | One reset request per submitted email per interval. |
+| `PASSWORD_RESET_MIN_INTERVAL_SECONDS` | `60` | One reset request per submitted email per interval (1 second–30 days). |
 | `PASSWORD_RESET_MAX_TRACKED` | `10000` | Maximum in-memory reset cooldowns; new identities receive 429 at capacity. |
 | `MFA_CODE_TTL_SECONDS` | `300` | Lifetime of an emailed MFA code. |
 | `MFA_MAX_ATTEMPTS` | `5` | Wrong-code attempts before a challenge dies. |
@@ -180,10 +180,11 @@ automated updates, and runtime verification.
 | `JWT_ISSUER` | `http://0.0.0.0:8082/` | The `iss` claim the verifier requires. |
 | `JWT_AUDIENCE` | `covenant-api` | The `aud` claim the verifier requires. |
 | `JWT_REALM` | `covenant-api` | The `WWW-Authenticate` realm. |
-| `JWT_ACCESS_EXPIRES_IN_SECONDS` | `900` | Access-token lifetime (the API bearer). |
-| `JWT_REFRESH_EXPIRES_IN_SECONDS` | `3600` | Refresh-token lifetime — the idle-session window. |
+| `JWT_ACCESS_EXPIRES_IN_SECONDS` | `900` | Access-token lifetime (the API bearer), 1 second–1 year. |
+| `JWT_REFRESH_EXPIRES_IN_SECONDS` | `3600` | Refresh-token lifetime — the idle-session window, 1 second–1 year. |
 | `ADMIN_INITIAL_PASSWORD` | *(blank)* | Rotates the V3 seed admin's `changeme` at startup while it still carries the seed hash; production rejects known placeholders and passwords outside the ordinary account limits. |
-| `HTTP_BEHIND_PROXY` | `false` | Honour `X-Forwarded-*` from a TLS-terminating proxy (rate-limit keys, HTTPS redirect). |
+| `HTTP_BEHIND_PROXY` | `false` | Trust canonical forwarded headers from a restricted TLS-terminating proxy. |
+| `HTTP_PROXY_HOPS` | `1` | Trusted proxy hop count for client-IP selection, from the right across all forwarding header lines. Must be positive. |
 | `CORS_ALLOWED_HOSTS` | *(blank)* | Comma-separated cross-origin hosts; blank = CORS not installed. |
 | `HTTP_EXPOSE_OPENAPI` | *(blank)* | Serve Swagger UI + the spec at `/openapi`; blank follows the mode. |
 | `CHECKER_URL` | *(blank)* | The lint/semantic checker sidecar; blank = off (every check carries `CHECKER_UNAVAILABLE`). |
@@ -203,6 +204,10 @@ automated updates, and runtime verification.
 | `POSTGRES_R2DBC_URL` | `r2dbc:postgresql://localhost:5434/covenant` | The runtime R2DBC URL. |
 | `POSTGRES_USER` | `covenant` | Database user. |
 | `POSTGRES_PASSWORD` | `covenant` | Database password. |
+| `POSTGRES_POOL_MAX_SIZE` | `20` | Maximum application R2DBC connections per instance (1–1000); leave database capacity for other clients. |
+| `POSTGRES_POOL_INITIAL_SIZE` | `2` | Initial pool size (0–max size). |
+| `POSTGRES_POOL_MAX_ACQUIRE_SECONDS` | `10` | Acquire interval (1–600 seconds); the pool retries once, giving at most twice this wait under saturation. |
+| `POSTGRES_POOL_MAX_IDLE_SECONDS` | `600` | Idle recycling interval (1–86400 seconds). |
 
 ## Useful Gradle tasks
 

@@ -250,3 +250,12 @@ untrusted links. Generation, plan-update and cache-observation timestamps are se
 instants. Include missing/stale/unavailable warnings and always state contract-level usage,
 unknown runtime version/line adoption and the limits of an empty observation. A failed read produces an
 inline error and no partial file; downloading never confirms retirement or modifies a policy.
+
+
+## API quality gates
+
+`npm run lint:api` checks the public server contract and the internal checker contract against their
+repository Spectral profiles. `npm run check:api` generates the server API types in memory and
+compares them with the committed `src/api/schema.ts`; it never changes that file. Run `gen:api`
+explicitly when a reviewed specification change requires regeneration. `npm run test:api` runs the adapter's fail-closed Node regressions separately from Vitest. CI runs all three before
+the usual lint/test/build gates.

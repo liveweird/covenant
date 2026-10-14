@@ -4,6 +4,10 @@ import ch.nokillswit.auth.LoginRequest
 import ch.nokillswit.auth.LoginResponse
 import ch.nokillswit.auth.PasswordResetRequest
 import ch.nokillswit.auth.RefreshRequest
+import ch.nokillswit.auth.processPasswordReset
+import ch.nokillswit.infra.mail.Mailer
+import ch.nokillswit.users.UserServiceKey
+import io.ktor.server.application.log
 import io.ktor.client.call.body
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -27,6 +31,41 @@ import kotlin.test.assertTrue
 class PasswordResetTest {
 
     @Test
+    fun `delivery exception messages never reach logs or audit fields`() = testApplication {
+        usePostgresTestcontainer()
+        val email = uniqueEmail("reset-sensitive-error")
+        TestUsers.seed(email = email, password = "old-password-123")
+        val marker = "smtp-secret-${java.util.UUID.randomUUID()}"
+        val logs = LogCapture(application.log.name)
+        val auditEvents = LogCapture("ch.nokillswit.audit")
+        try {
+            processPasswordReset(
+                application,
+                application.attributes[UserServiceKey],
+                object : Mailer {
+                    override suspend fun send(to: String, subject: String, body: String) {
+                        error(marker)
+                    }
+                },
+                null,
+                email,
+            )
+            val event = auditEvents.events.firstOrNull { it.message == "password_reset.send_failed" }
+            assertNotNull(event)
+            assertTrue(event.hasKeyValue("errorType", "IllegalStateException"))
+            assertFalse(event.hasKeyValue("error", marker))
+            val failure = logs.events.firstOrNull { it.formattedMessage.startsWith("Password reset failed") }
+            assertNotNull(failure)
+            assertNull(failure.throwableProxy)
+            assertFalse(logs.events.any { marker in it.formattedMessage })
+            assertEquals(HttpStatusCode.OK, jsonClient().login(email, "old-password-123").status)
+        } finally {
+            logs.detach()
+            auditEvents.detach()
+        }
+    }
+
+    @Test
     fun `a Polish-language account gets the Polish reset email`() = testApplication {
         usePostgresTestcontainer()
         val email = uniqueEmail("reset-pl")
@@ -47,7 +86,7 @@ class PasswordResetTest {
             )
             val message = mail.awaitEvent { "To: $email" in it.formattedMessage }?.formattedMessage
             assertNotNull(message, "the reset email should have been delivered (log transport)")
-            // The recipient's stored language (V18) drives the whole email.
+            // The recipient's stored language (V1) drives the whole email.
             assertTrue("Cześć Reset Polka," in message, "the PL greeting")
             assertTrue("Nowe hasło" in message, "the PL password label")
             assertTrue("Twoje nowe hasło Covenant" in message, "the PL subject")
