@@ -1,6 +1,6 @@
 # Product backlog
 
-Updated 2026-09-24. This file tracks outstanding work only; implemented behavior and
+Updated 2026-10-17. This file tracks outstanding work only; implemented behavior and
 release history belong in [README.md](README.md), the
 [application changelog](web/src/changelog/entries.ts), and the topic guides under
 `.claude/docs/`. Entries are proposals, not delivery commitments.
@@ -19,6 +19,20 @@ release history belong in [README.md](README.md), the
   design can check a candidate against a selected contract/major line, return machine-readable
   validation and compatibility results, and provide a small CLI/workflow example with scoped
   automation credentials. Publication remains explicit.
+
+- [new] **Gradle verification metadata pruning.** `--write-verification-metadata` only adds
+  entries, never removes them, so `gradle/verification-metadata.xml` grew from 624 components
+  when strict verification landed on 2026-10-14 to 725 across four bump rounds on 2026-10-17.
+  153 of its 491 distinct modules now carry more than one version, 234 entries beyond the
+  first. Roughly 108 of those extras are POM-only parent/BOM metadata that the resolution graph
+  legitimately references at several versions (`commons-parent` at twelve, `junit-bom` at
+  twelve), so deduplication is not a valid prune; the remaining ~126 carry a real JAR and are
+  largely dead (`kotlin-stdlib` at five versions, only two of them live). Stale checksums are
+  inert, since verification consults only the entries a build actually resolves, so this is
+  housekeeping rather than a defect. Decide whether to prune periodically by regenerating from
+  an empty Gradle home and reviewing the resulting diff for provenance — which
+  [dependency maintenance](.claude/docs/dependencies.md) requires be done deliberately, not by
+  rerunning the writer blindly.
 
 ## Dependency migrations to revisit
 
