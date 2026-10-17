@@ -34,6 +34,17 @@ release history belong in [README.md](README.md), the
   [dependency maintenance](.claude/docs/dependencies.md) requires be done deliberately, not by
   rerunning the writer blindly.
 
+- [new] **Tier-D registry abstraction.** The 0.5.1 checkup deferred collapsing the shape the
+  curated registries share. `DomainService` (128 lines), `SystemService` (157), `TeamService`
+  (246) and `EnvironmentService` (198) are four independent implementations of the same five
+  methods — `list(filter, paging)`, `read`, `create`, `update`, `delete` — each repeating soft
+  delete and count-plus-rows paging, with name-conflict handling in three of the four; their
+  route files repeat the shape across another 426 lines, and there is no shared base. Weigh
+  against the deliberate convention before acting: CLAUDE.md's feature template tells a new
+  registry to copy `teams/`, so this duplication is currently the documented idiom and an
+  abstraction would replace it. Teams' membership sub-collection and Environments'
+  `resolveTarget` fall outside the common shape and would stay bespoke either way.
+
 ## Dependency migrations to revisit
 
 The 2026-09-22 dependency triage deferred these coordinated major updates. Recheck upstream
