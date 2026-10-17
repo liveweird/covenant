@@ -44,7 +44,10 @@ used by cached images and local tools. Compare official release metadata, not ju
   Netty/Reactor Netty, or OpenTelemetry. Inspect published BOMs/POMs as well as release notes.
   `:server:checkDependencyAlignment` must pass, but alignment alone does not prove compatibility.
   Reactor core/pool/Netty carry different versions: the gate checks each against the Reactor BOM
-  constraints, rather than demanding identical version numbers.
+  constraints, rather than demanding identical version numbers. The gate also fails when the
+  resolved `io.netty` version differs from the one reactor-netty declares in its own pom, so
+  lifting `netty` ahead of the reactor-netty line is caught rather than merely discouraged — a
+  single Netty version across the classpath is necessary but not sufficient.
 - The checker's AsyncAPI and Spectral packages share a mixed Stoplight type graph. Review their
   peer/transitive requirements and real fixture verdicts before changing the direct type major.
 

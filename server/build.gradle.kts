@@ -278,7 +278,41 @@ val checkDependencyAlignment = tasks.register("checkDependencyAlignment") {
                 "$label: " + versions.entries.joinToString("; ") { (v, names) -> "$v -> ${names.sorted()}" }
             }
         }
-        check(drift.isEmpty() && reactorDrift.isEmpty()) { "Dependency families must align, including Reactor BOM constraints — " + (drift + reactorDrift).joinToString(" | ") }
+        // One Netty version is necessary but NOT sufficient: netty-bom pins EVERY io.netty module,
+        // reactor-netty's included, so lifting `netty` alone silently runs reactor-netty against a
+        // Netty it was never built on — single-version and therefore invisible to the family check
+        // above. The catalog's `netty` note calls for keeping the two in step; this enforces it.
+        // reactor-netty's pom requests are already on the graph, so no extra artifact is fetched.
+        val reactorNettyNodes = runtimeClasspath.get().incoming.resolutionResult.allComponents.filter {
+            (it.id as? org.gradle.api.artifacts.component.ModuleComponentIdentifier)?.group == "io.projectreactor.netty"
+        }
+        check(reactorNettyNodes.isNotEmpty()) { "No io.projectreactor.netty module on the runtime classpath — is the in-step check still needed?" }
+        val declaredNetty = reactorNettyNodes
+            .flatMap { it.dependencies }
+            .filterNot { it.isConstraint }
+            .mapNotNull { it.requested as? org.gradle.api.artifacts.component.ModuleComponentSelector }
+            .filter { it.group == "io.netty" }
+            .map { it.version }
+            .toSortedSet()
+        check(declaredNetty.isNotEmpty()) { "reactor-netty declares no io.netty dependency — has its packaging changed?" }
+        val resolvedNetty = ids.filter { it.group == "io.netty" }.map { it.version }.toSortedSet()
+        // A multi-version io.netty is already the family check's finding — do not report it twice.
+        val nettyInStep = when {
+            resolvedNetty.size != 1 -> emptyList()
+            declaredNetty.size > 1 ->
+                listOf("reactor-netty declares io.netty at ${declaredNetty.joinToString()} — expected one version")
+            resolvedNetty.single() != declaredNetty.single() -> listOf(
+                "io.netty resolved ${resolvedNetty.single()} but " +
+                    reactorNettyNodes.joinToString { "${it.id}" } +
+                    " was built on ${declaredNetty.single()} — keep `netty` in step with the reactor-netty line",
+            )
+            else -> {
+                logger.lifecycle("io.netty in step with reactor-netty's declared ${declaredNetty.single()}")
+                emptyList()
+            }
+        }
+        val failures = drift + reactorDrift + nettyInStep
+        check(failures.isEmpty()) { "Dependency families must align, including Reactor BOM constraints — " + failures.joinToString(" | ") }
         // Jackson 3 (tools.jackson, a different Java package from com.fasterxml.jackson) rides in
         // through Flyway 13 and coexists with the Jackson 2 line the validators use — the two never
         // share a type. Logged, not failed: what matters is that OUR libraries stay on ONE of them
