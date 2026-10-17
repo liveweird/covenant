@@ -36,7 +36,7 @@ testcontainers = "2.0.5"
 # The try-it Kafka leg (contracts/tryit/KafkaTry.kt): the KRaft-era client — no Jackson, Netty or
 # OpenTelemetry on its transitive set (only slf4j + the zstd/lz4/snappy codecs, KEPT so a read of a
 # compressed topic decompresses); checkDependencyAlignment logs the runtime classpath after a bump.
-kafka-clients = "4.3.1"
+kafka-clients = "4.4.0"
 # Runtime security floors (Trivy scans, 2026-09-24 and 2026-10-14). These remain transitive implementation
 # details of r2dbc-postgresql, Kafka and openapi-diff; server constraints select the first fixed
 # releases without forcing coordinated upgrades of those direct dependencies.
@@ -83,7 +83,7 @@ opentelemetry-logbackAppender = { module = "io.opentelemetry.instrumentation:ope
 opentelemetry-ktorInstrumentation = { module = "io.opentelemetry.instrumentation:opentelemetry-ktor-3.0", version.ref = "opentelemetry-ktor" }
 opentelemetry-sdkAutoconfigure = { module = "io.opentelemetry:opentelemetry-sdk-extension-autoconfigure", version.ref = "opentelemetry" }
 opentelemetry-semconv = { module = "io.opentelemetry.semconv:opentelemetry-semconv", version.ref = "opentelemetry-semconv" }
-postgresql = { module = "org.postgresql:postgresql", version = "42.7.13" }
+postgresql = { module = "org.postgresql:postgresql", version = "42.7.14" }
 netty-bom = { module = "io.netty:netty-bom", version.ref = "netty" }
 r2dbc-postgresql = { module = "org.postgresql:r2dbc-postgresql", version.ref = "r2dbc-postgresql" }
 reactor-netty-core = { module = "io.projectreactor.netty:reactor-netty-core" }
