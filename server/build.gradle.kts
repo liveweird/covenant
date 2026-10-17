@@ -19,9 +19,9 @@ buildscript {
             classpath("com.fasterxml.jackson.core:jackson-databind:2.22.3")
             classpath("com.fasterxml.jackson.core:jackson-annotations:2.22")
             classpath("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.22.3")
-            classpath("org.apache.logging.log4j:log4j-api:2.25.5")
-            classpath("org.apache.logging.log4j:log4j-core:2.25.5")
-            classpath("org.codehaus.plexus:plexus-utils:4.0.3")
+            classpath("org.apache.logging.log4j:log4j-api:2.26.1")
+            classpath("org.apache.logging.log4j:log4j-core:2.26.1")
+            classpath("org.codehaus.plexus:plexus-utils:4.1.0")
             // Ktor requests an open commons-lang3 range. Keep regeneration on the reviewed lock version.
             classpath("org.apache.commons:commons-lang3") { version { strictly("3.20.0") } }
         }
