@@ -1,7 +1,6 @@
 # This is a Gradle generated file for dependency locking.
 # Manual edits can break the build and are not advised.
 # This file is expected to be part of source control.
-# To regenerate this file, run: ./gradlew dependencies --write-locks
 com.fasterxml.jackson.core:jackson-annotations:2.22=classpath
 com.fasterxml.jackson.core:jackson-core:2.22.3=classpath
 com.fasterxml.jackson.core:jackson-databind:2.22.3=classpath
@@ -57,7 +56,7 @@ org.graalvm.buildtools:graalvm-reachability-metadata:0.10.6=classpath
 org.graalvm.buildtools:native-gradle-plugin:0.10.6=classpath
 org.graalvm.buildtools:utils:0.10.6=classpath
 org.jdom:jdom2:2.0.6.1=classpath
-org.jetbrains.kotlin:kotlin-stdlib:2.4.0=classpath
+org.jetbrains.kotlin:kotlin-stdlib:2.4.10=classpath
 org.jetbrains:annotations:13.0=classpath
 org.ow2.asm:asm-commons:9.8=classpath
 org.ow2.asm:asm-tree:9.8=classpath
