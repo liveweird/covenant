@@ -16,10 +16,13 @@ opentelemetry = "1.66.0"
 # Netty alignment (2026-09-04, Lettuce): Ktor's engine ships Netty 4.2 while r2dbc-postgresql 1.1.2
 # asks for reactor-netty 1.1.22 (built on 4.1.112) — Gradle lifted the shared modules to 4.2 and left
 # the six DNS/proxy modules only reactor-netty uses at 4.1, a mixed classpath under the driver's
-# hostname resolution. reactor-netty 1.3.x is built on Netty 4.2 (1.3.7 -> 4.2.17), and the BOM pins
-# EVERY io.netty module to one version, Ktor's included. Keep the two in step (the reactor-netty
-# line's Netty version is in its published pom); `:server:checkDependencyAlignment` fails on drift.
-netty = "4.2.17.Final"
+# hostname resolution. reactor-netty 1.3.x is built on Netty 4.2 (each release's exact version is
+# in its own published pom), and the BOM pins EVERY io.netty module to one version, Ktor's included.
+# Keep the two in step: `:server:checkDependencyAlignment` fails both on a mixed io.netty family and
+# on a SINGLE version that reactor-netty was not built on. 2026-10-25: 4.2.19.Final is reactor-netty
+# 1.3.8's declared Netty, so it moves together with reactor-bom 2025.0.8 below — netty-bom on its
+# own (Dependabot #89) stayed held for a week until that upstream pairing shipped.
+netty = "4.2.19.Final"
 # The SDK line and the instrumentation line MUST pair (instrumentation BOM 2.32.x -> SDK 1.66.0 —
 # read the SDK version off the instrumentation BOM's pom before bumping either). The alpha BOM
 # imported in core pins every io.opentelemetry artifact, incubator/alpha ones included, to that
@@ -28,8 +31,9 @@ opentelemetry-ktor = "2.32.0-alpha"
 opentelemetry-semconv = "1.44.0"
 r2dbc-pool = "1.0.2.RELEASE"
 # The Reactor BOM pairs core, pool and Netty versions; the alignment gate checks its constraints.
-# 2025.0.7 retains the existing reactor-core 3.8.7/reactor-netty 1.3.7 pairing.
-reactor-bom = "2025.0.7"
+# 2025.0.8 pairs reactor-core 3.8.8 / reactor-netty 1.3.8 / reactor-pool 1.2.8, and reactor-netty
+# 1.3.8's pom declares Netty 4.2.19.Final — the reason `netty` above moves in the same commit.
+reactor-bom = "2025.0.8"
 r2dbc-postgresql = "1.1.3.RELEASE"
 swagger-request-validator = "3.0.0"
 testcontainers = "2.0.5"
