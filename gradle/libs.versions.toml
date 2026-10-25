@@ -7,7 +7,14 @@ detekt = "1.23.8"
 # Exposed 1.4.0 stalled R2DBC work under full-suite load in Lettuce. The 1.5.0 retry
 # passed the full Docker-backed suite twice on 2026-09-20 (including the R2DBC
 # concurrency regressions); keep future upgrades gated on the same forced full-suite run.
-exposed = "1.5.0"
+# 1.6.0 (2026-10-25) cleared that gate: two forced `:server:test --rerun-tasks` runs, 560 tests
+# green each time with identical per-test outcomes. It also carries the 1.5.1 fix for
+# CVE-2026-108474, SQL injection through the string arguments of locate/concat/groupConcat/match
+# and the JSON extract/exists/contains — Covenant calls NONE of those (there is no Exposed json
+# import; the `exists(` call sites are the subquery operator and `contains(` is Kotlin stdlib), so
+# that fix's behaviour change — a client-escaped value now reaching the database with its escaping
+# intact — has no subject here. Re-check that list before adding a SQL-function call site.
+exposed = "1.6.0"
 flyway = "13.10.0"
 kotlin = "2.4.21"
 kover = "0.9.11"
