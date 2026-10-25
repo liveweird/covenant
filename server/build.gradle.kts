@@ -51,6 +51,39 @@ application {
     )
 }
 
+// Ktor's plugin applies Shadow, and Shadow's application integration puts shadowJar,
+// startShadowScripts, shadowDistTar and shadowDistZip on `assemble` — so a plain `./gradlew build`
+// produced ~240 MiB of fat-JAR artifacts (server-all.jar plus server-shadow-*.tar/zip) beside the
+// real installDist output in server/build/distributions. That artifact is not merely unused waste:
+// Shadow collapses the duplicate META-INF/services/org.flywaydb.core.extensibility.Plugin
+// descriptors, so the fat JAR NPEs at startup inside Flyway's plugin registry — the "never
+// :server:buildFatJar" invariant in CLAUDE.md. A broken deployable sitting in the output directory,
+// told apart from the working one only by the word "shadow" in its filename, is a deploy footgun,
+// so take the artifact tasks off the build and fail the entry points rather than leaving the rule
+// to memory. Package with :server:installDist (what the Dockerfile uses).
+val fatJarArtifactTasks = setOf("shadowJar", "startShadowScripts", "shadowDistTar", "shadowDistZip")
+val fatJarEntryPointTasks = setOf("buildFatJar", "runFatJar", "runShadow", "assembleShadowDist", "installShadowDist")
+
+// Reading `tasks.names` registers nothing, and a rename upstream must not turn this guard into a
+// silent no-op — the same fail-loudly stance as the "is this still needed?" checks below.
+val unknownFatJarTasks = (fatJarArtifactTasks + fatJarEntryPointTasks) - tasks.names
+check(unknownFatJarTasks.isEmpty()) {
+    "Shadow/Ktor no longer registers $unknownFatJarTasks — re-check which tasks build the fat JAR " +
+        "before trusting this guard."
+}
+
+tasks.matching { it.name in fatJarArtifactTasks }.configureEach { enabled = false }
+tasks.matching { it.name in fatJarEntryPointTasks }.configureEach {
+    val requested = name
+    doFirst {
+        error(
+            "`:server:$requested` builds the fat JAR, which NPEs at startup inside Flyway's plugin " +
+                "registry (Shadow merges away the duplicate ServiceLoader descriptors). Package " +
+                "with `:server:installDist` instead.",
+        )
+    }
+}
+
 kotlin {
     jvmToolchain(21)
 }

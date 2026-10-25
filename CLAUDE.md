@@ -13,7 +13,7 @@ Gradle wrapper is at `./gradlew` (use `gradlew.bat` on Windows). JDK 21 toolchai
 - Run a single test: `./gradlew :server:test --tests "ch.nokillswit.ServerTest.security headers are set on responses"`
 - Static analysis (detekt, both Kotlin modules): `./gradlew detekt` — rides `check`/`build`, zero-findings gate (no baseline file). Rule tuning lives in `config/detekt/detekt.yml` ONLY, one commented override per deliberate repo idiom; never add an uncommented `@Suppress`.
 - Dependency alignment: `./gradlew :server:checkDependencyAlignment` — one version per aligned family (Netty, OpenTelemetry, kotlin stdlib/reflect, Jackson 2), plus Reactor BOM constraint parity on the runtime classpath; rides `check`.
-- Package the server for deployment: `./gradlew :server:installDist`. **Never use `:server:buildFatJar`** — the fat JAR breaks Flyway's `ServiceLoader` discovery and NPEs at startup.
+- Package the server for deployment: `./gradlew :server:installDist`. **Never use `:server:buildFatJar`** — the fat JAR breaks Flyway's `ServiceLoader` discovery and NPEs at startup; the Shadow tasks are disabled in `server/build.gradle.kts`, so the build refuses it and no longer leaves a broken archive in `server/build/distributions`.
 - JVM memory flags are pre-tuned in `server/build.gradle.kts` (`applicationDefaultJvmArgs`) — the rationale is commented in place.
 - **Run the whole stack with one command: `docker compose up --build`** (only Docker required). See "Running the full stack" below.
 - Frontend: `cd web && npm install --legacy-peer-deps`, then `npm run dev|build|lint|test|test:coverage|knip|gen:api|lint:api|check:api` (details in `web/CLAUDE.md`).
@@ -129,7 +129,8 @@ you need to find where a concern lives, or before adding a new area.
   that exists; add a new one and its `MigrationChecksumTest` manifest line. A red checksum pin
   means REVERT the edit, never update the pinned value.
 - **Never use `:server:buildFatJar`** — it breaks Flyway's `ServiceLoader` discovery and NPEs at
-  startup. Package with `:server:installDist`.
+  startup. Package with `:server:installDist`. Enforced since 2026-10-25: `server/build.gradle.kts`
+  disables the Shadow artifact tasks (which rode `assemble`) and fails the fat-JAR entry points.
 - **Never log a secret, a document's text, or a payload/cell/header value.** The audit trail
   carries ids, hosts, counts and outcomes only; contract history is structural, never rendered.
 - **Never filter or sort on an encrypted column** (ciphertext carries no order or equality), and

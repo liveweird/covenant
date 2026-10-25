@@ -7,7 +7,7 @@ description: How to run, package, and deploy the covenant stack — docker compo
 
 ## Packaging
 
-Package the server for deployment with `./gradlew :server:installDist` (output under `server/build/install/server/`, launcher `bin/server`). **Do not use `:server:buildFatJar`** — the shadow plugin collapses the duplicate `META-INF/services/org.flywaydb.core.extensibility.Plugin` descriptors and the fat JAR NPEs at startup inside Flyway's plugin registry. `installDist` keeps each dependency JAR separate, so Flyway's `ServiceLoader` discovery works exactly as under `:server:run`.
+Package the server for deployment with `./gradlew :server:installDist` (output under `server/build/install/server/`, launcher `bin/server`). **Do not use `:server:buildFatJar`** — the shadow plugin collapses the duplicate `META-INF/services/org.flywaydb.core.extensibility.Plugin` descriptors and the fat JAR NPEs at startup inside Flyway's plugin registry. `server/build.gradle.kts` now disables the Shadow artifact tasks (`shadowJar`, `startShadowScripts`, `shadowDistTar`, `shadowDistZip`, which Shadow's application integration had put on `assemble`) and fails `buildFatJar`/`runFatJar`/`runShadow`/`assembleShadowDist`/`installShadowDist` with that reason, so a plain `build` no longer leaves a broken `server-all.jar` and `server-shadow-*.tar/zip` beside the real distribution. `installDist` keeps each dependency JAR separate, so Flyway's `ServiceLoader` discovery works exactly as under `:server:run`.
 
 ## JVM footprint tuning
 

@@ -218,7 +218,7 @@ automated updates, and runtime verification.
 | `./gradlew :server:test` | Server test suite (needs a Docker daemon for Testcontainers) |
 | `./gradlew detekt` | Static analysis only |
 | `./gradlew :server:checkDependencyAlignment` | One version per aligned dependency family on the runtime classpath |
-| `./gradlew :server:installDist` | Builds the runnable distribution (used by the Docker image; never `buildFatJar`) |
+| `./gradlew :server:installDist` | Builds the runnable distribution (used by the Docker image; `buildFatJar` is disabled — it breaks Flyway plugin discovery) |
 
 Frontend: `cd web && npm run build | lint | test | test:coverage | knip | gen:api`.
 Checker: `cd checker && npm run build | lint | knip | typecheck | test | test:coverage`.
