@@ -346,11 +346,15 @@ val checkDependencyAlignment = tasks.register("checkDependencyAlignment") {
         }
         val failures = drift + reactorDrift + nettyInStep
         check(failures.isEmpty()) { "Dependency families must align, including Reactor BOM constraints — " + failures.joinToString(" | ") }
-        // Jackson 3 (tools.jackson, a different Java package from com.fasterxml.jackson) rides in
-        // through Flyway 13 and coexists with the Jackson 2 line the validators use — the two never
-        // share a type. Logged, not failed: what matters is that OUR libraries stay on ONE of them
-        // (networknt 3.x would put JsonNode-incompatible trees next to swagger-parser's — see the
-        // catalog note), which the family check above guards.
+        // Jackson 3 (tools.jackson) is a different Java package from com.fasterxml.jackson, so the
+        // two can coexist without ever sharing a type. This branch is a TRIPWIRE, not a description
+        // of today: flyway-core declares tools.jackson.core:jackson-databind `optional=true`, so
+        // Gradle does not resolve it transitively and tools.jackson is absent from every lockfile —
+        // verified 2026-10-25, and this message has never fired. It starts firing if Flyway makes
+        // that dependency mandatory, or if anything else drags Jackson 3 in. Logged, not failed:
+        // what matters is that OUR libraries stay on ONE line (networknt 3.x would put
+        // JsonNode-incompatible trees next to swagger-parser's — see the catalog note), which the
+        // family check above guards.
         val jackson3 = ids.filter { it.group.startsWith("tools.jackson") }.map { "${it.name}:${it.version}" }.sorted()
         if (jackson3.isNotEmpty()) logger.lifecycle("tools.jackson (Jackson 3, via Flyway) present alongside Jackson 2: $jackson3")
     }
