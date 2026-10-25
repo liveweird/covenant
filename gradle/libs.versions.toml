@@ -15,7 +15,7 @@ detekt = "1.23.8"
 # that fix's behaviour change — a client-escaped value now reaching the database with its escaping
 # intact — has no subject here. Re-check that list before adding a SQL-function call site.
 exposed = "1.6.0"
-flyway = "13.10.3"
+flyway = "13.11.1"
 kotlin = "2.4.21"
 kover = "0.9.11"
 logback = "1.6.5"
@@ -59,10 +59,14 @@ lz4-java = "1.12.0"
 commons-configuration = "2.15.1"
 
 # Contract validation: these libraries build against Jackson 2.22.2. The 2026-10-14
-# security patch pins the family to 2.22.3 for parser/databind DoS fixes; the BOM and alignment gate guard
-# the family. networknt stays on the 2.0.x line on purpose: 3.x moved to Jackson 3 (tools.jackson),
-# whose JsonNode is a different type from swagger-parser's/Avro's Jackson 2 trees. (Flyway 13
-# itself rides Jackson 3 — a separate package, coexisting; checkDependencyAlignment logs it.)
+# security patch pins the family to 2.22.3 for parser/databind DoS fixes (2.22.4 since 2026-10-25);
+# the BOM and alignment gate guard the family. networknt stays on the 2.0.x line on purpose: 3.x
+# moved to Jackson 3 (tools.jackson), whose JsonNode is a different type from swagger-parser's and
+# Avro's Jackson 2 trees. Correction (2026-10-25): an earlier version of this note said Flyway 13
+# rides Jackson 3 alongside Jackson 2 and that checkDependencyAlignment logs it. It does not —
+# flyway-core declares tools.jackson.core:jackson-databind `optional=true`, so Gradle never resolves
+# it transitively and `tools.jackson` appears in NO lockfile. The gate's tools.jackson branch has
+# therefore never fired; keep it as the tripwire for the day Flyway makes that dependency mandatory.
 avro = "1.12.2"
 jackson = "2.22.4"
 json-schema-validator = "2.0.7"
