@@ -61,6 +61,12 @@ export default function ToadieConnectionEditorModal({ target, expandRegistryMapp
                   </Group>
                   <TextInput label={t("toadie.field.serviceBlueprint")} {...form.getInputProps("serviceBlueprint")} />
                   <TextInput label={t("toadie.field.apiBlueprint")} {...form.getInputProps("apiBlueprint")} />
+                  {/* Retargeting an EXISTING connection drops the contract links made through it (the
+                      server clears them, since a link row carries no blueprint of its own), so say so
+                      before the save rather than after. Orange: it is waivable, not blocking. */}
+                  {target && form.values.apiBlueprint.trim().toLowerCase() !== target.mapping.apiBlueprint.toLowerCase() && (
+                    <Alert color="orange" variant="light">{t("toadie.field.blueprintChangeWarning")}</Alert>
+                  )}
                   <TextInput label={t("toadie.field.providesRelation")} {...form.getInputProps("providesRelation")} />
                   <TextInput label={t("toadie.field.consumesRelation")} {...form.getInputProps("consumesRelation")} />
                   <TextInput label={t("toadie.field.systemRelation")} {...form.getInputProps("systemRelation")} />

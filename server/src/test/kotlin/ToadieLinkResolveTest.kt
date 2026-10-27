@@ -246,6 +246,47 @@ class ToadieLinkResolveTest {
     }
 
     @Test
+    fun `retargeting a connection at another blueprint clears its links, other mapping edits keep them`() = testApplication {
+        usePostgresTestcontainer()
+        val admin = seededClient("resolve-flip-admin", UserRole.ADMIN)
+        val ownerId = TestUsers.seed(uniqueEmail("resolve-flip-owner"), "pw")
+        val caller = CallerPrincipal(ownerId, "resolve-flip-owner@test", emptySet())
+        val service = directService()
+        val systemId = TestContracts.seedSystem("resolve-flip")
+        val entity = uniqueIdentifier("orders")
+        val connection = service.seedConnection("resolve-flip", entity)
+        val contractId = service.linkContract(systemId, ownerId, caller, connection, "flipped")
+
+        // A relation-name edit changes the mapping, so the snapshot is wiped and rescanned — but the
+        // links still point at the same entities of the same blueprint, so they must survive and keep
+        // resolving through the stored copy. This is why the guard is the blueprint, not `mappingChanged`.
+        val relationEdit = service.editMapping(connection, ToadieMapping(providesRelation = "offers_apis"))
+        assertEquals(0, relationEdit.linksCleared)
+        assertEquals(1, admin.resolve("api", entity).total)
+        assertEquals(contractId, admin.resolve("api", entity).items.single().contractId)
+
+        // Nor does a cosmetic case change: every blueprint comparison in this package ignores case,
+        // so `API` still describes the same entities.
+        val caseEdit = service.editMapping(connection, ToadieMapping(apiBlueprint = "API", providesRelation = "offers_apis"))
+        assertEquals(0, caseEdit.linksCleared)
+        assertEquals(1, admin.resolve("api", entity).total)
+
+        // Now the real flip. The links are orphaned for good — the forward read reports them MISSING
+        // and `replaceLinks` will not take them back — and their stored identifiers would otherwise
+        // answer a `dataset` lookup with an OpenAPI contract. They go.
+        val flip = service.editMapping(
+            connection,
+            ToadieMapping(apiBlueprint = "dataset", providesRelation = "produces_datasets", consumesRelation = "consumes_datasets"),
+        )
+        assertEquals(1, flip.linksCleared)
+        assertEquals(0, admin.resolve("dataset", entity).total)
+        assertEquals(0, admin.resolve("api", entity).total)
+
+        // The contract itself is untouched; only the link to a connection that no longer describes it.
+        assertEquals(HttpStatusCode.OK, admin.get("/api/v1/contracts/$contractId").status)
+    }
+
+    @Test
     fun `the reverse read validates its lookup keys and requires authentication`() = testApplication {
         usePostgresTestcontainer()
         val client = seededClient("resolve-validate")
@@ -365,6 +406,25 @@ class ToadieLinkResolveTest {
                     fetchedAt = System.currentTimeMillis(),
                     revision = 1,
                 ),
+            ),
+        )
+    }
+
+    /** Edits only the mapping of an existing connection, leaving its identity and credentials alone. */
+    private suspend fun ToadieService.editMapping(connectionId: UInt, mapping: ToadieMapping): ToadieConnectionUpdateResult {
+        val current = checkNotNull(read(connectionId))
+        return update(
+            connectionId,
+            ToadieConnectionRequest(
+                name = current.name,
+                baseUrl = current.baseUrl,
+                browserUrl = current.browserUrl,
+                apiKey = null,
+                enabled = current.enabled,
+                refreshIntervalMinutes = current.refreshIntervalMinutes,
+                mapping = mapping,
+                registryMapping = current.registryMapping,
+                adoptionMapping = current.adoptionMapping,
             ),
         )
     }

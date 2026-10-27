@@ -125,6 +125,19 @@ further `decodeURIComponent` would be a double decode. `buildQuery` carries it t
 `URLSearchParams`, which encodes `+` as `%2B`; splicing it into a URL string would arrive as a
 space and resolve the wrong entity. An anonymous visit keeps the full encoded path across sign-in.
 
+**Retargeting a connection clears its links.** A link row records the entity id plus a snapshot of
+the identifier and title taken at link time — never a blueprint of its own. So when an ADMIN edits a
+connection's `apiBlueprint`, `ToadieService.update` deletes that connection's rows in
+`contract_toadie_links` in the same transaction that wipes its snapshot, and the PUT emits
+`toadie_connection.links_cleared` with a count. Without it those links would keep answering lookups
+for the **new** blueprint and hand back, say, an OpenAPI contract for a dataset; there is no
+query-side repair, because once the snapshot is gone "the entity vanished upstream" and "the mapping
+changed" are indistinguishable in the data. Nothing recoverable is lost: those links are already
+permanently MISSING in the forward read, and `replaceLinks` refuses an entity id that is absent from
+the snapshot, so a writer cannot re-save them either. The guard is the blueprint **alone**, compared
+case-insensitively — a relation-name, registry or adoption edit rescans the snapshot but keeps every
+link, and so does a cosmetic `api` → `API` change.
+
 Access is the ordinary catalog read: every authenticated user already reads every contract and its
 links, so the resolver discloses nothing new. It is not public and needs no machine credentials.
 

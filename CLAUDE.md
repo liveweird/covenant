@@ -81,7 +81,9 @@ behind the SPA route `/toadie/:blueprint/:identifier` (`pages/ToadieLinkResolver
 is a public, stable contract: Toadie generates it from a calculated blueprint property, so renaming
 the route breaks every entity page there.** The identifier travels as a query value, never a path
 segment, and is decoded exactly once. No migration; the lookup prefers the live cached identifier
-over the copy stored on the link. See `.claude/docs/toadie-integration.md`.
+over the copy stored on the link. Because a link row carries no blueprint of its own, editing a
+connection's `apiBlueprint` clears that connection's links (audited) — otherwise they would answer
+lookups for the new blueprint. See `.claude/docs/toadie-integration.md`.
 
 ### Declared adoption reader (1.1.0)
 

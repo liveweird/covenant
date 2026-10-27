@@ -21,6 +21,7 @@
     "useDatasetMapping": "Use dataset mapping",
     "serviceBlueprint": "Service blueprint",
     "apiBlueprint": "API or dataset blueprint",
+    "blueprintChangeWarning": "Changing the target blueprint removes the contract links made through this connection — they describe entities of the old blueprint. Link those contracts again after saving.",
     "providesRelation": "Provides or produces relation",
     "consumesRelation": "Consumes relation",
     "systemRelation": "System relation"

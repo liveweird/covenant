@@ -360,7 +360,7 @@ class ToadieUsageTest {
             browserUrl = "http://renamed-toadie.internal",
             apiKey = null,
         )
-        assertEquals(1, service.update(connectionId, replacement))
+        assertEquals(1, service.update(connectionId, replacement).changed)
         assertFalse(service.publish(staleClaim, snapshot.copy(fetchedAt = System.currentTimeMillis())))
         assertFalse(service.publish(staleClaim, ToadieUnchanged(1, System.currentTimeMillis())))
         val displayClaim = service.claimRefresh(connectionId, force = false).second!!
@@ -371,14 +371,20 @@ class ToadieUsageTest {
         )
         assertEquals("Checkout", afterStalePublish!!.items.single().title)
 
-        assertEquals(1, service.update(connectionId, replacement.copy(apiKey = "rotated-secret")))
+        assertEquals(1, service.update(connectionId, replacement.copy(apiKey = "rotated-secret")).changed)
         val rotatedKeyClaim = service.claimRefresh(connectionId, force = false).second!!
         assertNull(rotatedKeyClaim.config.knownRevision)
         service.release(rotatedKeyClaim)
         assertEquals(4, storedState().third, "key replacement retains the last cache while forcing a full scan")
 
-        val remapped = replacement.copy(mapping = replacement.mapping.copy(apiBlueprint = "different-api"))
-        assertEquals(1, service.update(connectionId, remapped))
+        // A mapping change invalidates the snapshot, so the linked entity is no longer cached and the
+        // forward read reports MISSING while the link row survives. Deliberately NOT the
+        // `apiBlueprint` here: retargeting a connection at another blueprint DELETES its links
+        // instead (1.3.0), which `ToadieLinkResolveTest` pins — there would be no row left to read.
+        val remapped = replacement.copy(mapping = replacement.mapping.copy(systemRelation = "different-system"))
+        val remapResult = service.update(connectionId, remapped)
+        assertEquals(1, remapResult.changed)
+        assertEquals(0, remapResult.linksCleared, "only a blueprint change orphans links")
         assertEquals(ToadieLinkStatus.MISSING, service.links(contractId)!!.items.single().status)
         val currentClaim = service.claimRefresh(connectionId, force = false).second!!
         val reusedId = snapshot.copy(
