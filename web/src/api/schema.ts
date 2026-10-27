@@ -849,6 +849,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/toadie-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Find the contracts that cover a Toadie API or dataset entity
+         * @description Any authenticated user. The reverse of the contract-scoped link read: answers which Covenant contract(s) currently cover one Toadie entity, so Toadie can deep-link from an `api` or `dataset` entity into Covenant. `blueprint` and `identifier` are both REQUIRED equality filters. `blueprint` matches the connection's configured target blueprint case-insensitively; `identifier` matches byte-exactly, against the live cached identifier where the entity is still in the snapshot and the identifier stored on the link otherwise, so a renamed entity resolves under its new name. Several connections may match the same pair; every match is returned with the connection that produced it. No match is an empty page, never a 404. Soft-deleted contracts and connections are excluded; a disabled connection is not. Sortable: `id`, `contractName`; default `id` ascending.
+         */
+        get: operations["listToadieLinkMatches"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contracts/{contractId}/toadie-links": {
         parameters: {
             query?: never;
@@ -2821,6 +2841,30 @@ export interface components {
             connection: components["schemas"]["ToadieConnectionRef"] | null;
             cache: components["schemas"]["ToadieCacheStatus"];
             items: components["schemas"]["ToadieLinkResponse"][];
+        };
+        ToadieLinkMatch: {
+            /** Format: int32 */
+            linkId: number;
+            /** Format: int32 */
+            contractId: number;
+            contractName: string;
+            type: components["schemas"]["ContractType"];
+            system: components["schemas"]["RefSummary"];
+            latestVersion: components["schemas"]["LatestVersionSummary"] | null;
+            connection: components["schemas"]["ToadieConnectionRef"];
+            /** @description The connection's configured target blueprint — read-only. */
+            blueprint: string;
+            /** @description The entity identifier as currently known — read-only. */
+            identifier: string;
+            /** @description The entity title as currently known — read-only. */
+            title: string;
+        };
+        ToadieLinkMatchPage: {
+            items: components["schemas"]["ToadieLinkMatch"][];
+            page: number;
+            pageSize: number;
+            /** Format: int64 */
+            total: number;
         };
         /** @enum {string} */
         ToadieUsageRole: "PROVIDER" | "CONSUMER";
@@ -6196,6 +6240,45 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listToadieLinkMatches: {
+        parameters: {
+            query: {
+                /** @description The Toadie blueprint identifier, as configured on the connection (`api`, or `dataset` under the ODCS preset). */
+                blueprint: string;
+                /** @description The Toadie entity identifier, matched byte-exactly. */
+                identifier: string;
+                /** @description 1-based page index. Defaults to 1. */
+                page?: components["parameters"]["Page"];
+                /** @description Rows per page. Defaults to 20, maximum 100. */
+                pageSize?: components["parameters"]["PageSize"];
+                /**
+                 * @description Sort spec. Format: `field` (ascending) or `-field` (descending). Multiple fields are
+                 *     comma-separated, leftmost wins: `sort=-updatedAt,name`. The endpoint declares its
+                 *     sortable-field whitelist; unknown fields are rejected with `400`. `id` ascending is
+                 *     always appended as a deterministic tiebreaker.
+                 */
+                sort?: components["parameters"]["Sort"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matching contracts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToadieLinkMatchPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalServerError"];
         };
     };

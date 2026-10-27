@@ -92,6 +92,42 @@ Missing mapped APIs or datasets remain visible; disconnected connections do not 
 current empty result means **no declared usage observed**, never proof that a contract is unused.
 Port ownership/lifecycle and Covenant ownership/lifecycle have independent meanings.
 
+## Resolving a Toadie entity (1.3.0)
+
+`GET /api/v1/toadie-links?blueprint={b}&identifier={i}` is the REVERSE of the contract-scoped link
+read: it answers which contract(s) currently cover one Toadie entity. Any authenticated user; both
+keys are required. `blueprint` matches the connection's configured target blueprint
+case-insensitively, as every other snapshot read compares it; `identifier` matches **byte-exactly**,
+because Port resolves relation targets byte-exactly. The lookup prefers the **live cached
+identifier** and falls back to the copy stored on the link row only where the entity has left the
+snapshot — the stored copy alone would go stale the moment an entity is renamed upstream, which is
+precisely when the incoming URL carries the new name. Soft-deleted contracts and connections are
+excluded; a **disabled** connection is not, since its links remain the right answer and only its
+cache has stopped moving. Several connections may match one pair, so every match carries the
+connection that produced it. No match is an empty page, never a 404: "not linked yet" is an answer.
+Over-long or blank keys are a 400 rather than a guaranteed-empty query.
+
+**`/toadie/{blueprint}/{identifier}` is a public, stable contract between the two apps.** Toadie
+generates it on its own `api`/`dataset` entity pages from a calculated blueprint property over the
+entity's own identifier (`"<covenant-origin>/toadie/api/" + (.identifier | @uri)`), so it needs no
+writes, no sync and no Covenant ids on Toadie's side, and it never goes stale. Covenant owns the
+link and keeps owning it; Toadie never calls Covenant. Renaming this route therefore breaks every
+entity page over there — it is registered on the route in `web/src/App.tsx` and guarded end to end
+by `e2e/tests/toadie-resolver.spec.ts`.
+
+The SPA route (`pages/ToadieLinkResolver.tsx`, inside `RequireAuth`) resolves one match with
+`navigate(..., { replace: true })`, so Back returns to Toadie rather than bouncing through the
+resolver; several matches list themselves with their connection; none renders a plain empty state.
+An identifier may contain `/` (arriving as `%2F`), `+`, `:`, `@`, `=`, `.`, `_`, `-`, `'` and
+unicode letters, up to 200 characters. It is therefore passed to the server as a query **value**,
+never as a path segment, and decoded exactly once — React Router already decodes path params, so a
+further `decodeURIComponent` would be a double decode. `buildQuery` carries it through
+`URLSearchParams`, which encodes `+` as `%2B`; splicing it into a URL string would arrive as a
+space and resolve the wrong entity. An anonymous visit keeps the full encoded path across sign-in.
+
+Access is the ordinary catalog read: every authenticated user already reads every contract and its
+links, so the resolver discloses nothing new. It is not public and needs no machine credentials.
+
 ## Refresh and failure behavior
 
 Enabled connections refresh periodically. ADMIN can request connection refresh; a contract

@@ -40,6 +40,7 @@ const Users = lazy(() => import("./pages/Users"));
 const UserFeatures = lazy(() => import("./pages/UserFeatures"));
 const FeatureFlags = lazy(() => import("./pages/FeatureFlags"));
 const ToadieConnections = lazy(() => import("./pages/ToadieConnections"));
+const ToadieLinkResolver = lazy(() => import("./pages/ToadieLinkResolver"));
 const CreateUser = lazy(() => import("./pages/CreateUser"));
 const EditUser = lazy(() => import("./pages/EditUser"));
 const ChangePassword = lazy(() => import("./pages/ChangePassword"));
@@ -226,6 +227,13 @@ export default function App() {
             <Route path="domains" element={<Domains />} />
             <Route path="systems" element={<Systems />} />
             <Route path="environments" element={<Environments />} />
+            {/*
+              The way IN from Toadie. This path is a PUBLIC, STABLE cross-app contract: Toadie
+              hard-codes it in a calculated blueprint property (`"<covenant>/toadie/api/" +
+              (.identifier | @uri)`), so renaming it breaks every entity page over there.
+              Covenant never builds this URL itself — see `.claude/docs/toadie-integration.md`.
+            */}
+            <Route path="toadie/:blueprint/:identifier" element={<ToadieLinkResolver />} />
             <Route path="teams" element={<Teams />} />
             <Route path="teams/:id" element={<TeamDetails />} />
             {/* The management surface — ADMIN only, guarded once here (the pages no longer redirect themselves). */}

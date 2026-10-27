@@ -17,6 +17,20 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "1.3.0",
+    date: "2026-10-27",
+    en: `**Open a contract straight from Toadie.**
+
+- An API or dataset in Toadie now links to the Covenant contract that covers it. Following the link opens the contract directly; when several contracts cover the same entity you get a short list to choose from, each naming the Toadie connection it came through.
+- An entity nothing covers yet says so plainly instead of showing an error.
+- Following such a link without being signed in returns you to the same entity after you sign in.`,
+    pl: `**Otwieraj kontrakt wprost z Toadie.**
+
+- API lub zbiór danych w Toadie prowadzi teraz do kontraktu w Covenant, który go obejmuje. Link otwiera kontrakt od razu, a gdy ten sam obiekt obejmuje kilka kontraktów, zobaczysz krótką listę do wyboru — każda pozycja wskazuje połączenie z Toadie, z którego pochodzi.
+- Obiekt, którego jeszcze nic nie obejmuje, mówi o tym wprost, zamiast pokazywać błąd.
+- Jeśli otworzysz taki link bez zalogowania, po zalogowaniu wrócisz do tego samego obiektu.`,
+  },
+  {
     version: "1.2.6",
     date: "2026-10-14",
     en: `**More reliable sessions and production health checks.**

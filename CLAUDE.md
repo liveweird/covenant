@@ -74,6 +74,15 @@ major lines and dataset contract versions are exposed as separate source declara
 concurrency, cache semantics and deployment. The SPA adds Toadie connection administration
 and a Usage from Toadie panel on contract details.
 
+### Toadie entity resolver (1.3.0)
+
+`GET /api/v1/toadie-links?blueprint=&identifier=` is the reverse of the contract-scoped link read,
+behind the SPA route `/toadie/:blueprint/:identifier` (`pages/ToadieLinkResolver.tsx`). **That URL
+is a public, stable contract: Toadie generates it from a calculated blueprint property, so renaming
+the route breaks every entity page there.** The identifier travels as a query value, never a path
+segment, and is decoded exactly once. No migration; the lookup prefers the live cached identifier
+over the copy stored on the link. See `.claude/docs/toadie-integration.md`.
+
 ### Declared adoption reader (1.1.0)
 
 An opt-in per-connection reader exposes Toadie's API major-line and dataset contract-version

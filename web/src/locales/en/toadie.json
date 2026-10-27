@@ -242,5 +242,21 @@
     "openEntity": "Open {{name}} in Toadie",
     "refresh": "Refresh usage",
     "refreshing": "Refreshing usage…"
+  },
+  "resolve": {
+    "title": "Covenant contract",
+    "entity": "Toadie {{blueprint}}",
+    "back": "All contracts",
+    "several_one": "{{count}} contract covers this entity. Pick the one you need.",
+    "several_other": "{{count}} contracts cover this entity. Pick the one you need.",
+    "empty": "No Covenant contract is linked to Toadie {{blueprint}} “{{identifier}}” yet. Open the contract that should cover it and link the entity from its Toadie panel.",
+    "noVersion": "No version yet",
+    "column": {
+      "contract": "Contract",
+      "type": "Type",
+      "system": "System",
+      "latestVersion": "Highest version",
+      "connection": "Toadie connection"
+    }
   }
 }

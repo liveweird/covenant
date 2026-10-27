@@ -11,6 +11,8 @@ type ToadieConnectionCreateBody = components["schemas"]["ToadieConnectionCreateR
 export type ToadieEntityPage = paths["/api/v1/toadie-connections/{id}/apis"]["get"]["responses"]["200"]["content"]["application/json"];
 export type ToadieEntityRef = ToadieEntityPage["items"][number];
 export type ToadieLinks = paths["/api/v1/contracts/{contractId}/toadie-links"]["get"]["responses"]["200"]["content"]["application/json"];
+export type ToadieLinkMatchPage = paths["/api/v1/toadie-links"]["get"]["responses"]["200"]["content"]["application/json"];
+export type ToadieLinkMatch = ToadieLinkMatchPage["items"][number];
 export type ToadieLinksBody = paths["/api/v1/contracts/{contractId}/toadie-links"]["put"]["requestBody"]["content"]["application/json"];
 export type ToadieUsage = paths["/api/v1/contracts/{contractId}/toadie-usage"]["get"]["responses"]["200"]["content"]["application/json"];
 export type ToadieAdoptionKind = components["schemas"]["ToadieAdoptionKind"];
@@ -83,4 +85,18 @@ export async function previewToadieRegistrySync(id: number, body: ToadieRegistry
 
 export async function applyToadieRegistrySync(id: number, body: components["schemas"]["ToadieRegistryApplyRequest"]): Promise<ToadieRegistrySyncResult> {
   return jsonRequest<ToadieRegistrySyncResult>(`/api/v1/toadie-connections/${id}/registry-sync`, { method: "POST", body: JSON.stringify(body) });
+}
+
+/**
+ * The REVERSE link read: which contract(s) cover one Toadie `api`/`dataset` entity. Behind the
+ * `/toadie/:blueprint/:identifier` resolver page, which is the URL Toadie generates on its own
+ * entity pages — see `.claude/docs/toadie-integration.md`. `buildQuery` carries both keys as
+ * query values, so an identifier holding `/` or `+` reaches the server intact (`URLSearchParams`
+ * encodes `+` as `%2B`; interpolating it into the string would arrive as a space).
+ */
+export async function listToadieLinkMatches(
+  q: { blueprint: string; identifier: string; page: number; pageSize: number; sort?: string },
+): Promise<ToadieLinkMatchPage> {
+  const params = buildQuery(q);
+  return jsonRequest<ToadieLinkMatchPage>(`/api/v1/toadie-links?${params}`);
 }

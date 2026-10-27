@@ -242,5 +242,23 @@
     "openEntity": "Otwórz {{name}} w Toadie",
     "refresh": "Odśwież użycie",
     "refreshing": "Odświeżanie użycia…"
+  },
+  "resolve": {
+    "title": "Kontrakt w Covenant",
+    "entity": "Toadie — {{blueprint}}",
+    "back": "Wszystkie kontrakty",
+    "several_one": "{{count}} kontrakt obejmuje ten obiekt. Wybierz ten, który Cię interesuje.",
+    "several_few": "{{count}} kontrakty obejmują ten obiekt. Wybierz ten, który Cię interesuje.",
+    "several_many": "{{count}} kontraktów obejmuje ten obiekt. Wybierz ten, który Cię interesuje.",
+    "several_other": "{{count}} kontraktu obejmuje ten obiekt. Wybierz ten, który Cię interesuje.",
+    "empty": "Żadny kontrakt w Covenant nie jest jeszcze powiązany z obiektem Toadie {{blueprint}} „{{identifier}}”. Otwórz kontrakt, który powinien go obejmować, i powiąż obiekt w panelu Toadie.",
+    "noVersion": "Brak wersji",
+    "column": {
+      "contract": "Kontrakt",
+      "type": "Typ",
+      "system": "System",
+      "latestVersion": "Najwyższa wersja",
+      "connection": "Połączenie z Toadie"
+    }
   }
 }

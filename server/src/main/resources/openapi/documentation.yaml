@@ -1335,6 +1335,41 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
         '500': { $ref: '#/components/responses/InternalServerError' }
+  /api/v1/toadie-links:
+    get:
+      tags: [toadie]
+      operationId: listToadieLinkMatches
+      summary: Find the contracts that cover a Toadie API or dataset entity
+      description: >-
+        Any authenticated user. The reverse of the contract-scoped link read: answers which Covenant
+        contract(s) currently cover one Toadie entity, so Toadie can deep-link from an `api` or
+        `dataset` entity into Covenant. `blueprint` and `identifier` are both REQUIRED equality
+        filters. `blueprint` matches the connection's configured target blueprint case-insensitively;
+        `identifier` matches byte-exactly, against the live cached identifier where the entity is
+        still in the snapshot and the identifier stored on the link otherwise, so a renamed entity
+        resolves under its new name. Several connections may match the same pair; every match is
+        returned with the connection that produced it. No match is an empty page, never a 404.
+        Soft-deleted contracts and connections are excluded; a disabled connection is not.
+        Sortable: `id`, `contractName`; default `id` ascending.
+      parameters:
+        - name: blueprint
+          in: query
+          required: true
+          description: The Toadie blueprint identifier, as configured on the connection (`api`, or `dataset` under the ODCS preset).
+          schema: { type: string, minLength: 1, maxLength: 100 }
+        - name: identifier
+          in: query
+          required: true
+          description: The Toadie entity identifier, matched byte-exactly.
+          schema: { type: string, minLength: 1, maxLength: 200 }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+      responses:
+        '200': { description: Matching contracts, content: { application/json: { schema: { $ref: '#/components/schemas/ToadieLinkMatchPage' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
   /api/v1/contracts/{contractId}/toadie-links:
     parameters:
       - name: contractId
@@ -4224,6 +4259,30 @@ components:
           nullable: true
         cache: { $ref: '#/components/schemas/ToadieCacheStatus' }
         items: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/ToadieLinkResponse' } }
+    ToadieLinkMatch:
+      type: object
+      required: [linkId, contractId, contractName, type, system, latestVersion, connection, blueprint, identifier, title]
+      properties:
+        linkId: { type: integer, format: int32, minimum: 0 }
+        contractId: { type: integer, format: int32, minimum: 0 }
+        contractName: { type: string }
+        type: { $ref: '#/components/schemas/ContractType' }
+        system: { $ref: '#/components/schemas/RefSummary' }
+        latestVersion:
+          allOf: [{ $ref: '#/components/schemas/LatestVersionSummary' }]
+          nullable: true
+        connection: { $ref: '#/components/schemas/ToadieConnectionRef' }
+        blueprint: { type: string, description: 'The connection''s configured target blueprint — read-only.' }
+        identifier: { type: string, description: 'The entity identifier as currently known — read-only.' }
+        title: { type: string, description: 'The entity title as currently known — read-only.' }
+    ToadieLinkMatchPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ToadieLinkMatch' } }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, format: int64, minimum: 0 }
     ToadieUsageRole:
       type: string
       enum: [PROVIDER, CONSUMER]
