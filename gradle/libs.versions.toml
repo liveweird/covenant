@@ -57,6 +57,17 @@ kafka-clients = "4.4.0"
 scram = "3.4"
 lz4-java = "1.12.0"
 commons-configuration = "2.15.1"
+# Added 2026-10-27 after the advisory database picked these up mid-evening (the same PRs passed the
+# scan twenty minutes earlier). Both are transitive and neither is called from server code:
+# guava arrives through openapi-diff/swagger-parser and the Kafka client pulls snappy as one of the
+# codecs kafka-clients above deliberately keeps. Constraints again, so no direct dependency is
+# dragged forward: guava 33.7.2 clears CVE-2026-102554 (DoS), snappy-java 1.1.10.9 clears
+# CVE-2026-93451 and CVE-2026-108106 (HIGH) plus CVE-2026-116590 (MEDIUM). Mind the suffix: Trivy
+# reports guava's fix as plain "33.7.2", but every Guava release carries a `-jre`/`-android` flavour
+# and the bare coordinate does not exist — this is the JVM one. The constraint also lifts the
+# test-compile classpath off 32.1.3-ANDROID, which is the wrong flavour for a server anyway.
+guava = "33.7.2-jre"
+snappy-java = "1.1.10.9"
 
 # Contract validation: these libraries build against Jackson 2.22.2. The 2026-10-14
 # security patch pins the family to 2.22.3 for parser/databind DoS fixes (2.22.4 since 2026-10-25);
@@ -115,6 +126,8 @@ kafka-clients = { module = "org.apache.kafka:kafka-clients", version.ref = "kafk
 scram-client = { module = "com.ongres.scram:scram-client", version.ref = "scram" }
 scram-common = { module = "com.ongres.scram:scram-common", version.ref = "scram" }
 lz4-java = { module = "at.yawk.lz4:lz4-java", version.ref = "lz4-java" }
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
+snappy-java = { module = "org.xerial.snappy:snappy-java", version.ref = "snappy-java" }
 commons-configuration = { module = "org.apache.commons:commons-configuration2", version.ref = "commons-configuration" }
 
 [plugins]

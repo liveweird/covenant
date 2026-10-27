@@ -151,6 +151,40 @@ detekt, coverage and alignment gates), both app and checker images built, `/api/
 returned OK, all seven sample documents passed check-only validation, and all 87 Playwright
 journeys passed. Compose retained the existing Postgres and Mailpit containers and data volume.
 
+## Guava and snappy-java advisory floors (2026-10-27)
+
+A Trivy database update mid-evening turned the scan red on `master` with five HIGH findings that
+the very same PRs had passed twenty minutes earlier: `com.google.guava:guava` (CVE-2026-102554,
+DoS) at 33.6.0-jre on the server runtime, 32.1.3-**android** on its test-compile classpath and
+32.1.2-jre on the Ktor plugin's script classpath, plus `org.xerial.snappy:snappy-java` 1.1.10.7
+(CVE-2026-93451, CVE-2026-108106 HIGH and CVE-2026-116590 MEDIUM). Both are transitive and neither
+is called from server code — guava arrives through openapi-diff/swagger-parser and the Jib
+integration, snappy is one of the codecs `kafka-clients` deliberately keeps. Catalog constraints
+plus one script-classpath constraint select guava **33.7.2-jre** and snappy **1.1.10.9**, the
+first fixed releases, so no direct dependency is dragged forward. Guava's own annotation-only
+transitives follow its POM (`error_prone_annotations` 2.50.0, `failureaccess` 1.0.3,
+`j2objc-annotations` 3.1, and `checker-qual` replaced by `jspecify` 1.0.1); the constraint also
+lifts the test-compile classpath off the `-android` flavour, which was never right for a server.
+
+Two traps this exposed, both of which will recur on the next security pin:
+
+- **Trivy reports Guava's fixed version as a bare `33.7.2`, which is not a published coordinate.**
+  Every Guava release carries a `-jre`/`-android` flavour suffix. Read the real version from
+  `https://repo1.maven.org/maven2/com/google/guava/guava/maven-metadata.xml`; the
+  `search.maven.org` index lags badly and reported neither this release nor snappy 1.1.10.9.
+- **`--write-locks` and `--write-verification-metadata sha256` must be passed in the SAME
+  invocation** when a constraint introduces a version the verification file has never seen.
+  Alone, each fails on the other's safeguard: the lock writer is refused by dependency
+  verification ("Dependency verification failed for configuration 'classpath'"), and the metadata
+  writer is refused by strict locking ("Component is the target of multiple version constraints
+  with conflicting requirements: 32.1.2-jre - from lock file"). The separate steps above are
+  correct only when a version already present in the catalog moves.
+
+Verification: both writers run from an empty `GRADLE_USER_HOME` (cold, so parent POMs are
+captured), the accepted file revalidated from a second empty home with
+`--dependency-verification strict`, and the pinned Trivy 0.74.0 image rerun over all seven
+lockfiles with the CI command — **zero advisories of any severity**.
+
 ## Buildscript advisory follow-up (2026-09-26)
 
 The next CI scan reported CVE-2026-84939 in the root plugin classpath's transitive
