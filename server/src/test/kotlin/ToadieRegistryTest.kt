@@ -202,7 +202,7 @@ class ToadieRegistryTest {
         val imported = apply(service, connectionId, ToadieRegistryKind.DOMAIN, ToadieRegistrySelection("101"))
         assertNull(TestDomains.service.read(imported.localId)?.description)
 
-        assertEquals(1, service.update(connectionId, request(name, descriptions = true).copy(apiKey = null)))
+        assertEquals(1, service.update(connectionId, request(name, descriptions = true).copy(apiKey = null)).changed)
         assertTrue(service.publish(service.claimRefresh(connectionId, false).second!!, current.copy(revision = 41)))
         val synchronized = assertNotNull(TestDomains.service.read(imported.localId))
         assertEquals("Domain description", synchronized.description)

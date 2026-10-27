@@ -23,12 +23,14 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
 
 - An API or dataset in Toadie now links to the Covenant contract that covers it. Following the link opens the contract directly; when several contracts cover the same entity you get a short list to choose from, each naming the Toadie connection it came through.
 - An entity nothing covers yet says so plainly instead of showing an error.
-- Following such a link without being signed in returns you to the same entity after you sign in.`,
+- Following such a link without being signed in returns you to the same entity after you sign in.
+- Administrators: changing which Toadie blueprint a connection targets now clears the contract links it carried. They described entities of the old blueprint and would otherwise answer for the new one.`,
     pl: `**Otwieraj kontrakt wprost z Toadie.**
 
 - API lub zbiór danych w Toadie prowadzi teraz do kontraktu w Covenant, który go obejmuje. Link otwiera kontrakt od razu, a gdy ten sam obiekt obejmuje kilka kontraktów, zobaczysz krótką listę do wyboru — każda pozycja wskazuje połączenie z Toadie, z którego pochodzi.
 - Obiekt, którego jeszcze nic nie obejmuje, mówi o tym wprost, zamiast pokazywać błąd.
-- Jeśli otworzysz taki link bez zalogowania, po zalogowaniu wrócisz do tego samego obiektu.`,
+- Jeśli otworzysz taki link bez zalogowania, po zalogowaniu wrócisz do tego samego obiektu.
+- Dla administratorek/administratorów: zmiana blueprintu, na który wskazuje połączenie z Toadie, usuwa teraz powiązania kontraktów prowadzące przez to połączenie. Opisywały obiekty starego blueprintu i w przeciwnym razie odpowiadałyby za nowy.`,
   },
   {
     version: "1.2.6",

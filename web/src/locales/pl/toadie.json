@@ -21,6 +21,7 @@
     "useDatasetMapping": "Użyj mapowania zbioru danych",
     "serviceBlueprint": "Blueprint usługi",
     "apiBlueprint": "Blueprint API lub zbioru danych",
+    "blueprintChangeWarning": "Zmiana docelowego blueprintu usunie powiązania kontraktów utworzone przez to połączenie — opisują obiekty starego blueprintu. Po zapisaniu powiąż te kontrakty ponownie.",
     "providesRelation": "Relacja dostarczania lub tworzenia",
     "consumesRelation": "Relacja użycia",
     "systemRelation": "Relacja systemu"

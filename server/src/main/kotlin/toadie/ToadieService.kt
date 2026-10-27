@@ -31,6 +31,13 @@ val ToadieServiceKey = AttributeKey<ToadieService>("ToadieService")
 data class ToadieConnectionListResult(val items: List<ToadieConnectionResponse>, val total: Long)
 data class ToadieApiListResult(val items: List<ToadieEntityRef>, val total: Long)
 data class ToadieLinkMatchListResult(val items: List<ToadieLinkMatch>, val total: Long)
+
+/**
+ * The outcome of editing a connection: [changed] is 0 when no active connection carries the id
+ * (the route turns that into a 404), and [linksCleared] counts the contract links dropped because
+ * the connection changed which blueprint it targets. The route audits the two separately.
+ */
+data class ToadieConnectionUpdateResult(val changed: Int, val linksCleared: Int)
 @kotlinx.serialization.Serializable
 internal data class ToadieFullUsageProjection(
     val connection: ToadieConnectionRef?,
@@ -170,14 +177,21 @@ class ToadieService(
         }[Connections.id].value
     }
 
-    suspend fun update(id: UInt, request: ToadieConnectionRequest): Int = suspendTransaction(database) {
+    suspend fun update(id: UInt, request: ToadieConnectionRequest): ToadieConnectionUpdateResult = suspendTransaction(database) {
         val current = Connections.selectAll().where { (Connections.id eq id) and Connections.active() }
-            .forUpdate().toList().singleOrNull() ?: return@suspendTransaction 0
+            .forUpdate().toList().singleOrNull()
+            ?: return@suspendTransaction ToadieConnectionUpdateResult(changed = 0, linksCleared = 0)
         if (request.baseUrl != current[Connections.baseUrl]) {
             throw ConflictException("baseUrl is the connection identity; create a new connection to change it")
         }
         val mappingChanged = request.mapping != current.mapping() || request.registryMapping != current.registryMapping() ||
             request.adoptionMapping != current.adoptionMapping()
+        // Deliberately NOT `mappingChanged`: that is also true for a relation-name or registry edit,
+        // which leaves every link pointing at the same entities. Only the TARGET BLUEPRINT moving
+        // orphans them, and a link row carries no blueprint of its own to tell them apart later.
+        // Case-insensitively, because every blueprint comparison in this package is (a cosmetic
+        // `api` -> `API` edit still matches the same entities, so its links must survive).
+        val blueprintChanged = !request.mapping.apiBlueprint.equals(current.mapping().apiBlueprint, ignoreCase = true)
         val apiKeyChanged = request.apiKey != null
         val key = request.apiKey?.let(cipher::encrypt) ?: current[Connections.apiKey]
         val changed = Connections.update({ (Connections.id eq id) and Connections.active() }) {
@@ -209,7 +223,12 @@ class ToadieService(
             it[updatedAt] = nowMillis()
         }
         if (mappingChanged) SnapshotEntities.deleteWhere { SnapshotEntities.connectionId eq id }
-        changed
+        // The links of a connection that now targets another blueprint are dead either way: the
+        // forward read reports them MISSING for good, `replaceLinks` refuses to re-save an entity id
+        // absent from the snapshot, and `resolveToadieLinks` would otherwise let their stored
+        // identifiers answer lookups for the NEW blueprint — an OpenAPI contract for a dataset.
+        val linksCleared = if (blueprintChanged) Links.deleteWhere { Links.connectionId eq id } else 0
+        ToadieConnectionUpdateResult(changed, linksCleared)
     }
 
     suspend fun registryCandidates(

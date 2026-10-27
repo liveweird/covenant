@@ -154,6 +154,37 @@ describe("Toadie connections page", () => {
     });
   });
 
+  test("retargeting an existing connection at another blueprint warns that its links will go", async () => {
+    localStorage.setItem("covenant.auth.roles", JSON.stringify(["ADMIN"]));
+    const user = userEvent.setup();
+    renderWithProviders(<ToadieConnections />);
+    await user.click(await screen.findByRole("button", { name: "Operations for Architecture" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Advanced mapping" }));
+    // The stored blueprint, untouched: nothing is being dropped, so no warning.
+    expect(within(dialog).queryByText(/removes the contract links/)).not.toBeInTheDocument();
+
+    // A cosmetic case change is not a retarget — the server compares blueprints case-insensitively.
+    const blueprint = within(dialog).getByLabelText("API or dataset blueprint");
+    await user.clear(blueprint);
+    await user.type(blueprint, "API");
+    expect(within(dialog).queryByText(/removes the contract links/)).not.toBeInTheDocument();
+
+    // A real retarget says so BEFORE the save, since the server clears the links on it.
+    await user.clear(blueprint);
+    await user.type(blueprint, "dataset");
+    expect(within(dialog).getByText(/removes the contract links/)).toBeInTheDocument();
+
+    // A brand-new connection has no links to lose, so the warning never applies there.
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await user.click(await screen.findByRole("button", { name: "New connection" }));
+    const fresh = await screen.findByRole("dialog");
+    await user.click(within(fresh).getByRole("button", { name: "Advanced mapping" }));
+    await user.click(within(fresh).getByRole("button", { name: "Use dataset mapping" }));
+    expect(within(fresh).queryByText(/removes the contract links/)).not.toBeInTheDocument();
+  });
+
   test("an administrator can queue a manual refresh from the row menu", async () => {
     localStorage.setItem("covenant.auth.roles", JSON.stringify(["ADMIN"]));
     const user = userEvent.setup();

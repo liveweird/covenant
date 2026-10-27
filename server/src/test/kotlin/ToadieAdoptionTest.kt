@@ -90,11 +90,17 @@ class ToadieAdoptionTest {
             assertEquals(2, retained.items.size, "a failed scan cannot publish a false zero")
 
             val unknownMapping = mapping.copy(environmentRelation = null)
-            assertEquals(1, service.update(connectionId, ToadieConnectionRequest(
-                name = "adoption-updated-${System.nanoTime()}", baseUrl = "http://adoption.internal",
-                browserUrl = "http://adoption.internal", enabled = true, refreshIntervalMinutes = 60,
-                adoptionMapping = unknownMapping,
-            )))
+            assertEquals(
+                1,
+                service.update(
+                    connectionId,
+                    ToadieConnectionRequest(
+                        name = "adoption-updated-${System.nanoTime()}", baseUrl = "http://adoption.internal",
+                        browserUrl = "http://adoption.internal", enabled = true, refreshIntervalMinutes = 60,
+                        adoptionMapping = unknownMapping,
+                    ),
+                ).changed,
+            )
             val invalidated = reader.get("/api/v1/contracts/${contract.id}/toadie-adoptions")
                 .body<ToadieAdoptionResponse>()
             assertEquals(ToadieAdoptionAvailability.NOT_SCANNED, invalidated.availability)

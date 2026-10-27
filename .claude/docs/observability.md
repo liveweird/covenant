@@ -58,6 +58,15 @@ read-only and unaudited. No property values, descriptions, upstream documents or
 belong in these logs. These operations do not change contract ownership or lifecycle and do
 not append contract product history or follower notifications.
 
+**Entity resolver link clearing (1.3.0).** Retargeting a connection at another `api_blueprint`
+drops the contract links it carried, because a link row records no blueprint of its own and its
+stored identifier would otherwise answer lookups for the new blueprint. The PUT emits
+`toadie_connection.links_cleared` (`byUserId`, `connectionId`, `linkCount`) beside the ordinary
+`toadie_connection.updated`, and only when rows were actually removed — a relation-name, registry
+or adoption edit still rescans the snapshot but clears nothing and logs nothing extra. Counts only:
+no entity identifiers, titles or contract names. The resolver read itself
+(`GET /api/v1/toadie-links`) is unaudited like every other catalog read.
+
 
 **Hardening log policy:** Flyway logs a JDBC target with userinfo, query parameters and semicolon
 parameters removed. Logout parsing/token failures, MFA delivery failures and password-reset failures log only the

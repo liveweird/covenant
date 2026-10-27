@@ -122,11 +122,20 @@ private fun Route.connectionRoutes(
                 requireAdmin(caller)
                 val request = sanitizeToadieRequest(call.receive())
                 validateToadieRequest(request, apiKeyRequired = false, allowHttp = allowHttp)
-                service.update(route.id, request).orNotFound("Toadie connection")
+                val updated = service.update(route.id, request)
+                updated.changed.orNotFound("Toadie connection")
                 audit(
                     "toadie_connection.updated", "byUserId" to caller.userId.toLong(),
                     "connectionId" to route.id.toLong(), "baseHost" to java.net.URI(request.baseUrl).host,
                 )
+                // Retargeting a connection at another blueprint drops the contract links it carried;
+                // that is a deletion an ADMIN triggered indirectly, so it gets its own event.
+                if (updated.linksCleared > 0) {
+                    audit(
+                        "toadie_connection.links_cleared", "byUserId" to caller.userId.toLong(),
+                        "connectionId" to route.id.toLong(), "linkCount" to updated.linksCleared,
+                    )
+                }
                 if (request.enabled) refresh.request(route.id, force = false)
                 call.respond(HttpStatusCode.NoContent)
             }
