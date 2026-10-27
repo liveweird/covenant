@@ -3,7 +3,24 @@ import { randomUUID } from "node:crypto";
 
 // A test-owned HTTP upstream: the browser talks only to Covenant, whose real GraphQL client
 // reads this fixture through Docker's host gateway. No live Toadie architecture is modified.
-export async function startToadieFixture({ datasets = false, adoptions = false }: { datasets?: boolean; adoptions?: boolean } = {}) {
+/**
+ * One entity a caller adds to the catalog. Reverse reads like `GET /api/v1/toadie-links` are keyed
+ * on (blueprint, identifier) ALONE — nothing scopes them to a connection or a contract — so a spec
+ * that asserts on a SINGLE match cannot share this fixture's stock `orders`/`events` identifiers
+ * with the specs running beside it on another worker. It passes its own uniquely named entity here.
+ */
+export type ExtraFixtureEntity = {
+  id: string;
+  blueprint: string;
+  identifier: string;
+  title: string;
+  relations: Record<string, string | string[]>;
+};
+
+export async function startToadieFixture(
+  { datasets = false, adoptions = false, extraEntities = [] }:
+  { datasets?: boolean; adoptions?: boolean; extraEntities?: ExtraFixtureEntity[] } = {},
+) {
   datasets = datasets || adoptions;
   const adoptionProperties = { status: { type: "string" }, declared_by: { type: "string" }, verified_at: { type: "string", format: "date-time" }, notes: { type: "string" } };
   const key = `e2e-${randomUUID()}`;
@@ -67,6 +84,7 @@ export async function startToadieFixture({ datasets = false, adoptions = false }
       { id: "16", blueprint: "dataset_adoption", identifier: "pipeline-orders", title: "Declared dataset adoption",
         properties: { contract_version: "1.0.0", status: "current", declared_by: "data.team", verified_at: "2026-08-02T09:00:00Z", notes: "Keep `orders` compatible <script>not executable</script>" }, relations: { consumer: "pipeline", dataset: "orders" } },
     ] : []),
+    ...extraEntities,
     ...(adoptions ? [
       { id: "17", blueprint: "environment", identifier: "production", title: "Production", relations: {} },
       { id: "18", blueprint: "api_adoption", identifier: "storefront-orders-v2", title: "Parallel API adoption",
