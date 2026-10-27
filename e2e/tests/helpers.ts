@@ -30,9 +30,13 @@ export async function login(page: Page, email = ADMIN, password = PASSWORD): Pro
   await expect(accountMenu(page)).toBeVisible({ timeout: 15_000 });
 }
 
-/** The header account-menu trigger — visible only inside the authenticated shell (v1.19.0). */
+/**
+ * The header account-menu trigger — visible only inside the authenticated shell (v1.19.0). Its
+ * accessible name carries the signed-in name ("Account menu: Admin"), because a label beside
+ * visible text has to contain that text (WCAG 2.5.3), so match the stable prefix.
+ */
 export function accountMenu(page: Page) {
-  return page.getByRole("button", { name: "Account menu" });
+  return page.getByRole("button", { name: /^Account menu/ });
 }
 
 /** Sign out through the account menu (the former header Logout button). */

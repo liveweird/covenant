@@ -63,7 +63,7 @@ describe("UserMenu", () => {
     stubFetch((url) => (url === "/api/v1/users/7" ? Response.json(ME) : undefined));
     const user = userEvent.setup();
     renderMenu();
-    await user.click(screen.getByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("button", { name: /^Account menu/ }));
     expect(await screen.findByText("alice@covenant.local")).toBeInTheDocument();
     expect(screen.getAllByText("Alice Admin").length).toBeGreaterThan(0);
     expect(screen.getByText("Admin")).toBeInTheDocument();
@@ -71,11 +71,27 @@ describe("UserMenu", () => {
     expect(screen.getByRole("menuitem", { name: /Changelog/ })).toHaveAttribute("href", "/changelog");
   });
 
+  // WCAG 2.5.3 Label in Name, which axe reports as `label-content-name-mismatch` (serious): a
+  // control whose label sits beside visible text must have that text IN its accessible name, or a
+  // voice-control user cannot activate what they can read. The nightly axe sweep catches a
+  // regression a day late, so pin it here too.
+  test("the accessible name contains the trigger's whole visible text, initials included", async () => {
+    stubFetch((url) => (url === "/api/v1/users/7" ? Response.json(ME) : undefined));
+    renderMenu();
+
+    const trigger = await screen.findByRole("button", { name: "Account menu: AAAlice Admin" });
+    // This is axe's own comparison: `label-content-name-mismatch` takes the element's visible text
+    // — its textContent, initials glued to the name and all — and requires it inside the accessible
+    // name as a contiguous run of words. Asserting it here catches a drift in CI rather than a day
+    // later in the nightly axe sweep.
+    expect(trigger.getAttribute("aria-label")).toContain(trigger.textContent);
+  });
+
   test("lists every language by its native name; a pick switches the UI and saves server-side", async () => {
     const mockFetch = stubFetch((url) => (url === "/api/v1/users/7" ? Response.json(ME) : undefined));
     const user = userEvent.setup();
     renderMenu();
-    await user.click(screen.getByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("button", { name: /^Account menu/ }));
     expect(await screen.findByRole("menuitem", { name: "English" })).toBeInTheDocument();
     await user.click(screen.getByRole("menuitem", { name: "Polski" }));
     expect(i18n.resolvedLanguage).toBe("pl");
@@ -92,7 +108,7 @@ describe("UserMenu", () => {
     const mockFetch = stubFetch(() => undefined);
     const user = userEvent.setup();
     renderMenu();
-    await user.click(screen.getByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("button", { name: /^Account menu/ }));
     await user.click(await screen.findByRole("menuitem", { name: "Polski" }));
     expect(i18n.resolvedLanguage).toBe("pl");
     expect(mockFetch).not.toHaveBeenCalled();
@@ -102,7 +118,7 @@ describe("UserMenu", () => {
     stubFetch(() => undefined);
     const user = userEvent.setup();
     renderMenu();
-    await user.click(screen.getByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("button", { name: /^Account menu/ }));
     await user.click(await screen.findByRole("radio", { name: "Dark" }));
     await waitFor(() =>
       expect(document.documentElement.getAttribute("data-mantine-color-scheme")).toBe("dark"),
@@ -131,7 +147,7 @@ describe("UserMenu", () => {
     }));
     const user = userEvent.setup();
     renderProtectedMenu();
-    await user.click(screen.getByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("button", { name: /^Account menu/ }));
     await user.click(await screen.findByRole("menuitem", { name: "Sign out" }));
     await waitFor(() => expect(localStorage.getItem("covenant.auth.token")).toBeNull());
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();

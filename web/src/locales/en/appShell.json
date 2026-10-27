@@ -26,6 +26,7 @@
   },
   "userMenu": {
     "open": "Account menu",
+    "openFor": "Account menu: {{name}}",
     "language": "Language",
     "theme": "Theme",
     "themeLight": "Light",
