@@ -66,9 +66,6 @@ is not a current dependency or security assessment.
   API-generation tooling, then a three-workspace migration.
 - **networknt 3:** [PR #10](https://github.com/liveweird/covenant/pull/10) crosses the
   current Jackson 2 validator boundary and needs a coordinated parser/schema migration.
-- **Stoplight types 14:** [PR #3](https://github.com/liveweird/covenant/pull/3) must be
-  evaluated with the AsyncAPI parser and Spectral graph; changing only the direct pin does
-  not align their transitive requirements. Check whether the unused direct pin is needed.
 
 The ongoing compatibility rules and maintenance checks are in
 [dependency maintenance](.claude/docs/dependencies.md).
