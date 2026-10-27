@@ -155,4 +155,22 @@ ch.nokillswit
 ├── systems/            the hierarchy's middle level (V8): System.kt, SystemService.kt (joins the domain
 │                       name; domainId filter; a PUT moves the system; the domain id checked inside the
 │                       write's transaction), SystemRoutes.kt — /api/v1/systems, same authz split
+└── toadie/             the read-only Toadie/Port connector (0.10.0 → 1.3.0): ToadieModels.kt (DTOs,
+                        limits, the mapping presets, the snapshot types + the client interface),
+                        ToadieValidation.kt (request sanitizing; HTTPS required outside development),
+                        ToadieService.kt (the Connections/SnapshotEntities/Links tables — the
+                        composition root for everything below — ADMIN connection CRUD with the
+                        encrypted api_key, refresh claim/lease/publish, a contract's links, usage and
+                        adoptions), ToadieGraphqlClient.kt (the real Port GraphQL reader: revision
+                        comparison, bounded paging, one restart), ToadieRefresh.kt (the scheduled +
+                        on-demand coordinator, coalescing and cooldown), ToadieOverview.kt and
+                        ToadieAdoptionProjection.kt (read projections over the cached snapshot —
+                        shared freshness classification, batched usage counts, declared adoption),
+                        ToadieLinkResolution.kt (the REVERSE link read behind /api/v1/toadie-links —
+                        which contracts cover one Toadie entity; the resolver URL Toadie generates is
+                        a stable cross-app contract), ToadieRegistry.kt + ToadieRegistryProjection.kt
+                        + ToadieRegistryRoutes.kt (optional domain/system/team synchronization),
+                        ToadieRoutes.kt — /api/v1/toadie-connections (ADMIN writes), the
+                        contract-scoped /toadie-links|-usage|-adoptions (writer guards), and the
+                        cross-contract /api/v1/toadie-links lookup (any authenticated caller)
 ```

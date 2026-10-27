@@ -30,6 +30,7 @@ val ToadieServiceKey = AttributeKey<ToadieService>("ToadieService")
 
 data class ToadieConnectionListResult(val items: List<ToadieConnectionResponse>, val total: Long)
 data class ToadieApiListResult(val items: List<ToadieEntityRef>, val total: Long)
+data class ToadieLinkMatchListResult(val items: List<ToadieLinkMatch>, val total: Long)
 @kotlinx.serialization.Serializable
 internal data class ToadieFullUsageProjection(
     val connection: ToadieConnectionRef?,
@@ -310,6 +311,13 @@ class ToadieService(
             projectLinks(connection, links, cachedApis),
         )
     }
+
+    /**
+     * The REVERSE link read — which contracts cover one Toadie entity. The query, its matching
+     * rules and its row projection live in [resolveToadieLinks]; this is only the transaction.
+     */
+    suspend fun resolveLinks(blueprint: String, identifier: String, paging: PageRequest): ToadieLinkMatchListResult =
+        suspendTransaction(database) { resolveToadieLinks(blueprint, identifier, paging) }
 
     suspend fun usage(
         contractId: UInt,

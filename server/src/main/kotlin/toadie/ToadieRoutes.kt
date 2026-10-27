@@ -13,6 +13,7 @@ import ch.nokillswit.contracts.ContractServiceKey
 import ch.nokillswit.infra.db.orVanished
 import ch.nokillswit.infra.paging.optionalString
 import ch.nokillswit.infra.paging.parsePaging
+import ch.nokillswit.infra.paging.singleValue
 import ch.nokillswit.infra.paging.toPage
 import io.ktor.http.*
 import io.ktor.resources.*
@@ -30,6 +31,7 @@ import kotlinx.serialization.Serializable
 private val CONNECTION_SORT_FIELDS = setOf("id", "name", "createdAt", "updatedAt")
 private val API_SORT_FIELDS = setOf("id", "title")
 private val USAGE_SORT_FIELDS = setOf("id", "title")
+private val LINK_MATCH_SORT_FIELDS = setOf("id", "contractName")
 
 @Serializable
 @Resource("/api/v1/toadie-connections")
@@ -48,6 +50,17 @@ class ToadieConnectionsRoute {
 @Serializable
 @Resource("/api/v1/contracts/{contractId}/toadie-links")
 class ContractToadieLinksRoute(val contractId: UInt)
+
+/**
+ * The reverse of [ContractToadieLinksRoute] — the same link resource read ACROSS contracts, so a
+ * Toadie entity can find the contract(s) that cover it. A filtered collection rather than a
+ * `/resolve` sub-path: API-RES-003 keeps verbs out of paths, and `blueprint`/`identifier` are
+ * ordinary whitelisted equality filters (API-LIST-004). Query form, not a path segment, so an
+ * identifier carrying `/` or `+` never meets path decoding.
+ */
+@Serializable
+@Resource("/api/v1/toadie-links")
+class ToadieLinksRoute
 
 @Serializable
 @Resource("/api/v1/contracts/{contractId}/toadie-usage")
@@ -68,6 +81,7 @@ fun Application.configureToadieRoutes() {
     routing {
         authenticate {
             connectionRoutes(service, refresh, developmentMode)
+            linkResolutionRoutes(service)
             registryRoutes(service)
             contractRoutes(service, refresh, contracts, activity)
         }
@@ -135,6 +149,33 @@ private fun Route.connectionRoutes(
                     .orNotFound("Toadie connection")
                 call.respond(HttpStatusCode.OK, paging.toPage(result.items, result.total))
             }
+}
+
+private fun Route.linkResolutionRoutes(service: ToadieService) {
+    get<ToadieLinksRoute> {
+        call.caller()
+        val params = call.request.queryParameters
+        val blueprint = params.requiredIdentifierParam("blueprint", MAX_TOADIE_NAME_LENGTH)
+        val identifier = params.requiredIdentifierParam("identifier", MAX_TOADIE_IDENTIFIER_LENGTH)
+        val paging = call.parsePaging(LINK_MATCH_SORT_FIELDS)
+        val result = service.resolveLinks(blueprint, identifier, paging)
+        call.respond(HttpStatusCode.OK, paging.toPage(result.items, result.total))
+    }
+}
+
+/**
+ * A required, byte-exact lookup key: present, non-blank and within the stored column's width.
+ * Length is checked here rather than left to a guaranteed-empty query, so an over-long key is the
+ * 400 API-SEC-003 asks for instead of a silent "not linked". The value itself is NOT normalized —
+ * Toadie resolves relation targets byte-exactly, so the lookup must too.
+ */
+private fun Parameters.requiredIdentifierParam(name: String, maxLength: Int): String {
+    val value = singleValue(name) ?: throw BadRequestException("$name is required")
+    if (value.isBlank()) throw BadRequestException("$name must not be blank")
+    if (value.codePointCount(0, value.length) > maxLength) {
+        throw BadRequestException("$name must be at most $maxLength characters")
+    }
+    return value
 }
 
 private fun Route.contractRoutes(

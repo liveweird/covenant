@@ -1,5 +1,8 @@
 package ch.nokillswit.toadie
 
+import ch.nokillswit.contracts.ContractType
+import ch.nokillswit.contracts.LatestVersionSummary
+import ch.nokillswit.contracts.RefSummary
 import ch.nokillswit.infra.paging.PageResponse
 import io.ktor.util.AttributeKey
 import kotlinx.serialization.Serializable
@@ -7,6 +10,9 @@ import kotlinx.serialization.Serializable
 const val MAX_TOADIE_CONNECTIONS = 10
 const val MAX_TOADIE_LINKS = 100
 const val MAX_TOADIE_NAME_LENGTH = 100
+/** The stored width of a Toadie entity identifier (`toadie_snapshot_entities.identifier`,
+ * `contract_toadie_links.identifier`) — also the reverse lookup's accepted key length. */
+const val MAX_TOADIE_IDENTIFIER_LENGTH = 200
 const val MAX_TOADIE_URL_LENGTH = 2048
 const val MAX_MIGRATION_REPORT_BYTES = 8 * 1024 * 1024
 internal const val MIGRATION_REPORT_ENVELOPE_RESERVE_BYTES = 256 * 1024
@@ -241,6 +247,33 @@ data class ToadieLinksResponse(
 
 @Serializable
 data class ToadieLinksRequest(val connectionId: UInt?, val apiEntityIds: List<String>)
+
+/**
+ * One contract that currently covers a Toadie entity — the REVERSE of [ToadieLinksResponse],
+ * answering "which Covenant contract is this `api`/`dataset` about?" for the deep link Toadie
+ * renders on its own entity pages (see `.claude/docs/toadie-integration.md`, "Resolving a Toadie
+ * entity"). [connection] names WHICH Toadie the link came through, because Covenant may hold
+ * several connections over the same blueprint and each can link the same identifier.
+ *
+ * [identifier] and [title] are the CURRENT snapshot's values where the entity is still in the
+ * cache, else the copies stored when the link was made — the same preference the forward read
+ * applies (`ToadieService.toLinkResponse`), so a renamed entity resolves under its new name.
+ */
+@Serializable
+data class ToadieLinkMatch(
+    val linkId: UInt,
+    val contractId: UInt,
+    val contractName: String,
+    val type: ContractType,
+    val system: RefSummary,
+    val latestVersion: LatestVersionSummary?,
+    val connection: ToadieConnectionRef,
+    val blueprint: String,
+    val identifier: String,
+    val title: String,
+)
+
+typealias ToadieLinkMatchPageResponse = PageResponse<ToadieLinkMatch>
 
 @Serializable
 enum class ToadieUsageRole { PROVIDER, CONSUMER }

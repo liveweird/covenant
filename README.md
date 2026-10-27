@@ -251,6 +251,14 @@ dataset consumption. Optional adoption entities can be read using a separate opt
 see [declared adoption](.claude/docs/toadie-adoption.md). See the
 [ODCS setup instructions](.claude/docs/toadie-integration.md#configure-odcs-dataset-usage).
 
+Since **1.3.0** the link also works the other way round. `/toadie/{blueprint}/{identifier}` —
+for example `/toadie/api/orders` — resolves a Toadie entity to the contract(s) that cover it:
+one match opens the contract directly, several offer a short list naming the connection each
+came through, and an entity nothing covers yet says so. Signing in returns you to the same
+entity. Toadie produces those URLs itself from a calculated blueprint property over the
+entity's identifier, so it stores no Covenant ids and never calls Covenant; the URL shape is a
+stable contract between the two apps. Treat it as one when changing routes.
+
 ## Registry metadata from Toadie
 
 Since **1.0.0**, administrators can enable registry synchronization on a Toadie connection,
