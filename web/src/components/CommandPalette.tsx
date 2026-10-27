@@ -91,10 +91,14 @@ export default function CommandPalette() {
   const shortcut = os === "macos" ? "⌘ K" : "Ctrl K";
   return (
     <>
+      {/* No aria-label: this button has visible text (placeholder + shortcut), which IS its
+          accessible name. A label beside visible text must CONTAIN that text (WCAG 2.5.3 Label in
+          Name, axe `label-content-name-mismatch`) or a voice-control user cannot say what they
+          read — and a label repeating an OS-dependent shortcut would only drift again. The
+          icon-only variant below has no text, so it still needs the label. */}
       <UnstyledButton
         className={classes.paletteTrigger}
         visibleFrom="sm"
-        aria-label={t("appShell.palette.open")}
         onClick={palette.open}
       >
         <IconSearch size={16} />

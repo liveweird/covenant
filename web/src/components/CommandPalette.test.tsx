@@ -32,11 +32,24 @@ describe("CommandPalette", () => {
     localStorage.clear();
   });
 
+  // The same Label-in-Name rule as UserMenu's: this trigger carries visible text, so its accessible
+  // name IS that text. An aria-label here would have to repeat an OS-dependent shortcut to stay
+  // valid, which is exactly how the previous mismatch went unnoticed.
+  test("the desktop trigger is named by its own visible text", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    renderPalette();
+
+    const trigger = screen.getByRole("button", { name: /^Search or jump to a page/ });
+    expect(trigger).not.toHaveAttribute("aria-label");
+    expect(trigger.textContent).toContain("Search or jump to a page");
+  });
+
   test("the header trigger opens the palette listing the session's pages", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const user = userEvent.setup();
     renderPalette();
-    await user.click(screen.getAllByRole("button", { name: "Search and jump to…" })[0]);
+    // The desktop trigger is named by its own visible text; the icon-only one keeps the label.
+    await user.click(screen.getByRole("button", { name: /^Search or jump to a page/ }));
     expect(await screen.findByRole("button", { name: /Hierarchy/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Change password/ })).toBeInTheDocument();
     // A regular session never sees the admin pages.

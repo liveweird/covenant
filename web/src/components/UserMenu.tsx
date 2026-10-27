@@ -93,7 +93,19 @@ export default function UserMenu() {
         title={changelogUnseen ? t("changelog.whatsNew") : undefined}
       >
         <Menu.Target>
-          <UnstyledButton aria-label={t("appShell.userMenu.open")} px={4} py={2}>
+          {/* The accessible name must CONTAIN the trigger's visible text as a CONTIGUOUS run of words
+              (WCAG 2.5.3 Label in Name, axe `label-content-name-mismatch`) or a voice-control user
+              cannot activate what they read. That text is this button's `textContent` — the avatar
+              initials immediately followed by the name, with NO separator between them — so the
+              label embeds exactly that, glued the same way. Measured, not assumed: a label reading
+              "… A Admin" fails where "… AAdmin" passes, and `aria-hidden` on the avatar does not
+              help because axe compares against what is on SCREEN, not what a screen reader gets.
+              Without a name there is no visible text and the plain label stands. */}
+          <UnstyledButton
+            aria-label={name ? t("appShell.userMenu.openFor", { name: `${initials(name)}${name}` }) : t("appShell.userMenu.open")}
+            px={4}
+            py={2}
+          >
             <Group gap={6} wrap="nowrap">
               <Avatar size={28} radius="xl" color="covenant" variant="light">
                 {initials(name)}
