@@ -390,6 +390,6 @@ org.testcontainers:testcontainers-jdbc:2.0.5=testCompileClasspath,testRuntimeCla
 org.testcontainers:testcontainers-kafka:2.0.5=testCompileClasspath,testRuntimeClasspath
 org.testcontainers:testcontainers-postgresql:2.0.5=testCompileClasspath,testRuntimeClasspath
 org.testcontainers:testcontainers:2.0.5=testCompileClasspath,testRuntimeClasspath
-org.xerial.snappy:snappy-java:1.1.10.9=runtimeClasspath,testRuntimeClasspath
+org.xerial.snappy:snappy-java:1.1.10.12=runtimeClasspath,testRuntimeClasspath
 org.yaml:snakeyaml:2.6=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
 empty=annotationProcessor,detektPlugins,implementationDependenciesMetadata,kotlinCompilerPluginClasspath,kotlinNativeCompilerPluginClasspath,kotlinScriptDefExtensions,koverExternalArtifacts,koverExternalArtifactsJvm,shadow,testAnnotationProcessor,testImplementationDependenciesMetadata,testKotlinScriptDefExtensions
