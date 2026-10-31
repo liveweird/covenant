@@ -18,7 +18,7 @@ exposed = "1.6.0"
 flyway = "13.11.1"
 kotlin = "2.4.21"
 kover = "0.9.11"
-logback = "1.6.5"
+logback = "1.6.6"
 opentelemetry = "1.67.0"
 # Netty alignment (2026-09-04, Lettuce): Ktor's engine ships Netty 4.2 while r2dbc-postgresql 1.1.2
 # asks for reactor-netty 1.1.22 (built on 4.1.112) — Gradle lifted the shared modules to 4.2 and left
@@ -55,7 +55,7 @@ kafka-clients = "4.4.0"
 # details of r2dbc-postgresql, Kafka and openapi-diff; server constraints select the first fixed
 # releases without forcing coordinated upgrades of those direct dependencies.
 scram = "3.4"
-lz4-java = "1.12.0"
+lz4-java = "1.12.1"
 commons-configuration = "2.15.1"
 # Added 2026-10-27 after the advisory database picked these up mid-evening (the same PRs passed the
 # scan twenty minutes earlier). Both are transitive and neither is called from server code:
