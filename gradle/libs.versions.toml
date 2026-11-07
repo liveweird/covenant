@@ -29,7 +29,7 @@ opentelemetry = "1.67.0"
 # on a SINGLE version that reactor-netty was not built on. 2026-10-25: 4.2.19.Final is reactor-netty
 # 1.3.8's declared Netty, so it moves together with reactor-bom 2025.0.8 below — netty-bom on its
 # own (Dependabot #89) stayed held for a week until that upstream pairing shipped.
-netty = "4.2.19.Final"
+netty = "4.2.20.Final"
 # The SDK line and the instrumentation line MUST pair (instrumentation BOM 2.33.x -> SDK 1.67.0 —
 # read the SDK version off the instrumentation BOM's pom before bumping either; opentelemetry-ktor-3.0
 # 2.33.0-alpha declares opentelemetry-api 1.67.0). The alpha BOM imported in core pins every
