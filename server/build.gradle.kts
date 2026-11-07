@@ -23,7 +23,7 @@ buildscript {
             classpath("org.apache.logging.log4j:log4j-core:2.26.1")
             classpath("org.codehaus.plexus:plexus-utils:4.1.0")
             // Guava rides the Ktor plugin's own classpath; keep it above the same advisory floor.
-            classpath("com.google.guava:guava:33.7.2-jre")
+            classpath("com.google.guava:guava:33.8.0-jre")
             // Ktor requests an open commons-lang3 range. Keep regeneration on the reviewed lock version.
             classpath("org.apache.commons:commons-lang3") { version { strictly("3.20.0") } }
         }

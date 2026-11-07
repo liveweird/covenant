@@ -15,10 +15,10 @@ detekt = "1.23.8"
 # that fix's behaviour change — a client-escaped value now reaching the database with its escaping
 # intact — has no subject here. Re-check that list before adding a SQL-function call site.
 exposed = "1.6.0"
-flyway = "13.11.1"
+flyway = "13.12.0"
 kotlin = "2.4.21"
 kover = "0.9.11"
-logback = "1.6.5"
+logback = "1.6.6"
 opentelemetry = "1.67.0"
 # Netty alignment (2026-09-04, Lettuce): Ktor's engine ships Netty 4.2 while r2dbc-postgresql 1.1.2
 # asks for reactor-netty 1.1.22 (built on 4.1.112) — Gradle lifted the shared modules to 4.2 and left
@@ -38,7 +38,7 @@ netty = "4.2.19.Final"
 opentelemetry-ktor = "2.33.0-alpha"
 # Stable semconv, held deliberately apart from the instrumentation BOM's incubating pin: 2.33.0-alpha
 # pins semconv-incubating 1.44.0-alpha, the same series, so this stays put across the SDK bump.
-opentelemetry-semconv = "1.44.0"
+opentelemetry-semconv = "1.45.0"
 r2dbc-pool = "1.0.2.RELEASE"
 # The Reactor BOM pairs core, pool and Netty versions; the alignment gate checks its constraints.
 # 2025.0.8 pairs reactor-core 3.8.8 / reactor-netty 1.3.8 / reactor-pool 1.2.8, and reactor-netty
@@ -55,7 +55,7 @@ kafka-clients = "4.4.0"
 # details of r2dbc-postgresql, Kafka and openapi-diff; server constraints select the first fixed
 # releases without forcing coordinated upgrades of those direct dependencies.
 scram = "3.4"
-lz4-java = "1.12.0"
+lz4-java = "1.12.1"
 commons-configuration = "2.15.1"
 # Added 2026-10-27 after the advisory database picked these up mid-evening (the same PRs passed the
 # scan twenty minutes earlier). Both are transitive and neither is called from server code:
@@ -66,7 +66,7 @@ commons-configuration = "2.15.1"
 # reports guava's fix as plain "33.7.2", but every Guava release carries a `-jre`/`-android` flavour
 # and the bare coordinate does not exist — this is the JVM one. The constraint also lifts the
 # test-compile classpath off 32.1.3-ANDROID, which is the wrong flavour for a server anyway.
-guava = "33.7.2-jre"
+guava = "33.8.0-jre"
 snappy-java = "1.1.10.9"
 
 # Contract validation: these libraries build against Jackson 2.22.2. The 2026-10-14
