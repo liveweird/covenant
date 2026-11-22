@@ -1,9 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-labelledby="t d">
   <title id="t">Covenant</title>
-  <desc id="d">A triskele — three spiralling paths from one centre; three who meet make a covenant.</desc>
+  <desc id="d">A witch's familiar with a crescent on its forehead, framed by a violet seal.</desc>
   <circle cx="24" cy="24" r="22" fill="#a887f2"/>
-  <path d="M24 24 C24 14 30 8 37 12 C40 14 39 19 35.5 18.5" fill="none" stroke="#2a1650" stroke-width="2.7" stroke-linecap="round" transform="rotate(0 24 24)"/>
-  <path d="M24 24 C24 14 30 8 37 12 C40 14 39 19 35.5 18.5" fill="none" stroke="#2a1650" stroke-width="2.7" stroke-linecap="round" transform="rotate(120 24 24)"/>
-  <path d="M24 24 C24 14 30 8 37 12 C40 14 39 19 35.5 18.5" fill="none" stroke="#2a1650" stroke-width="2.7" stroke-linecap="round" transform="rotate(240 24 24)"/>
-  <circle cx="24" cy="24" r="2.2" fill="#e8b84a"/>
+  <circle cx="24" cy="24" r="19.8" fill="none" stroke="#7a44d6" stroke-width="0.8"/>
+  <path d="M18.5 5a19.8 19.8 0 0 1 11 0" fill="none" stroke="#dccffc" stroke-linecap="round" stroke-width="0.8"/>
+  <path d="M24 7.1q0.6 2.4 2.9 2.9-2.3 0.5-2.9 2.9-0.6-2.4-2.9-2.9 2.3-0.5 2.9-2.9Z" fill="#421c7a"/>
+  <g fill="#5b2aa6">
+    <circle cx="7.4" cy="22.6" r="0.8"/>
+    <circle cx="40.6" cy="22.6" r="0.8"/>
+  </g>
+  <path fill="#421c7a" d="M19.9 18.7C22.4 17.7 25.6 17.7 28.1 18.7
+    C30.2 15.5 32.4 12.2 34.9 9.7C36.7 14.4 37.6 19.5 36.8 25
+    C39.4 28.9 38 33.1 34.6 35.6C32.4 37.3 29.1 38.7 26.8 39.6
+    C25 40.3 23 40.3 21.2 39.6C18.9 38.7 15.6 37.3 13.4 35.6
+    C10 33.1 8.6 28.9 11.2 25C10.4 19.5 11.3 14.4 13.1 9.7
+    C15.6 12.2 17.8 15.5 19.9 18.7Z"/>
+  <path fill="#5b2aa6" d="M34.9 9.7C36.7 14.4 37.6 19.5 36.8 25
+    C39.4 28.9 38 33.1 34.6 35.6C32.4 37.3 29.1 38.7 26.8 39.6
+    C25.9 39.95 24.9 40.1 24 40.1C30.4 36.8 33.2 32.9 33.1 28.5
+    C33 24.5 34.6 18.1 34.9 9.7Z"/>
+  <path d="M13.7 14.6q2.4 2.6 4.2 5.6l-4.6 2.2q-0.3-3.7 0.4-7.8Z" fill="#7a44d6"/>
+  <path d="M34.3 14.6q-2.4 2.6-4.2 5.6l4.6 2.2q0.3-3.7-0.4-7.8Z" fill="#8f62e8"/>
+  <path d="M21.3 18.9C19.7 21 20.3 24 22.6 25C25.3 26.2 28 24.1 28 21.5
+    C28 20.6 27.6 19.5 26.7 18.9C27 21 25.7 22.5 24 22.5S21 21 21.3 18.9Z" fill="#f6f2ff"/>
+  <path d="M14.5 27.1C17.4 26.6 20 27.4 21.5 30.4C18.4 30.5 16.1 29.5 14.5 27.1Z
+    M33.5 27.1C30.6 26.6 28 27.4 26.5 30.4C29.6 30.5 31.9 29.5 33.5 27.1Z" fill="#dccffc"/>
+  <path d="M22.5 33.5q1.5-0.7 3 0 0.1 0.7-1.5 1.8-1.6-1.1-1.5-1.8Z" fill="#a887f2"/>
 </svg>
