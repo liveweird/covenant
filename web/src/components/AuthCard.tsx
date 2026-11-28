@@ -12,7 +12,7 @@ interface Props {
 
 /**
  * The shared scaffold of the unauthenticated pages (Login): a soft brand-tinted canvas
- * (scheme-aware — a faint radial amber wash) holding a lifted card with the brand lockup,
+ * holding a lifted card with the brand lockup,
  * a dimmed page title, and the VersionStamp underneath. The child structure and all text
  * are pinned by tests; only the frame is decorative.
  */
@@ -21,7 +21,7 @@ export default function AuthCard({ title, children }: Props) {
 
   return (
     <Center
-      h="100vh"
+      mih="100dvh"
       p="md"
       style={{
         background:
@@ -30,8 +30,8 @@ export default function AuthCard({ title, children }: Props) {
           "light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-8)) 70%)",
       }}
     >
-      <Stack gap="sm">
-        <Paper shadow="lg" p="xl" radius="lg" w={384} withBorder>
+      <Stack gap="sm" w="100%" maw={384}>
+        <Paper shadow="md" p={{ base: "lg", sm: "xl" }} radius="lg" withBorder>
           <Stack>
             <Stack align="center" gap="xs">
               <BrandLogo size={48} />

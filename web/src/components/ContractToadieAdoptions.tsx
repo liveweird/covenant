@@ -13,6 +13,7 @@ import EmptyState from "./EmptyState";
 import LoadingBlock from "./LoadingBlock";
 import PaginationBar from "./PaginationBar";
 import SortHeader from "./SortHeader";
+import TableViewport from "./TableViewport";
 
 const SORT_FIELDS = ["title", "id"] as const;
 type SortField = (typeof SORT_FIELDS)[number];
@@ -46,7 +47,7 @@ export default function ContractToadieAdoptions({ contractId, onFetchingChange }
     {cache?.lastSuccessAt != null && <Text size="sm" c="dimmed">{t("toadie.adoptions.sourceSnapshot", { time: formatDateTime(cache.lastSuccessAt, i18n.language) })}</Text>}
     {availability === "AVAILABLE" && <>
       <ClearableTextInput label={t("toadie.adoptions.search")} value={search} onChange={setSearch} clearLabel={t("common.filter.clearName")} />
-      <Table.ScrollContainer minWidth={900}>
+      <TableViewport label={t("toadie.adoptions.tableAria")} minWidth={900} empty={!query.isLoading && !query.isError && query.data?.items.length === 0}>
         <Table aria-label={t("toadie.adoptions.title")}>
           <Table.Thead><Table.Tr>
             <SortHeader field="title" label={t("toadie.adoptions.declaration")} activeField={paging.sortField} activeDir={paging.sortDir} onToggle={paging.toggleSort} />
@@ -65,7 +66,7 @@ export default function ContractToadieAdoptions({ contractId, onFetchingChange }
             {!query.isLoading && !query.isError && query.data?.items.length === 0 && <Table.Tr><Table.Td colSpan={7}><EmptyState icon={IconListDetails} label={cacheIncomplete ? t("toadie.adoptions.emptyIncomplete") : t("toadie.adoptions.empty")} /></Table.Td></Table.Tr>}
           </Table.Tbody>
         </Table>
-      </Table.ScrollContainer>
+      </TableViewport>
       <PaginationBar total={query.data?.total ?? 0} page={paging.page} pageSize={paging.pageSize} onPageChange={paging.setPage} onPageSizeChange={paging.setPageSize} />
     </>}
   </Stack>;

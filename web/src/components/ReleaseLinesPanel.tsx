@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
-import { Alert, Anchor, Badge, Button, Group, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
+import { Alert, Anchor, Badge, Button, Group, Paper, SimpleGrid, Stack, Text, Title } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { IconFilter, IconPlus, IconSettings } from "@tabler/icons-react";
 import {
@@ -15,7 +15,6 @@ import { supportStatusLabel } from "../utils/releaseLines";
 import ReleaseLinePolicyModal from "./ReleaseLinePolicyModal";
 import ReleaseLinePlan from "./ReleaseLinePlan";
 import RetirementImpactModal from "./RetirementImpactModal";
-import EmptyState from "./EmptyState";
 import LifecyclePill from "./LifecyclePill";
 import LoadingBlock from "./LoadingBlock";
 
@@ -45,18 +44,18 @@ export default function ReleaseLinesPanel({
 
   return (
     <Stack component="section" aria-label={t("contracts.releaseLines.title")} gap="sm">
-      <Text fw={600} size="lg">
+      <Title order={3} size="h4">
         {t("contracts.releaseLines.title")}
-      </Text>
+      </Title>
       {lines.isLoading && !lines.data && <LoadingBlock />}
       {lines.isError && (
         <Alert color="red" variant="light" title={t("contracts.releaseLines.loadFailed")}>
           {loadErrorMessage(lines.error, t)}
         </Alert>
       )}
-      {lines.data?.length === 0 && !lines.isError && <EmptyState icon={IconSettings} label={t("contracts.releaseLines.empty")} />}
+      {lines.data?.length === 0 && !lines.isError && <Text size="sm" c="dimmed">{t("contracts.releaseLines.empty")}</Text>}
       {lines.data && lines.data.length > 0 && (
-        <SimpleGrid cols={{ base: 1, lg: 2 }}>
+        <SimpleGrid type="container" cols={{ base: 1, "52rem": 2 }}>
           {lines.data.map((line) => (
             <ReleaseLineCard key={line.id} line={line} canWrite={canWrite} onReview={() => setReviewing(line)} onEdit={() => setEditing(line)} onFilter={() => onFilter(line.major)} />
           ))}
@@ -70,7 +69,7 @@ export default function ReleaseLinesPanel({
 
 function SummaryLink({ contractId, version }: { contractId: number; version: NonNullable<ReleaseLineResponse["latestVersion"]> }) {
   return (
-    <Group gap={6} wrap="nowrap">
+    <Group gap={6}>
       <Anchor component={RouterLink} to={versionPath(contractId, version.id)} size="sm" ff="monospace">
         {version.version}
       </Anchor>
@@ -95,7 +94,7 @@ function ReleaseLineCard({
   const { t } = useTranslation();
   const name = `${line.major}.x`;
   return (
-    <Paper component="section" aria-label={t("contracts.releaseLines.lineAria", { line: name })} withBorder p="md" radius="md">
+    <Paper component="section" aria-label={t("contracts.releaseLines.lineAria", { line: name })} withBorder p="sm" radius="md">
       <Stack gap="sm">
         <Group justify="space-between" align="center">
           <Text fw={700}>{name}</Text>
@@ -103,7 +102,7 @@ function ReleaseLineCard({
             {supportStatusLabel(line.supportStatus, t)}
           </Badge>
         </Group>
-        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
+        <SimpleGrid cols={2} spacing="xs">
           <LineValue label={t("contracts.releaseLines.latestVersion")}>
             {line.latestVersion ? <SummaryLink contractId={line.contractId} version={line.latestVersion} /> : t("contracts.releaseLines.noVersions")}
           </LineValue>

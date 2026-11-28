@@ -7,7 +7,7 @@ import MarkdownView from "./MarkdownView";
 export default function ReaderInfoHeader({ info, externalDocs, tags, specLabel }: { info: InfoView; externalDocs?: ExternalDocsView; tags: readonly TagView[]; specLabel: string }) {
   const { t } = useTranslation();
   return (
-    <Stack gap="xs" id="reader-info" data-pointer="/info">
+    <Stack gap="xs" id="reader-info" data-pointer="/info" style={{ overflowWrap: "anywhere" }}>
       <Group gap="sm" align="baseline">
         <Title order={3}>{info.title || t("reader.untitled")}</Title>
         <Badge variant="outline" color="gray" style={{ textTransform: "none" }}>
@@ -26,7 +26,7 @@ export default function ReaderInfoHeader({ info, externalDocs, tags, specLabel }
             {info.contact.email && (
               <>
                 {" "}
-                <Anchor href={`mailto:${info.contact.email}`} size="sm">
+                <Anchor href={`mailto:${info.contact.email}`} size="sm" underline="always">
                   {info.contact.email}
                 </Anchor>
               </>
@@ -34,7 +34,7 @@ export default function ReaderInfoHeader({ info, externalDocs, tags, specLabel }
             {info.contact.url && (
               <>
                 {" "}
-                <Anchor href={info.contact.url} size="sm" target="_blank" rel="noreferrer">
+                <Anchor href={info.contact.url} size="sm" underline="always" target="_blank" rel="noreferrer">
                   {info.contact.url}
                 </Anchor>
               </>
@@ -45,7 +45,7 @@ export default function ReaderInfoHeader({ info, externalDocs, tags, specLabel }
           <Text size="sm" c="dimmed">
             {t("reader.license")}:{" "}
             {info.license.url ? (
-              <Anchor href={info.license.url} size="sm" target="_blank" rel="noreferrer">
+              <Anchor href={info.license.url} size="sm" underline="always" target="_blank" rel="noreferrer">
                 {info.license.name}
               </Anchor>
             ) : (

@@ -176,6 +176,7 @@
   },
   "adoptions": {
     "title": "Declared adoption from Toadie",
+    "tableAria": "Declared adoption table",
     "intro": "Explicit upstream version or major-line declarations. These declarations are separate from observed runtime usage.",
     "loadFailed": "Could not load declared adoption",
     "search": "Search adoption declarations",
@@ -213,6 +214,7 @@
   "usage": {
     "lastRefreshed": "Last successful refresh: {{time}}",
     "title": "Usage from Toadie",
+    "tableAria": "Toadie usage table",
     "intro": "Declared providers and consumers from the latest cached Toadie data.",
     "editLinks": "Edit Toadie links",
     "links": "Linked APIs or datasets",

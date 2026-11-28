@@ -32,6 +32,7 @@ describe("ContractDetails page", () => {
   });
 
   test("shows the placement, the owner, the versions (highest first) and the writer's actions", async () => {
+    const user = userEvent.setup();
     serve(mockFetch, {
       "GET /api/v1/contracts/5": { status: 200, body: CONTRACT },
       "GET /api/v1/contracts/5/versions?": { status: 200, body: VERSION_PAGE },
@@ -45,6 +46,9 @@ describe("ContractDetails page", () => {
     expect(screen.getByRole("link", { name: "Open version 1.0.0" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "New version" })).toHaveAttribute("href", "/contracts/5/versions/new?from=11");
     expect(screen.getByRole("link", { name: "Compare versions" })).toHaveAttribute("href", "/contracts/5/diff");
+    expect(screen.queryByRole("combobox", { name: "Release line" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    expect(screen.getByRole("menuitem", { name: /^Infer/ })).toHaveAttribute("href", "/contracts/5/infer");
     expect(calledUrl(mockFetch, "GET", (u) => u.startsWith("/api/v1/contracts/5/versions?") && u.includes("sort=-version"))).toBeDefined();
     expect(screen.getByText("Active")).toBeInTheDocument();
     const history = await screen.findByRole("region", { name: "History" });
@@ -89,6 +93,7 @@ describe("ContractDetails page", () => {
     await user.click(within(lines).getByRole("button", { name: "Filter versions in 1.x" }));
     await waitFor(() => expect(calledUrl(mockFetch, "GET", (url) => url.includes("/versions?") && url.includes("major=1"))).toBeDefined());
     expect(screen.getByRole("combobox", { name: "Release line" })).toHaveValue("1.x");
+    expect(screen.getByRole("heading", { name: "Versions of orders-api" })).toHaveFocus();
   });
 
   test("a reader has no write actions; the More menu still exports", async () => {

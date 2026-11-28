@@ -58,7 +58,7 @@ export default function VersionAsidePanel({
       <Paper withBorder p="md" radius="md">
         <Stack gap="md">
           {toc.length > 0 && (
-            // The divider travels with the TOC: below `lg` the panel stacks under the document and
+            // The divider travels with the TOC: below `lg` the panel stacks before the document and
             // shows Findings only, with no stray hairline above them.
             <Box visibleFrom="lg">
               <Stack gap="md">

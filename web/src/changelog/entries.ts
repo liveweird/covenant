@@ -17,6 +17,22 @@ interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    version: "1.4.0",
+    date: "2026-11-28",
+    en: `**A more compact workspace for browsing and reviewing contracts.**
+
+- The narrower sidebar, centered search, and clearer page headings give the catalog more room. The new witch’s familiar appears in the app and browser tab in both themes.
+- Filters and summaries use less vertical space. Wide tables scroll within their own area, and hierarchy rows wrap on small screens.
+- Contract pages show the version list before release-line details. Filtering from a release line takes you straight to those versions.
+- The OpenAPI reader uses fewer nested panels. On narrow screens, findings appear above the document.`,
+    pl: `**Bardziej zwarty widok katalogu i przeglądania kontraktów.**
+
+- Węższy pasek boczny, wyszukiwarka na środku i czytelniejsze nagłówki dają katalogowi więcej miejsca. Nowy znak z kocim chowańcem widać w aplikacji i na karcie przeglądarki w obu motywach.
+- Filtry i podsumowania zajmują mniej miejsca w pionie. Szerokie tabele przewijają się we własnym obszarze, a wiersze hierarchii dopasowują się do wąskiego ekranu.
+- Strona kontraktu pokazuje listę wersji przed szczegółami linii wydania. Filtrowanie z poziomu linii przenosi od razu do jej wersji.
+- Czytnik OpenAPI ma mniej zagnieżdżonych paneli. Na wąskich ekranach ustalenia pojawiają się nad dokumentem.`,
+  },
+  {
     version: "1.3.0",
     date: "2026-10-27",
     en: `**Open a contract straight from Toadie.**

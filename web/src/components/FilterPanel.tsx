@@ -1,8 +1,9 @@
-import { type ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { Badge, Button, Group, Paper } from "@mantine/core";
 import { IconChevronDown, IconFilter } from "@tabler/icons-react";
 import { useTranslation } from "react-i18next";
 import { isBoolean, useStoredState } from "../hooks/useStoredState";
+import classes from "../theme.module.css";
 
 /**
  * The collapsible filter drawer above every list table: collapsed by default, open state
@@ -26,14 +27,16 @@ export default function FilterPanel({
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useStoredState(`${storageKey}.filtersOpen`, false, isBoolean);
+  const panelId = useId();
   return (
     <div>
-      <Group gap="xs" mb={open ? "sm" : 0} wrap="wrap">
+      <Group gap="xs" mb={open ? "xs" : 0} wrap="wrap">
         <Button
           variant="default"
           size="xs"
           onClick={() => setOpen(!open)}
           aria-expanded={open}
+          aria-controls={open ? panelId : undefined}
           leftSection={<IconFilter size={16} />}
           rightSection={
             <Group gap={6} wrap="nowrap" component="span">
@@ -42,10 +45,7 @@ export default function FilterPanel({
                   {activeFilterCount}
                 </Badge>
               )}
-              <IconChevronDown
-                size={16}
-                style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}
-              />
+              <IconChevronDown size={16} className={classes.filterChevron} data-open={open || undefined} aria-hidden />
             </Group>
           }
         >
@@ -55,10 +55,8 @@ export default function FilterPanel({
         {trailing && <Group ml="auto">{trailing}</Group>}
       </Group>
       {open && (
-        <Paper withBorder radius="md" p="sm" bg="var(--mantine-color-default-hover)">
-          <Group align="flex-end" gap="sm">
-            {children}
-          </Group>
+        <Paper id={panelId} withBorder radius="md" p="sm" className={classes.filterFields}>
+          {children}
         </Paper>
       )}
     </div>

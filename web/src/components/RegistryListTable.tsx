@@ -5,10 +5,12 @@ import { useTranslation } from "react-i18next";
 import EmptyState from "./EmptyState";
 import PaginationBar from "./PaginationBar";
 import TableLoadingRow from "./TableLoadingRow";
+import TableViewport from "./TableViewport";
 import { loadErrorMessage } from "../utils/saveError";
 
 /** Common load/error/empty/pagination shell for the small registry tables. */
 export default function RegistryListTable({
+  label,
   errorTitle,
   error,
   isError,
@@ -26,6 +28,7 @@ export default function RegistryListTable({
   onPageChange,
   onPageSizeChange,
 }: {
+  label: string;
   errorTitle: string;
   error: unknown;
   isError: boolean;
@@ -52,22 +55,28 @@ export default function RegistryListTable({
           {loadErrorMessage(error, t)}
         </Alert>
       )}
-      <Table>
-        <Table.Thead>{header}</Table.Thead>
-        <Table.Tbody>
-          {isLoading && !hasData ? (
-            <TableLoadingRow colSpan={columnCount} />
-          ) : rowCount > 0 ? (
-            rows
-          ) : !isError ? (
-            <Table.Tr>
-              <Table.Td colSpan={columnCount}>
-                <EmptyState icon={emptyIcon} label={emptyLabel} />
-              </Table.Td>
-            </Table.Tr>
-          ) : null}
-        </Table.Tbody>
-      </Table>
+      <TableViewport
+        label={label}
+        minWidth={560}
+        empty={!isLoading && !isError && rowCount === 0}
+      >
+        <Table>
+          <Table.Thead>{header}</Table.Thead>
+          <Table.Tbody>
+            {isLoading && !hasData ? (
+              <TableLoadingRow colSpan={columnCount} />
+            ) : rowCount > 0 ? (
+              rows
+            ) : !isError ? (
+              <Table.Tr>
+                <Table.Td colSpan={columnCount}>
+                  <EmptyState icon={emptyIcon} label={emptyLabel} />
+                </Table.Td>
+              </Table.Tr>
+            ) : null}
+          </Table.Tbody>
+        </Table>
+      </TableViewport>
       <PaginationBar
         total={total}
         page={page}

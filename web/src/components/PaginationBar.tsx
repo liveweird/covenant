@@ -39,16 +39,17 @@ export default function PaginationBar({
           allowDeselect={false}
           w={110}
         />
-        <Pagination
-          value={page}
-          onChange={onPageChange}
-          total={totalPages}
-          siblings={1}
-          withEdges
-          // The edge/arrow controls are icon-only; without names they fail WCAG 4.1.2
-          // (the axe e2e spec pins this).
-          getControlProps={(control) => ({ "aria-label": t(`common.table.${control}Page`) })}
-        />
+        {(totalPages > 1 || page > 1) && (
+          <Pagination
+            value={page}
+            onChange={onPageChange}
+            total={totalPages}
+            siblings={1}
+            size="sm"
+            withEdges
+            getControlProps={(control) => ({ "aria-label": t(`common.table.${control}Page`) })}
+          />
+        )}
       </Group>
     </Group>
   );

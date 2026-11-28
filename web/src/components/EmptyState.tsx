@@ -7,12 +7,12 @@ import type { Icon } from "@tabler/icons-react";
  */
 export default function EmptyState({ icon: Icon, label }: { icon: Icon; label: string }) {
   return (
-    <Center py={48}>
-      <Stack align="center" gap="sm">
-        <ThemeIcon variant="light" color="gray" size={64} radius="xl">
-          <Icon size={32} stroke={1.2} />
+    <Center py="xl" data-empty-state>
+      <Stack align="center" gap="xs">
+        <ThemeIcon variant="light" color="gray" size={44} radius="md" aria-hidden>
+          <Icon size={24} stroke={1.5} />
         </ThemeIcon>
-        <Text c="dimmed" size="sm">
+        <Text c="dimmed" size="sm" ta="center" maw="54ch">
           {label}
         </Text>
       </Stack>

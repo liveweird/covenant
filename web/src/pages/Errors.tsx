@@ -16,6 +16,7 @@ import PageHeader from "../components/PageHeader";
 import PaginationBar from "../components/PaginationBar";
 import SortHeader from "../components/SortHeader";
 import TableLoadingRow from "../components/TableLoadingRow";
+import TableViewport from "../components/TableViewport";
 import TypeBadge from "../components/TypeBadge";
 import { useErrorFilterState } from "../hooks/useErrorFilterState";
 import { usePagedSort } from "../hooks/usePagedSort";
@@ -91,84 +92,90 @@ export default function Errors() {
           {loadErrorMessage(error, t)}
         </Alert>
       )}
-      <Table>
-        <Table.Thead>
-          <Table.Tr>
-            <SortHeader field="name" label={t("errors.field.contract")} activeField={sortField} activeDir={sortDir} onToggle={toggleSort} />
-            <SortHeader field="version" label={t("errors.field.version")} activeField={sortField} activeDir={sortDir} onToggle={toggleSort} />
-            <Table.Th>{t("errors.field.findings")}</Table.Th>
-            <SortHeader field="checkedAt" label={t("errors.field.checked")} activeField={sortField} activeDir={sortDir} onToggle={toggleSort} />
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {filters.noSelection ? (
+      <TableViewport
+        label={t("errors.title")}
+        minWidth={720}
+        empty={filters.noSelection || (!isLoading && !isError && rows.length === 0)}
+      >
+        <Table>
+          <Table.Thead>
             <Table.Tr>
-              <Table.Td colSpan={columnCount}>
-                <EmptyState icon={IconListCheck} label={t("errors.noSelection")} />
-              </Table.Td>
+              <SortHeader field="name" label={t("errors.field.contract")} activeField={sortField} activeDir={sortDir} onToggle={toggleSort} />
+              <SortHeader field="version" label={t("errors.field.version")} activeField={sortField} activeDir={sortDir} onToggle={toggleSort} />
+              <Table.Th>{t("errors.field.findings")}</Table.Th>
+              <SortHeader field="checkedAt" label={t("errors.field.checked")} activeField={sortField} activeDir={sortDir} onToggle={toggleSort} />
             </Table.Tr>
-          ) : isLoading && !data ? (
-            <TableLoadingRow colSpan={columnCount} />
-          ) : rows.length > 0 ? (
-            rows.map(({ row, showContract }) => (
-              <Table.Tr key={row.version.id}>
-                <Table.Td>
-                  {showContract && (
-                    <Stack gap={2}>
-                      <Group gap={6} wrap="nowrap">
-                        <ContractNameLink id={row.contract.id} name={row.contract.name} />
-                        <TypeBadge type={row.contract.type} size="xs" />
-                      </Group>
-                      <Text size="xs" c="dimmed">
-                        {row.contract.system.name} · {row.contract.domain.name}
-                      </Text>
-                      <OwnerChip owner={row.contract.owner} />
-                    </Stack>
-                  )}
-                </Table.Td>
-                <Table.Td>
-                  <Group gap={6} wrap="nowrap">
-                    <Anchor
-                      component={RouterLink}
-                      to={versionPath(row.contract.id, row.version.id)}
-                      ff="monospace"
-                      size="sm"
-                      aria-label={t("errors.openVersionAria", { version: row.version.version, contract: row.contract.name })}
-                    >
-                      {row.version.version}
-                    </Anchor>
-                    <LifecyclePill lifecycle={row.version.lifecycle} size="xs" />
-                    <CheckSummaryBadges errors={row.version.checkErrors} warnings={row.version.checkWarnings} complete={row.version.checkComplete} />
-                  </Group>
-                </Table.Td>
-                <Table.Td>
-                  <Group gap={4} wrap="wrap">
-                    {groupFindingsByCode(row.findings).map((g) => (
-                      <Badge key={`${g.severity}-${g.source}-${g.code}`} variant="light" size="xs" color={SEVERITY_COLOR[g.severity]} title={g.message} tt="none" ff="monospace">
-                        {g.code}
-                        {g.count > 1 ? ` ${t("errors.times", { count: g.count })}` : ""}
-                      </Badge>
-                    ))}
-                  </Group>
-                </Table.Td>
-                <Table.Td>
-                  <Tooltip label={formatDateTime(row.version.checkedAt, i18n.language)}>
-                    <Text size="sm" c="dimmed">
-                      {relativeTimeAgo(row.version.checkedAt, i18n.language)}
-                    </Text>
-                  </Tooltip>
+          </Table.Thead>
+          <Table.Tbody>
+            {filters.noSelection ? (
+              <Table.Tr>
+                <Table.Td colSpan={columnCount}>
+                  <EmptyState icon={IconListCheck} label={t("errors.noSelection")} />
                 </Table.Td>
               </Table.Tr>
-            ))
-          ) : !isError ? (
-            <Table.Tr>
-              <Table.Td colSpan={columnCount}>
-                <EmptyState icon={IconListCheck} label={filters.activeCount > 0 ? t("errors.emptyFiltered") : t("errors.noFindings")} />
-              </Table.Td>
-            </Table.Tr>
-          ) : null}
-        </Table.Tbody>
-      </Table>
+            ) : isLoading && !data ? (
+              <TableLoadingRow colSpan={columnCount} />
+            ) : rows.length > 0 ? (
+              rows.map(({ row, showContract }) => (
+                <Table.Tr key={row.version.id}>
+                  <Table.Td>
+                    {showContract && (
+                      <Stack gap={2}>
+                        <Group gap={6} wrap="nowrap">
+                          <ContractNameLink id={row.contract.id} name={row.contract.name} />
+                          <TypeBadge type={row.contract.type} size="xs" />
+                        </Group>
+                        <Text size="xs" c="dimmed">
+                          {row.contract.system.name} · {row.contract.domain.name}
+                        </Text>
+                        <OwnerChip owner={row.contract.owner} />
+                      </Stack>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    <Group gap={6} wrap="nowrap">
+                      <Anchor
+                        component={RouterLink}
+                        to={versionPath(row.contract.id, row.version.id)}
+                        ff="monospace"
+                        size="sm"
+                        aria-label={t("errors.openVersionAria", { version: row.version.version, contract: row.contract.name })}
+                      >
+                        {row.version.version}
+                      </Anchor>
+                      <LifecyclePill lifecycle={row.version.lifecycle} size="xs" />
+                      <CheckSummaryBadges errors={row.version.checkErrors} warnings={row.version.checkWarnings} complete={row.version.checkComplete} />
+                    </Group>
+                  </Table.Td>
+                  <Table.Td>
+                    <Group gap={4} wrap="wrap">
+                      {groupFindingsByCode(row.findings).map((g) => (
+                        <Badge key={`${g.severity}-${g.source}-${g.code}`} variant="light" size="xs" color={SEVERITY_COLOR[g.severity]} title={g.message} tt="none" ff="monospace">
+                          {g.code}
+                          {g.count > 1 ? ` ${t("errors.times", { count: g.count })}` : ""}
+                        </Badge>
+                      ))}
+                    </Group>
+                  </Table.Td>
+                  <Table.Td>
+                    <Tooltip label={formatDateTime(row.version.checkedAt, i18n.language)}>
+                      <Text size="sm" c="dimmed">
+                        {relativeTimeAgo(row.version.checkedAt, i18n.language)}
+                      </Text>
+                    </Tooltip>
+                  </Table.Td>
+                </Table.Tr>
+              ))
+            ) : !isError ? (
+              <Table.Tr>
+                <Table.Td colSpan={columnCount}>
+                  <EmptyState icon={IconListCheck} label={filters.activeCount > 0 ? t("errors.emptyFiltered") : t("errors.noFindings")} />
+                </Table.Td>
+              </Table.Tr>
+            ) : null}
+          </Table.Tbody>
+        </Table>
+      </TableViewport>
       <PaginationBar total={data?.total ?? 0} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} />
     </Stack>
   );

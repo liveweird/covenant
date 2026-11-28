@@ -80,6 +80,7 @@ export default function Domains() {
         <ClearableTextInput label={t("common.field.name")} value={nameFilter} onChange={setNameFilter} clearLabel={t("common.filter.clearName")} />
       </FilterPanel>
       <RegistryListTable
+        label={t("domains.title")}
         errorTitle={t("domains.loadFailed")}
         error={error}
         isError={isError}

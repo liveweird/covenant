@@ -13,6 +13,7 @@ import PaginationBar from "../components/PaginationBar";
 import RowActionsMenu from "../components/RowActionsMenu";
 import SortHeader from "../components/SortHeader";
 import TableLoadingRow from "../components/TableLoadingRow";
+import TableViewport from "../components/TableViewport";
 import ToadieConnectionEditorModal from "../components/ToadieConnectionEditorModal";
 import ToadieRegistrySyncModal from "../components/ToadieRegistrySyncModal";
 import { useDeleteConfirm } from "../hooks/useDeleteConfirm";
@@ -70,35 +71,37 @@ export default function ToadieConnections() {
     <Stack gap="md">
       <PageHeader title={t("toadie.title")} description={t("toadie.intro")} actions={admin && <Button leftSection={<IconPlus size={16} />} onClick={() => { setExpandRegistryMapping(false); setEditor("new"); }}>{t("toadie.newConnection")}</Button>} />
       {(query.isError || refreshError) && <Alert color="red" variant="light" title={query.isError ? t("toadie.loadFailed") : t("toadie.refreshFailed")}>{query.isError ? loadErrorMessage(query.error, t) : refreshError}</Alert>}
-      <Table>
-        <Table.Thead><Table.Tr>
-          <SortHeader field="name" label={t("common.field.name")} activeField={paging.sortField} activeDir={paging.sortDir} onToggle={paging.toggleSort} />
-          <Table.Th>{t("toadie.field.browserUrl")}</Table.Th>
-          <Table.Th>{t("toadie.column.status")}</Table.Th>
-          <Table.Th>{t("toadie.column.lastSuccess")}</Table.Th>
-          <Table.Th>{t("toadie.column.interval")}</Table.Th>
-          {admin && <Table.Th aria-label={t("common.table.operations")} style={{ width: 1 }} />}
-        </Table.Tr></Table.Thead>
-        <Table.Tbody>
-          {query.isLoading && !query.data ? <TableLoadingRow colSpan={columnCount} /> : query.data?.items.length ? query.data.items.map((row) => {
-            const status = connectionStatus(row);
-            return <Table.Tr key={row.id}>
-              <Table.Td><Text size="sm" fw={500}>{row.name}</Text></Table.Td>
-              <Table.Td><Text component="a" href={row.browserUrl} target="_blank" rel="noreferrer" size="sm">{row.browserUrl}</Text></Table.Td>
-              <Table.Td><Badge color={status.color} variant="light">{t(`toadie.status.${status.key}`)}</Badge></Table.Td>
-              <Table.Td>{row.lastSuccessAt == null ? <Text size="sm" c="dimmed">—</Text> : <Tooltip label={formatDateTime(row.lastSuccessAt, i18n.language)}><Text size="sm">{relativeTimeAgo(row.lastSuccessAt, i18n.language)}</Text></Tooltip>}</Table.Td>
-              <Table.Td><Text size="sm">{row.refreshIntervalMinutes} min</Text></Table.Td>
-              {admin && <Table.Td ta="right"><RowActionsMenu label={t("common.table.operationsAria", { name: row.name })}>
-                <Menu.Item leftSection={<IconRefresh size={14} />} disabled={row.refreshing || !row.enabled} onClick={() => void refresh(row)}>{t("toadie.refresh")}</Menu.Item>
-                <Menu.Item leftSection={<IconDatabaseImport size={14} />} onClick={() => setRegistrySync(row)}>{t("toadie.registry.action")}</Menu.Item>
-                <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => { setExpandRegistryMapping(false); setEditor(row); }}>{t("common.action.edit")}</Menu.Item>
-                <Menu.Divider />
-                <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => remove.requestDelete(row)}>{t("common.action.delete")}</Menu.Item>
-              </RowActionsMenu></Table.Td>}
-            </Table.Tr>;
-          }) : !query.isError ? <Table.Tr><Table.Td colSpan={columnCount}><EmptyState icon={IconBrandDatabricks} label={t("toadie.empty")} /></Table.Td></Table.Tr> : null}
-        </Table.Tbody>
-      </Table>
+      <TableViewport label={t("toadie.title")} minWidth={680} empty={!query.data?.items.length}>
+        <Table>
+          <Table.Thead><Table.Tr>
+            <SortHeader field="name" label={t("common.field.name")} activeField={paging.sortField} activeDir={paging.sortDir} onToggle={paging.toggleSort} />
+            <Table.Th>{t("toadie.field.browserUrl")}</Table.Th>
+            <Table.Th>{t("toadie.column.status")}</Table.Th>
+            <Table.Th>{t("toadie.column.lastSuccess")}</Table.Th>
+            <Table.Th>{t("toadie.column.interval")}</Table.Th>
+            {admin && <Table.Th aria-label={t("common.table.operations")} style={{ width: 1 }} />}
+          </Table.Tr></Table.Thead>
+          <Table.Tbody>
+            {query.isLoading && !query.data ? <TableLoadingRow colSpan={columnCount} /> : query.data?.items.length ? query.data.items.map((row) => {
+              const status = connectionStatus(row);
+              return <Table.Tr key={row.id}>
+                <Table.Td><Text size="sm" fw={500}>{row.name}</Text></Table.Td>
+                <Table.Td><Text component="a" href={row.browserUrl} target="_blank" rel="noreferrer" size="sm">{row.browserUrl}</Text></Table.Td>
+                <Table.Td><Badge color={status.color} variant="light">{t(`toadie.status.${status.key}`)}</Badge></Table.Td>
+                <Table.Td>{row.lastSuccessAt == null ? <Text size="sm" c="dimmed">—</Text> : <Tooltip label={formatDateTime(row.lastSuccessAt, i18n.language)}><Text size="sm">{relativeTimeAgo(row.lastSuccessAt, i18n.language)}</Text></Tooltip>}</Table.Td>
+                <Table.Td><Text size="sm">{row.refreshIntervalMinutes} min</Text></Table.Td>
+                {admin && <Table.Td ta="right"><RowActionsMenu label={t("common.table.operationsAria", { name: row.name })}>
+                  <Menu.Item leftSection={<IconRefresh size={14} />} disabled={row.refreshing || !row.enabled} onClick={() => void refresh(row)}>{t("toadie.refresh")}</Menu.Item>
+                  <Menu.Item leftSection={<IconDatabaseImport size={14} />} onClick={() => setRegistrySync(row)}>{t("toadie.registry.action")}</Menu.Item>
+                  <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => { setExpandRegistryMapping(false); setEditor(row); }}>{t("common.action.edit")}</Menu.Item>
+                  <Menu.Divider />
+                  <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => remove.requestDelete(row)}>{t("common.action.delete")}</Menu.Item>
+                </RowActionsMenu></Table.Td>}
+              </Table.Tr>;
+            }) : !query.isError ? <Table.Tr><Table.Td colSpan={columnCount}><EmptyState icon={IconBrandDatabricks} label={t("toadie.empty")} /></Table.Td></Table.Tr> : null}
+          </Table.Tbody>
+        </Table>
+      </TableViewport>
       <PaginationBar total={query.data?.total ?? 0} page={paging.page} pageSize={paging.pageSize} onPageChange={paging.setPage} onPageSizeChange={paging.setPageSize} />
       {editor != null && <ToadieConnectionEditorModal target={editor === "new" ? null : editor} expandRegistryMapping={expandRegistryMapping} onClose={() => setEditor(null)} onSaved={async () => { setEditor(null); await refreshQueriesAfterMutation(queryClient, ["toadie"]); }} />}
       {registrySync != null && <ToadieRegistrySyncModal connection={registrySync} onClose={() => setRegistrySync(null)} onConfigure={() => {

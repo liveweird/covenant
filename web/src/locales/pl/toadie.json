@@ -176,6 +176,7 @@
   },
   "adoptions": {
     "title": "Zadeklarowana adopcja z Toadie",
+    "tableAria": "Tabela zadeklarowanej adopcji",
     "intro": "Jawne deklaracje wersji lub linii głównej ze źródła. Są oddzielone od zaobserwowanego użycia w czasie działania.",
     "loadFailed": "Nie udało się wczytać zadeklarowanej adopcji",
     "search": "Szukaj deklaracji adopcji",
@@ -213,6 +214,7 @@
   "usage": {
     "lastRefreshed": "Ostatnie udane odświeżenie: {{time}}",
     "title": "Użycie z Toadie",
+    "tableAria": "Tabela użycia z Toadie",
     "intro": "Deklarowani dostawcy i odbiorcy z najnowszych danych Toadie w pamięci podręcznej.",
     "editLinks": "Edytuj powiązania Toadie",
     "links": "Powiązane API lub zbiory danych",

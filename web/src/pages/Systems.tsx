@@ -103,6 +103,7 @@ export default function Systems() {
         />
       </FilterPanel>
       <RegistryListTable
+        label={t("systems.title")}
         errorTitle={t("systems.loadFailed")}
         error={error}
         isError={isError}

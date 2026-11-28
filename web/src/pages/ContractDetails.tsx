@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
-import { Alert, Button, Group, Menu, Paper, Select, Stack, Table, Text, Tooltip } from "@mantine/core";
+import { Alert, Button, Group, Menu, Paper, Select, SimpleGrid, Stack, Table, Text, Title, Tooltip } from "@mantine/core";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconArrowsDiff, IconDots, IconDownload, IconFileText, IconPencil, IconPlus, IconTrash, IconWand } from "@tabler/icons-react";
 import { deleteContract, exportContract, getContract } from "../api/contracts";
@@ -22,6 +22,7 @@ import RowActionsMenu from "../components/RowActionsMenu";
 import ReleaseLinesPanel from "../components/ReleaseLinesPanel";
 import SortHeader from "../components/SortHeader";
 import TableLoadingRow from "../components/TableLoadingRow";
+import TableViewport from "../components/TableViewport";
 import TypeBadge from "../components/TypeBadge";
 import ContractToadieUsage from "../components/ContractToadieUsage";
 import { useDeleteConfirm } from "../hooks/useDeleteConfirm";
@@ -49,6 +50,7 @@ export default function ContractDetails() {
   const { id: idParam } = useParams();
   const id = Number(idParam);
   const [versionMajor, setVersionMajor] = useState<number | null>(null);
+  const versionsHeading = useRef<HTMLHeadingElement>(null);
   const contract = useQuery({ queryKey: ["contracts", "detail", id], queryFn: () => getContract(id), enabled: Number.isFinite(id) });
   const { page, setPage, pageSize, setPageSize, sortField, sortDir, sortParam, toggleSort } = usePagedSort<SortField>("version", [id], {
     key: "versions",
@@ -123,11 +125,6 @@ export default function ContractDetails() {
               </Button>
             )}
             {data.canWrite && (
-              <Button component={RouterLink} to={inferVersionPath(id)} variant="default" leftSection={<IconWand size={16} />}>
-                {t("contracts.infer")}
-              </Button>
-            )}
-            {data.canWrite && (
               <Button component={RouterLink} to={newVersionPath(id, latest?.id)} leftSection={<IconPlus size={16} />}>
                 {t("versions.newVersion")}
               </Button>
@@ -142,6 +139,11 @@ export default function ContractDetails() {
                 {data.canWrite && (
                   <Menu.Item component={RouterLink} to={editContractPath(id)} leftSection={<IconPencil size={14} />}>
                     {t("common.action.edit")}
+                  </Menu.Item>
+                )}
+                {data.canWrite && (
+                  <Menu.Item component={RouterLink} to={inferVersionPath(id)} leftSection={<IconWand size={14} />}>
+                    {t("contracts.infer")}
                   </Menu.Item>
                 )}
                 <Menu.Item leftSection={<IconDownload size={14} />} onClick={() => void handleExport()} disabled={data.versionCount === 0}>
@@ -160,16 +162,16 @@ export default function ContractDetails() {
           </>
         }
       />
-      <Paper withBorder p="md" radius="md">
-        <Group gap="xl" wrap="wrap">
+      <Paper withBorder p="sm" radius="md">
+        <SimpleGrid type="container" cols={{ base: 2, "42rem": 4 }} spacing="sm" style={{ overflowWrap: "anywhere" }}>
           <Stack gap={2}>
-            <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+            <Text size="xs" c="dimmed" fw={600}>
               {t("contracts.field.type")}
             </Text>
             <TypeBadge type={data.type} />
           </Stack>
           <Stack gap={2}>
-            <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+            <Text size="xs" c="dimmed" fw={600}>
               {t("contracts.field.system")}
             </Text>
             <Text size="sm">
@@ -177,13 +179,13 @@ export default function ContractDetails() {
             </Text>
           </Stack>
           <Stack gap={2}>
-            <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+            <Text size="xs" c="dimmed" fw={600}>
               {t("contracts.field.owner")}
             </Text>
             <OwnerChip owner={data.owner} />
           </Stack>
           <Stack gap={2}>
-            <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
+            <Text size="xs" c="dimmed" fw={600}>
               {t("contracts.column.latest")}
             </Text>
             {latest ? (
@@ -199,21 +201,14 @@ export default function ContractDetails() {
               </Text>
             )}
           </Stack>
-        </Group>
+        </SimpleGrid>
       </Paper>
-      <ReleaseLinesPanel
-        contractId={id}
-        canWrite={data.canWrite}
-        onFilter={(major) => {
-          setVersionMajor(major);
-          setPage(1);
-        }}
-      />
       <Group justify="space-between" align="flex-end">
-        <Text fw={600} size="lg">
+        <Title order={3} size="h4" ref={versionsHeading} tabIndex={-1}
+          style={{ scrollMarginBlockStart: "calc(var(--app-shell-header-height) + var(--app-shell-padding))" }}>
           {t("versions.tableAria", { name: data.name })}
-        </Text>
-        <Select
+        </Title>
+        {((releaseLines.data?.length ?? 0) > 0 || versionMajor != null) && <Select
           label={t("versions.field.releaseLine")}
           data={(releaseLines.data ?? []).map((line) => ({ value: String(line.major), label: `${line.major}.x` }))}
           value={versionMajor == null ? null : String(versionMajor)}
@@ -224,7 +219,7 @@ export default function ContractDetails() {
           placeholder={t("versions.field.allReleaseLines")}
           clearable
           w={220}
-        />
+        />}
       </Group>
       {downloads.error != null && (
         <Alert color="red" variant="light" withCloseButton onClose={downloads.dismissError} title={t("versions.downloadFailed")}>
@@ -236,92 +231,107 @@ export default function ContractDetails() {
           {loadErrorMessage(versions.error, t)}
         </Alert>
       )}
-      <Table aria-label={t("versions.tableAria", { name: data.name })}>
-        <Table.Thead>
-          <Table.Tr>
-            <SortHeader field="version" label={t("versions.field.version")} activeField={sortField} activeDir={sortDir} onToggle={toggleSort} />
-            <SortHeader field="lifecycle" label={t("versions.field.lifecycle")} activeField={sortField} activeDir={sortDir} onToggle={toggleSort} />
-            <Table.Th>{t("versions.field.title")}</Table.Th>
-            <Table.Th>{t("versions.field.specVersion")}</Table.Th>
-            <Table.Th>{t("findings.title")}</Table.Th>
-            <SortHeader field="updatedAt" label={t("contracts.column.updated")} activeField={sortField} activeDir={sortDir} onToggle={toggleSort} />
-            <Table.Th aria-label={t("common.table.operations")} style={{ width: 1 }} />
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {versions.isLoading && !versions.data ? (
-            <TableLoadingRow colSpan={columnCount} />
-          ) : versions.data && versions.data.items.length > 0 ? (
-            versions.data.items.map((v) => (
-              <Table.Tr key={v.id}>
-                <Table.Td>
-                  <Button component={RouterLink} to={versionPath(id, v.id)} variant="subtle" size="compact-sm" ff="monospace" px={4} aria-label={t("versions.openAria", { version: v.version })}>
-                    {v.version}
-                  </Button>
-                </Table.Td>
-                <Table.Td>
-                  <LifecyclePill lifecycle={v.lifecycle} />
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm" c={v.docTitle ? undefined : "dimmed"} lineClamp={1}>
-                    {v.docTitle ?? "—"}
-                  </Text>
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm" ff="monospace">
-                    {v.specVersion ?? "—"}
-                  </Text>
-                </Table.Td>
-                <Table.Td>
-                  <CheckSummaryBadges errors={v.checkErrors} warnings={v.checkWarnings} complete={v.checkComplete} />
-                </Table.Td>
-                <Table.Td>
-                  <Tooltip label={formatDateTime(v.updatedAt, i18n.language)}>
-                    <Text size="sm" c="dimmed">
-                      {relativeTimeAgo(v.updatedAt, i18n.language)}
+      <TableViewport
+        label={t("versions.tableAria", { name: data.name })}
+        minWidth={760}
+        empty={!versions.isLoading && !versions.isError && (versions.data?.items.length ?? 0) === 0}
+      >
+        <Table aria-label={t("versions.tableAria", { name: data.name })}>
+          <Table.Thead>
+            <Table.Tr>
+              <SortHeader field="version" label={t("versions.field.version")} activeField={sortField} activeDir={sortDir} onToggle={toggleSort} />
+              <SortHeader field="lifecycle" label={t("versions.field.lifecycle")} activeField={sortField} activeDir={sortDir} onToggle={toggleSort} />
+              <Table.Th>{t("versions.field.title")}</Table.Th>
+              <Table.Th>{t("versions.field.specVersion")}</Table.Th>
+              <Table.Th>{t("findings.title")}</Table.Th>
+              <SortHeader field="updatedAt" label={t("contracts.column.updated")} activeField={sortField} activeDir={sortDir} onToggle={toggleSort} />
+              <Table.Th aria-label={t("common.table.operations")} style={{ width: 1 }} />
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {versions.isLoading && !versions.data ? (
+              <TableLoadingRow colSpan={columnCount} />
+            ) : versions.data && versions.data.items.length > 0 ? (
+              versions.data.items.map((v) => (
+                <Table.Tr key={v.id}>
+                  <Table.Td>
+                    <Button component={RouterLink} to={versionPath(id, v.id)} variant="subtle" size="compact-sm" ff="monospace" px={4} aria-label={t("versions.openAria", { version: v.version })}>
+                      {v.version}
+                    </Button>
+                  </Table.Td>
+                  <Table.Td>
+                    <LifecyclePill lifecycle={v.lifecycle} />
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm" c={v.docTitle ? undefined : "dimmed"} lineClamp={1}>
+                      {v.docTitle ?? "—"}
                     </Text>
-                  </Tooltip>
-                </Table.Td>
-                <Table.Td style={{ width: 1 }} ta="right">
-                  <RowActionsMenu label={t("common.table.operationsAria", { name: v.version })} loading={downloads.downloadingId === v.id}>
-                    <Menu.Item
-                      leftSection={<IconDownload size={14} />}
-                      onClick={() => void downloads.download({ contractId: id, versionId: v.id, system: data.system.name, contract: data.name, version: v.version, format: v.format })}
-                    >
-                      {t("versions.download")}
-                    </Menu.Item>
-                    {latest && latest.id !== v.id && (
-                      <Menu.Item component={RouterLink} to={versionDiffPath(id, v.id, latest.id)} leftSection={<IconArrowsDiff size={14} />}>
-                        {t("versions.compareWithLatest")}
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm" ff="monospace">
+                      {v.specVersion ?? "—"}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <CheckSummaryBadges errors={v.checkErrors} warnings={v.checkWarnings} complete={v.checkComplete} />
+                  </Table.Td>
+                  <Table.Td>
+                    <Tooltip label={formatDateTime(v.updatedAt, i18n.language)}>
+                      <Text size="sm" c="dimmed">
+                        {relativeTimeAgo(v.updatedAt, i18n.language)}
+                      </Text>
+                    </Tooltip>
+                  </Table.Td>
+                  <Table.Td style={{ width: 1 }} ta="right">
+                    <RowActionsMenu label={t("common.table.operationsAria", { name: v.version })} loading={downloads.downloadingId === v.id}>
+                      <Menu.Item
+                        leftSection={<IconDownload size={14} />}
+                        onClick={() => void downloads.download({ contractId: id, versionId: v.id, system: data.system.name, contract: data.name, version: v.version, format: v.format })}
+                      >
+                        {t("versions.download")}
                       </Menu.Item>
-                    )}
-                    {data.canWrite && (
-                      <Menu.Item component={RouterLink} to={newVersionPath(id, v.id)} leftSection={<IconPlus size={14} />}>
-                        {t("versions.newFromThis")}
-                      </Menu.Item>
-                    )}
-                    {data.canWrite && isDeletable(v.lifecycle) && (
-                      <>
-                        <Menu.Divider />
-                        <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => removeVersion.requestDelete(v)} aria-label={t("versions.deleteAria", { version: v.version })}>
-                          {t("common.action.delete")}
+                      {latest && latest.id !== v.id && (
+                        <Menu.Item component={RouterLink} to={versionDiffPath(id, v.id, latest.id)} leftSection={<IconArrowsDiff size={14} />}>
+                          {t("versions.compareWithLatest")}
                         </Menu.Item>
-                      </>
-                    )}
-                  </RowActionsMenu>
+                      )}
+                      {data.canWrite && (
+                        <Menu.Item component={RouterLink} to={newVersionPath(id, v.id)} leftSection={<IconPlus size={14} />}>
+                          {t("versions.newFromThis")}
+                        </Menu.Item>
+                      )}
+                      {data.canWrite && isDeletable(v.lifecycle) && (
+                        <>
+                          <Menu.Divider />
+                          <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => removeVersion.requestDelete(v)} aria-label={t("versions.deleteAria", { version: v.version })}>
+                            {t("common.action.delete")}
+                          </Menu.Item>
+                        </>
+                      )}
+                    </RowActionsMenu>
+                  </Table.Td>
+                </Table.Tr>
+              ))
+            ) : !versions.isError ? (
+              <Table.Tr>
+                <Table.Td colSpan={columnCount}>
+                  <EmptyState icon={IconFileText} label={data.canWrite ? t("versions.emptyWriter") : t("versions.empty")} />
                 </Table.Td>
               </Table.Tr>
-            ))
-          ) : !versions.isError ? (
-            <Table.Tr>
-              <Table.Td colSpan={columnCount}>
-                <EmptyState icon={IconFileText} label={data.canWrite ? t("versions.emptyWriter") : t("versions.empty")} />
-              </Table.Td>
-            </Table.Tr>
-          ) : null}
-        </Table.Tbody>
-      </Table>
+            ) : null}
+          </Table.Tbody>
+        </Table>
+      </TableViewport>
       <PaginationBar total={versions.data?.total ?? 0} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} />
+      <ReleaseLinesPanel
+        contractId={id}
+        canWrite={data.canWrite}
+        onFilter={(major) => {
+          setVersionMajor(major);
+          setPage(1);
+          versionsHeading.current?.focus();
+        }}
+      />
       <ContractToadieUsage contractId={id} canWrite={data.canWrite} />
       <ContractHistory contractId={id} />
       <ConfirmDeleteModal

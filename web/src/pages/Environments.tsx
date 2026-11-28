@@ -90,6 +90,7 @@ export default function Environments() {
         />
       </FilterPanel>
       <RegistryListTable
+        label={t("environments.title")}
         errorTitle={t("environments.loadFailed")}
         error={error}
         isError={isError}

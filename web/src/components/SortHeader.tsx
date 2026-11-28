@@ -1,5 +1,6 @@
 import { Table, UnstyledButton } from "@mantine/core";
 import { IconArrowDown, IconArrowUp, IconArrowsSort } from "@tabler/icons-react";
+import classes from "../theme.module.css";
 
 export type SortDir = "asc" | "desc";
 
@@ -30,10 +31,10 @@ export default function SortHeader<F extends string>({
     <Table.Th aria-sort={!isActive ? "none" : activeDir === "asc" ? "ascending" : "descending"} w={width}>
       <UnstyledButton
         onClick={() => onToggle(field)}
-        style={{ display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 600 }}
+        className={classes.sortHeaderButton}
       >
         <span>{label}</span>
-        <Icon size={14} stroke={1.5} opacity={isActive ? 1 : 0.4} />
+        <Icon size={14} stroke={1.5} opacity={isActive ? 1 : 0.4} aria-hidden />
       </UnstyledButton>
     </Table.Th>
   );

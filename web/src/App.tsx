@@ -111,16 +111,17 @@ function Shell() {
   return (
     <AppShell
       header={{ height: 48 }}
-      navbar={{ width: { base: 240, sm: rail ? 64 : 240 }, breakpoint: "sm", collapsed: { mobile: !opened } }}
-      padding="md"
+      navbar={{ width: { base: 240, sm: rail ? 64 : 216 }, breakpoint: "sm", collapsed: { mobile: !opened } }}
+      padding={{ base: "xs", sm: "md" }}
     >
       <AppShell.Header>
         <a href="#main-content" className="skip-link">
           {t("appShell.skipToContent")}
         </a>
-        <Group h={48} px="md" justify="space-between" wrap="nowrap">
-          <Group gap="sm" wrap="nowrap">
-            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+        <Box className={classes.appHeaderLayout}>
+          <Group gap={8} wrap="nowrap" className={classes.appBrand}>
+            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm"
+              aria-label={t("appShell.mobileNav")} aria-expanded={opened} aria-controls="app-navigation" />
             {/* Sits beside the Burger, where the nav it toggles lives. */}
             <Tooltip label={t("appShell.toggleNav")} position="right" withinPortal>
               <ActionIcon
@@ -128,6 +129,8 @@ function Shell() {
                 visibleFrom="sm"
                 onClick={() => setNavCollapsed(!navCollapsed)}
                 aria-label={t("appShell.toggleNav")}
+                aria-expanded={!navCollapsed}
+                aria-controls="app-navigation"
                 data-expanded={!navCollapsed || undefined}
               >
                 {navCollapsed ? (
@@ -142,15 +145,15 @@ function Shell() {
               {t("appShell.brand")}
             </Text>
           </Group>
-          <Group gap="sm" wrap="nowrap">
-            <CommandPalette />
+          <CommandPalette />
+          <Group gap="xs" wrap="nowrap" justify="flex-end">
             <NotificationsButton />
             <UserMenu />
           </Group>
-        </Group>
+        </Box>
       </AppShell.Header>
 
-      <AppShell.Navbar p="xs">
+      <AppShell.Navbar id="app-navigation" p="xs">
         {/* The link list scrolls when it outgrows the viewport; the version stamp stays pinned. */}
         <AppShell.Section grow component={ScrollArea} type="hover" scrollbarSize={6} offsetScrollbars>
           {sections.map((section, index) => (
