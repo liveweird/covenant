@@ -72,7 +72,6 @@ export default function ContractFilterControls({ filters, facets = null }: { fil
         onChange={slots.setTypes}
         clearable
         clearButtonProps={{ "aria-label": t("common.filter.clearType") }}
-        w={220}
       />
       {showLatestVersionFilters && (
         <MultiSelect
@@ -83,7 +82,6 @@ export default function ContractFilterControls({ filters, facets = null }: { fil
           onChange={slots.setLifecycles}
           clearable
           clearButtonProps={{ "aria-label": t("common.filter.clearLifecycle") }}
-          w={240}
         />
       )}
       <Select

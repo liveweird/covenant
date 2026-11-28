@@ -39,7 +39,7 @@ export default function ReaderOpenApi({ model, specVersion }: { model: OpenApiMo
         </ReaderSection>
       )}
       {groups.map((g) => (
-        <ReaderSection key={g.key} id={`tag-${g.key}`} title={g.label ?? t("reader.untagged")}>
+        <ReaderSection key={g.key} id={`tag-${g.key}`} title={g.label ?? t("reader.untagged")} framed={false}>
           {g.label && model.tags.find((tag) => tag.name === g.label)?.description && (
             <Text size="sm" c="dimmed">
               {model.tags.find((tag) => tag.name === g.label)?.description}
@@ -58,7 +58,7 @@ export default function ReaderOpenApi({ model, specVersion }: { model: OpenApiMo
         </Text>
       )}
       {model.webhooks.length > 0 && (
-        <ReaderSection id="reader-webhooks" title={t("reader.section.webhooks")} pointer="/webhooks">
+        <ReaderSection id="reader-webhooks" title={t("reader.section.webhooks")} pointer="/webhooks" framed={false}>
           <Stack gap="sm">
             {model.webhooks.map((op, i) => (
               <OperationCard key={op.pointer} operation={op} id={`webhook-${i}`} inheritedSecurity={model.security} schemaAnchors={anchors} />

@@ -11,6 +11,7 @@ import ClearableTextInput from "./ClearableTextInput";
 import EmptyState from "./EmptyState";
 import PaginationBar from "./PaginationBar";
 import SortHeader from "./SortHeader";
+import TableViewport from "./TableViewport";
 import TableLoadingRow from "./TableLoadingRow";
 import ToadieLinksModal from "./ToadieLinksModal";
 import { loadErrorMessage, saveErrorMessage } from "../utils/saveError";
@@ -90,22 +91,24 @@ export default function ContractToadieUsage({ contractId, canWrite, consumersOnl
           <ClearableTextInput label={t("toadie.usage.service")} value={search} onChange={setSearch} clearLabel={t("common.filter.clearName")} />
           {!consumersOnly && <Select label={t("toadie.usage.role")} value={role} onChange={(value) => setRole(value as typeof role)} placeholder={t("toadie.usage.anyRole")} clearable data={[{ value: "PROVIDER", label: t("toadie.usage.provider") }, { value: "CONSUMER", label: t("toadie.usage.consumer") }]} />}
         </Group>
-        <Table aria-label={t("toadie.usage.title")}>
-          <Table.Thead><Table.Tr>
-            <SortHeader field="title" label={t("toadie.usage.service")} activeField={paging.sortField} activeDir={paging.sortDir} onToggle={paging.toggleSort} />
-            <Table.Th style={{ minWidth: 95 }}>{t("toadie.usage.role")}</Table.Th><Table.Th>{t("toadie.usage.systems")}</Table.Th><Table.Th>{t("toadie.usage.teams")}</Table.Th><Table.Th>{t("toadie.usage.version")}</Table.Th><Table.Th>{t("toadie.usage.releaseLine")}</Table.Th>
-          </Table.Tr></Table.Thead>
-          <Table.Tbody>
-            {usage.isLoading && !usage.data ? <TableLoadingRow colSpan={6} /> : usage.data?.items.length ? usage.data.items.map((row) => <Table.Tr key={row.id}>
-              <Table.Td>{row.url ? <Anchor href={row.url} target="_blank" rel="noreferrer" aria-label={t("toadie.usage.openEntity", { name: row.title })}>{row.title}<IconExternalLink size={12} style={{ marginInlineStart: 4 }} /></Anchor> : <Text size="sm">{row.title}</Text>}<Text size="xs" c="dimmed">{row.identifier}</Text></Table.Td>
-              <Table.Td><Group gap={4}>{row.roles.map((item) => <Badge key={item} style={{ flexShrink: 0 }} variant="light" color={item === "PROVIDER" ? "teal" : "gray"}>{item === "PROVIDER" ? t("toadie.usage.provider") : t("toadie.usage.consumer")}</Badge>)}</Group></Table.Td>
-              <Table.Td>{row.systems.length ? row.systems.map((item) => item.url ? <Anchor key={item.entityId} href={item.url} target="_blank" rel="noreferrer" display="block" size="sm" aria-label={t("toadie.usage.openEntity", { name: item.title })}>{item.title}</Anchor> : <Text key={item.entityId} size="sm">{item.title}</Text>) : "—"}</Table.Td>
-              <Table.Td>{row.teams.length ? row.teams.map((item) => item.url ? <Anchor key={item.entityId} href={item.url} target="_blank" rel="noreferrer" display="block" size="sm" aria-label={t("toadie.usage.openEntity", { name: item.title })}>{item.title}</Anchor> : <Text key={item.entityId} size="sm">{item.title}</Text>) : "—"}</Table.Td>
-              <Table.Td><Text size="sm" c={row.version == null ? "dimmed" : undefined}>{row.version ?? t("toadie.usage.unknown")}</Text></Table.Td>
-              <Table.Td><Text size="sm" c={row.releaseLine == null ? "dimmed" : undefined}>{row.releaseLine ?? t("toadie.usage.unknown")}</Text></Table.Td>
-            </Table.Tr>) : !usage.isError ? <Table.Tr><Table.Td colSpan={6}><EmptyState icon={IconBrandDatabricks} label={t("toadie.usage.empty")} /></Table.Td></Table.Tr> : null}
-          </Table.Tbody>
-        </Table>
+        <TableViewport label={t("toadie.usage.tableAria")} minWidth={640} empty={!usage.data?.items.length}>
+          <Table aria-label={t("toadie.usage.title")}>
+            <Table.Thead><Table.Tr>
+              <SortHeader field="title" label={t("toadie.usage.service")} activeField={paging.sortField} activeDir={paging.sortDir} onToggle={paging.toggleSort} />
+              <Table.Th style={{ minWidth: 95 }}>{t("toadie.usage.role")}</Table.Th><Table.Th>{t("toadie.usage.systems")}</Table.Th><Table.Th>{t("toadie.usage.teams")}</Table.Th><Table.Th>{t("toadie.usage.version")}</Table.Th><Table.Th>{t("toadie.usage.releaseLine")}</Table.Th>
+            </Table.Tr></Table.Thead>
+            <Table.Tbody>
+              {usage.isLoading && !usage.data ? <TableLoadingRow colSpan={6} /> : usage.data?.items.length ? usage.data.items.map((row) => <Table.Tr key={row.id}>
+                <Table.Td>{row.url ? <Anchor href={row.url} target="_blank" rel="noreferrer" aria-label={t("toadie.usage.openEntity", { name: row.title })}>{row.title}<IconExternalLink size={12} style={{ marginInlineStart: 4 }} /></Anchor> : <Text size="sm">{row.title}</Text>}<Text size="xs" c="dimmed">{row.identifier}</Text></Table.Td>
+                <Table.Td><Group gap={4}>{row.roles.map((item) => <Badge key={item} style={{ flexShrink: 0 }} variant="light" color={item === "PROVIDER" ? "teal" : "gray"}>{item === "PROVIDER" ? t("toadie.usage.provider") : t("toadie.usage.consumer")}</Badge>)}</Group></Table.Td>
+                <Table.Td>{row.systems.length ? row.systems.map((item) => item.url ? <Anchor key={item.entityId} href={item.url} target="_blank" rel="noreferrer" display="block" size="sm" aria-label={t("toadie.usage.openEntity", { name: item.title })}>{item.title}</Anchor> : <Text key={item.entityId} size="sm">{item.title}</Text>) : "—"}</Table.Td>
+                <Table.Td>{row.teams.length ? row.teams.map((item) => item.url ? <Anchor key={item.entityId} href={item.url} target="_blank" rel="noreferrer" display="block" size="sm" aria-label={t("toadie.usage.openEntity", { name: item.title })}>{item.title}</Anchor> : <Text key={item.entityId} size="sm">{item.title}</Text>) : "—"}</Table.Td>
+                <Table.Td><Text size="sm" c={row.version == null ? "dimmed" : undefined}>{row.version ?? t("toadie.usage.unknown")}</Text></Table.Td>
+                <Table.Td><Text size="sm" c={row.releaseLine == null ? "dimmed" : undefined}>{row.releaseLine ?? t("toadie.usage.unknown")}</Text></Table.Td>
+              </Table.Tr>) : !usage.isError ? <Table.Tr><Table.Td colSpan={6}><EmptyState icon={IconBrandDatabricks} label={t("toadie.usage.empty")} /></Table.Td></Table.Tr> : null}
+            </Table.Tbody>
+          </Table>
+        </TableViewport>
         <PaginationBar total={usage.data?.total ?? 0} page={paging.page} pageSize={paging.pageSize} onPageChange={paging.setPage} onPageSizeChange={paging.setPageSize} />
         {editing && links.data && <ToadieLinksModal contractId={contractId} links={links.data} onClose={() => setEditing(false)} onSaved={async () => { setEditing(false); await refreshQueriesAfterMutation(queryClient, ["contracts"]); }} />}
       </Stack>

@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
-import { Alert, Button, Grid, Group, Paper, Stack, Text } from "@mantine/core";
+import { Alert, Button, Grid, Group, Paper, Stack, Text, useMantineTheme } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getContract } from "../api/contracts";
 import { ApiError } from "../api/http";
@@ -48,6 +49,11 @@ function mainSpanFor(view: VersionView, asideOpen: boolean): number {
   return asideOpen ? MAIN_SPAN[view] : 12;
 }
 
+/** Match DOM and visual order so tabbing follows the layout at either width. */
+function orderDocumentColumns(main: ReactNode, aside: ReactNode, wideLayout: boolean): ReactNode[] {
+  return wideLayout ? [main, aside] : [aside, main];
+}
+
 function editingHintKey(hasHard: boolean, tooLarge: boolean, dirty: boolean) {
   if (hasHard) return "versions.blockedBySyntax" as const;
   if (tooLarge) return "versions.validation.contentTooLarge" as const;
@@ -64,6 +70,8 @@ function editingHintKey(hasHard: boolean, tooLarge: boolean, dirty: boolean) {
  */
 export default function VersionPage() {
   const { t } = useTranslation();
+  const theme = useMantineTheme();
+  const wideLayout = useMediaQuery(`(min-width: ${theme.breakpoints.lg})`, false, { getInitialValueInEffect: false });
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { id: idParam, vid: vidParam } = useParams();
@@ -138,6 +146,50 @@ export default function VersionPage() {
   const editingHint = t(editingHintKey(hasHard, tooLarge, dirty));
   const latestId = data.latestVersion?.id ?? null;
   const errorCount = findings.filter((f) => f.severity === "ERROR").length;
+  const mainColumn = (
+    <Grid.Col key="document" span={{ base: 12, lg: mainSpanFor(view, asideOpen) }}>
+      <Stack gap="xs">
+        {view === "reader" ? (
+          <LazyContractReader contract={data} version={stored} highlight={highlight} />
+        ) : (
+          <LazyCodeEditor
+            value={text}
+            onChange={editing ? setDraft : undefined}
+            readOnly={!editing}
+            format={detectFormat(text)}
+            diagnostics={diagnostics}
+            jumpTo={jump}
+            ariaLabel={t("versions.editorAria")}
+          />
+        )}
+        <VersionMetaStrip version={stored} />
+      </Stack>
+    </Grid.Col>
+  );
+  const asideColumn = asideOpen ? (
+    <Grid.Col key="aside" span={{ base: 12, lg: ASIDE_SPAN[view] }}>
+      <VersionAsidePanel
+        view={view}
+        model={model.data}
+        contract={data}
+        version={stored}
+        editing={editing}
+        findings={findings}
+        mode={editing ? "live" : "stored"}
+        checked={!editing || check.checked}
+        checkComplete={editing ? (check.report?.checkerAvailable ?? true) : stored.checkComplete}
+        baselineVersion={check.report?.baselineVersion}
+        jumpBy={JUMP_BY[view]}
+        onJump={(f) => {
+          if (view === "reader") {
+            if (f.path) setHighlight({ path: f.path, nonce: Date.now() });
+          } else if (f.line != null) {
+            setJump({ line: f.line, column: f.column, nonce: Date.now() });
+          }
+        }}
+      />
+    </Grid.Col>
+  ) : null;
 
   return (
     <Stack gap="md">
@@ -187,50 +239,7 @@ export default function VersionPage() {
           {loadErrorMessage(downloads.error, t)}
         </Alert>
       )}
-      <Grid gap="md">
-        <Grid.Col span={{ base: 12, lg: mainSpanFor(view, asideOpen) }}>
-          <Stack gap="xs">
-            {view === "reader" ? (
-              <LazyContractReader contract={data} version={stored} highlight={highlight} />
-            ) : (
-              <LazyCodeEditor
-                value={text}
-                onChange={editing ? setDraft : undefined}
-                readOnly={!editing}
-                format={detectFormat(text)}
-                diagnostics={diagnostics}
-                jumpTo={jump}
-                ariaLabel={t("versions.editorAria")}
-              />
-            )}
-            <VersionMetaStrip version={stored} />
-          </Stack>
-        </Grid.Col>
-        {asideOpen && (
-          <Grid.Col span={{ base: 12, lg: ASIDE_SPAN[view] }}>
-            <VersionAsidePanel
-              view={view}
-              model={model.data}
-              contract={data}
-              version={stored}
-              editing={editing}
-              findings={findings}
-              mode={editing ? "live" : "stored"}
-              checked={!editing || check.checked}
-              checkComplete={editing ? (check.report?.checkerAvailable ?? true) : stored.checkComplete}
-              baselineVersion={check.report?.baselineVersion}
-              jumpBy={JUMP_BY[view]}
-              onJump={(f) => {
-                if (view === "reader") {
-                  if (f.path) setHighlight({ path: f.path, nonce: Date.now() });
-                } else if (f.line != null) {
-                  setJump({ line: f.line, column: f.column, nonce: Date.now() });
-                }
-              }}
-            />
-          </Grid.Col>
-        )}
-      </Grid>
+      <Grid gap="md">{orderDocumentColumns(mainColumn, asideColumn, wideLayout)}</Grid>
       <VersionReviews
         key={`${id}:${vid}`}
         contractId={id}

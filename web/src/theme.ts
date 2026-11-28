@@ -69,7 +69,7 @@ export const theme = createTheme({
     // verticalSpacing xs (10px) + 14px/1.55 text = ~40px rows: the density of a data grid,
     // not a marketing table. Pages never pass a spacing of their own.
     Table: Table.extend({
-      defaultProps: { highlightOnHover: true, verticalSpacing: "xs", horizontalSpacing: "md", fz: "sm" },
+      defaultProps: { highlightOnHover: true, verticalSpacing: 8, horizontalSpacing: "sm", fz: "sm" },
       classNames: { table: classes.table, thead: classes.tableHead },
     }),
     // The shell surfaces: white header/navbar over a tinted main canvas, crisp separators.

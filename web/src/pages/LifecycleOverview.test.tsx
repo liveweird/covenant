@@ -50,7 +50,9 @@ describe("Lifecycle overview", () => {
     renderWithProviders(<LifecycleOverview />);
     await screen.findByText("1.x");
     const table = await screen.findByRole("table", { name: "Lifecycle overview" });
-    expect(table.closest<HTMLElement>('[style*="--table-min-width"]')).toHaveStyle("--table-min-width: 77.5rem");
+    const viewport = screen.getByRole("region", { name: "Lifecycle overview" });
+    expect(viewport).toContainElement(table);
+    expect(viewport).toHaveAttribute("tabindex", "0");
     expect(within(table).getByText("1.x")).toBeInTheDocument();
     expect(within(table).getByText("2.x")).toBeInTheDocument();
     const eolRow = within(table).getByText("3.x").closest("tr")!;

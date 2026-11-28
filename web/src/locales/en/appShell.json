@@ -1,6 +1,7 @@
 {
   "brand": "Covenant",
   "skipToContent": "Skip to main content",
+  "mobileNav": "Navigation menu",
   "toggleNav": "Show or hide the navigation",
   "nav": {
     "users": "Users",

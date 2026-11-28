@@ -1,0 +1,18 @@
+.viewport {
+  container-type: inline-size;
+}
+
+.viewport:focus-visible {
+  outline: 2px solid var(--covenant-accent-ink);
+  outline-offset: 2px;
+}
+
+/*
+ * A wide table keeps its intrinsic column widths, but its zero-row content should
+ * remain centred in the visible viewport instead of the off-screen table canvas.
+ */
+.viewport[data-empty] [data-empty-state] {
+  position: sticky;
+  inset-inline-start: var(--mantine-spacing-sm);
+  max-inline-size: calc(100cqi - 2 * var(--mantine-spacing-sm));
+}

@@ -17,6 +17,7 @@ import ReleaseLinePolicyModal from "../components/ReleaseLinePolicyModal";
 import RetirementImpactModal from "../components/RetirementImpactModal";
 import SortHeader from "../components/SortHeader";
 import TableLoadingRow from "../components/TableLoadingRow";
+import TableViewport from "../components/TableViewport";
 import TypeBadge from "../components/TypeBadge";
 import { useLifecycleOverviewFilters } from "../hooks/useLifecycleOverviewFilters";
 import { usePagedSort } from "../hooks/usePagedSort";
@@ -79,17 +80,21 @@ export default function LifecycleOverview() {
       <LifecycleOverviewFilters filters={filters} summary={summary.data} />
     </FilterPanel>
     {(overview.isError || actionError != null) && <Alert color="red" variant="light" title={t("lifecycleOverview.loadFailed")}>{loadErrorMessage(actionError ?? overview.error, t)}</Alert>}
-    <Table.ScrollContainer minWidth={1240}>
+    <TableViewport
+      label={t("lifecycleOverview.tableAria")}
+      minWidth={1080}
+      empty={!overview.isLoading && !overview.isError && (overview.data?.items.length ?? 0) === 0}
+    >
       <Table aria-label={t("lifecycleOverview.tableAria")}>
         <Table.Thead><Table.Tr>
           <SortHeader field="name" label={t("lifecycleOverview.column.contract")} activeField={paging.sortField} activeDir={paging.sortDir} onToggle={paging.toggleSort} />
           <SortHeader field="major" label={t("lifecycleOverview.column.line")} activeField={paging.sortField} activeDir={paging.sortDir} onToggle={paging.toggleSort} />
-          <Table.Th style={{ minWidth: 165 }}>{t("lifecycleOverview.column.owner")}</Table.Th>
+          <Table.Th style={{ minWidth: 140 }}>{t("lifecycleOverview.column.owner")}</Table.Th>
           <SortHeader field="supportStatus" label={t("lifecycleOverview.column.support")} activeField={paging.sortField} activeDir={paging.sortDir} onToggle={paging.toggleSort} />
           <SortHeader field="nextDeadline" label={t("lifecycleOverview.column.deadline")} activeField={paging.sortField} activeDir={paging.sortDir} onToggle={paging.toggleSort} />
-          <Table.Th style={{ minWidth: 170 }}>{t("lifecycleOverview.column.plan")}</Table.Th>
+          <Table.Th style={{ minWidth: 145 }}>{t("lifecycleOverview.column.plan")}</Table.Th>
           <Table.Th style={{ minWidth: 150 }}>{t("lifecycleOverview.column.consumers")}</Table.Th>
-          <Table.Th style={{ minWidth: 90 }} aria-label={t("common.table.operations")} />
+          <Table.Th style={{ minWidth: 76 }} aria-label={t("common.table.operations")} />
         </Table.Tr></Table.Thead>
         <Table.Tbody>
           {overview.isLoading && !overview.data ? <TableLoadingRow colSpan={8} /> : overview.data?.items.length ? overview.data.items.map((row) =>
@@ -97,7 +102,7 @@ export default function LifecycleOverview() {
           ) : !overview.isError ? <Table.Tr><Table.Td colSpan={8}><EmptyState icon={IconCalendarStats} label={filters.activeCount ? t("lifecycleOverview.emptyFiltered") : t("lifecycleOverview.empty")} /></Table.Td></Table.Tr> : null}
         </Table.Tbody>
       </Table>
-    </Table.ScrollContainer>
+    </TableViewport>
     <PaginationBar total={overview.data?.total ?? 0} page={paging.page} pageSize={paging.pageSize} onPageChange={paging.setPage} onPageSizeChange={paging.setPageSize} />
     {reviewing && <RetirementImpactModal contractId={reviewing.contract.id} major={reviewing.major} canWrite={reviewing.contract.canWrite} onClose={() => setReviewing(null)} />}
     {editing && <ReleaseLinePolicyModal key={`${editing.contractId}:${editing.major}`} contractId={editing.contractId} line={editing} onClose={() => setEditing(null)} />}
@@ -108,14 +113,14 @@ function OverviewRow({ row, locale, editPending, onReview, onEdit }: { row: Life
   const { t } = useTranslation();
   const line = `${row.major}.x`;
   return <Table.Tr>
-    <Table.Td style={{ minWidth: 230 }}><Stack gap={2}>
-      <Group gap="xs"><Anchor component={RouterLink} to={contractPath(row.contract.id)}>{row.contract.name}</Anchor><TypeBadge type={row.contract.type} /></Group>
+    <Table.Td style={{ minWidth: 190 }}><Stack gap={2}>
+      <Group gap="xs"><Anchor component={RouterLink} to={contractPath(row.contract.id)} size="sm" fw={600}>{row.contract.name}</Anchor><TypeBadge type={row.contract.type} /></Group>
       <Text size="xs" c="dimmed">{row.contract.domain.name} · {row.contract.system.name}</Text>
     </Stack></Table.Td>
-    <Table.Td style={{ minWidth: 75 }}><Text ff="monospace" fw={600}>{line}</Text></Table.Td>
+    <Table.Td style={{ minWidth: 65 }}><Text ff="monospace" fw={600}>{line}</Text></Table.Td>
     <Table.Td><OwnerChip owner={row.contract.owner} /></Table.Td>
-    <Table.Td style={{ minWidth: 150 }}><Badge color={STATUS_COLORS[row.supportStatus]} variant="light">{supportStatusLabel(row.supportStatus, t)}</Badge></Table.Td>
-    <Table.Td style={{ minWidth: 210 }}><DeadlineCell row={row} locale={locale} /></Table.Td>
+    <Table.Td style={{ minWidth: 140 }}><Badge size="sm" color={STATUS_COLORS[row.supportStatus]} variant="light">{supportStatusLabel(row.supportStatus, t)}</Badge></Table.Td>
+    <Table.Td style={{ minWidth: 188 }}><DeadlineCell row={row} locale={locale} /></Table.Td>
     <Table.Td><PlanCell row={row} /></Table.Td>
     <Table.Td><UsageCell row={row} locale={locale} /></Table.Td>
     <Table.Td><Group gap="xs" wrap="nowrap">
@@ -155,7 +160,7 @@ function PlanCell({ row }: { row: LifecycleOverviewRow }) {
     <Badge color={planKey === "incomplete" ? "orange" : planKey === "complete" ? "teal" : "gray"} variant="light" size="xs">
       {t(`lifecycleOverview.plan.${planKey}`)}
     </Badge>
-    {row.replacement && <Text size="xs" c={row.replacement.available ? "dimmed" : "orange"}>
+    {row.replacement && <Text size="xs" c={row.replacement.available ? "dimmed" : "var(--covenant-ink-warning)"}>
       {row.replacement.available
         ? `${row.replacement.contractName}${row.replacement.major == null ? "" : ` · ${row.replacement.major}.x`}`
         : t("contracts.releaseLines.replacementUnavailable", { id: row.replacement.contractId, line: row.replacement.major == null ? "" : ` · ${row.replacement.major}.x` })}

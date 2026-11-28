@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
-import { ActionIcon, Alert, Anchor, Box, Button, Group, Stack, Switch, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Alert, Anchor, Box, Button, Group, Paper, Stack, Switch, Text, Tooltip } from "@mantine/core";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { IconChevronDown, IconChevronRight, IconChevronsDown, IconChevronsUp, IconFileImport, IconFolders, IconPlus, IconServer2, IconSitemap } from "@tabler/icons-react";
 import { getContractFacets, getContractTree, type TreeContract, type TreeDomain, type TreeSystem } from "../api/contracts";
@@ -25,33 +25,32 @@ const SETTINGS_KEY = "hierarchy";
 function ContractRow({ contract }: { contract: TreeContract }) {
   const { t } = useTranslation();
   return (
-    <Group gap="xs" wrap="nowrap" py={3} px={4} className={classes.treeRow} role="treeitem" aria-level={3}>
-      <Box w={18} style={{ flexShrink: 0 }} />
-      <TypeBadge type={contract.type} size="xs" />
-      <ContractNameLink id={contract.id} name={contract.name} />
-      {contract.latestVersion ? (
-        <Group gap={6} wrap="nowrap">
-          <Anchor
-            component={RouterLink}
-            to={versionPath(contract.id, contract.latestVersion.id, "reader")}
-            size="xs"
-            ff="monospace"
-            aria-label={t("versions.readAria", { version: contract.latestVersion.version, name: contract.name })}
-          >
-            {contract.latestVersion.version}
-          </Anchor>
-          <LifecyclePill lifecycle={contract.latestVersion.lifecycle} size="xs" />
-          <CheckSummaryBadges errors={contract.latestVersion.checkErrors} warnings={contract.latestVersion.checkWarnings} complete={contract.latestVersion.checkComplete} />
-        </Group>
-      ) : (
-        <Text size="xs" c="dimmed">
-          {t("contracts.noVersions")}
-        </Text>
-      )}
-      <Text size="xs" c="dimmed" ml="auto" truncate style={{ flexShrink: 0 }}>
-        {contract.owner.name}
-      </Text>
-    </Group>
+    <Box className={`${classes.treeRow} ${classes.treeLeaf}`} role="treeitem" aria-level={3}>
+      <Group gap="xs" className={classes.treeIdentity}>
+        <TypeBadge type={contract.type} size="xs" />
+        <ContractNameLink id={contract.id} name={contract.name} />
+      </Group>
+      <Group gap="xs" className={classes.treeMetadata}>
+        {contract.latestVersion ? (
+          <Group gap={6}>
+            <Anchor
+              component={RouterLink}
+              to={versionPath(contract.id, contract.latestVersion.id, "reader")}
+              size="xs"
+              ff="monospace"
+              aria-label={t("versions.readAria", { version: contract.latestVersion.version, name: contract.name })}
+            >
+              {contract.latestVersion.version}
+            </Anchor>
+            <LifecyclePill lifecycle={contract.latestVersion.lifecycle} size="xs" />
+            <CheckSummaryBadges errors={contract.latestVersion.checkErrors} warnings={contract.latestVersion.checkWarnings} complete={contract.latestVersion.checkComplete} />
+          </Group>
+        ) : (
+          <Text size="xs" c="dimmed">{t("contracts.noVersions")}</Text>
+        )}
+        <Text size="xs" c="dimmed" maw="24ch">{contract.owner.name}</Text>
+      </Group>
+    </Box>
   );
 }
 
@@ -79,11 +78,11 @@ function Branch({
   return (
     <Box role="treeitem" aria-level={level} aria-expanded={!isCollapsed}>
       <Group gap="xs" wrap="nowrap" py={3} px={4} className={classes.treeRow}>
-        <ActionIcon size="xs" aria-label={t("hierarchy.toggleAria", { name: label })} aria-expanded={!isCollapsed} onClick={() => onToggle(id)}>
+        <ActionIcon size="md" aria-label={t("hierarchy.toggleAria", { name: label })} aria-expanded={!isCollapsed} onClick={() => onToggle(id)}>
           {isCollapsed ? <IconChevronRight size={14} /> : <IconChevronDown size={14} />}
         </ActionIcon>
-        <Icon size={16} stroke={1.5} color="var(--mantine-color-dimmed)" />
-        <Text size="sm" fw={level === 1 ? 600 : 500}>
+        <Icon size={16} stroke={1.5} color="var(--mantine-color-dimmed)" aria-hidden />
+        <Text size="sm" fw={level === 1 ? 600 : 500} className={classes.treeBranchName}>
           {label}
         </Text>
         <Text size="xs" c="dimmed">
@@ -91,7 +90,7 @@ function Branch({
         </Text>
       </Group>
       {!isCollapsed && (
-        <Box pl={22} ml={13} className={classes.treeBranch} role="group">
+        <Box className={classes.treeBranch} role="group">
           {children}
         </Box>
       )}
@@ -196,7 +195,7 @@ export default function Hierarchy() {
         <LoadingBlock />
       ) : data && data.domains.length > 0 ? (
         shown.length > 0 ? (
-          <Box role="tree" aria-label={t("hierarchy.treeAria")}>
+          <Paper withBorder p={{ base: "xs", sm: "sm" }} className={classes.treeWorkspace} role="tree" aria-label={t("hierarchy.treeAria")}>
             {shown.map((domain) => (
               <Branch key={domain.id} id={domainKey(domain)} label={domain.name} icon={IconFolders} count={contractsIn(domain)} level={1} collapsed={collapsed} onToggle={toggle}>
                 {domain.systems.length === 0 && (
@@ -218,12 +217,12 @@ export default function Hierarchy() {
                 ))}
               </Branch>
             ))}
-          </Box>
+          </Paper>
         ) : (
-          <EmptyState icon={IconSitemap} label={t("hierarchy.allEmpty")} />
+          <Paper withBorder><EmptyState icon={IconSitemap} label={t("hierarchy.allEmpty")} /></Paper>
         )
       ) : !isError ? (
-        <EmptyState icon={IconSitemap} label={t("hierarchy.empty")} />
+        <Paper withBorder><EmptyState icon={IconSitemap} label={t("hierarchy.empty")} /></Paper>
       ) : null}
     </Stack>
   );

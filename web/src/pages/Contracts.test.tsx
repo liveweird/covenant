@@ -84,6 +84,8 @@ describe("Contracts page", () => {
     serve(mockFetch, { "GET /api/v1/contracts?": { status: 200, body: { ...CONTRACT_PAGE, items: [], total: 0 } } });
     const { unmount } = renderWithProviders(<Contracts />);
     expect(await screen.findByText("No contracts yet — create one or import a document")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Next page" })).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Rows per page" })).toBeInTheDocument();
     unmount();
     serve(mockFetch, { "GET /api/v1/contracts?": { status: 500, body: { title: "x", status: 500 } } });
     renderWithProviders(<Contracts />);

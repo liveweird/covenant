@@ -13,8 +13,12 @@
   overflow: hidden;
 }
 
-.table tbody tr:last-child td {
-  border-bottom: none;
+.table tbody tr[data-with-row-border]:not(:last-child) > :is(td, th) {
+  border-block-end: 1px solid var(--mantine-color-default-border);
+}
+
+.table td {
+  overflow-wrap: anywhere;
 }
 
 /* Neutral, compact table headers: dimmed 600-weight labels on a faint surface tint, with a
@@ -31,6 +35,18 @@
   border-bottom: 1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
 }
 
+.sortHeaderButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  color: inherit;
+}
+
+.sortHeaderButton:hover {
+  color: var(--mantine-color-text);
+}
+
 /* The shell: white (dark: dark-7) header + navbar surfaces over a faintly tinted main canvas,
    separated by hairlines — surfaces (Papers, tables) lift off the canvas instead of blending. */
 .appMain {
@@ -42,8 +58,32 @@
   border-bottom: 1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4));
 }
 
+.appHeaderLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 6px;
+  block-size: 100%;
+  padding-inline: var(--mantine-spacing-xs);
+}
+
+.appBrand {
+  min-inline-size: 0;
+}
+
 .brandText {
-  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: -0.025em;
+}
+
+@media (min-width: 48em) {
+  .appHeaderLayout {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: var(--mantine-spacing-xs);
+    padding-inline: var(--mantine-spacing-md);
+  }
 }
 
 .appNavbar {
@@ -75,11 +115,9 @@
 /* The sidebar's section labels (Catalog / Registries / Administration): a static caption,
    never a toggle — every leaf stays in the DOM. */
 .navSectionLabel {
-  padding: 14px 12px 4px;
-  font-size: 11px;
+  padding: var(--mantine-spacing-sm) var(--mantine-spacing-sm) 4px;
+  font-size: var(--mantine-font-size-xs);
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--mantine-color-dimmed);
 }
 
@@ -115,13 +153,107 @@
   align-items: center;
   gap: var(--mantine-spacing-xs);
   height: 32px;
-  min-width: 260px;
+  inline-size: clamp(17rem, 26vw, 24rem);
   padding: 0 var(--mantine-spacing-sm);
   border: 1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
   border-radius: var(--mantine-radius-md);
   background-color: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6));
   color: var(--mantine-color-dimmed);
   font-size: var(--mantine-font-size-sm);
+}
+
+.pageHeader {
+  align-items: center;
+}
+
+.pageHeading {
+  flex: 1 1 18rem;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.pageTitle {
+  font-size: clamp(1.375rem, 1.15rem + 0.5vw, 1.625rem);
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+}
+
+.pageActions {
+  max-inline-size: 100%;
+}
+
+@media (width < 48em) {
+  .pageActions :global(.mantine-Button-root) {
+    padding-inline: var(--mantine-spacing-sm);
+  }
+}
+
+.filterFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr));
+  align-items: end;
+  gap: var(--mantine-spacing-sm);
+}
+
+.filterFields > * {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+.filterChevron[data-open] {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .filterChevron {
+    transition: transform 150ms ease;
+  }
+}
+
+.summaryGrid {
+  background: var(--mantine-color-default-border);
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  overflow: clip;
+}
+
+.summaryTile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  min-inline-size: 0;
+  min-block-size: 3.625rem;
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
+  background: var(--mantine-color-body);
+  color: var(--mantine-color-text);
+  text-align: start;
+}
+
+.summaryTile:hover {
+  background: var(--covenant-surface-tint);
+}
+
+.summaryTile[aria-pressed="true"] {
+  background: var(--mantine-color-covenant-light);
+  color: var(--mantine-color-covenant-light-color);
+  box-shadow: inset 0 -2px var(--covenant-accent-ink);
+}
+
+.summaryTile:focus-visible {
+  outline-color: var(--covenant-accent-ink);
+  outline-offset: -3px;
+}
+
+.summaryValue {
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.summaryLabel {
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .paletteTrigger:hover {
@@ -137,6 +269,12 @@
    (quieter than default-border — the guide is orientation, not a divider). */
 .treeRow {
   border-radius: var(--mantine-radius-sm);
+  min-inline-size: 0;
+}
+
+.treeRow > button,
+.treeRow > svg {
+  flex: none;
 }
 
 .treeRow:hover {
@@ -144,7 +282,57 @@
 }
 
 .treeBranch {
-  border-left: 1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-5));
+  margin-inline-start: var(--mantine-spacing-xs);
+  padding-inline-start: var(--mantine-spacing-xs);
+  border-inline-start: 1px solid var(--mantine-color-default-border);
+}
+
+.treeBranchName {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.treeWorkspace {
+  container-type: inline-size;
+}
+
+.treeLeaf {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 4px var(--mantine-spacing-md);
+  min-block-size: 2.125rem;
+  padding: 4px var(--mantine-spacing-xs);
+  overflow-wrap: anywhere;
+}
+
+.treeIdentity {
+  display: grid;
+  grid-template-columns: 4.75rem minmax(0, 1fr);
+  min-inline-size: 0;
+}
+
+.treeIdentity > :first-child {
+  justify-self: start;
+}
+
+.treeMetadata {
+  min-inline-size: 0;
+}
+
+@container (inline-size >= 44rem) {
+  .treeLeaf {
+    grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+  }
+
+  .treeMetadata {
+    justify-content: flex-end;
+  }
+
+  .treeBranch {
+    margin-inline-start: var(--mantine-spacing-md);
+    padding-inline-start: var(--mantine-spacing-sm);
+  }
 }
 
 /* A count riding a filter chip (the Errors severity/source chips): tabular, lighter in weight
@@ -195,11 +383,10 @@
   border-bottom-right-radius: var(--mantine-radius-md);
 }
 
-/* The same bar sitting directly on the page (the new-version, import and infer screens):
-   the shell pads by `md`, not `lg`, so the edge-to-edge margins must match it — the `lg`
-   pair overflows the viewport by four pixels and gives the page a horizontal scrollbar. */
+/* The same bar sitting directly on the page matches the responsive AppShell gutters. */
 .stickyActionsPage {
-  margin: 0 calc(-1 * var(--mantine-spacing-md)) calc(-1 * var(--mantine-spacing-md));
+  margin: 0 calc(-1 * var(--app-shell-padding)) calc(-1 * var(--app-shell-padding));
+  padding-inline: var(--app-shell-padding);
 }
 
 /* The editor's preview column, and the version page's single side panel (Contents above

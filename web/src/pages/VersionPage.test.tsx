@@ -30,6 +30,7 @@ describe("VersionPage", () => {
   });
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
     localStorage.clear();
   });
 
@@ -284,6 +285,35 @@ describe("VersionPage", () => {
     expect(within(nav).getByRole("link", { name: "pets", hidden: true })).toHaveAttribute("href", "#tag-pets");
     const region = screen.getByRole("region", { name: "Findings" });
     expect(nav.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  test("the side panel precedes the document so findings stay reachable in the narrow stacked layout", async () => {
+    serve(mockFetch, base);
+    renderPage("/contracts/5/versions/11?view=reader");
+    const findings = await screen.findByRole("region", { name: "Findings" });
+    const reader = await screen.findByRole("region", { name: "Contract reader" });
+    expect(findings.compareDocumentPosition(reader) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  test("the document precedes the side panel in the wide layout so visual and keyboard order agree", async () => {
+    vi.spyOn(window, "matchMedia").mockImplementation(
+      (query) =>
+        ({
+          matches: query.startsWith("(min-width:"),
+          media: query,
+          onchange: null,
+          addListener: () => {},
+          removeListener: () => {},
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          dispatchEvent: () => false,
+        }) as MediaQueryList,
+    );
+    serve(mockFetch, base);
+    renderPage("/contracts/5/versions/11?view=reader");
+    const reader = await screen.findByRole("region", { name: "Contract reader" });
+    const findings = await screen.findByRole("region", { name: "Findings" });
+    expect(reader.compareDocumentPosition(findings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   test("the toggle hides the side panel and persists the choice; a fresh render honours it and keeps the ERROR count visible", async () => {
